@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -19,13 +19,37 @@ const NAV_ITEMS = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [checked, setChecked]     = useState(false);
   const pathname  = usePathname();
   const router    = useRouter();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) {
+        router.replace("/login");
+        return;
+      }
+      // Verificar que el usuario tiene rol admin
+      const { data: profile } = await supabase
+        .from("users")
+        .select("rol")
+        .eq("id", session.user.id)
+        .single();
+
+      if (!profile || profile.rol !== "admin") {
+        router.replace("/dashboard");
+        return;
+      }
+      setChecked(true);
+    });
+  }, [router]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
   };
+
+  if (!checked) return null;
 
   const isActive = (item: typeof NAV_ITEMS[0]) =>
     item.exact ? pathname === item.href : pathname.startsWith(item.href);

@@ -1,21 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard } from "lucide-react";
 import Link from "next/link";
-import { useAuth } from "@/hooks/useAuth";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
-  
-  let logout: (() => void) | null = null;
-  try {
-    const auth = useAuth();
-    logout = auth.logout;
-  } catch (e) {
-    // useAuth not available, continue without logout
-  }
+  const [checked, setChecked] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.replace("/login");
+      } else {
+        setChecked(true);
+      }
+    });
+  }, [router]);
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
+  if (!checked) return null;
 
   const toggleMenu = (menu: string) => {
     setExpandedMenu(expandedMenu === menu ? null : menu);
@@ -200,7 +212,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {/* Logout */}
           <button
-            onClick={() => logout && logout()}
+            onClick={logout}
             className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all ${
               sidebarOpen ? "hover:text-red-400 hover:bg-red-500/10" : "hover:text-red-400"
             }`}
