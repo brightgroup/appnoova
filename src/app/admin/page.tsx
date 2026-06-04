@@ -5,7 +5,13 @@ import { Users, BarChart3, Phone, Settings, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function AdminDashboard() {
-  const { user, logout } = useAuth();
+  let user: any = null;
+  let logout: (() => void) | null = null;
+  try {
+    const auth = useAuth();
+    user = auth.user;
+    logout = auth.logout;
+  } catch (e) {}
 
   const stats = [
     { label: "Clientes Totales", value: "0", icon: Users, color: "violet" },
@@ -50,7 +56,7 @@ export default function AdminDashboard() {
           <p className="text-gray-400">Logueado como: {user?.email}</p>
         </div>
         <button
-          onClick={logout}
+          onClick={() => logout && logout()}
           className="flex items-center gap-2 px-4 py-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
         >
           <LogOut className="w-5 h-5" />
