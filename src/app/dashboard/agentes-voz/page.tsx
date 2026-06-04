@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Plus, Folder, MoreVertical, ChevronLeft, Mic, MicOff, Zap, Target, Calendar } from "lucide-react";
+import { Search, Plus, Folder, MoreVertical, ChevronLeft, Mic, MicOff, PhoneCall, ShieldCheck, TrendingUp, ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 interface Agent {
@@ -34,23 +34,35 @@ const AGENT_TEMPLATES = [
   {
     id: "lead-qualification",
     name: "Calificación de Leads",
-    icon: Target,
-    color: "violet",
-    desc: "Llamadas para calificar prospectos y entender sus necesidades"
+    tag: "Inbound",
+    icon: PhoneCall,
+    iconBg: "from-violet-500 to-purple-600",
+    ringColor: "hover:ring-violet-500/40",
+    stat: "+40% conversión",
+    statColor: "text-violet-400",
+    desc: "Llama a prospectos, califica su intención de compra y obtén información clave automáticamente."
   },
   {
     id: "policy-reminder",
     name: "Recordatorio de Póliza",
-    icon: Calendar,
-    color: "cyan",
-    desc: "Llamadas automáticas para recordar renovaciones"
+    tag: "Outbound",
+    icon: ShieldCheck,
+    iconBg: "from-cyan-500 to-blue-600",
+    ringColor: "hover:ring-cyan-500/40",
+    stat: "+65% renovaciones",
+    statColor: "text-cyan-400",
+    desc: "Contacta clientes antes del vencimiento y agenda renovaciones de pólizas sin esfuerzo."
   },
   {
     id: "follow-up",
-    name: "Follow-up",
-    icon: Zap,
-    color: "blue",
-    desc: "Seguimiento automatizado de oportunidades abiertas"
+    name: "Follow-up Inteligente",
+    tag: "Outbound",
+    icon: TrendingUp,
+    iconBg: "from-blue-500 to-indigo-600",
+    ringColor: "hover:ring-blue-500/40",
+    stat: "+30% cierre",
+    statColor: "text-blue-400",
+    desc: "Da seguimiento automático a oportunidades abiertas y reactiva leads sin respuesta."
   }
 ];
 
@@ -204,48 +216,67 @@ export default function AgentesVozPage() {
 
       {/* Template Selection Modal */}
       {showTemplateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md">
-          <div className="bg-[#09090f] border border-white/[.15] rounded-3xl p-10 max-w-3xl w-full mx-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl">
+          <div className="relative bg-[#0b0c14] border border-white/[.10] rounded-3xl p-8 max-w-2xl w-full mx-4 shadow-2xl overflow-hidden">
+
+            {/* Ambient glow */}
+            <div className="absolute -top-20 -right-20 w-64 h-64 bg-violet-600/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+
             {/* Header */}
-            <div className="mb-10">
-              <h2 className="text-3xl font-bold text-white mb-3">Crea tu agente de voz</h2>
-              <p className="text-base text-gray-400">Elige una plantilla especializada para comenzar</p>
+            <div className="relative mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/20">
+                  <Sparkles className="w-3 h-3 text-violet-400" />
+                  <span className="text-xs font-medium text-violet-400">IA de Voz</span>
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold text-white tracking-tight">Elige tu plantilla</h2>
+              <p className="text-sm text-gray-500 mt-1">Selecciona el tipo de agente que necesitas</p>
             </div>
 
             {/* Templates Grid */}
-            <div className="grid grid-cols-3 gap-6 mb-10">
+            <div className="relative grid grid-cols-3 gap-4 mb-8">
               {AGENT_TEMPLATES.map((template) => {
                 const Icon = template.icon;
-                const colorMap = {
-                  violet: "from-violet-600/30 to-blue-600/30 border-violet-500/20 hover:border-violet-500/40",
-                  cyan: "from-cyan-600/30 to-blue-600/30 border-cyan-500/20 hover:border-cyan-500/40",
-                  blue: "from-blue-600/30 to-purple-600/30 border-blue-500/20 hover:border-blue-500/40"
-                };
-                
                 return (
                   <button
                     key={template.id}
                     onClick={() => handleSelectTemplate(template.id)}
-                    className={`group p-6 rounded-2xl border bg-gradient-to-br ${colorMap[template.color as keyof typeof colorMap]} hover:bg-white/[.03] transition-all cursor-pointer text-left`}
+                    className={`group relative flex flex-col p-5 rounded-2xl bg-white/[.03] border border-white/[.08] hover:border-white/[.16] hover:bg-white/[.05] hover:ring-2 ${template.ringColor} hover:ring-offset-0 transition-all duration-200 cursor-pointer text-left`}
                   >
+                    {/* Tag */}
+                    <span className="text-[10px] font-semibold tracking-widest uppercase text-gray-500 mb-4">{template.tag}</span>
+
                     {/* Icon */}
-                    <div className="mb-4 p-3 rounded-xl bg-white/[.05] group-hover:bg-white/[.08] transition-colors w-fit">
-                      <Icon className="w-6 h-6 text-white" />
+                    <div className={`mb-4 w-11 h-11 rounded-xl bg-gradient-to-br ${template.iconBg} flex items-center justify-center shadow-lg`}>
+                      <Icon className="w-5 h-5 text-white" strokeWidth={1.8} />
                     </div>
-                    
-                    {/* Content */}
-                    <h3 className="font-semibold text-white text-lg mb-2 group-hover:text-violet-300 transition-colors">{template.name}</h3>
-                    <p className="text-sm text-gray-400 leading-relaxed">{template.desc}</p>
+
+                    {/* Title */}
+                    <h3 className="font-semibold text-white text-sm leading-snug mb-2">{template.name}</h3>
+
+                    {/* Description */}
+                    <p className="text-xs text-gray-500 leading-relaxed flex-1">{template.desc}</p>
+
+                    {/* Stat */}
+                    <div className={`mt-4 text-xs font-semibold ${template.statColor}`}>
+                      {template.stat}
+                    </div>
+
+                    {/* Arrow on hover */}
+                    <ArrowRight className="absolute bottom-5 right-5 w-4 h-4 text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </button>
                 );
               })}
             </div>
 
-            {/* Buttons */}
-            <div className="flex gap-3 justify-end">
+            {/* Footer */}
+            <div className="relative flex items-center justify-between">
+              <p className="text-xs text-gray-600">Podrás personalizar el agente después</p>
               <button
                 onClick={() => setShowTemplateModal(false)}
-                className="px-8 py-3 rounded-xl border border-white/[.1] text-white hover:bg-white/[.05] transition-colors font-medium"
+                className="px-5 py-2 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/[.05] transition-colors font-medium"
               >
                 Cancelar
               </button>

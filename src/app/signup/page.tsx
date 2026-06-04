@@ -44,9 +44,7 @@ export default function SignupPage() {
         email,
         password,
         options: {
-          data: {
-            nombre: nombre
-          }
+          data: { nombre }
         }
       });
 
@@ -57,6 +55,23 @@ export default function SignupPage() {
       }
 
       if (data.user) {
+        // Insertar perfil en la tabla pública users
+        const { error: profileError } = await supabase
+          .from("users")
+          .insert({
+            id: data.user.id,
+            email: data.user.email,
+            nombre: nombre,
+            rol: "user"
+          });
+
+        if (profileError) {
+          // Si el perfil ya existe (trigger lo creó), ignorar el error de duplicado
+          if (!profileError.code?.includes("23505")) {
+            console.error("Error al crear perfil:", profileError.message);
+          }
+        }
+
         router.push("/dashboard");
       }
     } catch (err: any) {

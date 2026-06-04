@@ -33,7 +33,13 @@ export default function LoginPage() {
       });
 
       if (authError) {
-        setError(authError.message || "Correo o contraseña incorrectos.");
+        if (authError.message?.toLowerCase().includes("email not confirmed")) {
+          setError("Tu correo aún no está verificado. Revisa tu bandeja de entrada o contacta al administrador.");
+        } else if (authError.message?.toLowerCase().includes("invalid login credentials")) {
+          setError("Correo o contraseña incorrectos. Verifica tus datos.");
+        } else {
+          setError(authError.message || "Error al iniciar sesión.");
+        }
         setLoading(false);
         return;
       }

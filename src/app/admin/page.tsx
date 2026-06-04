@@ -1,17 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Users, BarChart3, Phone, Settings, LogOut } from "lucide-react";
+import { Users, BarChart3, Phone, Settings } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function AdminDashboard() {
-  let user: any = null;
-  let logout: (() => void) | null = null;
-  try {
-    const auth = useAuth();
-    user = auth.user;
-    logout = auth.logout;
-  } catch (e) {}
+  const { user } = useAuth();
 
   const stats = [
     { label: "Clientes Totales", value: "0", icon: Users, color: "violet" },
@@ -50,18 +44,9 @@ export default function AdminDashboard() {
   return (
     <div className="flex-1 flex flex-col bg-[#0d0e14] text-white">
       {/* Header */}
-      <div className="border-b border-white/[.08] px-6 py-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl font-bold mb-2">Panel Administrador</h1>
-          <p className="text-gray-400">Logueado como: {user?.email}</p>
-        </div>
-        <button
-          onClick={() => logout && logout()}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
-        >
-          <LogOut className="w-5 h-5" />
-          Logout
-        </button>
+      <div className="border-b border-white/[.08] px-6 py-6">
+        <h1 className="text-2xl font-bold mb-1">Panel Administrador</h1>
+        {user?.email && <p className="text-sm text-gray-500">Sesión: {user.email}</p>}
       </div>
 
       {/* Content */}
