@@ -56,8 +56,8 @@ export default function LoginPage() {
 
         {/* Logo */}
         <Link href="/" className="mb-10 flex items-center">
-          <div className="relative h-8 w-32">
-            <Image src="/logonoova.png" alt="Noova 360" fill className="object-contain object-center" />
+          <div className="relative h-14 w-14">
+            <Image src="/logo-noova.png" alt="Noova 360" fill className="object-contain object-center" />
           </div>
         </Link>
 
