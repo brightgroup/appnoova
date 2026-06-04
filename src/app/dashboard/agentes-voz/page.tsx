@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Search, Plus, Folder, MoreVertical, ChevronLeft, Mic, MicOff, PhoneCall, ShieldCheck, TrendingUp, ArrowRight, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface Agent {
   id: string;
@@ -69,6 +70,7 @@ const AGENT_TEMPLATES = [
 type MicState = "idle" | "requesting" | "active" | "denied" | "error";
 
 export default function AgentesVozPage() {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [agents] = useState(agentesData);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -145,10 +147,9 @@ export default function AgentesVozPage() {
   };
 
   const handleContinue = () => {
-    // Cuando el agente esté integrado, aquí navegamos a su configuración
-    // Por ahora cerramos y dejamos el mic activo hasta la siguiente pantalla
     stopMic();
     setShowMicrophoneModal(false);
+    router.push(`/dashboard/agentes-voz/sesion?template=${selectedTemplate ?? "lead-qualification"}`);
     setSelectedTemplate(null);
   };
 
