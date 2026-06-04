@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -29,18 +28,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Logo */}
         <div className={`p-4 border-b border-white/[.08] flex items-center ${sidebarOpen ? "justify-between" : "justify-center"}`}>
           {sidebarOpen && (
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="relative h-8 w-8 flex-shrink-0">
-                <Image src="/logo-noova.png" alt="Noova 360" fill className="object-contain" />
-              </div>
-              <span className="font-bold text-base tracking-tight">Noova 360</span>
-            </Link>
-          )}
-          {!sidebarOpen && (
-            <Link href="/dashboard">
-              <div className="relative h-8 w-8">
-                <Image src="/logo-noova.png" alt="Noova 360" fill className="object-contain" />
-              </div>
+            <Link href="/dashboard" className="font-bold text-base tracking-tight text-white">
+              Noova 360
             </Link>
           )}
           <button

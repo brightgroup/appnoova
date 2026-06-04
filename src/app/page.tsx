@@ -39,7 +39,7 @@ export default function LandingPage() {
             </div>
 
             {/* Main headline */}
-            <h1 className="text-6xl sm:text-7xl lg:text-8xl font-extrabold leading-tight mb-6 text-white tracking-tight">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight mb-6 text-white tracking-tight">
               IA Operativa para corredores de seguros
             </h1>
 
