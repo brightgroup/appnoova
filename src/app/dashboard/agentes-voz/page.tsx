@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Plus, Folder, MoreVertical, ChevronLeft, Mic, MicOff, PhoneCall, ShieldCheck, TrendingUp, ArrowRight, Sparkles } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Search, Plus, Folder, MoreVertical, ChevronLeft, Mic, MicOff, PhoneCall, ShieldCheck, TrendingUp, ArrowRight, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
 interface Agent {
@@ -66,28 +66,94 @@ const AGENT_TEMPLATES = [
   }
 ];
 
+type MicState = "idle" | "requesting" | "active" | "denied" | "error";
+
 export default function AgentesVozPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [agents, setAgents] = useState(agentesData);
+  const [agents] = useState(agentesData);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showMicrophoneModal, setShowMicrophoneModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
 
-  const filteredAgents = agents.filter(agent =>
-    agent.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+  // Mic state
+  const [micState, setMicState] = useState<MicState>("idle");
+  const [audioLevel, setAudioLevel] = useState(0);
+  const streamRef    = useRef<MediaStream | null>(null);
+  const analyserRef  = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number>(0);
+
+  const filteredAgents = agents.filter(a =>
+    a.nombre.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Limpia el stream y la animación al cerrar el modal
+  const stopMic = useCallback(() => {
+    cancelAnimationFrame(animFrameRef.current);
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    analyserRef.current = null;
+    setAudioLevel(0);
+    setMicState("idle");
+  }, []);
+
+  // Visualización de nivel de audio
+  const startLevelMonitor = (stream: MediaStream) => {
+    const ctx      = new AudioContext();
+    const source   = ctx.createMediaStreamSource(stream);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+    analyserRef.current = analyser;
+
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const tick = () => {
+      analyser.getByteFrequencyData(data);
+      const avg = data.reduce((a, b) => a + b, 0) / data.length;
+      setAudioLevel(Math.min(avg / 80, 1)); // normaliza 0-1
+      animFrameRef.current = requestAnimationFrame(tick);
+    };
+    tick();
+  };
+
+  const handleActivateMicrophone = async () => {
+    setMicState("requesting");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      streamRef.current = stream;
+      startLevelMonitor(stream);
+      setMicState("active");
+    } catch (err: any) {
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        setMicState("denied");
+      } else {
+        setMicState("error");
+      }
+    }
+  };
 
   const handleSelectTemplate = (templateId: string) => {
     setSelectedTemplate(templateId);
     setShowTemplateModal(false);
     setShowMicrophoneModal(true);
+    setMicState("idle");
   };
 
-  const handleActivateMicrophone = () => {
+  const handleCloseMicModal = () => {
+    stopMic();
     setShowMicrophoneModal(false);
-    // Aquí irá la navegación a la página de configuración
-    console.log("Micrófono activado, ir a configuración");
+    setSelectedTemplate(null);
   };
+
+  const handleContinue = () => {
+    // Cuando el agente esté integrado, aquí navegamos a su configuración
+    // Por ahora cerramos y dejamos el mic activo hasta la siguiente pantalla
+    stopMic();
+    setShowMicrophoneModal(false);
+    setSelectedTemplate(null);
+  };
+
+  // Limpieza al desmontar
+  useEffect(() => () => stopMic(), [stopMic]);
 
   return (
     <div className="flex-1 flex flex-col bg-[#0d0e14] text-white overflow-hidden">
@@ -286,61 +352,150 @@ export default function AgentesVozPage() {
       )}
 
       {/* Microphone Activation Modal */}
-      {showMicrophoneModal && selectedTemplate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md">
-          <div className="bg-[#09090f] border border-white/[.15] rounded-3xl p-10 max-w-xl w-full mx-4 shadow-2xl">
-            {/* Header */}
-            <h2 className="text-3xl font-bold text-white mb-2 text-center">Activa tu micrófono</h2>
-            <p className="text-center text-gray-400 mb-10">Tu agente necesita escucharte. Haz clic en el botón y permite el acceso cuando tu navegador lo solicite.</p>
+      {showMicrophoneModal && selectedTemplate && (() => {
+        const tpl = AGENT_TEMPLATES.find(t => t.id === selectedTemplate)!;
+        const TplIcon = tpl.icon;
+        const pulse = 1 + audioLevel * 0.5; // escala el ring según el nivel de audio
 
-            {/* Microphone Status */}
-            <div className="mb-10 flex justify-center">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-violet-600/20 to-blue-600/20 rounded-full blur-3xl"></div>
-                <div className="relative w-32 h-32 rounded-full border-2 border-white/[.1] bg-white/[.02] flex items-center justify-center">
-                  <MicOff className="w-12 h-12 text-gray-500" />
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl">
+            <div className="relative bg-[#0b0c14] border border-white/[.10] rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl overflow-hidden">
+
+              {/* Ambient glow que pulsa con el audio */}
+              <div
+                className="absolute inset-0 pointer-events-none transition-all duration-75"
+                style={{
+                  background: micState === "active"
+                    ? `radial-gradient(ellipse 60% 40% at 50% 50%, rgba(99,102,241,${0.06 + audioLevel * 0.12}) 0%, transparent 70%)`
+                    : "none"
+                }}
+              />
+
+              {/* Header */}
+              <div className="relative mb-6 text-center">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${tpl.iconBg} flex items-center justify-center`}>
+                    <TplIcon className="w-4 h-4 text-white" strokeWidth={1.8} />
+                  </div>
+                  <span className="text-sm font-semibold text-white">{tpl.name}</span>
+                </div>
+                <h2 className="text-xl font-bold text-white tracking-tight">
+                  {micState === "active" ? "Micrófono activo" : "Activa tu micrófono"}
+                </h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  {micState === "idle"       && "El agente necesita escucharte para conversar"}
+                  {micState === "requesting" && "Esperando permiso del navegador..."}
+                  {micState === "active"     && "Te estamos escuchando — habla con tu agente"}
+                  {micState === "denied"     && "Permiso denegado — revisa la configuración del navegador"}
+                  {micState === "error"      && "No se pudo acceder al micrófono"}
+                </p>
+              </div>
+
+              {/* Mic visualizer */}
+              <div className="relative flex justify-center items-center mb-8" style={{ height: 160 }}>
+
+                {/* Rings de audio — solo visibles cuando está activo */}
+                {micState === "active" && (
+                  <>
+                    <div
+                      className="absolute rounded-full border border-violet-500/20 transition-all duration-75"
+                      style={{
+                        width:  `${120 + audioLevel * 60}px`,
+                        height: `${120 + audioLevel * 60}px`,
+                        opacity: 0.4 + audioLevel * 0.4
+                      }}
+                    />
+                    <div
+                      className="absolute rounded-full border border-violet-500/10 transition-all duration-100"
+                      style={{
+                        width:  `${140 + audioLevel * 80}px`,
+                        height: `${140 + audioLevel * 80}px`,
+                        opacity: 0.2 + audioLevel * 0.3
+                      }}
+                    />
+                  </>
+                )}
+
+                {/* Círculo principal */}
+                <div
+                  className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-150 ${
+                    micState === "active"
+                      ? "bg-gradient-to-br from-violet-600 to-blue-600 shadow-lg shadow-violet-600/40"
+                      : micState === "denied" || micState === "error"
+                      ? "bg-red-500/10 border-2 border-red-500/30"
+                      : "bg-white/[.04] border-2 border-white/[.10]"
+                  }`}
+                  style={micState === "active" ? { transform: `scale(${pulse})` } : {}}
+                >
+                  {micState === "idle"       && <MicOff  className="w-10 h-10 text-gray-500" />}
+                  {micState === "requesting" && <Mic     className="w-10 h-10 text-violet-400 animate-pulse" />}
+                  {micState === "active"     && <Mic     className="w-10 h-10 text-white" />}
+                  {micState === "denied"     && <AlertTriangle className="w-10 h-10 text-red-400" />}
+                  {micState === "error"      && <AlertTriangle className="w-10 h-10 text-red-400" />}
                 </div>
               </div>
-            </div>
 
-            {/* Agent Info */}
-            <div className="mb-10 p-6 rounded-xl bg-white/[.02] border border-white/[.08]">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Agente seleccionado</p>
-              <p className="text-lg font-semibold text-white">
-                {AGENT_TEMPLATES.find(t => t.id === selectedTemplate)?.name}
-              </p>
-            </div>
+              {/* Barra de nivel de audio */}
+              {micState === "active" && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-gray-500">Nivel de audio</span>
+                    <div className="flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-green-400" />
+                      <span className="text-xs text-green-400 font-medium">En vivo</span>
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-white/[.06] rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-violet-500 to-blue-500 rounded-full transition-all duration-75"
+                      style={{ width: `${Math.max(audioLevel * 100, 2)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
 
-            {/* Tip Box */}
-            <div className="mb-10 p-4 rounded-xl bg-blue-600/10 border border-blue-500/20">
-              <div className="flex gap-3 items-start">
-                <span className="text-lg flex-shrink-0">💡</span>
-                <p className="text-sm text-gray-300">Asegúrate de estar en un lugar tranquilo. Esto ayudará al agente a entenderte mejor.</p>
+              {/* Error / denied instructions */}
+              {(micState === "denied" || micState === "error") && (
+                <div className="mb-6 p-4 rounded-xl bg-red-500/[.07] border border-red-500/20 text-sm text-red-400">
+                  {micState === "denied"
+                    ? "Haz clic en el ícono 🔒 en la barra del navegador y permite el acceso al micrófono. Luego recarga la página."
+                    : "No se detectó ningún micrófono. Verifica que esté conectado y vuelve a intentarlo."}
+                </div>
+              )}
+
+              {/* Botones */}
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCloseMicModal}
+                  className="flex-1 py-2.5 rounded-xl border border-white/[.08] text-sm text-gray-400 hover:text-white hover:bg-white/[.05] transition-colors font-medium"
+                >
+                  Cancelar
+                </button>
+
+                {micState === "active" ? (
+                  <button
+                    onClick={handleContinue}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white text-sm font-semibold hover:from-violet-700 hover:to-blue-700 transition-all shadow-lg shadow-violet-600/25"
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                    Continuar
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleActivateMicrophone}
+                    disabled={micState === "requesting"}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white text-sm font-semibold hover:from-violet-700 hover:to-blue-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-lg shadow-violet-600/25"
+                  >
+                    <Mic className="w-4 h-4" />
+                    {micState === "requesting" ? "Esperando..." : micState === "denied" || micState === "error" ? "Reintentar" : "Activar micrófono"}
+                  </button>
+                )}
               </div>
-            </div>
 
-            {/* Buttons */}
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => {
-                  setShowMicrophoneModal(false);
-                  setSelectedTemplate(null);
-                }}
-                className="px-8 py-3 rounded-xl border border-white/[.1] text-white hover:bg-white/[.05] transition-colors font-medium"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleActivateMicrophone}
-                className="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white hover:from-violet-700 hover:to-blue-700 transition-all font-medium shadow-lg shadow-violet-600/25"
-              >
-                <Mic className="w-4 h-4" />
-                Activar micrófono
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
