@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import { getTemplateMeta } from "@/lib/voice-agent-templates";
+import { normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
 import { GEMINI_VOICES, VOICE_MODELS, LLM_MODELS } from "@/lib/voice-agent-options";
 import type { VoiceAgentFormData, VoiceAgentRecord } from "@/types/voice-agent";
 
@@ -56,21 +57,10 @@ function ConfigContent() {
       if (data.agent) {
         const a = data.agent as VoiceAgentRecord;
         setAgentId(a.id);
-        setForm({
-          template_id: a.template_id,
-          name: a.name,
-          prompt: a.prompt,
-          voice_name: a.voice_name,
-          model: a.model,
-          voice_speed: Number(a.voice_speed),
-          temperature: Number(a.temperature),
-          volume: Number(a.volume),
-          llm_model: a.llm_model,
-          color: a.color
-        });
+        setForm(normalizeVoiceAgentForm(a));
         setSaved(true);
       } else if (data.defaults) {
-        setForm(data.defaults);
+        setForm(normalizeVoiceAgentForm(data.defaults));
         setSaved(false);
       }
     } catch {
@@ -115,9 +105,6 @@ function ConfigContent() {
     { id: "metrica", label: "Métrica", icon: LayoutGrid },
     { id: "canales", label: "Canales", icon: Radio }
   ];
-
-  const setNum = (key: keyof VoiceAgentFormData, val: number) =>
-    setForm(f => ({ ...f, [key]: val }));
 
   if (loading) {
     return (
@@ -234,12 +221,33 @@ function ConfigContent() {
                 </select>
               </Field>
 
-              <SliderField label="Velocidad de voz" value={form.voice_speed} min={0.5} max={1.5} step={0.05}
-                onChange={v => setNum("voice_speed", v)} />
-              <SliderField label="Temperatura" value={form.temperature} min={0} max={2} step={0.1}
-                onChange={v => setNum("temperature", v)} />
-              <SliderField label="Volumen" value={form.volume} min={0} max={2} step={0.1}
-                onChange={v => setNum("volume", v)} />
+              <SliderField
+                label="Velocidad de voz"
+                hint="Reproducción del audio en la prueba (0.5 lento · 1.5 rápido)"
+                value={form.voice_speed}
+                min={0.5}
+                max={1.5}
+                step={0.05}
+                onChange={v => setForm(f => ({ ...f, voice_speed: v }))}
+              />
+              <SliderField
+                label="Temperatura"
+                hint="Creatividad de Lia vía Gemini (0 = precisa · 2 = más libre)"
+                value={form.temperature}
+                min={0.1}
+                max={2}
+                step={0.1}
+                onChange={v => setForm(f => ({ ...f, temperature: v }))}
+              />
+              <SliderField
+                label="Volumen"
+                hint="Nivel de salida en tu navegador durante la sesión"
+                value={form.volume}
+                min={0}
+                max={2}
+                step={0.05}
+                onChange={v => setForm(f => ({ ...f, volume: v }))}
+              />
 
               <Field label="Modelo de LLM">
                 <select
@@ -350,21 +358,35 @@ function Field({ label, children, className = "" }: { label: string; children: R
 }
 
 function SliderField({
-  label, value, min, max, step, onChange
+  label, hint, value, min, max, step, onChange
 }: {
-  label: string; value: number; min: number; max: number; step: number;
+  label: string;
+  hint?: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
   onChange: (v: number) => void;
 }) {
+  const safe = Number.isFinite(value) ? value : min;
+
   return (
     <Field label={label}>
       <div className="flex items-center gap-3">
         <input
-          type="range" min={min} max={max} step={step} value={value}
-          onChange={e => onChange(parseFloat(e.target.value))}
-          className="flex-1 accent-violet-500"
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={safe}
+          onInput={e => onChange(parseFloat(e.currentTarget.value))}
+          className="flex-1 h-2 cursor-pointer accent-violet-500 bg-white/[.08] rounded-full appearance-none"
         />
-        <span className="text-xs text-gray-400 w-8 text-right tabular-nums">{value.toFixed(2)}</span>
+        <span className="text-xs text-gray-300 w-9 text-right tabular-nums font-medium">
+          {safe.toFixed(2)}
+        </span>
       </div>
+      {hint && <p className="text-[10px] text-gray-600 mt-1 leading-snug">{hint}</p>}
     </Field>
   );
 }

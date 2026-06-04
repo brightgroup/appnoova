@@ -8,6 +8,7 @@ import { GoogleGenAI, Modality, type Session, type LiveServerMessage } from "@go
 import { VOICE_AGENT_TEMPLATES, getTemplateDefaults, getTemplateMeta } from "@/lib/voice-agent-templates";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
+import { geminiTemperature, normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
 import type { VoiceAgentFormData } from "@/types/voice-agent";
 
 const PROMPTS = VOICE_AGENT_TEMPLATES;
@@ -92,6 +93,8 @@ export default function SesionPage() {
   const procRef       = useRef<ScriptProcessorNode | null>(null);
   const streamRef     = useRef<MediaStream | null>(null);
   const playCtxRef    = useRef<AudioContext | null>(null);
+  const gainNodeRef   = useRef<GainNode | null>(null);
+  const configRef     = useRef(agentConfig);
   const nextTimeRef   = useRef(0);
   const timerRef      = useRef<NodeJS.Timeout | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -100,6 +103,7 @@ export default function SesionPage() {
   const inputRateRef  = useRef(16000);
 
   useEffect(() => { mutedRef.current = muted; }, [muted]);
+  useEffect(() => { configRef.current = agentConfig; }, [agentConfig]);
 
   useEffect(() => {
     (async () => {
@@ -108,21 +112,9 @@ export default function SesionPage() {
         const res = await fetch(`/api/voice/agents?template_id=${template}`, { headers });
         const data = await res.json();
         if (data.agent) {
-          const a = data.agent;
-          setAgentConfig({
-            template_id: a.template_id,
-            name: a.name,
-            prompt: a.prompt,
-            voice_name: a.voice_name,
-            model: a.model,
-            voice_speed: Number(a.voice_speed),
-            temperature: Number(a.temperature),
-            volume: Number(a.volume),
-            llm_model: a.llm_model,
-            color: a.color
-          });
+          setAgentConfig(normalizeVoiceAgentForm(data.agent));
         } else if (data.defaults) {
-          setAgentConfig(data.defaults);
+          setAgentConfig(normalizeVoiceAgentForm(data.defaults));
         }
       } catch { /* usa defaults locales */ }
       setConfigLoaded(true);
@@ -162,21 +154,29 @@ export default function SesionPage() {
 
     if (!playCtxRef.current) {
       playCtxRef.current = new AudioContext();
+      gainNodeRef.current = playCtxRef.current.createGain();
+      gainNodeRef.current.connect(playCtxRef.current.destination);
       nextTimeRef.current = playCtxRef.current.currentTime;
     }
     const ctx = playCtxRef.current;
+    const gain = gainNodeRef.current!;
     if (ctx.state === "suspended") await ctx.resume();
+
+    const speed  = configRef.current.voice_speed || 1;
+    const volume = configRef.current.volume ?? 1;
+    gain.gain.value = volume;
 
     const buf = ctx.createBuffer(1, float32.length, rate);
     buf.copyToChannel(float32 as Float32Array<ArrayBuffer>, 0);
 
     const source = ctx.createBufferSource();
     source.buffer = buf;
-    source.connect(ctx.destination);
+    source.playbackRate.value = speed;
+    source.connect(gain);
 
     const startAt = Math.max(nextTimeRef.current, ctx.currentTime + 0.02);
     source.start(startAt);
-    nextTimeRef.current = startAt + buf.duration;
+    nextTimeRef.current = startAt + buf.duration / speed;
 
     setState(prev => (prev === "thinking" || prev === "listening" ? "speaking" : prev));
   }, []);
@@ -251,6 +251,7 @@ export default function SesionPage() {
     micCtxRef.current = null;
     playCtxRef.current?.close().catch(() => {});
     playCtxRef.current = null;
+    gainNodeRef.current = null;
     nextTimeRef.current = 0;
     setState("idle");
     setDuration(0);
@@ -317,7 +318,7 @@ export default function SesionPage() {
             includeThoughts: false,
             thinkingBudget: 0
           },
-          temperature: agentConfig.temperature,
+          temperature: geminiTemperature(agentConfig.temperature),
           systemInstruction: agentConfig.prompt,
           inputAudioTranscription: {},
           outputAudioTranscription: {}

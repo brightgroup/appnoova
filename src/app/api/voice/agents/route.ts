@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { getTemplateDefaults } from "@/lib/voice-agent-templates";
+import { normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
 
 function adminClient() {
   return createClient(
@@ -57,7 +58,11 @@ export async function GET(req: NextRequest) {
   }
 
   if (data) {
-    return NextResponse.json({ agent: data, saved: true, dbReady: true });
+    return NextResponse.json({
+      agent: normalizeVoiceAgentForm({ ...data, template_id: data.template_id }),
+      saved: true,
+      dbReady: true
+    });
   }
 
   return NextResponse.json({
@@ -108,5 +113,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ agent: data, saved: true });
+  return NextResponse.json({
+    agent: normalizeVoiceAgentForm({ ...data, template_id: data.template_id }),
+    saved: true
+  });
 }
