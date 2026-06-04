@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Mic, MicOff, PhoneOff, Loader2, ChevronLeft, Volume2 } from "lucide-react";
 import Link from "next/link";
 import { GoogleGenAI, Modality, type Session, type LiveServerMessage } from "@google/genai";
-import { VOICE_AGENT_TEMPLATES } from "@/lib/voice-agent-templates";
+import { VOICE_AGENT_TEMPLATES, getTemplateDefaults } from "@/lib/voice-agent-templates";
+import { getAuthHeaders } from "@/lib/voice-agents-api";
+import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
+import type { VoiceAgentFormData } from "@/types/voice-agent";
 
 const PROMPTS = VOICE_AGENT_TEMPLATES;
-
-const LIVE_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
 
 // ─── Helpers de audio ────────────────────────────────────────────────────────
 function resampleTo16kPcm(input: Float32Array, inputRate: number): string {
@@ -69,8 +70,14 @@ interface TranscriptLine {
 // ─── Componente principal ────────────────────────────────────────────────────
 export default function SesionPage() {
   const params   = useSearchParams();
+  const router   = useRouter();
   const template = params.get("template") || "lead-qualification";
   const info     = PROMPTS[template] ?? PROMPTS["lead-qualification"];
+
+  const [agentConfig, setAgentConfig] = useState<VoiceAgentFormData>(() =>
+    getTemplateDefaults(template)
+  );
+  const [configLoaded, setConfigLoaded] = useState(false);
 
   const [state,      setState]      = useState<SessionState>("idle");
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
@@ -92,6 +99,34 @@ export default function SesionPage() {
   const inputRateRef  = useRef(16000);
 
   useEffect(() => { mutedRef.current = muted; }, [muted]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/voice/agents?template_id=${template}`, { headers });
+        const data = await res.json();
+        if (data.agent) {
+          const a = data.agent;
+          setAgentConfig({
+            template_id: a.template_id,
+            name: a.name,
+            prompt: a.prompt,
+            voice_name: a.voice_name,
+            model: a.model,
+            voice_speed: Number(a.voice_speed),
+            temperature: Number(a.temperature),
+            volume: Number(a.volume),
+            llm_model: a.llm_model,
+            color: a.color
+          });
+        } else if (data.defaults) {
+          setAgentConfig(data.defaults);
+        }
+      } catch { /* usa defaults locales */ }
+      setConfigLoaded(true);
+    })();
+  }, [template]);
 
   useEffect(() => {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: "smooth" });
@@ -203,28 +238,28 @@ export default function SesionPage() {
     }
   }, [appendTranscript, playAudioChunk, startMicStreaming]);
 
-  const stopSession = useCallback(() => {
+  const cleanupResources = useCallback(() => {
     setupDoneRef.current = false;
     sessionRef.current?.close();
     sessionRef.current = null;
-
     procRef.current?.disconnect();
     procRef.current = null;
-
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
-
     micCtxRef.current?.close().catch(() => {});
     micCtxRef.current = null;
-
     playCtxRef.current?.close().catch(() => {});
     playCtxRef.current = null;
     nextTimeRef.current = 0;
-
     setState("idle");
     setDuration(0);
     setStatusHint("");
   }, []);
+
+  const stopSession = useCallback(() => {
+    cleanupResources();
+    router.push(`/dashboard/agentes-voz/configuracion?template=${template}`);
+  }, [cleanupResources, router, template]);
 
   const startSession = useCallback(async () => {
     setState("connecting");
@@ -271,17 +306,18 @@ export default function SesionPage() {
 
       const ai = new GoogleGenAI({ apiKey });
       const session = await ai.live.connect({
-        model: LIVE_MODEL,
+        model: agentConfig.model || DEFAULT_LIVE_MODEL,
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } }
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: agentConfig.voice_name || "Aoede" } }
           },
           thinkingConfig: {
             includeThoughts: false,
             thinkingBudget: 0
           },
-          systemInstruction: info.prompt,
+          temperature: agentConfig.temperature,
+          systemInstruction: agentConfig.prompt,
           inputAudioTranscription: {},
           outputAudioTranscription: {}
         },
@@ -312,9 +348,9 @@ export default function SesionPage() {
       setState("error");
       stopSession();
     }
-  }, [info.prompt, handleServerMessage, stopSession]);
+  }, [agentConfig, handleServerMessage, stopSession]);
 
-  useEffect(() => () => stopSession(), [stopSession]);
+  useEffect(() => () => cleanupResources(), [cleanupResources]);
 
   const isConnecting = state === "connecting";
   const isActive = state === "listening" || state === "thinking" || state === "speaking";
@@ -328,7 +364,7 @@ export default function SesionPage() {
             <ChevronLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-base font-bold">{info.name}</h1>
+            <h1 className="text-base font-bold">{agentConfig.name || info.name}</h1>
             <p className="text-xs text-gray-500">Sesión de prueba · Gemini Live</p>
           </div>
         </div>
@@ -373,7 +409,8 @@ export default function SesionPage() {
             {!isActive && !isConnecting ? (
               <button
                 onClick={startSession}
-                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all bg-gradient-to-r ${info.color} text-white hover:opacity-90 shadow-lg`}
+                disabled={!configLoaded}
+                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all bg-gradient-to-r ${info.color} text-white hover:opacity-90 shadow-lg disabled:opacity-50`}
               >
                 <Mic className="w-4 h-4" /> Iniciar sesión
               </button>
@@ -414,8 +451,8 @@ export default function SesionPage() {
 
           <div className="mt-auto pt-6 border-t border-white/[.06]">
             <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">Modelo</p>
-            <p className="text-xs text-gray-400 font-mono break-all">{LIVE_MODEL}</p>
-            <p className="text-[10px] text-gray-600 mt-1">Voz: Aoede · Español</p>
+            <p className="text-xs text-gray-400 font-mono break-all">{agentConfig.model || DEFAULT_LIVE_MODEL}</p>
+            <p className="text-[10px] text-gray-600 mt-1">Voz: {agentConfig.voice_name} · Español</p>
           </div>
         </div>
 
