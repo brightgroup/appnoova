@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -41,8 +42,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Logo */}
         <div className={`p-4 border-b border-white/[.08] flex items-center ${sidebarOpen ? "justify-between" : "justify-center"}`}>
           {sidebarOpen && (
-            <Link href="/dashboard" className="font-bold text-base tracking-tight text-white">
-              Noova 360
+            <Link href="/dashboard" className="relative h-10 w-44 flex-shrink-0">
+              <Image
+                src="/logo-noova.png"
+                alt="Noova 360"
+                fill
+                className="object-contain object-left"
+                priority
+              />
             </Link>
           )}
           <button
