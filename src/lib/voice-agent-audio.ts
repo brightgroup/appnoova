@@ -1,11 +1,13 @@
+import { resolveBaseTemplateId } from "@/lib/voice-agent-templates";
 import type { VoiceAgentFormData } from "@/types/voice-agent";
 
 /** Asegura que los sliders reciban números válidos desde Supabase/JSON. */
 export function normalizeVoiceAgentForm(
-  raw: Partial<VoiceAgentFormData> & { template_id: string }
+  raw: Partial<VoiceAgentFormData> & { template_id?: string; source_template?: string }
 ): VoiceAgentFormData {
+  const source = raw.source_template || resolveBaseTemplateId(raw.template_id ?? "lead-qualification");
   return {
-    template_id: raw.template_id,
+    source_template: source,
     name: raw.name ?? "",
     prompt: raw.prompt ?? "",
     voice_name: raw.voice_name ?? "Aoede",

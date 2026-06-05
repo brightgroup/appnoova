@@ -1,35 +1,19 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Search, Plus, Folder, MoreVertical, ChevronLeft, Mic, MicOff, PhoneCall, ShieldCheck, TrendingUp, ArrowRight, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Search, Plus, Folder, MoreVertical, ChevronLeft, Mic, MicOff, PhoneCall, ShieldCheck, TrendingUp, ArrowRight, Sparkles, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-
-interface Agent {
-  id: string;
-  nombre: string;
-  contactos: number;
-  contactados: number;
-  llamadas: number;
-  metasLogradas: number;
-  costo: string;
-  costoResultado: string;
-  calidad: string;
-}
-
-const agentesData: Agent[] = [
-  {
-    id: "1",
-    nombre: "Lia - Calificación De Leads",
-    contactos: 0,
-    contactados: 0,
-    llamadas: 1,
-    metasLogradas: 0,
-    costo: "US$ 0.00",
-    costoResultado: "-",
-    calidad: "Aprendiendo"
-  }
-];
+import { useRouter, usePathname } from "next/navigation";
+import { getAuthHeaders } from "@/lib/voice-agents-api";
+import { supabase } from "@/lib/supabase";
+import {
+  formatContactedLine,
+  formatCostPerResult,
+  formatCostUsd,
+  qualityBadgeClass
+} from "@/lib/voice-agent-display";
+import { getTemplateMeta } from "@/lib/voice-agent-templates";
+import type { VoiceAgentListItem } from "@/types/voice-agent";
 
 const AGENT_TEMPLATES = [
   {
@@ -71,8 +55,13 @@ type MicState = "idle" | "requesting" | "active" | "denied" | "error";
 
 export default function AgentesVozPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const [searchTerm, setSearchTerm] = useState("");
-  const [agents] = useState(agentesData);
+  const [agents, setAgents] = useState<VoiceAgentListItem[]>([]);
+  const [loadingAgents, setLoadingAgents] = useState(true);
+  const [listError, setListError] = useState("");
+  const [creatingAgent, setCreatingAgent] = useState(false);
+  const [createError, setCreateError] = useState("");
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showMicrophoneModal, setShowMicrophoneModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
@@ -84,9 +73,66 @@ export default function AgentesVozPage() {
   const analyserRef  = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number>(0);
 
+  const loadAgents = useCallback(async () => {
+    setLoadingAgents(true);
+    setListError("");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setListError("Sesión no disponible. Recarga la página o vuelve a iniciar sesión.");
+        setAgents([]);
+        return;
+      }
+
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/voice/agents", {
+        headers,
+        cache: "no-store"
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setListError(data.error || "No se pudieron cargar los agentes");
+        setAgents([]);
+        return;
+      }
+      if (data.dbReady === false) {
+        setListError("Configura la tabla voice_agents en Supabase (migración 001).");
+        setAgents([]);
+        return;
+      }
+      setAgents(data.agents ?? []);
+    } catch {
+      setListError("Error de red al cargar agentes");
+      setAgents([]);
+    }
+    setLoadingAgents(false);
+  }, []);
+
+  useEffect(() => {
+    if (pathname !== "/dashboard/agentes-voz") return;
+
+    loadAgents();
+
+    const onFocus = () => loadAgents();
+    window.addEventListener("focus", onFocus);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      loadAgents();
+    });
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      subscription.unsubscribe();
+    };
+  }, [pathname, loadAgents]);
+
   const filteredAgents = agents.filter(a =>
-    a.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+    a.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const openAgent = (id: string) => {
+    router.push(`/dashboard/agentes-voz/configuracion?id=${id}`);
+  };
 
   // Limpia el stream y la animación al cerrar el modal
   const stopMic = useCallback(() => {
@@ -135,6 +181,7 @@ export default function AgentesVozPage() {
 
   const handleSelectTemplate = (templateId: string) => {
     setSelectedTemplate(templateId);
+    setCreateError("");
     setShowTemplateModal(false);
     setShowMicrophoneModal(true);
     setMicState("idle");
@@ -146,11 +193,53 @@ export default function AgentesVozPage() {
     setSelectedTemplate(null);
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    const template = selectedTemplate ?? "lead-qualification";
     stopMic();
-    setShowMicrophoneModal(false);
-    router.push(`/dashboard/agentes-voz/sesion?template=${selectedTemplate ?? "lead-qualification"}`);
-    setSelectedTemplate(null);
+    setCreatingAgent(true);
+    setCreateError("");
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/voice/agents", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ source_template: template })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.agent?.id) {
+        const msg = data.error || "No se pudo crear el agente";
+        setCreateError(msg);
+        setListError(msg);
+        return;
+      }
+      setShowMicrophoneModal(false);
+      setSelectedTemplate(null);
+      setAgents(prev => {
+        const item = data.agent;
+        if (!item?.id) return prev;
+        const exists = prev.some(a => a.id === item.id);
+        if (exists) return prev;
+        return [{
+          id: item.id,
+          source_template: item.source_template ?? template,
+          name: item.name,
+          contacts_count: item.contacts_count ?? 0,
+          contacted_count: item.contacted_count ?? 0,
+          calls_count: item.calls_count ?? 0,
+          goals_achieved: item.goals_achieved ?? 0,
+          cost_usd: item.cost_usd ?? 0,
+          quality_label: item.quality_label ?? "Aprendiendo",
+          updated_at: item.updated_at ?? new Date().toISOString()
+        }, ...prev];
+      });
+      router.push(`/dashboard/agentes-voz/configuracion?id=${data.agent.id}&tab=probar`);
+    } catch {
+      const msg = "Error de red al crear el agente";
+      setCreateError(msg);
+      setListError(msg);
+    } finally {
+      setCreatingAgent(false);
+    }
   };
 
   // Limpieza al desmontar
@@ -201,6 +290,18 @@ export default function AgentesVozPage() {
         </div>
       </div>
 
+      {listError && (
+        <div className="mx-6 mt-4 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-300">
+          <p className="font-semibold text-red-200 mb-1">No se pudo cargar la lista</p>
+          <p className="text-xs leading-relaxed">{listError}</p>
+          {listError.includes("migración") && (
+            <p className="text-[11px] text-red-400/80 mt-2">
+              Abre Supabase → SQL Editor y ejecuta el archivo <code className="text-red-200">supabase/APPLY_IN_SUPABASE.sql</code>
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Content Area */}
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-7xl">
@@ -222,28 +323,52 @@ export default function AgentesVozPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAgents.length > 0 ? (
+                  {loadingAgents ? (
+                    <tr>
+                      <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
+                        <Loader2 className="w-5 h-5 animate-spin inline mr-2" />
+                        Cargando agentes...
+                      </td>
+                    </tr>
+                  ) : filteredAgents.length > 0 ? (
                     filteredAgents.map((agent, idx) => (
-                      <tr key={agent.id} className={`border-b border-white/[.08] hover:bg-white/[.02] transition-colors ${idx % 2 === 0 ? "bg-white/[.01]" : ""}`}>
-                        <td className="px-6 py-4 text-sm font-medium text-white cursor-pointer hover:text-violet-400">
+                      <tr
+                        key={agent.id}
+                        onClick={() => openAgent(agent.id)}
+                        className={`border-b border-white/[.08] hover:bg-white/[.04] transition-colors cursor-pointer ${idx % 2 === 0 ? "bg-white/[.01]" : ""}`}
+                      >
+                        <td className="px-6 py-4 text-sm font-medium text-white hover:text-violet-400">
                           <div className="flex items-center gap-2">
                             <span>📞</span>
-                            {agent.nombre}
+                            <div>
+                              <div>{agent.name}</div>
+                              <div className="text-[10px] text-gray-600 font-normal mt-0.5">
+                                Plantilla: {getTemplateMeta(agent.source_template).tag}
+                              </div>
+                            </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-400 text-right">{agent.contactos}</td>
-                        <td className="px-6 py-4 text-sm text-gray-400 text-right">{agent.contactados} ({((agent.contactados / Math.max(agent.contactos, 1)) * 100).toFixed(1)}%)</td>
-                        <td className="px-6 py-4 text-sm text-gray-400 text-right">{agent.llamadas}</td>
-                        <td className="px-6 py-4 text-sm text-gray-400 text-right">{agent.metasLogradas}</td>
-                        <td className="px-6 py-4 text-sm text-gray-400 text-right">{agent.costo}</td>
-                        <td className="px-6 py-4 text-sm text-gray-400 text-right">{agent.costoResultado}</td>
-                        <td className="px-6 py-4 text-sm text-right">
-                          <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs font-medium">
-                            {agent.calidad}
+                        <td className="px-6 py-4 text-sm text-gray-400 text-right">{agent.contacts_count}</td>
+                        <td className="px-6 py-4 text-sm text-gray-400 text-right">
+                          {formatContactedLine(agent.contacted_count, agent.contacts_count)}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-400 text-right">{agent.calls_count}</td>
+                        <td className="px-6 py-4 text-sm text-gray-400 text-right">{agent.goals_achieved}</td>
+                        <td className="px-6 py-4 text-sm text-gray-400 text-right">{formatCostUsd(agent.cost_usd)}</td>
+                        <td className="px-6 py-4 text-sm text-gray-400 text-right">
+                          {formatCostPerResult(agent.cost_usd, agent.goals_achieved)}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${qualityBadgeClass(agent.quality_label)}`}>
+                            {agent.quality_label}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <button className="p-1 hover:bg-white/[.08] rounded transition-colors text-gray-400 hover:text-white">
+                        <td className="px-6 py-4 text-center" onClick={e => e.stopPropagation()}>
+                          <button
+                            onClick={() => openAgent(agent.id)}
+                            className="p-1 hover:bg-white/[.08] rounded transition-colors text-gray-400 hover:text-white"
+                            title="Abrir agente"
+                          >
                             <MoreVertical className="w-4 h-4" />
                           </button>
                         </td>
@@ -252,7 +377,9 @@ export default function AgentesVozPage() {
                   ) : (
                     <tr>
                       <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
-                        No se encontraron agentes
+                        {searchTerm
+                          ? "No se encontraron agentes con ese nombre"
+                          : "Aún no tienes agentes. Crea uno con «Nuevo agente»."}
                       </td>
                     </tr>
                   )}
@@ -464,6 +591,12 @@ export default function AgentesVozPage() {
                 </div>
               )}
 
+              {createError && (
+                <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/25 text-xs text-red-300 leading-relaxed">
+                  {createError}
+                </div>
+              )}
+
               {/* Botones */}
               <div className="flex gap-3">
                 <button
@@ -476,10 +609,11 @@ export default function AgentesVozPage() {
                 {micState === "active" ? (
                   <button
                     onClick={handleContinue}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white text-sm font-semibold hover:from-violet-700 hover:to-blue-700 transition-all shadow-lg shadow-violet-600/25"
+                    disabled={creatingAgent}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white text-sm font-semibold hover:from-violet-700 hover:to-blue-700 transition-all shadow-lg shadow-violet-600/25 disabled:opacity-60"
                   >
-                    <ArrowRight className="w-4 h-4" />
-                    Continuar
+                    {creatingAgent ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                    {creatingAgent ? "Creando agente..." : "Continuar"}
                   </button>
                 ) : (
                   <button

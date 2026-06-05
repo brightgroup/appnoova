@@ -1,120 +1,174 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
-import { getTemplateDefaults } from "@/lib/voice-agent-templates";
+import { getTemplateDefaults, resolveBaseTemplateId } from "@/lib/voice-agent-templates";
 import { normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
+import { toVoiceAgentListItem, toVoiceAgentRecord } from "@/lib/voice-agent-record";
+import { insertVoiceAgentRow, updateVoiceAgentRow } from "@/lib/voice-agents-db";
+import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
 
-function adminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
+function dbNotReady() {
+  return NextResponse.json({ agents: [], dbReady: false });
 }
 
-async function getUserId(req: NextRequest): Promise<string | null> {
-  const auth = req.headers.get("authorization");
-  if (!auth?.startsWith("Bearer ")) return null;
-
-  const token = auth.slice(7);
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-  if (error || !user) return null;
-  return user.id;
-}
-
-/** GET ?template_id= — devuelve agente del usuario o defaults de plantilla */
+/**
+ * GET /api/voice/agents
+ *   → lista de agentes del usuario autenticado (multitenant)
+ * GET /api/voice/agents?id=
+ *   → un agente del usuario
+ * GET /api/voice/agents?source_template=lead-qualification
+ *   → solo defaults de plantilla en código (sin leer BD)
+ */
 export async function GET(req: NextRequest) {
-  const userId = await getUserId(req);
+  const userId = await getUserIdFromRequest(req);
   if (!userId) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const templateId = req.nextUrl.searchParams.get("template_id");
-  if (!templateId) {
-    return NextResponse.json({ error: "template_id requerido" }, { status: 400 });
-  }
-
+  const agentId = req.nextUrl.searchParams.get("id");
+  const sourceTemplateParam =
+    req.nextUrl.searchParams.get("source_template") ||
+    req.nextUrl.searchParams.get("template_id");
   const db = adminClient();
-  const { data, error } = await db
-    .from("voice_agents")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("template_id", templateId)
-    .maybeSingle();
 
-  if (error) {
-    if (error.code === "42P01") {
-      return NextResponse.json({
-        agent: null,
-        defaults: getTemplateDefaults(templateId),
-        saved: false,
-        dbReady: false
-      });
+  if (agentId) {
+    const { data, error } = await db
+      .from("voice_agents")
+      .select("*")
+      .eq("id", agentId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) {
+      if (error.code === "42P01") {
+        return NextResponse.json({ agent: null, defaults: null, saved: false, dbReady: false });
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
 
-  if (data) {
+    if (!data) {
+      return NextResponse.json({ error: "Agente no encontrado" }, { status: 404 });
+    }
+
     return NextResponse.json({
-      agent: normalizeVoiceAgentForm({ ...data, template_id: data.template_id }),
+      agent: toVoiceAgentRecord(data),
       saved: true,
       dbReady: true
     });
   }
 
+  if (sourceTemplateParam) {
+    const base = resolveBaseTemplateId(sourceTemplateParam);
+    return NextResponse.json({
+      agent: null,
+      defaults: getTemplateDefaults(base),
+      saved: false,
+      dbReady: true
+    });
+  }
+
+  const { data, error } = await db
+    .from("voice_agents")
+    .select("*")
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    if (error.code === "42P01") return dbNotReady();
+    const msg = error.message ?? "";
+    const needsMigration =
+      msg.includes("contacts_count") ||
+      msg.includes("quality_label") ||
+      msg.includes("source_template");
+    return NextResponse.json(
+      {
+        error: needsMigration
+          ? "Ejecuta las migraciones en supabase/APPLY_IN_SUPABASE.sql y 003_voice_agents_source_template.sql"
+          : msg
+      },
+      { status: 500 }
+    );
+  }
+
   return NextResponse.json({
-    agent: null,
-    defaults: getTemplateDefaults(templateId),
-    saved: false,
+    agents: (data ?? []).map((row) => toVoiceAgentListItem(row)),
     dbReady: true
   });
 }
 
-/** POST — crea o actualiza agente del usuario (no modifica plantillas globales) */
+/** POST — crea instancia del usuario (precargada desde plantilla en código) o actualiza por id */
 export async function POST(req: NextRequest) {
-  const userId = await getUserId(req);
+  const userId = await getUserIdFromRequest(req);
   if (!userId) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
   const body = await req.json();
-  const templateId = body.template_id as string;
-  if (!templateId) {
-    return NextResponse.json({ error: "template_id requerido" }, { status: 400 });
+  const sourceTemplate = resolveBaseTemplateId(
+    (body.source_template || body.template_id) as string
+  );
+
+  if (!sourceTemplate) {
+    return NextResponse.json({ error: "source_template requerido" }, { status: 400 });
   }
 
-  const defaults = getTemplateDefaults(templateId);
+  const defaults = getTemplateDefaults(sourceTemplate);
+  const form = normalizeVoiceAgentForm({
+    ...defaults,
+    ...body,
+    source_template: sourceTemplate
+  });
+
+  let agentName = form.name;
+  const db = adminClient();
+
+  if (!body.id) {
+    const { count } = await db
+      .from("voice_agents")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId);
+    const n = (count ?? 0) + 1;
+    if (n > 1 && agentName === defaults.name) {
+      agentName = `${defaults.name} (${n})`;
+    }
+  }
+
   const row = {
     user_id: userId,
-    template_id: templateId,
-    name: body.name ?? defaults.name,
-    prompt: body.prompt ?? defaults.prompt,
-    voice_name: body.voice_name ?? defaults.voice_name,
-    model: body.model ?? defaults.model,
-    voice_speed: body.voice_speed ?? defaults.voice_speed,
-    temperature: body.temperature ?? defaults.temperature,
-    volume: body.volume ?? defaults.volume,
-    llm_model: body.llm_model ?? defaults.llm_model,
-    color: body.color ?? defaults.color,
+    source_template: sourceTemplate,
+    template_id: sourceTemplate,
+    name: agentName,
+    prompt: form.prompt,
+    voice_name: form.voice_name,
+    model: form.model,
+    voice_speed: form.voice_speed,
+    temperature: form.temperature,
+    volume: form.volume,
+    llm_model: form.llm_model,
+    color: form.color ?? defaults.color,
     updated_at: new Date().toISOString()
   };
 
-  const db = adminClient();
-  const { data, error } = await db
-    .from("voice_agents")
-    .upsert(row, { onConflict: "user_id,template_id" })
-    .select()
-    .single();
+  if (body.id) {
+    const { data, error } = await updateVoiceAgentRow(db, row, body.id, userId);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      agent: toVoiceAgentRecord(data),
+      saved: true
+    });
+  }
+
+  const { data, error } = await insertVoiceAgentRow(db, row);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   return NextResponse.json({
-    agent: normalizeVoiceAgentForm({ ...data, template_id: data.template_id }),
-    saved: true
+    agent: toVoiceAgentRecord(data),
+    saved: true,
+    created: true
   });
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Save, Loader2, CheckCircle2, Phone, Settings2,
@@ -12,15 +12,36 @@ import { getTemplateMeta } from "@/lib/voice-agent-templates";
 import { normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
 import { GEMINI_VOICES, VOICE_MODELS, LLM_MODELS } from "@/lib/voice-agent-options";
 import type { VoiceAgentFormData, VoiceAgentRecord } from "@/types/voice-agent";
+import { VoiceSessionPanel } from "@/components/voice/VoiceSessionPanel";
 
 type TabId = "contexto" | "probar" | "config" | "analisis" | "registro" | "metrica" | "canales";
 
-function ConfigContent() {
-  const params = useSearchParams();
-  const templateId = params.get("template") || "lead-qualification";
-  const meta = getTemplateMeta(templateId);
+function parseTab(tab: string | null): TabId {
+  if (tab === "probar" || tab === "contexto" || tab === "config") return tab;
+  return "config";
+}
 
-  const [activeTab, setActiveTab] = useState<TabId>("config");
+function ConfigContent() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const agentIdParam = params.get("id");
+
+  const [activeTab, setActiveTab] = useState<TabId>(() => parseTab(params.get("tab")));
+
+  const setTab = useCallback((tab: TabId) => {
+    if (!agentIdParam) return;
+    setActiveTab(tab);
+    const qs = new URLSearchParams();
+    qs.set("id", agentIdParam);
+    qs.set("tab", tab);
+    router.replace(`/dashboard/agentes-voz/configuracion?${qs.toString()}`, { scroll: false });
+  }, [router, agentIdParam]);
+
+  useEffect(() => {
+    setActiveTab(parseTab(params.get("tab")));
+  }, [params]);
+  const [callActive, setCallActive] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
   const [editorMode, setEditorMode] = useState<"preview" | "markdown">("markdown");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -29,24 +50,30 @@ function ConfigContent() {
   const [error, setError] = useState("");
 
   const [form, setForm] = useState<VoiceAgentFormData>({
-    template_id: templateId,
-    name: meta.name,
-    prompt: meta.prompt,
+    source_template: "lead-qualification",
+    name: "",
+    prompt: "",
     voice_name: "Aoede",
     model: VOICE_MODELS[0].id,
     voice_speed: 1.0,
     temperature: 1.0,
     volume: 1.0,
     llm_model: LLM_MODELS[0].id,
-    color: meta.color
+    color: null
   });
 
+  const meta = getTemplateMeta(form.source_template);
+
   const loadAgent = useCallback(async () => {
+    if (!agentIdParam) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError("");
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch(`/api/voice/agents?template_id=${templateId}`, { headers });
+      const res = await fetch(`/api/voice/agents?id=${agentIdParam}`, { headers });
       const data = await res.json();
 
       if (!res.ok) {
@@ -59,15 +86,12 @@ function ConfigContent() {
         setAgentId(a.id);
         setForm(normalizeVoiceAgentForm(a));
         setSaved(true);
-      } else if (data.defaults) {
-        setForm(normalizeVoiceAgentForm(data.defaults));
-        setSaved(false);
       }
     } catch {
       setError("Error de red al cargar el agente");
     }
     setLoading(false);
-  }, [templateId]);
+  }, [agentIdParam]);
 
   useEffect(() => { loadAgent(); }, [loadAgent]);
 
@@ -79,14 +103,20 @@ function ConfigContent() {
       const res = await fetch("/api/voice/agents", {
         method: "POST",
         headers,
-        body: JSON.stringify({ ...form, template_id: templateId, color: meta.color })
+        body: JSON.stringify({
+          ...form,
+          id: agentId,
+          source_template: form.source_template,
+          color: meta.color
+        })
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "Error al guardar");
         return;
       }
-      setAgentId(data.agent?.id ?? null);
+      const newId = data.agent?.id ?? null;
+      setAgentId(newId);
       setSaved(true);
     } catch {
       setError("Error de red al guardar");
@@ -94,17 +124,31 @@ function ConfigContent() {
     setSaving(false);
   };
 
-  const sesionUrl = `/dashboard/agentes-voz/sesion?template=${templateId}${agentId ? `&agent=${agentId}` : ""}`;
-
-  const tabs: { id: TabId; label: string; icon: React.ElementType; href?: string }[] = [
+  const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
     { id: "contexto", label: "Contexto", icon: FileText },
-    { id: "probar", label: "Probar agente", icon: Phone, href: sesionUrl },
+    { id: "probar", label: "Probar agente", icon: Phone },
     { id: "config", label: "Configuración", icon: Settings2 },
     { id: "analisis", label: "Análisis de llamadas", icon: BarChart3 },
     { id: "registro", label: "Registro de llamadas", icon: History },
     { id: "metrica", label: "Métrica", icon: LayoutGrid },
     { id: "canales", label: "Canales", icon: Radio }
   ];
+
+  if (!agentIdParam) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center bg-[#0d0e14] text-center px-6">
+        <p className="text-sm text-gray-400 max-w-md leading-relaxed">
+          Cada agente pertenece a tu cuenta. Créalo desde <strong className="text-white">Agentes de voz → Nuevo agente</strong> y ábrelo desde la lista.
+        </p>
+        <Link
+          href="/dashboard/agentes-voz"
+          className="mt-4 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold"
+        >
+          Ir a mis agentes
+        </Link>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -134,14 +178,27 @@ function ConfigContent() {
             </p>
           </div>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-60 shrink-0"
-        >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-          {saving ? "Guardando..." : "Guardar cambios"}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {callActive && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/[.08] border border-emerald-500/20">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+              </span>
+              <span className="text-xs font-semibold text-emerald-400 tabular-nums">
+                {String(Math.floor(callDuration / 60)).padStart(2, "0")}:{String(callDuration % 60).padStart(2, "0")}
+              </span>
+            </div>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving || callActive}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-60 shrink-0"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+            {saving ? "Guardando..." : "Guardar cambios"}
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -151,23 +208,11 @@ function ConfigContent() {
           const isActive = activeTab === tab.id;
           const disabled = !["config", "probar", "contexto"].includes(tab.id);
 
-          if (tab.href && tab.id === "probar") {
-            return (
-              <Link
-                key={tab.id}
-                href={tab.href}
-                className="flex items-center gap-1.5 px-3 py-3 text-xs font-medium whitespace-nowrap text-gray-500 hover:text-white border-b-2 border-transparent hover:border-white/20"
-              >
-                <Icon className="w-3.5 h-3.5" /> {tab.label}
-              </Link>
-            );
-          }
-
           return (
             <button
               key={tab.id}
               disabled={disabled}
-              onClick={() => !disabled && setActiveTab(tab.id)}
+              onClick={() => !disabled && setTab(tab.id)}
               className={`flex items-center gap-1.5 px-3 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
                 isActive
                   ? "text-white border-violet-500"
@@ -313,6 +358,21 @@ function ConfigContent() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Probar agente — sesión en vivo */}
+      {activeTab === "probar" && (
+        <VoiceSessionPanel
+          sourceTemplate={form.source_template}
+          agentId={agentId}
+          agentConfig={form}
+          ready={!loading}
+          onEndCall={() => setTab("config")}
+          onCallStatusChange={(active, sec) => {
+            setCallActive(active);
+            setCallDuration(sec);
+          }}
+        />
       )}
 
       {/* Contexto tab */}

@@ -68,10 +68,17 @@ Recuerda el interés previo del lead. Pregunta qué los detuvo y si aún desean 
   }
 };
 
+/** Plantilla base (ej. lead-qualification) desde id guardado (puede ser lead-qualification::a1b2c3d4). */
+export function resolveBaseTemplateId(templateId: string): string {
+  const base = templateId.split("::")[0]?.trim() || templateId;
+  return base in VOICE_AGENT_TEMPLATES ? base : "lead-qualification";
+}
+
 export function getTemplateDefaults(templateId: string): VoiceAgentFormData {
-  const t = VOICE_AGENT_TEMPLATES[templateId] ?? VOICE_AGENT_TEMPLATES["lead-qualification"];
+  const base = resolveBaseTemplateId(templateId);
+  const t = VOICE_AGENT_TEMPLATES[base];
   return {
-    template_id: templateId in VOICE_AGENT_TEMPLATES ? templateId : "lead-qualification",
+    source_template: base,
     name: t.name,
     prompt: t.prompt,
     voice_name: "Aoede",
@@ -85,5 +92,6 @@ export function getTemplateDefaults(templateId: string): VoiceAgentFormData {
 }
 
 export function getTemplateMeta(templateId: string): VoiceTemplateMeta {
-  return VOICE_AGENT_TEMPLATES[templateId] ?? VOICE_AGENT_TEMPLATES["lead-qualification"];
+  const base = resolveBaseTemplateId(templateId);
+  return VOICE_AGENT_TEMPLATES[base];
 }
