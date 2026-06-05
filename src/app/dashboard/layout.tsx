@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -11,6 +11,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -137,9 +138,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </button>
 
           {/* ORI (Copiloto) */}
-          <button 
-            className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all ${
-              sidebarOpen ? "hover:text-white hover:bg-white/[.08]" : "hover:text-white"
+          <Link
+            href="/dashboard/ori"
+            className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              pathname === "/dashboard/ori"
+                ? "text-white bg-gradient-to-r from-violet-600/25 to-cyan-600/15 border border-violet-500/30"
+                : `text-gray-300 ${sidebarOpen ? "hover:text-white hover:bg-white/[.08]" : "hover:text-white"}`
             }`}
             title="ORI - Copiloto"
           >
@@ -154,7 +158,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             ) : (
               <Bot className="w-5 h-5 flex-shrink-0 text-violet-400" />
             )}
-          </button>
+          </Link>
 
           {sidebarOpen && <div className="h-px bg-white/[.08] my-2"></div>}
 

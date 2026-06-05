@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
+import { getVoiceGoogleApiKey } from "@/lib/google-ai";
 
-/** Lee la API key en runtime (no requiere rebuild al cambiar .env.local). */
+/** Lee la API key de voz en runtime (no requiere rebuild al cambiar .env.local). */
 export async function GET() {
-  const apiKey =
-    process.env.GOOGLE_AI_KEY?.trim() ||
-    process.env.NEXT_PUBLIC_GOOGLE_AI_KEY?.trim() ||
-    "";
+  const apiKey = getVoiceGoogleApiKey();
 
   if (!apiKey) {
     return NextResponse.json(
