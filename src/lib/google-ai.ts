@@ -9,7 +9,7 @@ export function getVoiceGoogleApiKey(): string {
 
 /** API key dedicada para Ori Copiloto (facturación separada en Google AI Studio). */
 export function getOriApiKey(): string {
-  return process.env.ORI_GOOGLE_AI_KEY?.trim() || "";
+  return process.env.ORI_GOOGLE_AI_KEY?.trim() || getVoiceGoogleApiKey();
 }
 
 export const ORI_DEFAULT_MODEL = "gemini-2.5-flash";

@@ -183,3 +183,44 @@ export async function POST(req: NextRequest) {
     created: true
   });
 }
+
+/** DELETE /api/voice/agents?id= — elimina agente del usuario (cascade en llamadas) */
+export async function DELETE(req: NextRequest) {
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) {
+    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+
+  const agentId = req.nextUrl.searchParams.get("id");
+  if (!agentId) {
+    return NextResponse.json({ error: "id requerido" }, { status: 400 });
+  }
+
+  const db = adminClient();
+
+  const { data: existing, error: fetchErr } = await db
+    .from("voice_agents")
+    .select("id")
+    .eq("id", agentId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (fetchErr) {
+    return NextResponse.json({ error: fetchErr.message }, { status: 500 });
+  }
+  if (!existing) {
+    return NextResponse.json({ error: "Agente no encontrado" }, { status: 404 });
+  }
+
+  const { error: deleteErr } = await db
+    .from("voice_agents")
+    .delete()
+    .eq("id", agentId)
+    .eq("user_id", userId);
+
+  if (deleteErr) {
+    return NextResponse.json({ error: deleteErr.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
+}

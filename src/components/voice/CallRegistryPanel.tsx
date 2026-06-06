@@ -1,0 +1,488 @@
+"use client";
+
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import {
+  ChevronLeft, Download, Loader2, Play, Pause, Phone,
+  RefreshCw, Search, FileJson, SlidersHorizontal, ArrowUpDown
+} from "lucide-react";
+import {
+  btnFilterActive, btnFilterIdle, btnGhost, inputSearch
+} from "@/lib/brand-ui";
+import { getAuthHeaders } from "@/lib/voice-agents-api";
+import {
+  audioExtensionFromUrl, callQualityPercent, displayCallId, downloadCallJson, downloadCallAudio,
+  formatCallDateShort, formatCallDuration, formatCallTimestamp, formatTranscriptTime
+} from "@/lib/voice-call-utils";
+import type { VoiceAgentCallListItem, VoiceAgentCallRecord } from "@/types/voice-agent-call";
+
+type CallFilter = "todas" | "exitosas" | "conectadas";
+
+interface CallRegistryPanelProps {
+  agentId: string;
+  refreshKey?: number;
+}
+
+export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanelProps) {
+  const [calls, setCalls] = useState<VoiceAgentCallListItem[]>([]);
+  const [selected, setSelected] = useState<VoiceAgentCallRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [dbReady, setDbReady] = useState(true);
+  const [detailTab, setDetailTab] = useState<"transcripcion" | "comentarios" | "calidad">("transcripcion");
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [reanalyzing, setReanalyzing] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<CallFilter>("todas");
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => () => { audioRef.current?.pause(); }, []);
+
+  const loadList = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/voice/agents/calls?agent_id=${agentId}`, { headers });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Error al cargar llamadas");
+        return;
+      }
+      setDbReady(data.dbReady !== false);
+      setCalls(data.calls ?? []);
+    } catch {
+      setError("Error de red");
+    }
+    setLoading(false);
+  }, [agentId]);
+
+  useEffect(() => { loadList(); }, [loadList, refreshKey]);
+
+  const filteredCalls = useMemo(() => {
+    let list = calls;
+    if (filter === "exitosas") {
+      list = list.filter(c => c.status_label.toLowerCase().includes("exitosa"));
+    } else if (filter === "conectadas") {
+      list = list.filter(c => c.duration_sec >= 5);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(c =>
+        c.phone_number.toLowerCase().includes(q) ||
+        c.disconnect_reason.toLowerCase().includes(q) ||
+        c.summary?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [calls, filter, search]);
+
+  const stopAudio = () => {
+    audioRef.current?.pause();
+    setPlayingId(null);
+  };
+
+  const togglePlay = (callId: string, url: string | null) => {
+    if (!url) return;
+    if (playingId === callId) { stopAudio(); return; }
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      audioRef.current.onended = () => setPlayingId(null);
+    }
+    audioRef.current.src = url;
+    audioRef.current.play().catch(() => setError("No se pudo reproducir el audio"));
+    setPlayingId(callId);
+  };
+
+  const openCall = async (id: string) => {
+    setDetailLoading(true);
+    setError("");
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/voice/agents/calls?id=${id}`, { headers });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Error al cargar detalle");
+        return;
+      }
+      setSelected(data.call);
+      setDetailTab("transcripcion");
+    } catch {
+      setError("Error de red");
+    }
+    setDetailLoading(false);
+  };
+
+  const handleReanalyze = async () => {
+    if (!selected) return;
+    setReanalyzing(true);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/voice/agents/calls/analyze?id=${selected.id}`, { method: "POST", headers });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Error al analizar"); return; }
+      setSelected(prev => prev ? {
+        ...prev,
+        summary: data.call.summary,
+        user_sentiment: data.call.user_sentiment,
+        extracted_data: data.call.extracted_data
+      } : null);
+      await loadList();
+    } catch {
+      setError("Error de red al analizar");
+    }
+    setReanalyzing(false);
+  };
+
+  const handleDownloadAudio = async (call: { id: string; audio_url: string | null }) => {
+    if (!call.audio_url) return;
+    const ext = audioExtensionFromUrl(call.audio_url);
+    await downloadCallAudio(call.audio_url, `${displayCallId(call.id)}.${ext}`);
+  };
+
+  if (selected) {
+    return (
+      <CallDetailView
+        selected={selected}
+        detailLoading={detailLoading}
+        detailTab={detailTab}
+        setDetailTab={setDetailTab}
+        reanalyzing={reanalyzing}
+        onBack={() => { setSelected(null); stopAudio(); }}
+        onReanalyze={handleReanalyze}
+        onDownloadAudio={handleDownloadAudio}
+        onDownloadJson={() => downloadCallJson(selected as unknown as Record<string, unknown>, `${displayCallId(selected.id)}.json`)}
+      />
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 bg-[#080808] overflow-hidden">
+      {/* Toolbar */}
+      <div className="px-5 py-4 border-b border-white/[.06] shrink-0 space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-xl">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por teléfono, desconexión o resumen..."
+              className={inputSearch}
+            />
+          </div>
+          <div className="flex rounded-lg border border-white/[.08] overflow-hidden shrink-0">
+            {([
+              ["conectadas", "Conectadas"],
+              ["exitosas", "Exitosas"],
+              ["todas", "Todas"]
+            ] as const).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setFilter(id)}
+                className={filter === id ? btnFilterActive : btnFilterIdle}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <button onClick={loadList} className="p-2.5 rounded-lg border border-white/[.08] text-gray-400 hover:text-white hover:bg-white/[.04]" title="Actualizar">
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <button className="p-2.5 rounded-lg border border-white/[.08] text-gray-500 hover:text-white hover:bg-white/[.04]" title="Columnas">
+            <SlidersHorizontal className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {!dbReady && (
+        <div className="mx-5 mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
+          Ejecuta la migración <code>006_voice_agent_calls.sql</code> en Supabase.
+        </div>
+      )}
+      {error && (
+        <div className="mx-5 mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400">{error}</div>
+      )}
+
+      <div className="flex-1 overflow-auto">
+        {loading ? (
+          <div className="flex items-center justify-center py-20 text-gray-500">
+            <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando llamadas...
+          </div>
+        ) : filteredCalls.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+            <Phone className="w-10 h-10 text-gray-700 mb-3" />
+            <p className="text-sm text-gray-500">No hay llamadas en este filtro.</p>
+          </div>
+        ) : (
+          <table className="w-full text-xs min-w-[1200px]">
+            <thead className="sticky top-0 z-10 bg-[#0a0a0a] border-b border-white/[.08]">
+              <tr className="text-gray-500 uppercase tracking-wide">
+                <Th>Fecha <ArrowUpDown className="w-3 h-3 inline opacity-40" /></Th>
+                <Th>Duración</Th>
+                <Th>Créditos</Th>
+                <Th>Calidad</Th>
+                <Th>Núm. origen</Th>
+                <Th>Núm. destino</Th>
+                <Th>Contacto</Th>
+                <Th>Estado</Th>
+                <Th>Desconexión</Th>
+                <Th>Exitosa</Th>
+                <Th>Dirección</Th>
+                <Th className="text-center">Grabación</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCalls.map(call => {
+                const quality = callQualityPercent(call);
+                const isSuccess = call.status_label.toLowerCase().includes("exitosa");
+                return (
+                  <tr
+                    key={call.id}
+                    onClick={() => openCall(call.id)}
+                    className="border-b border-white/[.04] hover:bg-white/[.02] cursor-pointer transition-colors group"
+                  >
+                    <Td mono>{formatCallDateShort(call.created_at)}</Td>
+                    <Td mono>{formatCallDuration(call.duration_sec)}</Td>
+                    <Td mono>{call.credits}</Td>
+                    <Td>
+                      <QualityBar percent={quality} />
+                    </Td>
+                    <Td mono className="text-gray-400">Prueba web</Td>
+                    <Td mono>{call.phone_number}</Td>
+                    <Td className="text-gray-500">N/A</Td>
+                    <Td><span className="text-gray-300">ended</span></Td>
+                    <Td mono className="text-gray-400 lowercase">{call.disconnect_reason.replace(/\s+/g, "_").toLowerCase()}</Td>
+                    <Td>{isSuccess ? "Sí" : "No"}</Td>
+                    <Td className="text-gray-500">web_test</Td>
+                    <Td>
+                      <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
+                        <IconBtn
+                          title={call.audio_url ? "Reproducir" : "Sin grabación"}
+                          disabled={!call.audio_url}
+                          onClick={() => togglePlay(call.id, call.audio_url)}
+                        >
+                          {playingId === call.id ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                        </IconBtn>
+                        <IconBtn
+                          title={call.audio_url ? "Descargar audio" : "Sin grabación"}
+                          disabled={!call.audio_url}
+                          onClick={() => handleDownloadAudio(call)}
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </IconBtn>
+                        <IconBtn
+                          title="Descargar JSON"
+                          onClick={async () => {
+                            const headers = await getAuthHeaders();
+                            const res = await fetch(`/api/voice/agents/calls?id=${call.id}`, { headers });
+                            const data = await res.json();
+                            if (data.call) downloadCallJson(data.call, `${displayCallId(call.id)}.json`);
+                          }}
+                        >
+                          <FileJson className="w-3.5 h-3.5" />
+                        </IconBtn>
+                      </div>
+                    </Td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CallDetailView({
+  selected, detailLoading, detailTab, setDetailTab, reanalyzing,
+  onBack, onReanalyze, onDownloadAudio, onDownloadJson
+}: {
+  selected: VoiceAgentCallRecord;
+  detailLoading: boolean;
+  detailTab: "transcripcion" | "comentarios" | "calidad";
+  setDetailTab: (t: "transcripcion" | "comentarios" | "calidad") => void;
+  reanalyzing: boolean;
+  onBack: () => void;
+  onReanalyze: () => void;
+  onDownloadAudio: (call: { id: string; audio_url: string | null }) => void;
+  onDownloadJson: () => void;
+}) {
+  const quality = callQualityPercent(selected);
+
+  if (detailLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-[#080808] text-gray-500">
+        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando llamada...
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex min-h-0 overflow-hidden bg-[#080808]">
+      <aside className="w-[400px] shrink-0 border-r border-white/[.06] overflow-y-auto p-5 space-y-5">
+        <div className="flex items-center gap-2">
+          <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-white/[.06] text-gray-400 hover:text-white">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <h2 className="text-lg font-semibold truncate">{selected.phone_number}</h2>
+          <button onClick={onDownloadJson} className="ml-auto flex items-center gap-1 text-xs text-gray-500 hover:text-white px-2 py-1 rounded hover:bg-white/[.04]">
+            <FileJson className="w-3.5 h-3.5" /> JSON
+          </button>
+        </div>
+
+        <MetaSection title="Análisis de conversación">
+          <MetaRow label="ID de Llamada" value={displayCallId(selected.id)} mono />
+          <MetaRow label="Teléfono" value={selected.phone_number} />
+          <MetaRow label="Duración" value={formatCallDuration(selected.duration_sec)} />
+          <MetaRow label="Fecha" value={formatCallTimestamp(selected.created_at)} />
+          <MetaRow label="Créditos" value={String(selected.credits)} />
+          <MetaRow label="Calidad" value={`${quality}%`} />
+          <MetaRow label="Estado" value={selected.status_label} />
+          <MetaRow label="Desconexión" value={selected.disconnect_reason} />
+          <MetaRow label="Sentimiento" value={selected.user_sentiment} />
+        </MetaSection>
+
+        <MetaSection title="Grabación">
+          {selected.audio_url ? (
+            <div className="space-y-3">
+              <audio controls src={selected.audio_url} className="w-full h-9" preload="metadata" />
+              <button
+                onClick={() => onDownloadAudio(selected)}
+                className={btnGhost}
+              >
+                <Download className="w-3.5 h-3.5" /> Descargar audio
+              </button>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-600">Sin grabación — haz una nueva prueba de llamada para generar audio.</p>
+          )}
+        </MetaSection>
+
+        <MetaSection
+          title="Resumen y análisis"
+          action={
+            <button onClick={onReanalyze} disabled={reanalyzing} className="p-1 rounded hover:bg-white/[.04] text-gray-500 hover:text-[#00e8b5] disabled:opacity-50">
+              <RefreshCw className={`w-3.5 h-3.5 ${reanalyzing ? "animate-spin" : ""}`} />
+            </button>
+          }
+        >
+          <p className="text-sm text-gray-300 leading-relaxed">{selected.summary || "N/A"}</p>
+        </MetaSection>
+
+        <MetaSection title="Datos extraídos">
+          {Object.keys(selected.extracted_data).length ? (
+            Object.entries(selected.extracted_data).map(([k, v]) => (
+              <div key={k} className="py-1.5 border-b border-white/[.04] last:border-0">
+                <span className="text-[10px] text-[#00e8b5]/80 uppercase tracking-wide">{k.replace(/_/g, " ")}</span>
+                <p className="text-xs text-gray-300 mt-0.5">{Array.isArray(v) ? v.join(" · ") : String(v ?? "")}</p>
+              </div>
+            ))
+          ) : (
+            <p className="text-xs text-gray-600">N/A</p>
+          )}
+        </MetaSection>
+      </aside>
+
+      <main className="flex-1 flex flex-col min-w-0">
+        <div className="border-b border-white/[.06] px-5 flex gap-6 shrink-0">
+          {(["transcripcion", "comentarios", "calidad"] as const).map(id => (
+            <button
+              key={id}
+              onClick={() => setDetailTab(id)}
+              className={`py-3 text-sm font-medium border-b-2 capitalize transition-colors ${
+                detailTab === id ? "text-white border-[#00e8b5]" : "text-gray-500 border-transparent hover:text-gray-300"
+              }`}
+            >
+              {id === "transcripcion" ? "Transcripción" : id === "comentarios" ? "Comentarios" : "Calidad"}
+            </button>
+          ))}
+        </div>
+        <div className="flex-1 overflow-y-auto p-5">
+          {detailTab === "transcripcion" && (
+            <div className="space-y-3 max-w-3xl">
+              {selected.transcript.map((line, i) => (
+                <div key={i} className="flex gap-3 text-sm">
+                  <span className="text-gray-600 tabular-nums w-10 shrink-0">{formatTranscriptTime(line.time_sec)}</span>
+                  <p>
+                    <span className="font-semibold text-white">{line.role === "user" ? "User" : "Agent"}: </span>
+                    <span className="text-gray-300">{line.text}</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+          {detailTab === "comentarios" && <p className="text-sm text-gray-600">Próximamente.</p>}
+          {detailTab === "calidad" && <p className="text-sm text-gray-600">Calidad estimada: {quality}%</p>}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <th className={`text-left px-4 py-3 font-semibold whitespace-nowrap ${className}`}>{children}</th>;
+}
+
+function Td({ children, className = "", mono }: { children: React.ReactNode; className?: string; mono?: boolean }) {
+  return (
+    <td className={`px-4 py-3 text-gray-300 whitespace-nowrap ${mono ? "tabular-nums font-mono text-[11px]" : ""} ${className}`}>
+      {children}
+    </td>
+  );
+}
+
+function IconBtn({ children, onClick, title, disabled }: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  title: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+      className={`p-1.5 rounded-md transition-colors ${
+        disabled
+          ? "text-gray-700 cursor-not-allowed"
+          : "text-gray-400 hover:text-[#00e8b5] hover:bg-[#00e8b5]/10"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function QualityBar({ percent }: { percent: number }) {
+  const color = percent >= 80 ? "bg-emerald-500" : percent >= 60 ? "bg-amber-500" : "bg-orange-500";
+  return (
+    <div className="flex items-center gap-2 min-w-[72px]">
+      <div className="flex-1 h-1.5 rounded-full bg-white/[.08] overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${percent}%` }} />
+      </div>
+      <span className="text-[10px] tabular-nums text-gray-400 w-8">{percent}%</span>
+    </div>
+  );
+}
+
+function MetaSection({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{title}</h3>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function MetaRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex gap-2 py-1.5 text-xs border-b border-white/[.04] last:border-0">
+      <span className="text-gray-600 w-[130px] shrink-0">{label}</span>
+      <span className={`text-gray-300 break-all ${mono ? "font-mono text-[10px]" : ""}`}>{value}</span>
+    </div>
+  );
+}

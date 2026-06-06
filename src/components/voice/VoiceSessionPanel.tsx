@@ -8,7 +8,9 @@ import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
 import { geminiTemperature } from "@/lib/voice-agent-audio";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { parsePcmRate, pcmBase64ToFloat32, resampleTo16kPcm } from "@/lib/voice-session-audio";
-import { getAuthHeaders } from "@/lib/voice-agents-api";
+import { getAuthHeaders, getAuthToken } from "@/lib/voice-agents-api";
+import { encodeWav, mergePcmBuffers, downsamplePcm } from "@/lib/call-recording";
+import { blobToBase64 } from "@/lib/brand-ui";
 import { isGoodbyeUtterance } from "@/lib/voice-goodbye-detection";
 import type { VoiceAgentFormData } from "@/types/voice-agent";
 
@@ -17,6 +19,7 @@ type SessionState = "idle" | "connecting" | "listening" | "thinking" | "speaking
 interface TranscriptLine {
   role: "user" | "agent";
   text: string;
+  time_sec: number;
 }
 
 export interface VoiceSessionPanelProps {
@@ -27,6 +30,7 @@ export interface VoiceSessionPanelProps {
   companyContext?: string | null;
   ready?: boolean;
   onEndCall?: () => void;
+  onCallSaved?: () => void;
   onCallStatusChange?: (active: boolean, durationSec: number) => void;
 }
 
@@ -37,6 +41,7 @@ export function VoiceSessionPanel({
   companyContext,
   ready = true,
   onEndCall,
+  onCallSaved,
   onCallStatusChange
 }: VoiceSessionPanelProps) {
   const meta = getTemplateMeta(sourceTemplate);
@@ -49,24 +54,38 @@ export function VoiceSessionPanel({
   const [duration, setDuration] = useState(0);
   const [statusHint, setStatusHint] = useState("");
 
+  const agentIdRef = useRef(agentId);
+  const onCallSavedRef = useRef(onCallSaved);
+
+  useEffect(() => { agentIdRef.current = agentId; }, [agentId]);
+  useEffect(() => { onCallSavedRef.current = onCallSaved; }, [onCallSaved]);
+
   const sessionRef = useRef<Session | null>(null);
-  const micCtxRef = useRef<AudioContext | null>(null);
+  const mainCtxRef = useRef<AudioContext | null>(null);
   const procRef = useRef<ScriptProcessorNode | null>(null);
+  const recProcRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const playCtxRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const configRef = useRef(agentConfig);
   const companyContextRef = useRef(companyContext);
   const nextTimeRef = useRef(0);
+  const agentSpeakUntilRef = useRef(0);
+  const micToGeminiBlockedRef = useRef(true);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const mutedRef = useRef(false);
   const setupDoneRef = useRef(false);
-  const callRecordedRef = useRef(false);
+  const callSavedRef = useRef(false);
+  const sessionStartRef = useRef<number | null>(null);
+  const durationRef = useRef(0);
+  const disconnectReasonRef = useRef("Agent Hangup");
   const transcriptLinesRef = useRef<TranscriptLine[]>([]);
   const goodbyeTriggeredRef = useRef(false);
   const autoHangupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stopSessionRef = useRef<() => void>(() => {});
+  const stopSessionRef = useRef<(userInitiated?: boolean) => void>(() => {});
+  const recordDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const pcmBuffersRef = useRef<Float32Array[]>([]);
+  const pcmSampleRateRef = useRef(48000);
 
   useEffect(() => { mutedRef.current = muted; }, [muted]);
   useEffect(() => { configRef.current = agentConfig; }, [agentConfig]);
@@ -84,6 +103,10 @@ export function VoiceSessionPanel({
   }, [isActive, isConnecting, duration, onCallStatusChange]);
 
   useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
+
+  useEffect(() => {
     if (isActive || isConnecting) {
       timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
     } else if (timerRef.current) {
@@ -92,16 +115,48 @@ export function VoiceSessionPanel({
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [isActive, isConnecting]);
 
+  const currentTimeSec = useCallback(() => {
+    if (sessionStartRef.current) {
+      return Math.max(0, Math.floor((Date.now() - sessionStartRef.current) / 1000));
+    }
+    return durationRef.current;
+  }, []);
+
   const appendTranscript = useCallback((role: "user" | "agent", text: string) => {
     if (!text.trim()) return;
+    const time_sec = currentTimeSec();
     const prev = transcriptLinesRef.current;
     const last = prev[prev.length - 1];
     const next: TranscriptLine[] =
       last?.role === role
-        ? [...prev.slice(0, -1), { role, text: last.text + text }]
-        : [...prev, { role, text }];
+        ? [...prev.slice(0, -1), { role, text: last.text + text, time_sec: last.time_sec }]
+        : [...prev, { role, text, time_sec }];
     transcriptLinesRef.current = next;
     setTranscript(next);
+  }, [currentTimeSec]);
+
+  const canSendMicToGemini = useCallback(() => {
+    if (mutedRef.current || !setupDoneRef.current || !sessionRef.current) return false;
+    if (micToGeminiBlockedRef.current) return false;
+    const ctx = mainCtxRef.current;
+    if (ctx && ctx.currentTime < agentSpeakUntilRef.current + 0.25) return false;
+    return true;
+  }, []);
+
+  const stopCallRecording = useCallback(async (): Promise<Blob | null> => {
+    await new Promise(r => setTimeout(r, 300));
+
+    const pcm = mergePcmBuffers(pcmBuffersRef.current);
+    pcmBuffersRef.current = [];
+
+    if (pcm.length > 1600) {
+      const rate = 16000;
+      const down = downsamplePcm(pcm, pcmSampleRateRef.current, rate);
+      const wav = encodeWav(down, rate);
+      if (wav.size > 500) return wav;
+    }
+
+    return null;
   }, []);
 
   const scheduleAutoHangup = useCallback((role: "user" | "agent") => {
@@ -129,17 +184,13 @@ export function VoiceSessionPanel({
   }, [scheduleAutoHangup]);
 
   const playAudioChunk = useCallback(async (b64: string, mimeType?: string) => {
+    const ctx = mainCtxRef.current;
+    const gain = gainNodeRef.current;
+    const recordDest = recordDestRef.current;
+    if (!ctx || !gain || !recordDest) return;
+
     const rate = parsePcmRate(mimeType);
     const float32 = pcmBase64ToFloat32(b64);
-
-    if (!playCtxRef.current) {
-      playCtxRef.current = new AudioContext();
-      gainNodeRef.current = playCtxRef.current.createGain();
-      gainNodeRef.current.connect(playCtxRef.current.destination);
-      nextTimeRef.current = playCtxRef.current.currentTime;
-    }
-    const ctx = playCtxRef.current;
-    const gain = gainNodeRef.current!;
     if (ctx.state === "suspended") await ctx.resume();
 
     gain.gain.value = configRef.current.volume ?? 1;
@@ -149,27 +200,18 @@ export function VoiceSessionPanel({
 
     const source = ctx.createBufferSource();
     source.buffer = buf;
-    source.playbackRate.value = configRef.current.voice_speed || 1;
-    source.connect(gain);
-
     const speed = configRef.current.voice_speed || 1;
+    source.playbackRate.value = speed;
+    source.connect(gain);
+    source.connect(recordDest);
+
     const startAt = Math.max(nextTimeRef.current, ctx.currentTime + 0.02);
     source.start(startAt);
-    nextTimeRef.current = startAt + buf.duration / speed;
+    const endAt = startAt + buf.duration / speed;
+    nextTimeRef.current = endAt;
+    agentSpeakUntilRef.current = endAt;
 
     setState(prev => (prev === "thinking" || prev === "listening" ? "speaking" : prev));
-  }, []);
-
-  const startMicStreaming = useCallback((session: Session) => {
-    if (!micCtxRef.current || !procRef.current) return;
-    procRef.current.onaudioprocess = (e) => {
-      if (mutedRef.current || !setupDoneRef.current || !sessionRef.current) return;
-      const channel = e.inputBuffer.getChannelData(0);
-      const b64 = resampleTo16kPcm(channel, micCtxRef.current!.sampleRate);
-      session.sendRealtimeInput({
-        audio: { data: b64, mimeType: "audio/pcm;rate=16000" }
-      });
-    };
   }, []);
 
   const handleServerMessage = useCallback((msg: LiveServerMessage) => {
@@ -178,33 +220,18 @@ export function VoiceSessionPanel({
       setState("listening");
       setStatusHint("Conectado · Habla o espera el saludo de Lia");
 
-      if (agentId && !callRecordedRef.current) {
-        callRecordedRef.current = true;
-        getAuthHeaders()
-          .then(headers =>
-            fetch("/api/voice/agents/call", {
-              method: "POST",
-              headers,
-              body: JSON.stringify({ agent_id: agentId })
-            })
-          )
-          .catch(() => {});
-      }
+      sessionStartRef.current = Date.now();
 
-      const session = sessionRef.current;
-      if (session) {
-        startMicStreaming(session);
-        session.sendClientContent({
-          turns: [{ role: "user", parts: [{ text: "Inicia la llamada con un saludo breve en español colombiano." }] }],
-          turnComplete: true
-        });
-      }
+      sessionRef.current?.sendClientContent({
+        turns: [{ role: "user", parts: [{ text: "Inicia la llamada con un saludo breve en español colombiano." }] }],
+        turnComplete: true
+      });
     }
 
     const sc = msg.serverContent;
     if (!sc) return;
 
-    if (sc.inputTranscription?.text) {
+    if (sc.inputTranscription?.text && !micToGeminiBlockedRef.current) {
       appendTranscript("user", sc.inputTranscription.text);
       setState("thinking");
     }
@@ -219,18 +246,87 @@ export function VoiceSessionPanel({
       }
     }
 
-    if (sc.interrupted && playCtxRef.current) {
-      nextTimeRef.current = playCtxRef.current.currentTime;
+    if (sc.interrupted && mainCtxRef.current) {
+      nextTimeRef.current = mainCtxRef.current.currentTime;
+      agentSpeakUntilRef.current = mainCtxRef.current.currentTime;
     }
     if (sc.turnComplete) {
+      micToGeminiBlockedRef.current = false;
       checkGoodbyeAndHangup();
       setState("listening");
     }
-  }, [agentId, appendTranscript, playAudioChunk, startMicStreaming, checkGoodbyeAndHangup]);
+  }, [appendTranscript, playAudioChunk, checkGoodbyeAndHangup]);
+
+  const saveCallRecord = useCallback(async (snapshot: {
+    lines: TranscriptLine[];
+    durationSec: number;
+    disconnectReason: string;
+  }, audioBlob: Blob | null) => {
+    const id = agentIdRef.current;
+    if (!id || callSavedRef.current) return false;
+
+    const { lines, durationSec, disconnectReason } = snapshot;
+    if (durationSec < 1 && lines.length === 0) return false;
+
+    callSavedRef.current = true;
+    const now = new Date();
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        setError("Sesión no válida. Inicia sesión de nuevo para guardar la llamada.");
+        callSavedRef.current = false;
+        return false;
+      }
+
+      const payload = {
+        voice_agent_id: id,
+        phone_number: "Prueba web",
+        duration_sec: durationSec,
+        disconnect_reason: disconnectReason,
+        transcript: lines.map(({ role, text, time_sec }) => ({ role, text, time_sec })),
+        dynamic_variables: {
+          contact_name: "",
+          contact_email: "",
+          current_time: now.toLocaleString("es-CO", { dateStyle: "full", timeStyle: "long" }),
+          agent_name: configRef.current.name
+        }
+      };
+
+      let res: Response;
+      const bodyPayload: Record<string, unknown> = { ...payload };
+
+      if (audioBlob && audioBlob.size > 0) {
+        bodyPayload.audio_base64 = await blobToBase64(audioBlob);
+        bodyPayload.audio_mime = audioBlob.type || "audio/wav";
+      }
+
+      res = await fetch("/api/voice/agents/calls", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+        body: JSON.stringify(bodyPayload)
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        callSavedRef.current = false;
+        console.error("[voice] Error al guardar llamada:", data.error || res.status);
+        setError(data.error || "No se pudo guardar la llamada en el registro.");
+        return false;
+      }
+      onCallSavedRef.current?.();
+      return true;
+    } catch (err) {
+      callSavedRef.current = false;
+      console.error("[voice] Error de red al guardar llamada:", err);
+      setError("Error de red al guardar la llamada.");
+      return false;
+    }
+  }, []);
 
   const cleanupResources = useCallback(() => {
     setupDoneRef.current = false;
     goodbyeTriggeredRef.current = false;
+    sessionStartRef.current = null;
     if (autoHangupTimerRef.current) {
       clearTimeout(autoHangupTimerRef.current);
       autoHangupTimerRef.current = null;
@@ -240,23 +336,38 @@ export function VoiceSessionPanel({
     sessionRef.current = null;
     procRef.current?.disconnect();
     procRef.current = null;
+    recProcRef.current?.disconnect();
+    recProcRef.current = null;
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
-    micCtxRef.current?.close().catch(() => {});
-    micCtxRef.current = null;
-    playCtxRef.current?.close().catch(() => {});
-    playCtxRef.current = null;
+    recordDestRef.current = null;
+    mainCtxRef.current?.close().catch(() => {});
+    mainCtxRef.current = null;
     gainNodeRef.current = null;
     nextTimeRef.current = 0;
+    agentSpeakUntilRef.current = 0;
+    micToGeminiBlockedRef.current = true;
     setState("idle");
     setDuration(0);
     setStatusHint("");
   }, []);
 
-  const stopSession = useCallback(() => {
+  const stopSession = useCallback(async (userInitiated = false) => {
+    if (userInitiated) disconnectReasonRef.current = "User Ended";
+
+    const snapshot = {
+      lines: [...transcriptLinesRef.current],
+      durationSec: durationRef.current,
+      disconnectReason: disconnectReasonRef.current
+    };
+
+    const audioBlob = await stopCallRecording();
+    const saved = await saveCallRecord(snapshot, audioBlob);
     cleanupResources();
-    onEndCall?.();
-  }, [cleanupResources, onEndCall]);
+    if (saved || (snapshot.durationSec < 1 && snapshot.lines.length === 0)) {
+      onEndCall?.();
+    }
+  }, [cleanupResources, onEndCall, saveCallRecord, stopCallRecording]);
 
   stopSessionRef.current = stopSession;
 
@@ -266,10 +377,15 @@ export function VoiceSessionPanel({
     setStatusHint("Obteniendo configuración...");
     setTranscript([]);
     transcriptLinesRef.current = [];
+    pcmBuffersRef.current = [];
+    micToGeminiBlockedRef.current = true;
+    agentSpeakUntilRef.current = 0;
     goodbyeTriggeredRef.current = false;
     setDuration(0);
     setupDoneRef.current = false;
-    callRecordedRef.current = false;
+    callSavedRef.current = false;
+    disconnectReasonRef.current = "Agent Hangup";
+    sessionStartRef.current = null;
 
     let apiKey = "";
     try {
@@ -289,22 +405,57 @@ export function VoiceSessionPanel({
 
     try {
       setStatusHint("Activando micrófono...");
+      const cfg = configRef.current;
       const micStream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true }
       });
       streamRef.current = micStream;
 
-      micCtxRef.current = new AudioContext();
-      await micCtxRef.current.resume();
+      const mainCtx = new AudioContext();
+      await mainCtx.resume();
+      mainCtxRef.current = mainCtx;
+      pcmSampleRateRef.current = mainCtx.sampleRate;
+      nextTimeRef.current = mainCtx.currentTime;
 
-      const source = micCtxRef.current.createMediaStreamSource(micStream);
-      const proc = micCtxRef.current.createScriptProcessor(4096, 1, 1);
+      gainNodeRef.current = mainCtx.createGain();
+      gainNodeRef.current.gain.value = cfg.volume ?? 1;
+      gainNodeRef.current.connect(mainCtx.destination);
+
+      recordDestRef.current = mainCtx.createMediaStreamDestination();
+
+      const micSource = mainCtx.createMediaStreamSource(micStream);
+      micSource.connect(recordDestRef.current);
+
+      const proc = mainCtx.createScriptProcessor(4096, 1, 1);
       procRef.current = proc;
-      source.connect(proc);
-      proc.connect(micCtxRef.current.destination);
+      proc.onaudioprocess = (e) => {
+        if (!canSendMicToGemini()) return;
+        const channel = e.inputBuffer.getChannelData(0);
+        const b64 = resampleTo16kPcm(channel, mainCtx.sampleRate);
+        sessionRef.current!.sendRealtimeInput({
+          audio: { data: b64, mimeType: "audio/pcm;rate=16000" }
+        });
+      };
+      micSource.connect(proc);
+      const procSilent = mainCtx.createGain();
+      procSilent.gain.value = 0;
+      proc.connect(procSilent);
+      procSilent.connect(mainCtx.destination);
+
+      const recMonitor = mainCtx.createMediaStreamSource(recordDestRef.current.stream);
+      const recProc = mainCtx.createScriptProcessor(4096, 1, 1);
+      recProcRef.current = recProc;
+      recProc.onaudioprocess = (e) => {
+        const channel = e.inputBuffer.getChannelData(0);
+        pcmBuffersRef.current.push(new Float32Array(channel));
+      };
+      recMonitor.connect(recProc);
+      const recSilent = mainCtx.createGain();
+      recSilent.gain.value = 0;
+      recProc.connect(recSilent);
+      recSilent.connect(mainCtx.destination);
 
       setStatusHint("Conectando con Gemini Live...");
-      const cfg = configRef.current;
 
       const ai = new GoogleGenAI({ apiKey });
       const session = await ai.live.connect({
@@ -318,7 +469,8 @@ export function VoiceSessionPanel({
           temperature: geminiTemperature(cfg.temperature),
           systemInstruction: `${mergeCompanyContext(cfg.prompt, companyContextRef.current)}
 
-Si el usuario se despide o indica que quiere terminar la conversación, despídete de forma breve y cordial en español colombiano (máximo una oración) y cierra la llamada.`,
+Al iniciar la llamada, saluda con UNA sola frase breve en español colombiano y luego espera en silencio a que el usuario hable. No continúes hablando hasta que el usuario responda.
+Si el usuario se despide o indica que quiere terminar la conversación, despídete de forma breve y cordial (máximo una oración).`,
           inputAudioTranscription: {},
           outputAudioTranscription: {}
         },
@@ -345,7 +497,7 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
       setState("error");
       cleanupResources();
     }
-  }, [handleServerMessage, cleanupResources]);
+  }, [handleServerMessage, cleanupResources, canSendMicToGemini]);
 
   useEffect(() => () => cleanupResources(), [cleanupResources]);
 
@@ -375,7 +527,7 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
             <p className="text-sm font-semibold text-white">Lia</p>
             <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[.04] border border-white/[.08]">
               <span className={`w-1.5 h-1.5 rounded-full ${
-                isActive ? "bg-emerald-400 animate-pulse" :
+                isActive ? "bg-[#00e8b5] animate-pulse" :
                 isConnecting ? "bg-amber-400 animate-pulse" :
                 state === "error" ? "bg-red-400" : "bg-gray-500"
               }`} />
@@ -416,7 +568,7 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
                   {muted ? "Micrófono silenciado" : "Micrófono activo"}
                 </button>
                 <button
-                  onClick={stopSession}
+                  onClick={() => stopSession(true)}
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-red-500/[.08] border border-red-500/25 text-red-400 hover:bg-red-500/15 transition-all"
                 >
                   <PhoneOff className="w-4 h-4" /> Terminar sesión

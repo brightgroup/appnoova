@@ -7,6 +7,7 @@ import {
   ChevronLeft, Save, Loader2, CheckCircle2, Phone, Settings2,
   BarChart3, History, Radio, LayoutGrid
 } from "lucide-react";
+import { btnPrimary } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import { getTemplateMeta } from "@/lib/voice-agent-templates";
 import { normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
@@ -14,11 +15,12 @@ import { GEMINI_VOICES, VOICE_MODELS, LLM_MODELS } from "@/lib/voice-agent-optio
 import type { VoiceAgentFormData, VoiceAgentRecord } from "@/types/voice-agent";
 import type { CompanyContext } from "@/types/company-context";
 import { VoiceSessionPanel } from "@/components/voice/VoiceSessionPanel";
+import { CallRegistryPanel } from "@/components/voice/CallRegistryPanel";
 
 type TabId = "probar" | "config" | "analisis" | "registro" | "metrica" | "canales";
 
 function parseTab(tab: string | null): TabId {
-  if (tab === "probar" || tab === "config") return tab;
+  if (tab === "probar" || tab === "config" || tab === "registro") return tab;
   return "config";
 }
 
@@ -65,6 +67,7 @@ function ConfigContent() {
   });
 
   const [contexts, setContexts] = useState<CompanyContext[]>([]);
+  const [registryRefresh, setRegistryRefresh] = useState(0);
 
   const meta = getTemplateMeta(form.source_template);
   const assignedContext = contexts.find(c => c.id === form.company_context_id);
@@ -208,7 +211,7 @@ function ConfigContent() {
           <button
             onClick={handleSave}
             disabled={saving || callActive}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-60 shrink-0"
+            className={`${btnPrimary} shrink-0`}
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
             {saving ? "Guardando..." : "Guardar cambios"}
@@ -221,7 +224,7 @@ function ConfigContent() {
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
-          const disabled = !["config", "probar"].includes(tab.id);
+          const disabled = !["config", "probar", "registro"].includes(tab.id);
 
           return (
             <button
@@ -230,7 +233,7 @@ function ConfigContent() {
               onClick={() => !disabled && setTab(tab.id)}
               className={`flex items-center gap-1.5 px-3 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
                 isActive
-                  ? "text-white border-violet-500"
+                  ? "text-white border-[#00e8b5]"
                   : disabled
                     ? "text-gray-700 cursor-not-allowed border-transparent"
                     : "text-gray-500 hover:text-white border-transparent"
@@ -399,6 +402,11 @@ function ConfigContent() {
         </div>
       )}
 
+      {/* Registro de llamadas */}
+      {activeTab === "registro" && agentId && (
+        <CallRegistryPanel agentId={agentId} refreshKey={registryRefresh} />
+      )}
+
       {/* Probar agente — sesión en vivo */}
       {activeTab === "probar" && (
         <VoiceSessionPanel
@@ -407,7 +415,8 @@ function ConfigContent() {
           agentConfig={form}
           companyContext={companyContextText}
           ready={!loading}
-          onEndCall={() => setTab("config")}
+          onEndCall={() => setTab("registro")}
+          onCallSaved={() => setRegistryRefresh(k => k + 1)}
           onCallStatusChange={(active, sec) => {
             setCallActive(active);
             setCallDuration(sec);
