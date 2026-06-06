@@ -36,9 +36,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <div className="flex h-screen bg-[#0d0e14] text-white">
-      {/* Sidebar */}
-      <div className={`${sidebarOpen ? "w-64" : "w-20"} bg-[#09090f] border-r border-white/[.08] transition-all duration-300 flex flex-col overflow-hidden`}>
+    <div className="flex h-screen bg-noova-main text-white" data-noova-dashboard>
+      {/* Sidebar — tono más claro #2d2d2d */}
+      <div
+        className={`${sidebarOpen ? "w-64" : "w-20"} bg-noova-surface border-r border-white/[.10] transition-all duration-300 flex flex-col overflow-hidden`}
+        data-noova-sidebar
+      >
         {/* Logo */}
         <div className={`p-4 border-b border-white/[.08] flex items-center ${sidebarOpen ? "justify-between" : "justify-center"}`}>
           {sidebarOpen && (

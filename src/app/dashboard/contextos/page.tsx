@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Building2, Plus, Save, Loader2, Trash2, Star, Sparkles, Globe } from "lucide-react";
+import { btnPrimary } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import type { CompanyContext } from "@/types/company-context";
 
@@ -134,20 +135,20 @@ export default function ContextosPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0d0e14] text-white min-h-0">
+    <div className="flex-1 flex flex-col bg-noova-main text-gray-100 min-h-0">
       <div className="border-b border-white/[.08] px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <Building2 className="w-5 h-5 text-violet-400" />
           <div>
             <h1 className="text-lg font-bold">Contextos de marca</h1>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-400">
               Define la info de cada correduría o marca. Pega la URL y la IA genera un borrador de contexto.
             </p>
           </div>
         </div>
         <button
           onClick={handleNew}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-sm font-semibold"
+          className={`${btnPrimary} text-sm`}
         >
           <Plus className="w-4 h-4" /> Nueva marca
         </button>
@@ -224,7 +225,7 @@ export default function ContextosPage() {
                     type="button"
                     onClick={handleGenerateFromUrl}
                     disabled={generating || !form.website_url.trim()}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-sm font-semibold whitespace-nowrap disabled:opacity-40 shrink-0"
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5b5bf6] hover:bg-[#7070f8] text-sm font-semibold whitespace-nowrap disabled:opacity-40 shrink-0 text-white"
                   >
                     {generating ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -263,7 +264,7 @@ export default function ContextosPage() {
                 <button
                   onClick={handleSave}
                   disabled={saving || !dbReady}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold disabled:opacity-50"
+                  className={`${btnPrimary} disabled:opacity-50`}
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Guardar
@@ -302,4 +303,4 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const inputCls =
-  "w-full bg-[#12131a] border border-white/[.08] rounded-xl px-4 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-violet-500/40";
+  "w-full bg-noova-surface border border-white/[.08] rounded-xl px-4 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-violet-500/40";

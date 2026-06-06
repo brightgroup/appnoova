@@ -192,7 +192,7 @@ export default function SignupPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-8 w-full rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 py-3 font-semibold text-white transition-all hover:from-violet-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="mt-8 w-full rounded-lg bg-[#5b5bf6] hover:bg-[#7070f8] py-3 font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>

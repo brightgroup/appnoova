@@ -511,7 +511,7 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
   return (
     <div className="flex-1 flex min-h-0 p-4 gap-4 overflow-hidden">
       <aside className="w-[300px] shrink-0 flex flex-col gap-3">
-        <div className="flex-1 rounded-2xl border border-white/[.08] bg-[#12131a] p-5 flex flex-col min-h-[420px]">
+        <div className="flex-1 rounded-2xl border border-white/[.10] bg-noova-surface p-5 flex flex-col min-h-[420px]">
           <div className="flex flex-col items-center text-center pb-5 border-b border-white/[.06]">
             <div className="relative mb-4">
               {(state === "speaking" || state === "listening") && (
@@ -520,21 +520,21 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
                   <div className="absolute inset-0 rounded-full border border-white/20 animate-pulse" />
                 </>
               )}
-              <div className={`relative w-[88px] h-[88px] rounded-full flex items-center justify-center bg-gradient-to-br ${accent} shadow-lg ring-4 ring-[#12131a]`}>
+              <div className={`relative w-[88px] h-[88px] rounded-full flex items-center justify-center bg-gradient-to-br ${accent} shadow-lg ring-4 ring-noova-surface`}>
                 <span className="text-2xl font-bold text-white">L</span>
               </div>
             </div>
             <p className="text-sm font-semibold text-white">Lia</p>
             <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[.04] border border-white/[.08]">
               <span className={`w-1.5 h-1.5 rounded-full ${
-                isActive ? "bg-[#00e8b5] animate-pulse" :
+                isActive ? "bg-[#5b5bf6] animate-pulse" :
                 isConnecting ? "bg-amber-400 animate-pulse" :
                 state === "error" ? "bg-red-400" : "bg-gray-500"
               }`} />
               <span className="text-[11px] text-gray-400">{statusLabel}</span>
             </div>
             {isActive && statusHint && (
-              <p className="text-[10px] text-gray-600 mt-2 max-w-[200px] leading-relaxed">{statusHint}</p>
+              <p className="text-[10px] text-gray-400 mt-2 max-w-[200px] leading-relaxed">{statusHint}</p>
             )}
           </div>
 
@@ -584,23 +584,23 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
           )}
         </div>
 
-        <div className="rounded-xl border border-white/[.06] bg-[#12131a]/60 px-4 py-3">
-          <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-2">Motor de voz</p>
-          <p className="text-[11px] text-gray-500 font-mono leading-snug line-clamp-2">
+        <div className="rounded-xl border border-white/[.10] bg-noova-surface px-4 py-3">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Motor de voz</p>
+          <p className="text-[11px] text-gray-300 font-mono leading-snug line-clamp-2">
             {agentConfig.model || DEFAULT_LIVE_MODEL}
           </p>
-          <p className="text-[10px] text-gray-600 mt-1.5">Voz {agentConfig.voice_name} · Español</p>
+          <p className="text-[10px] text-gray-400 mt-1.5">Voz {agentConfig.voice_name} · Español</p>
         </div>
       </aside>
 
-      <section className="flex-1 min-w-0 flex flex-col rounded-2xl border border-white/[.08] bg-[#12131a] overflow-hidden">
+      <section className="flex-1 min-w-0 flex flex-col rounded-2xl border border-white/[.10] bg-noova-surface overflow-hidden">
         <div className="px-5 py-3.5 border-b border-white/[.06] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-violet-400/80" />
-            <span className="text-xs font-semibold text-gray-400 tracking-wide">Transcripción en vivo</span>
+            <span className="text-xs font-semibold text-gray-300 tracking-wide">Transcripción en vivo</span>
           </div>
           {transcript.length > 0 && (
-            <span className="text-[10px] text-gray-600 tabular-nums">{transcript.length} mensajes</span>
+            <span className="text-[10px] text-gray-400 tabular-nums">{transcript.length} mensajes</span>
           )}
         </div>
 
@@ -621,8 +621,8 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
                   ))}
                 </div>
               </div>
-              <p className="text-sm text-gray-500 font-medium">Sin conversación aún</p>
-              <p className="text-xs text-gray-600 mt-1.5 max-w-xs leading-relaxed">
+              <p className="text-sm text-gray-300 font-medium">Sin conversación aún</p>
+              <p className="text-xs text-gray-400 mt-1.5 max-w-xs leading-relaxed">
                 {isActive
                   ? "Lia saludará primero. Luego habla con naturalidad."
                   : "Inicia la sesión para probar tu agente con la configuración actual."}

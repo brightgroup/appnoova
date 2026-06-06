@@ -7,7 +7,7 @@ import {
   ChevronLeft, Save, Loader2, CheckCircle2, Phone, Settings2,
   BarChart3, History, Radio, LayoutGrid
 } from "lucide-react";
-import { btnPrimary } from "@/lib/brand-ui";
+import { btnPrimary, tabActive, tabIdle } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import { getTemplateMeta } from "@/lib/voice-agent-templates";
 import { normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
@@ -154,13 +154,13 @@ function ConfigContent() {
 
   if (!agentIdParam) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-[#0d0e14] text-center px-6">
+      <div className="flex-1 flex flex-col items-center justify-center bg-noova-main text-center px-6">
         <p className="text-sm text-gray-400 max-w-md leading-relaxed">
           Cada agente pertenece a tu cuenta. Créalo desde <strong className="text-white">Agentes de voz → Nuevo agente</strong> y ábrelo desde la lista.
         </p>
         <Link
           href="/dashboard/agentes-voz"
-          className="mt-4 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold"
+          className="mt-4 px-4 py-2 rounded-lg bg-[#5b5bf6] hover:bg-[#7070f8] text-white text-sm font-semibold"
         >
           Ir a mis agentes
         </Link>
@@ -170,14 +170,14 @@ function ConfigContent() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[#0d0e14] text-gray-400">
+      <div className="flex-1 flex items-center justify-center bg-noova-main text-gray-400">
         <Loader2 className="w-6 h-6 animate-spin mr-2" /> Cargando configuración...
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0d0e14] text-white min-h-0 overflow-hidden">
+    <div className="flex-1 flex flex-col bg-noova-main text-gray-100 min-h-0 overflow-hidden">
 
       {/* Header */}
       <div className="border-b border-white/[.08] px-6 py-4 flex items-center justify-between shrink-0">
@@ -190,7 +190,7 @@ function ConfigContent() {
           </Link>
           <div className="min-w-0">
             <h1 className="text-lg font-bold truncate">{form.name}</h1>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-400">
               Plantilla: {meta.tag} · {meta.description}
               {!saved && " · Sin guardar aún"}
             </p>
@@ -198,12 +198,12 @@ function ConfigContent() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {callActive && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/[.08] border border-emerald-500/20">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#5b5bf6]/[.08] border border-[#5b5bf6]/25">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#5b5bf6] opacity-60" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#5b5bf6]" />
               </span>
-              <span className="text-xs font-semibold text-emerald-400 tabular-nums">
+              <span className="text-xs font-semibold text-[#5b5bf6] tabular-nums">
                 {String(Math.floor(callDuration / 60)).padStart(2, "0")}:{String(callDuration % 60).padStart(2, "0")}
               </span>
             </div>
@@ -233,10 +233,10 @@ function ConfigContent() {
               onClick={() => !disabled && setTab(tab.id)}
               className={`flex items-center gap-1.5 px-3 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
                 isActive
-                  ? "text-white border-[#00e8b5]"
+                  ? tabActive
                   : disabled
                     ? "text-gray-700 cursor-not-allowed border-transparent"
-                    : "text-gray-500 hover:text-white border-transparent"
+                    : tabIdle
               }`}
             >
               <Icon className="w-3.5 h-3.5" /> {tab.label}
@@ -389,11 +389,11 @@ function ConfigContent() {
                 <textarea
                   value={form.prompt}
                   onChange={e => setForm(f => ({ ...f, prompt: e.target.value }))}
-                  className="w-full h-full min-h-[400px] bg-[#12131a] border border-white/[.08] rounded-xl p-4 text-sm text-gray-200 font-mono leading-relaxed resize-none focus:outline-none focus:border-violet-500/40"
+                  className="w-full h-full min-h-[400px] bg-noova-surface border border-white/[.08] rounded-xl p-4 text-sm text-gray-200 font-mono leading-relaxed resize-none focus:outline-none focus:border-violet-500/40"
                   spellCheck={false}
                 />
               ) : (
-                <div className="w-full h-full min-h-[400px] bg-[#12131a] border border-white/[.08] rounded-xl p-6 overflow-y-auto prose prose-invert prose-sm max-w-none">
+                <div className="w-full h-full min-h-[400px] bg-noova-surface border border-white/[.08] rounded-xl p-6 overflow-y-auto prose prose-invert prose-sm max-w-none">
                   <PromptPreview text={form.prompt} />
                 </div>
               )}
@@ -444,7 +444,7 @@ function PromptPreview({ text }: { text: string }) {
 function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={className}>
-      <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide">{label}</label>
+      <label className="block text-[11px] font-medium text-gray-400 mb-1.5 uppercase tracking-wide">{label}</label>
       {children}
     </div>
   );
@@ -479,7 +479,7 @@ function SliderField({
           {safe.toFixed(2)}
         </span>
       </div>
-      {hint && <p className="text-[10px] text-gray-600 mt-1 leading-snug">{hint}</p>}
+      {hint && <p className="text-[10px] text-gray-400 mt-1 leading-snug">{hint}</p>}
     </Field>
   );
 }
@@ -490,7 +490,7 @@ const selectCls =
 export default function ConfiguracionPage() {
   return (
     <Suspense fallback={
-      <div className="flex-1 flex items-center justify-center bg-[#0d0e14] text-gray-400">
+      <div className="flex-1 flex items-center justify-center bg-noova-main text-gray-400">
         <Loader2 className="w-6 h-6 animate-spin" />
       </div>
     }>

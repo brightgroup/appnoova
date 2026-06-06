@@ -14,7 +14,7 @@ function SesionRedirect() {
   }, [router, template]);
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-[#0d0e14] text-gray-400">
+    <div className="flex-1 flex items-center justify-center bg-noova-main text-gray-400">
       <Loader2 className="w-6 h-6 animate-spin" />
     </div>
   );
@@ -23,7 +23,7 @@ function SesionRedirect() {
 export default function SesionPage() {
   return (
     <Suspense fallback={
-      <div className="flex-1 flex items-center justify-center bg-[#0d0e14] text-gray-400">
+      <div className="flex-1 flex items-center justify-center bg-noova-main text-gray-400">
         <Loader2 className="w-6 h-6 animate-spin" />
       </div>
     }>

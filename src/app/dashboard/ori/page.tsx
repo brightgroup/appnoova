@@ -136,7 +136,7 @@ export default function OriCopilotoPage() {
   const hasChat = messages.length > 0;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#0d0e14] text-white relative">
+    <div className="flex-1 flex flex-col min-h-0 bg-noova-main text-white relative">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-violet-600/[.06] rounded-full blur-[100px]" />
       </div>
@@ -274,7 +274,7 @@ export default function OriCopilotoPage() {
                   <button
                     onClick={() => sendMessage(input)}
                     disabled={!input.trim() || loading}
-                    className="p-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white shadow-lg shadow-violet-600/25 hover:from-violet-500 hover:to-blue-500 disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+                    className="p-2.5 rounded-xl bg-[#5b5bf6] hover:bg-[#7070f8] text-white shadow-lg shadow-[#5b5bf6]/25 disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed transition-all"
                   >
                     {loading ? (
                       <Loader2 className="w-[18px] h-[18px] animate-spin" />

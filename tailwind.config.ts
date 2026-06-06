@@ -5,7 +5,14 @@ const config: Config = {
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        noova: {
+          main: "#212121",
+          surface: "#2d2d2d",
+        },
+      },
+    },
   },
   plugins: [],
 };

@@ -6,7 +6,9 @@ import {
   RefreshCw, Search, FileJson, SlidersHorizontal, ArrowUpDown
 } from "lucide-react";
 import {
-  btnFilterActive, btnFilterIdle, btnGhost, inputSearch
+  btnFilterActive, btnFilterGroup, btnFilterIdle, btnGhost, btnIcon, btnIconSm, btnMenuIcon,
+  inputSearch, registryPage, registryTableHead, registryTableHeadRow, registryTableRow, registryToolbar,
+  tabActive, tabIdle, textMuted, textSecondary
 } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import {
@@ -157,11 +159,11 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#080808] overflow-hidden">
+    <div className={registryPage}>
       {/* Toolbar */}
-      <div className="px-5 py-4 border-b border-white/[.06] shrink-0 space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-xl">
+      <div className={registryToolbar}>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-xl">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <input
               value={search}
@@ -170,7 +172,7 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
               className={inputSearch}
             />
           </div>
-          <div className="flex rounded-lg border border-white/[.08] overflow-hidden shrink-0">
+          <div className={btnFilterGroup}>
             {([
               ["conectadas", "Conectadas"],
               ["exitosas", "Exitosas"],
@@ -185,10 +187,10 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
               </button>
             ))}
           </div>
-          <button onClick={loadList} className="p-2.5 rounded-lg border border-white/[.08] text-gray-400 hover:text-white hover:bg-white/[.04]" title="Actualizar">
+          <button onClick={loadList} className={btnIcon} title="Actualizar">
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button className="p-2.5 rounded-lg border border-white/[.08] text-gray-500 hover:text-white hover:bg-white/[.04]" title="Columnas">
+          <button className={btnIcon} title="Columnas">
             <SlidersHorizontal className="w-4 h-4" />
           </button>
         </div>
@@ -205,18 +207,18 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
 
       <div className="flex-1 overflow-auto">
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-gray-500">
-            <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando llamadas...
+          <div className="flex items-center justify-center py-20 text-gray-400">
+            <Loader2 className="w-5 h-5 animate-spin mr-2 text-gray-300" /> Cargando llamadas...
           </div>
         ) : filteredCalls.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center px-6">
-            <Phone className="w-10 h-10 text-gray-700 mb-3" />
-            <p className="text-sm text-gray-500">No hay llamadas en este filtro.</p>
+            <Phone className="w-10 h-10 text-gray-500 mb-3" />
+            <p className="text-sm text-gray-300">No hay llamadas en este filtro.</p>
           </div>
         ) : (
           <table className="w-full text-xs min-w-[1200px]">
-            <thead className="sticky top-0 z-10 bg-[#0a0a0a] border-b border-white/[.08]">
-              <tr className="text-gray-500 uppercase tracking-wide">
+            <thead className={registryTableHead}>
+              <tr className={registryTableHeadRow}>
                 <Th>Fecha <ArrowUpDown className="w-3 h-3 inline opacity-40" /></Th>
                 <Th>Duración</Th>
                 <Th>Créditos</Th>
@@ -239,7 +241,7 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
                   <tr
                     key={call.id}
                     onClick={() => openCall(call.id)}
-                    className="border-b border-white/[.04] hover:bg-white/[.02] cursor-pointer transition-colors group"
+                    className={registryTableRow}
                   >
                     <Td mono>{formatCallDateShort(call.created_at)}</Td>
                     <Td mono>{formatCallDuration(call.duration_sec)}</Td>
@@ -249,17 +251,18 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
                     </Td>
                     <Td mono className="text-gray-400">Prueba web</Td>
                     <Td mono>{call.phone_number}</Td>
-                    <Td className="text-gray-500">N/A</Td>
-                    <Td><span className="text-gray-300">ended</span></Td>
+                    <Td className="text-gray-400">N/A</Td>
+                    <Td><span className="text-gray-200">ended</span></Td>
                     <Td mono className="text-gray-400 lowercase">{call.disconnect_reason.replace(/\s+/g, "_").toLowerCase()}</Td>
-                    <Td>{isSuccess ? "Sí" : "No"}</Td>
-                    <Td className="text-gray-500">web_test</Td>
+                    <Td>{isSuccess ? <span className="text-gray-200">Sí</span> : <span className="text-gray-400">No</span>}</Td>
+                    <Td className="text-gray-400">web_test</Td>
                     <Td>
                       <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
                         <IconBtn
                           title={call.audio_url ? "Reproducir" : "Sin grabación"}
                           disabled={!call.audio_url}
                           onClick={() => togglePlay(call.id, call.audio_url)}
+                          active={playingId === call.id}
                         >
                           {playingId === call.id ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                         </IconBtn>
@@ -312,21 +315,21 @@ function CallDetailView({
 
   if (detailLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[#080808] text-gray-500">
-        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando llamada...
+      <div className="flex-1 flex items-center justify-center bg-noova-main text-gray-400">
+        <Loader2 className="w-5 h-5 animate-spin mr-2 text-gray-300" /> Cargando llamada...
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex min-h-0 overflow-hidden bg-[#080808]">
-      <aside className="w-[400px] shrink-0 border-r border-white/[.06] overflow-y-auto p-5 space-y-5">
+    <div className="flex-1 flex min-h-0 overflow-hidden bg-noova-main text-white">
+      <aside className="w-[400px] shrink-0 border-r border-white/[.10] overflow-y-auto p-5 space-y-5 bg-noova-surface">
         <div className="flex items-center gap-2">
-          <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-white/[.06] text-gray-400 hover:text-white">
+          <button onClick={onBack} className={btnMenuIcon}>
             <ChevronLeft className="w-5 h-5" />
           </button>
           <h2 className="text-lg font-semibold truncate">{selected.phone_number}</h2>
-          <button onClick={onDownloadJson} className="ml-auto flex items-center gap-1 text-xs text-gray-500 hover:text-white px-2 py-1 rounded hover:bg-white/[.04]">
+          <button onClick={onDownloadJson} className={`ml-auto ${btnGhost}`}>
             <FileJson className="w-3.5 h-3.5" /> JSON
           </button>
         </div>
@@ -355,31 +358,31 @@ function CallDetailView({
               </button>
             </div>
           ) : (
-            <p className="text-xs text-gray-600">Sin grabación — haz una nueva prueba de llamada para generar audio.</p>
+            <p className="text-xs text-gray-400">Sin grabación — haz una nueva prueba de llamada para generar audio.</p>
           )}
         </MetaSection>
 
         <MetaSection
           title="Resumen y análisis"
           action={
-            <button onClick={onReanalyze} disabled={reanalyzing} className="p-1 rounded hover:bg-white/[.04] text-gray-500 hover:text-[#00e8b5] disabled:opacity-50">
+            <button onClick={onReanalyze} disabled={reanalyzing} className={`${btnIconSm} disabled:opacity-50`}>
               <RefreshCw className={`w-3.5 h-3.5 ${reanalyzing ? "animate-spin" : ""}`} />
             </button>
           }
         >
-          <p className="text-sm text-gray-300 leading-relaxed">{selected.summary || "N/A"}</p>
+          <p className="text-sm text-gray-200 leading-relaxed">{selected.summary || "N/A"}</p>
         </MetaSection>
 
         <MetaSection title="Datos extraídos">
           {Object.keys(selected.extracted_data).length ? (
             Object.entries(selected.extracted_data).map(([k, v]) => (
               <div key={k} className="py-1.5 border-b border-white/[.04] last:border-0">
-                <span className="text-[10px] text-[#00e8b5]/80 uppercase tracking-wide">{k.replace(/_/g, " ")}</span>
+                <span className="text-[10px] text-[#5b5bf6]/80 uppercase tracking-wide">{k.replace(/_/g, " ")}</span>
                 <p className="text-xs text-gray-300 mt-0.5">{Array.isArray(v) ? v.join(" · ") : String(v ?? "")}</p>
               </div>
             ))
           ) : (
-            <p className="text-xs text-gray-600">N/A</p>
+            <p className="text-xs text-gray-400">N/A</p>
           )}
         </MetaSection>
       </aside>
@@ -391,7 +394,7 @@ function CallDetailView({
               key={id}
               onClick={() => setDetailTab(id)}
               className={`py-3 text-sm font-medium border-b-2 capitalize transition-colors ${
-                detailTab === id ? "text-white border-[#00e8b5]" : "text-gray-500 border-transparent hover:text-gray-300"
+                detailTab === id ? tabActive : tabIdle
               }`}
             >
               {id === "transcripcion" ? "Transcripción" : id === "comentarios" ? "Comentarios" : "Calidad"}
@@ -403,17 +406,17 @@ function CallDetailView({
             <div className="space-y-3 max-w-3xl">
               {selected.transcript.map((line, i) => (
                 <div key={i} className="flex gap-3 text-sm">
-                  <span className="text-gray-600 tabular-nums w-10 shrink-0">{formatTranscriptTime(line.time_sec)}</span>
+                  <span className="text-gray-400 tabular-nums w-10 shrink-0">{formatTranscriptTime(line.time_sec)}</span>
                   <p>
-                    <span className="font-semibold text-white">{line.role === "user" ? "User" : "Agent"}: </span>
-                    <span className="text-gray-300">{line.text}</span>
+                    <span className="font-semibold text-gray-100">{line.role === "user" ? "User" : "Agent"}: </span>
+                    <span className="text-gray-200">{line.text}</span>
                   </p>
                 </div>
               ))}
             </div>
           )}
-          {detailTab === "comentarios" && <p className="text-sm text-gray-600">Próximamente.</p>}
-          {detailTab === "calidad" && <p className="text-sm text-gray-600">Calidad estimada: {quality}%</p>}
+          {detailTab === "comentarios" && <p className="text-sm text-gray-400">Próximamente.</p>}
+          {detailTab === "calidad" && <p className="text-sm text-gray-300">Calidad estimada: {quality}%</p>}
         </div>
       </main>
     </div>
@@ -426,28 +429,25 @@ function Th({ children, className = "" }: { children: React.ReactNode; className
 
 function Td({ children, className = "", mono }: { children: React.ReactNode; className?: string; mono?: boolean }) {
   return (
-    <td className={`px-4 py-3 text-gray-300 whitespace-nowrap ${mono ? "tabular-nums font-mono text-[11px]" : ""} ${className}`}>
+    <td className={`px-4 py-3.5 text-gray-100 whitespace-nowrap ${mono ? "tabular-nums font-mono text-[11px] text-gray-200" : ""} ${className}`}>
       {children}
     </td>
   );
 }
 
-function IconBtn({ children, onClick, title, disabled }: {
+function IconBtn({ children, onClick, title, disabled, active }: {
   children: React.ReactNode;
   onClick?: () => void;
   title: string;
   disabled?: boolean;
+  active?: boolean;
 }) {
   return (
     <button
       title={title}
       disabled={disabled}
       onClick={onClick}
-      className={`p-1.5 rounded-md transition-colors ${
-        disabled
-          ? "text-gray-700 cursor-not-allowed"
-          : "text-gray-400 hover:text-[#00e8b5] hover:bg-[#00e8b5]/10"
-      }`}
+      className={`${btnIconSm}${active ? " text-white bg-white/[.08]" : ""}`}
     >
       {children}
     </button>
@@ -481,8 +481,8 @@ function MetaSection({ title, action, children }: { title: string; action?: Reac
 function MetaRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex gap-2 py-1.5 text-xs border-b border-white/[.04] last:border-0">
-      <span className="text-gray-600 w-[130px] shrink-0">{label}</span>
-      <span className={`text-gray-300 break-all ${mono ? "font-mono text-[10px]" : ""}`}>{value}</span>
+      <span className="text-gray-400 w-[130px] shrink-0">{label}</span>
+      <span className={`text-gray-200 break-all ${mono ? "font-mono text-[10px]" : ""}`}>{value}</span>
     </div>
   );
 }

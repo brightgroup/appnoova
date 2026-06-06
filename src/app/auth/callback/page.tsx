@@ -99,7 +99,7 @@ export default function AuthCallbackPage() {
           {status === "error" && (
             <a
               href="/login"
-              className="inline-flex items-center justify-center w-full py-3 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white text-sm font-semibold hover:from-violet-700 hover:to-blue-700 transition-all"
+              className="inline-flex items-center justify-center w-full py-3 px-4 rounded-xl bg-[#5b5bf6] hover:bg-[#7070f8] text-white text-sm font-semibold transition-all"
             >
               Volver al login
             </a>

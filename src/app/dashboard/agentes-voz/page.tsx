@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Search, Plus, MoreVertical, ChevronLeft, Mic, MicOff, PhoneCall, ShieldCheck, TrendingUp, ArrowRight, Sparkles, AlertTriangle, CheckCircle2, Loader2, Trash2, RefreshCw } from "lucide-react";
+import { Search, Plus, MoreVertical, ChevronLeft, Mic, MicOff, PhoneCall, ShieldCheck, TrendingUp, ArrowRight, Sparkles, AlertTriangle, CheckCircle2, Loader2, Trash2, RefreshCw, Radio } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
-import { btnPrimary, inputSearch } from "@/lib/brand-ui";
+import { btnPrimary, btnIcon, btnIconSm, inputSearch, registryPage, registryRowIcon, registryTableHead, registryTableHeadRow, registryTableRow, registryToolbar } from "@/lib/brand-ui";
 import { supabase } from "@/lib/supabase";
 import {
   formatContactedLine,
@@ -280,8 +280,8 @@ export default function AgentesVozPage() {
   useEffect(() => () => stopMic(), [stopMic]);
 
   return (
-    <div className="flex-1 flex flex-col bg-[#080808] text-white overflow-hidden">
-      <div className="border-b border-white/[.06] px-6 py-4 shrink-0">
+    <div className={registryPage}>
+      <div className={registryToolbar}>
         <div className="flex items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3 min-w-0">
             <Link
@@ -292,7 +292,7 @@ export default function AgentesVozPage() {
             </Link>
             <div>
               <h1 className="text-xl font-bold tracking-tight">Agentes de Voz</h1>
-              <p className="text-xs text-gray-500 mt-0.5 max-w-xl truncate">
+              <p className="text-xs text-gray-400 mt-0.5 max-w-xl truncate">
                 Agentes IA para llamadas de cobro, confirmación y calificación
               </p>
             </div>
@@ -307,7 +307,7 @@ export default function AgentesVozPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-md">
+          <div className="relative flex-1 max-w-xl">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <input
               type="text"
@@ -317,11 +317,7 @@ export default function AgentesVozPage() {
               className={`${inputSearch} placeholder-gray-600`}
             />
           </div>
-          <button
-            onClick={loadAgents}
-            className="p-2.5 rounded-lg border border-white/[.08] text-gray-400 hover:text-white hover:bg-white/[.04]"
-            title="Actualizar"
-          >
+          <button onClick={loadAgents} className={btnIcon} title="Actualizar">
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>
@@ -340,124 +336,122 @@ export default function AgentesVozPage() {
       )}
 
       <div className="flex-1 overflow-auto">
-        <div className="min-w-0">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-xs">
-              <thead>
-                <tr className="border-b border-white/[.08] bg-[#0a0a0a] text-gray-500 uppercase tracking-wide">
-                  <th className="px-5 py-3 text-left font-semibold">Nombre</th>
-                  <th className="px-4 py-3 text-right font-semibold">Contactos</th>
-                  <th className="px-4 py-3 text-right font-semibold">Contactados</th>
-                  <th className="px-4 py-3 text-right font-semibold">Llamadas</th>
-                  <th className="px-4 py-3 text-right font-semibold">Metas</th>
-                  <th className="px-4 py-3 text-right font-semibold">Costo</th>
-                  <th className="px-4 py-3 text-right font-semibold">Costo / Resultado</th>
-                  <th className="px-4 py-3 text-right font-semibold">Calidad</th>
-                  <th className="px-4 py-3 text-center font-semibold">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                  {loadingAgents ? (
-                    <tr>
-                      <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
-                        <Loader2 className="w-5 h-5 animate-spin inline mr-2" />
-                        Cargando agentes...
-                      </td>
-                    </tr>
-                  ) : filteredAgents.length > 0 ? (
-                    filteredAgents.map((agent) => (
-                      <tr
-                        key={agent.id}
-                        onClick={() => openAgent(agent.id)}
-                        className="border-b border-white/[.04] hover:bg-white/[.02] transition-colors cursor-pointer"
-                      >
-                        <td className="px-5 py-3.5 text-sm font-medium text-white">
-                          <div className="flex items-center gap-2">
-                            <span className="w-7 h-7 rounded-lg bg-[#00e8b5]/15 flex items-center justify-center text-sm">📞</span>
-                            <div>
-                              <div>{agent.name}</div>
-                              <div className="text-[10px] text-gray-600 font-normal">{getTemplateMeta(agent.source_template).tag}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5 text-gray-400 text-right tabular-nums">{agent.contacts_count}</td>
-                        <td className="px-4 py-3.5 text-gray-400 text-right tabular-nums">
-                          {formatContactedLine(agent.contacted_count, agent.contacts_count)}
-                        </td>
-                        <td className="px-4 py-3.5 text-gray-300 text-right tabular-nums font-medium">{agent.calls_count}</td>
-                        <td className="px-4 py-3.5 text-gray-400 text-right tabular-nums">{agent.goals_achieved}</td>
-                        <td className="px-4 py-3.5 text-gray-400 text-right tabular-nums">{formatCostUsd(agent.cost_usd)}</td>
-                        <td className="px-4 py-3.5 text-gray-400 text-right tabular-nums">
-                          {formatCostPerResult(agent.cost_usd, agent.goals_achieved)}
-                        </td>
-                        <td className="px-4 py-3.5 text-right">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${qualityBadgeClass(agent.quality_label)}`}>
-                            {agent.quality_label}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center" onClick={e => e.stopPropagation()}>
-                          <div className="relative inline-block">
-                            <button
-                              onClick={e => {
-                                e.stopPropagation();
-                                setMenuAgentId(prev => prev === agent.id ? null : agent.id);
-                              }}
-                              className="p-1 hover:bg-white/[.08] rounded transition-colors text-gray-400 hover:text-white"
-                              title="Acciones"
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-                            {menuAgentId === agent.id && (
-                              <div
-                                className="absolute right-0 top-full mt-1 z-20 min-w-[160px] py-1 rounded-lg bg-[#1a1b24] border border-white/[.10] shadow-xl"
-                                onClick={e => e.stopPropagation()}
-                              >
-                                <button
-                                  onClick={() => openAgent(agent.id)}
-                                  className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-white/[.06]"
-                                >
-                                  Abrir configuración
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setMenuAgentId(null);
-                                    setDeleteTarget(agent);
-                                  }}
-                                  className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 flex items-center gap-2"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" /> Eliminar agente
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
-                        {searchTerm
-                          ? "No se encontraron agentes con ese nombre"
-                          : "Aún no tienes agentes. Crea uno con «Nuevo agente»."}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+        {loadingAgents ? (
+          <div className="flex items-center justify-center py-20 text-gray-400">
+            <Loader2 className="w-5 h-5 animate-spin mr-2 text-gray-300" /> Cargando agentes...
           </div>
-
-          <div className="px-5 py-3 flex items-center justify-between border-t border-white/[.06]">
-            <p className="text-xs text-gray-500">
-              Mostrando <span className="text-gray-300">{filteredAgents.length}</span> de {agents.length} agentes
+        ) : filteredAgents.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+            <Radio className="w-10 h-10 text-gray-500 mb-3" />
+            <p className="text-sm text-gray-300">
+              {searchTerm
+                ? "No se encontraron agentes con ese nombre"
+                : "Aún no tienes agentes. Crea uno con «Nuevo agente»."}
             </p>
           </div>
-        </div>
+        ) : (
+          <table className="w-full min-w-[900px] text-xs">
+            <thead className={registryTableHead}>
+              <tr className={registryTableHeadRow}>
+                <th className="px-5 py-3 text-left font-semibold">Agente</th>
+                <th className="px-4 py-3 text-right font-semibold">Contactos</th>
+                <th className="px-4 py-3 text-right font-semibold">Contactados</th>
+                <th className="px-4 py-3 text-right font-semibold">Llamadas</th>
+                <th className="px-4 py-3 text-right font-semibold">Metas</th>
+                <th className="px-4 py-3 text-right font-semibold">Costo</th>
+                <th className="px-4 py-3 text-right font-semibold">Costo / Resultado</th>
+                <th className="px-4 py-3 text-right font-semibold">Calidad</th>
+                <th className="px-4 py-3 text-center font-semibold">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAgents.map((agent) => {
+                const meta = getTemplateMeta(agent.source_template);
+                return (
+                  <tr
+                    key={agent.id}
+                    onClick={() => openAgent(agent.id)}
+                    className={registryTableRow}
+                  >
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <span className={registryRowIcon}>
+                          <PhoneCall className="w-3.5 h-3.5" />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-white truncate">{agent.name}</div>
+                          <div className="text-[10px] text-gray-400 font-normal mt-0.5">{meta.tag} · {meta.description.slice(0, 36)}…</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5 text-gray-300 text-right tabular-nums">{agent.contacts_count}</td>
+                    <td className="px-4 py-3.5 text-gray-300 text-right tabular-nums">
+                      {formatContactedLine(agent.contacted_count, agent.contacts_count)}
+                    </td>
+                    <td className="px-4 py-3.5 text-gray-100 text-right tabular-nums font-medium">{agent.calls_count}</td>
+                    <td className="px-4 py-3.5 text-gray-300 text-right tabular-nums">{agent.goals_achieved}</td>
+                    <td className="px-4 py-3.5 text-gray-300 text-right tabular-nums">{formatCostUsd(agent.cost_usd)}</td>
+                    <td className="px-4 py-3.5 text-gray-300 text-right tabular-nums">
+                      {formatCostPerResult(agent.cost_usd, agent.goals_achieved)}
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${qualityBadgeClass(agent.quality_label)}`}>
+                        {agent.quality_label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-center relative" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          setMenuAgentId(prev => prev === agent.id ? null : agent.id);
+                        }}
+                        className={btnIconSm}
+                        title="Acciones"
+                      >
+                        <MoreVertical className="w-3.5 h-3.5" />
+                      </button>
+                      {menuAgentId === agent.id && (
+                        <div
+                          className="absolute right-0 top-full mt-1 z-20 min-w-[160px] py-1 rounded-lg bg-[#14151c] border border-white/[.08] shadow-xl"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={() => openAgent(agent.id)}
+                            className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-white/[.06] hover:text-white"
+                          >
+                            Abrir configuración
+                          </button>
+                          <button
+                            onClick={() => {
+                              setMenuAgentId(null);
+                              setDeleteTarget(agent);
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 flex items-center gap-2"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Eliminar agente
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+        {!loadingAgents && filteredAgents.length > 0 && (
+          <div className="px-5 py-3 flex items-center justify-between border-t border-white/[.06]">
+            <p className="text-xs text-gray-400">
+              Mostrando <span className="text-gray-200">{filteredAgents.length}</span> de {agents.length} agentes
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Confirm delete agent */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-[#12131a] border border-white/[.10] rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+          <div className="bg-noova-surface border border-white/[.10] rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
             <h3 className="text-lg font-semibold text-white mb-2">Eliminar agente</h3>
             <p className="text-sm text-gray-400 leading-relaxed">
               ¿Eliminar <strong className="text-white">{deleteTarget.name}</strong>? Se borrarán también
@@ -487,7 +481,7 @@ export default function AgentesVozPage() {
       {/* Template Selection Modal */}
       {showTemplateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl">
-          <div className="relative bg-[#0b0c14] border border-white/[.10] rounded-3xl p-8 max-w-2xl w-full mx-4 shadow-2xl overflow-hidden">
+          <div className="relative bg-noova-surface border border-white/[.10] rounded-3xl p-8 max-w-2xl w-full mx-4 shadow-2xl overflow-hidden">
 
             {/* Ambient glow */}
             <div className="absolute -top-20 -right-20 w-64 h-64 bg-violet-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -563,7 +557,7 @@ export default function AgentesVozPage() {
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl">
-            <div className="relative bg-[#0b0c14] border border-white/[.10] rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl overflow-hidden">
+            <div className="relative bg-noova-surface border border-white/[.10] rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl overflow-hidden">
 
               {/* Ambient glow que pulsa con el audio */}
               <div
@@ -624,7 +618,7 @@ export default function AgentesVozPage() {
                 <div
                   className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-150 ${
                     micState === "active"
-                      ? "bg-gradient-to-br from-violet-600 to-blue-600 shadow-lg shadow-violet-600/40"
+                      ? "bg-[#5b5bf6] shadow-lg shadow-[#5b5bf6]/40"
                       : micState === "denied" || micState === "error"
                       ? "bg-red-500/10 border-2 border-red-500/30"
                       : "bg-white/[.04] border-2 border-white/[.10]"
@@ -651,7 +645,7 @@ export default function AgentesVozPage() {
                   </div>
                   <div className="h-1.5 bg-white/[.06] rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-violet-500 to-blue-500 rounded-full transition-all duration-75"
+                      className="h-full bg-[#5b5bf6] rounded-full transition-all duration-75"
                       style={{ width: `${Math.max(audioLevel * 100, 2)}%` }}
                     />
                   </div>
@@ -686,7 +680,7 @@ export default function AgentesVozPage() {
                   <button
                     onClick={handleContinue}
                     disabled={creatingAgent}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white text-sm font-semibold hover:from-violet-700 hover:to-blue-700 transition-all shadow-lg shadow-violet-600/25 disabled:opacity-60"
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#5b5bf6] hover:bg-[#7070f8] text-white text-sm font-semibold transition-all shadow-lg shadow-[#5b5bf6]/25 disabled:opacity-60"
                   >
                     {creatingAgent ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
                     {creatingAgent ? "Creando agente..." : "Continuar"}
@@ -695,7 +689,7 @@ export default function AgentesVozPage() {
                   <button
                     onClick={handleActivateMicrophone}
                     disabled={micState === "requesting"}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white text-sm font-semibold hover:from-violet-700 hover:to-blue-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-lg shadow-violet-600/25"
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#5b5bf6] hover:bg-[#7070f8] text-white text-sm font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-lg shadow-[#5b5bf6]/25"
                   >
                     <Mic className="w-4 h-4" />
                     {micState === "requesting" ? "Esperando..." : micState === "denied" || micState === "error" ? "Reintentar" : "Activar micrófono"}

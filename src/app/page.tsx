@@ -68,7 +68,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
               <Link
                 href="/login"
-                className="inline-flex items-center justify-center gap-2 px-8 py-3.5 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 transition-all shadow-lg shadow-violet-600/25"
+                className="inline-flex items-center justify-center gap-2 px-8 py-3.5 text-sm font-semibold text-white rounded-lg bg-[#5b5bf6] hover:bg-[#7070f8] transition-all shadow-lg shadow-[#5b5bf6]/25"
               >
                 Probar demo gratis
                 <ArrowRight className="w-4 h-4" />
@@ -229,7 +229,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/login"
-                className="inline-flex items-center justify-center gap-2 px-8 py-3.5 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 transition-all"
+                className="inline-flex items-center justify-center gap-2 px-8 py-3.5 text-sm font-semibold text-white rounded-lg bg-[#5b5bf6] hover:bg-[#7070f8] transition-all"
               >
                 Acceso Gratis
                 <ArrowRight className="w-4 h-4" />

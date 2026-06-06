@@ -4,9 +4,9 @@ import { Bell, MessageCircle, Zap, Phone } from "lucide-react";
 
 export default function Dashboard() {
   return (
-    <div className="flex-1 flex flex-col bg-[#0d0e14] text-white overflow-hidden">
+    <div className="flex-1 flex flex-col bg-noova-main text-white overflow-hidden">
       {/* Header */}
-      <div className="border-b border-white/[.06] bg-[#0d0e14]/50 backdrop-blur px-6 py-4">
+      <div className="border-b border-white/[.06] bg-noova-main/50 backdrop-blur px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex-1">
             <input
@@ -115,7 +115,7 @@ export default function Dashboard() {
               <div className="bg-gradient-to-br from-violet-600/20 to-blue-600/10 border border-violet-500/20 rounded-xl p-6">
                 <p className="text-sm font-semibold text-violet-300 mb-3">💡 Pro Tip</p>
                 <p className="text-sm text-gray-300 mb-4">Activa ORI Copiloto para recibir sugerencias automáticas en tus cotizaciones.</p>
-                <button className="w-full px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors">
+                <button className="w-full px-4 py-2 rounded-lg bg-[#5b5bf6] hover:bg-[#7070f8] text-white text-sm font-medium transition-colors">
                   Activar ORI
                 </button>
               </div>
