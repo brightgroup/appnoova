@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
+import type { CompanyContext } from "@/types/company-context";
 
 interface Message {
   id: string;
@@ -48,6 +49,8 @@ export default function OriCopilotoPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [contexts, setContexts] = useState<CompanyContext[]>([]);
+  const [contextId, setContextId] = useState<string>("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -60,6 +63,19 @@ export default function OriCopilotoPage() {
         "Corredor";
       setUserName(name.split(" ")[0]);
     });
+  }, []);
+
+  useEffect(() => {
+    getAuthHeaders().then(headers =>
+      fetch("/api/company-contexts", { headers })
+        .then(r => r.json())
+        .then(data => {
+          const list = (data.contexts ?? []) as CompanyContext[];
+          setContexts(list);
+          const def = list.find(c => c.is_default) ?? list[0];
+          if (def) setContextId(def.id);
+        })
+    );
   }, []);
 
   useEffect(() => {
@@ -82,7 +98,10 @@ export default function OriCopilotoPage() {
       const res = await fetch("/api/ori/chat", {
         method: "POST",
         headers,
-        body: JSON.stringify({ messages: nextMessages })
+        body: JSON.stringify({
+          messages: nextMessages,
+          company_context_id: contextId || undefined
+        })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -98,7 +117,7 @@ export default function OriCopilotoPage() {
     } finally {
       setLoading(false);
     }
-  }, [messages, loading]);
+  }, [messages, loading, contextId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -136,6 +155,17 @@ export default function OriCopilotoPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {contexts.length > 0 && (
+            <select
+              value={contextId}
+              onChange={e => setContextId(e.target.value)}
+              className="text-xs font-medium bg-[#14151c] border border-white/[.08] rounded-lg px-2.5 py-1.5 text-gray-300 focus:outline-none focus:border-violet-500/40"
+            >
+              {contexts.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          )}
           {hasChat && (
             <button
               onClick={startNewChat}

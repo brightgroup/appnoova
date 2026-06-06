@@ -18,6 +18,8 @@ export interface VoiceAgentFormData {
   source_template: VoiceSourceTemplateId | string;
   name: string;
   prompt: string;
+  /** Marca / contexto de empresa asignado a este agente. */
+  company_context_id?: string | null;
   voice_name: string;
   model: string;
   voice_speed: number;

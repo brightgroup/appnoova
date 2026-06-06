@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard } from "lucide-react";
+import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard, Building2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
@@ -188,6 +188,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </Link>
 
           {sidebarOpen && <div className="h-px bg-white/[.08] my-2"></div>}
+
+          {/* Contextos de marca */}
+          <Link
+            href="/dashboard/contextos"
+            className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              pathname === "/dashboard/contextos"
+                ? "text-white bg-white/[.08]"
+                : `text-gray-300 ${sidebarOpen ? "hover:text-white hover:bg-white/[.08]" : "hover:text-white"}`
+            }`}
+            title="Contextos de marca"
+          >
+            {sidebarOpen ? (
+              <>
+                <Building2 className="w-5 h-5 flex-shrink-0 mr-3" />
+                <span className="flex-1 text-left">Contextos</span>
+              </>
+            ) : (
+              <Building2 className="w-5 h-5 flex-shrink-0" />
+            )}
+          </Link>
 
           {/* Configuración */}
           <button 

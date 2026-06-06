@@ -6,8 +6,10 @@ import { GoogleGenAI, Modality, type Session, type LiveServerMessage } from "@go
 import { getTemplateMeta } from "@/lib/voice-agent-templates";
 import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
 import { geminiTemperature } from "@/lib/voice-agent-audio";
+import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { parsePcmRate, pcmBase64ToFloat32, resampleTo16kPcm } from "@/lib/voice-session-audio";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
+import { isGoodbyeUtterance } from "@/lib/voice-goodbye-detection";
 import type { VoiceAgentFormData } from "@/types/voice-agent";
 
 type SessionState = "idle" | "connecting" | "listening" | "thinking" | "speaking" | "error";
@@ -21,6 +23,8 @@ export interface VoiceSessionPanelProps {
   sourceTemplate: string;
   agentId?: string | null;
   agentConfig: VoiceAgentFormData;
+  /** Texto del contexto de marca asignado al agente (se fusiona con el prompt). */
+  companyContext?: string | null;
   ready?: boolean;
   onEndCall?: () => void;
   onCallStatusChange?: (active: boolean, durationSec: number) => void;
@@ -30,6 +34,7 @@ export function VoiceSessionPanel({
   sourceTemplate,
   agentId,
   agentConfig,
+  companyContext,
   ready = true,
   onEndCall,
   onCallStatusChange
@@ -51,15 +56,21 @@ export function VoiceSessionPanel({
   const playCtxRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const configRef = useRef(agentConfig);
+  const companyContextRef = useRef(companyContext);
   const nextTimeRef = useRef(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const mutedRef = useRef(false);
   const setupDoneRef = useRef(false);
   const callRecordedRef = useRef(false);
+  const transcriptLinesRef = useRef<TranscriptLine[]>([]);
+  const goodbyeTriggeredRef = useRef(false);
+  const autoHangupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopSessionRef = useRef<() => void>(() => {});
 
   useEffect(() => { mutedRef.current = muted; }, [muted]);
   useEffect(() => { configRef.current = agentConfig; }, [agentConfig]);
+  useEffect(() => { companyContextRef.current = companyContext; }, [companyContext]);
 
   useEffect(() => {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: "smooth" });
@@ -83,14 +94,39 @@ export function VoiceSessionPanel({
 
   const appendTranscript = useCallback((role: "user" | "agent", text: string) => {
     if (!text.trim()) return;
-    setTranscript(prev => {
-      const last = prev[prev.length - 1];
-      if (last?.role === role) {
-        return [...prev.slice(0, -1), { role, text: last.text + text }];
-      }
-      return [...prev, { role, text }];
-    });
+    const prev = transcriptLinesRef.current;
+    const last = prev[prev.length - 1];
+    const next: TranscriptLine[] =
+      last?.role === role
+        ? [...prev.slice(0, -1), { role, text: last.text + text }]
+        : [...prev, { role, text }];
+    transcriptLinesRef.current = next;
+    setTranscript(next);
   }, []);
+
+  const scheduleAutoHangup = useCallback((role: "user" | "agent") => {
+    if (goodbyeTriggeredRef.current) return;
+    goodbyeTriggeredRef.current = true;
+    setStatusHint(
+      role === "user"
+        ? "Despedida detectada · Colgando..."
+        : "Lia se despidió · Colgando..."
+    );
+    const delayMs = role === "agent" ? 2200 : 2800;
+    autoHangupTimerRef.current = setTimeout(() => {
+      stopSessionRef.current();
+    }, delayMs);
+  }, []);
+
+  const checkGoodbyeAndHangup = useCallback(() => {
+    if (goodbyeTriggeredRef.current || !setupDoneRef.current) return;
+    const lines = transcriptLinesRef.current;
+    if (lines.length < 2) return;
+    const last = lines[lines.length - 1];
+    if (last && isGoodbyeUtterance(last.text)) {
+      scheduleAutoHangup(last.role);
+    }
+  }, [scheduleAutoHangup]);
 
   const playAudioChunk = useCallback(async (b64: string, mimeType?: string) => {
     const rate = parsePcmRate(mimeType);
@@ -186,11 +222,20 @@ export function VoiceSessionPanel({
     if (sc.interrupted && playCtxRef.current) {
       nextTimeRef.current = playCtxRef.current.currentTime;
     }
-    if (sc.turnComplete) setState("listening");
-  }, [agentId, appendTranscript, playAudioChunk, startMicStreaming]);
+    if (sc.turnComplete) {
+      checkGoodbyeAndHangup();
+      setState("listening");
+    }
+  }, [agentId, appendTranscript, playAudioChunk, startMicStreaming, checkGoodbyeAndHangup]);
 
   const cleanupResources = useCallback(() => {
     setupDoneRef.current = false;
+    goodbyeTriggeredRef.current = false;
+    if (autoHangupTimerRef.current) {
+      clearTimeout(autoHangupTimerRef.current);
+      autoHangupTimerRef.current = null;
+    }
+    transcriptLinesRef.current = [];
     sessionRef.current?.close();
     sessionRef.current = null;
     procRef.current?.disconnect();
@@ -213,11 +258,15 @@ export function VoiceSessionPanel({
     onEndCall?.();
   }, [cleanupResources, onEndCall]);
 
+  stopSessionRef.current = stopSession;
+
   const startSession = useCallback(async () => {
     setState("connecting");
     setError("");
     setStatusHint("Obteniendo configuración...");
     setTranscript([]);
+    transcriptLinesRef.current = [];
+    goodbyeTriggeredRef.current = false;
     setDuration(0);
     setupDoneRef.current = false;
     callRecordedRef.current = false;
@@ -267,7 +316,9 @@ export function VoiceSessionPanel({
           },
           thinkingConfig: { includeThoughts: false, thinkingBudget: 0 },
           temperature: geminiTemperature(cfg.temperature),
-          systemInstruction: cfg.prompt,
+          systemInstruction: `${mergeCompanyContext(cfg.prompt, companyContextRef.current)}
+
+Si el usuario se despide o indica que quiere terminar la conversación, despídete de forma breve y cordial en español colombiano (máximo una oración) y cierra la llamada.`,
           inputAudioTranscription: {},
           outputAudioTranscription: {}
         },

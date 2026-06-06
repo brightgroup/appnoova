@@ -144,11 +144,17 @@ export async function POST(req: NextRequest) {
     volume: form.volume,
     llm_model: form.llm_model,
     color: form.color ?? defaults.color,
+    company_context_id: form.company_context_id || null,
     updated_at: new Date().toISOString()
   };
 
   if (body.id) {
-    const { data, error } = await updateVoiceAgentRow(db, row, body.id, userId);
+    let { data, error } = await updateVoiceAgentRow(db, row, body.id, userId);
+
+    if (error?.message?.includes("company_context_id")) {
+      const { company_context_id: _c, ...rest } = row;
+      ({ data, error } = await updateVoiceAgentRow(db, rest, body.id, userId));
+    }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -160,7 +166,12 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const { data, error } = await insertVoiceAgentRow(db, row);
+  let { data, error } = await insertVoiceAgentRow(db, row);
+
+  if (error?.message?.includes("company_context_id")) {
+    const { company_context_id: _c, ...rest } = row;
+    ({ data, error } = await insertVoiceAgentRow(db, rest));
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

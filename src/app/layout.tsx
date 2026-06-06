@@ -11,6 +11,10 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   title: "Noova 360",
   description: "AI Platform for Insurance Agents",
+  icons: {
+    icon: [{ url: "/favicon.png", type: "image/png" }],
+    apple: [{ url: "/favicon.png", type: "image/png" }]
+  }
 };
 
 export default function RootLayout({

@@ -1,8 +1,9 @@
-import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
+import { GoogleGenAI } from "@google/genai";
 import { getOriApiKey, getOriModel } from "@/lib/google-ai";
+import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { ORI_SYSTEM_PROMPT } from "@/lib/ori-prompt";
-import { getUserIdFromRequest } from "@/lib/voice-agents-server";
+import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -28,12 +29,35 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const messages = (body.messages ?? []) as ChatMessage[];
+  const companyContextId = body.company_context_id as string | undefined;
   const lastUser = [...messages].reverse().find(m => m.role === "user");
 
   if (!lastUser?.content?.trim()) {
     return NextResponse.json({ error: "Mensaje vacío" }, { status: 400 });
   }
 
+  let companyContextText = "";
+  if (companyContextId) {
+    const db = adminClient();
+    const { data } = await db
+      .from("company_contexts")
+      .select("content")
+      .eq("id", companyContextId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    companyContextText = data?.content ?? "";
+  } else {
+    const db = adminClient();
+    const { data } = await db
+      .from("company_contexts")
+      .select("content")
+      .eq("user_id", userId)
+      .eq("is_default", true)
+      .maybeSingle();
+    companyContextText = data?.content ?? "";
+  }
+
+  const systemInstruction = mergeCompanyContext(ORI_SYSTEM_PROMPT, companyContextText);
   const model = getOriModel();
   const ai = new GoogleGenAI({ apiKey });
 
@@ -47,7 +71,7 @@ export async function POST(req: NextRequest) {
       model,
       contents,
       config: {
-        systemInstruction: ORI_SYSTEM_PROMPT,
+        systemInstruction,
         temperature: 0.7,
         maxOutputTokens: 2048
       }

@@ -10,6 +10,7 @@ export function normalizeVoiceAgentForm(
     source_template: source,
     name: raw.name ?? "",
     prompt: raw.prompt ?? "",
+    company_context_id: raw.company_context_id ? String(raw.company_context_id) : null,
     voice_name: raw.voice_name ?? "Aoede",
     model: raw.model ?? "gemini-2.5-flash-native-audio-preview-12-2025",
     voice_speed: clamp(Number(raw.voice_speed) || 1, 0.5, 1.5),

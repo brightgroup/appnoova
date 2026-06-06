@@ -5,19 +5,20 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Save, Loader2, CheckCircle2, Phone, Settings2,
-  FileText, BarChart3, History, Radio, LayoutGrid
+  BarChart3, History, Radio, LayoutGrid
 } from "lucide-react";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import { getTemplateMeta } from "@/lib/voice-agent-templates";
 import { normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
 import { GEMINI_VOICES, VOICE_MODELS, LLM_MODELS } from "@/lib/voice-agent-options";
 import type { VoiceAgentFormData, VoiceAgentRecord } from "@/types/voice-agent";
+import type { CompanyContext } from "@/types/company-context";
 import { VoiceSessionPanel } from "@/components/voice/VoiceSessionPanel";
 
-type TabId = "contexto" | "probar" | "config" | "analisis" | "registro" | "metrica" | "canales";
+type TabId = "probar" | "config" | "analisis" | "registro" | "metrica" | "canales";
 
 function parseTab(tab: string | null): TabId {
-  if (tab === "probar" || tab === "contexto" || tab === "config") return tab;
+  if (tab === "probar" || tab === "config") return tab;
   return "config";
 }
 
@@ -53,6 +54,7 @@ function ConfigContent() {
     source_template: "lead-qualification",
     name: "",
     prompt: "",
+    company_context_id: null,
     voice_name: "Aoede",
     model: VOICE_MODELS[0].id,
     voice_speed: 1.0,
@@ -62,7 +64,20 @@ function ConfigContent() {
     color: null
   });
 
+  const [contexts, setContexts] = useState<CompanyContext[]>([]);
+
   const meta = getTemplateMeta(form.source_template);
+  const assignedContext = contexts.find(c => c.id === form.company_context_id);
+  const companyContextText = assignedContext?.content ?? "";
+
+  const loadContexts = useCallback(async () => {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/company-contexts", { headers });
+      const data = await res.json();
+      if (res.ok) setContexts(data.contexts ?? []);
+    } catch { /* optional */ }
+  }, []);
 
   const loadAgent = useCallback(async () => {
     if (!agentIdParam) {
@@ -94,6 +109,7 @@ function ConfigContent() {
   }, [agentIdParam]);
 
   useEffect(() => { loadAgent(); }, [loadAgent]);
+  useEffect(() => { loadContexts(); }, [loadContexts]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -125,7 +141,6 @@ function ConfigContent() {
   };
 
   const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
-    { id: "contexto", label: "Contexto", icon: FileText },
     { id: "probar", label: "Probar agente", icon: Phone },
     { id: "config", label: "Configuración", icon: Settings2 },
     { id: "analisis", label: "Análisis de llamadas", icon: BarChart3 },
@@ -206,7 +221,7 @@ function ConfigContent() {
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
-          const disabled = !["config", "probar", "contexto"].includes(tab.id);
+          const disabled = !["config", "probar"].includes(tab.id);
 
           return (
             <button
@@ -242,6 +257,30 @@ function ConfigContent() {
             <h2 className="text-sm font-semibold text-gray-300 mb-4">Configuración de voz</h2>
 
             <div className="space-y-4">
+              <Field label="Marca / contexto">
+                <select
+                  value={form.company_context_id ?? ""}
+                  onChange={e => setForm(f => ({
+                    ...f,
+                    company_context_id: e.target.value || null
+                  }))}
+                  className={selectCls}
+                >
+                  <option value="">Sin marca (solo prompt del agente)</option>
+                  {contexts.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{c.is_default ? " · predeterminada" : ""}
+                    </option>
+                  ))}
+                </select>
+                <Link
+                  href="/dashboard/contextos"
+                  className="inline-block mt-2 text-[11px] text-violet-400 hover:text-violet-300"
+                >
+                  Gestionar contextos de marca →
+                </Link>
+              </Field>
+
               <Field label="Voz">
                 <select
                   value={form.voice_name}
@@ -366,6 +405,7 @@ function ConfigContent() {
           sourceTemplate={form.source_template}
           agentId={agentId}
           agentConfig={form}
+          companyContext={companyContextText}
           ready={!loading}
           onEndCall={() => setTab("config")}
           onCallStatusChange={(active, sec) => {
@@ -373,22 +413,6 @@ function ConfigContent() {
             setCallDuration(sec);
           }}
         />
-      )}
-
-      {/* Contexto tab */}
-      {activeTab === "contexto" && (
-        <div className="flex-1 p-6 overflow-y-auto">
-          <div className="max-w-2xl space-y-4">
-            <h2 className="text-base font-semibold">Contexto del agente</h2>
-            <p className="text-sm text-gray-400 leading-relaxed">
-              Este agente se basa en la plantilla <strong className="text-white">{meta.name}</strong>.
-              Personaliza el prompt en la pestaña Configuración. Cada usuario tiene su propia copia editable.
-            </p>
-            <div className="p-4 rounded-xl bg-white/[.03] border border-white/[.08] text-sm text-gray-300 whitespace-pre-wrap font-mono">
-              {form.prompt.slice(0, 600)}{form.prompt.length > 600 ? "..." : ""}
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );
