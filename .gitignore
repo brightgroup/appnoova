@@ -32,3 +32,6 @@ next-env.d.ts
 # Backups
 *.tar.gz
 *.zip
+backups/*.sql
+backups/*.dump
+!backups/.gitkeep

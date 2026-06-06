@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "backup:db": "node scripts/backup-supabase.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.8.0",
