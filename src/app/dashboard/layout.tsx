@@ -108,7 +108,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   { name: "Agentes", href: "/dashboard/agentes-voz" },
                   { name: "Historial", href: "#" },
                   { name: "Números telefónicos", href: "/dashboard/agentes-voz/numeros" },
-                  { name: "Números de prueba", href: "#" },
+                  { name: "Números de prueba", href: "/dashboard/agentes-voz/numeros-prueba" },
                   { name: "Troncales SIP", href: "#" },
                   { name: "Canales", href: "#" }
                 ].map((item, i) => (

@@ -14,7 +14,7 @@ import { normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
 import { GEMINI_VOICES, VOICE_MODELS, LLM_MODELS } from "@/lib/voice-agent-options";
 import type { VoiceAgentFormData, VoiceAgentRecord } from "@/types/voice-agent";
 import type { CompanyContext } from "@/types/company-context";
-import { VoiceSessionPanel } from "@/components/voice/VoiceSessionPanel";
+import { AgentTestPanel } from "@/components/voice/AgentTestPanel";
 import { CallRegistryPanel } from "@/components/voice/CallRegistryPanel";
 import { AgentPhoneChannelPanel } from "@/components/telephony/AgentPhoneChannelPanel";
 
@@ -412,11 +412,12 @@ function ConfigContent() {
         <AgentPhoneChannelPanel agentId={agentId} />
       )}
 
-      {/* Probar agente — sesión en vivo */}
+      {/* Probar agente — web o teléfono */}
       {activeTab === "probar" && (
-        <VoiceSessionPanel
+        <AgentTestPanel
           sourceTemplate={form.source_template}
           agentId={agentId}
+          agentName={form.name}
           agentConfig={form}
           companyContext={companyContextText}
           ready={!loading}

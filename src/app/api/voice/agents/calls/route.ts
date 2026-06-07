@@ -119,7 +119,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await db
     .from("voice_agent_calls")
-    .select("id, voice_agent_id, phone_number, duration_sec, credits, status_label, disconnect_reason, user_sentiment, summary, audio_url, created_at")
+    .select("id, voice_agent_id, phone_number, duration_sec, credits, status_label, disconnect_reason, user_sentiment, summary, audio_url, metadata, created_at")
     .eq("user_id", userId)
     .eq("voice_agent_id", agentId)
     .order("created_at", { ascending: false });

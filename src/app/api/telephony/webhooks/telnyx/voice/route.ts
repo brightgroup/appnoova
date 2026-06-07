@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminClient } from "@/lib/voice-agents-server";
+import { agentGreeting, logInboundCall, resolveInboundCall } from "@/lib/telephony/inbound-call";
+import { answerAndSpeak } from "@/lib/telephony/telnyx-call-control";
 
-/** Webhook Telnyx Call Control — placeholder MVP. */
+/** Webhook Telnyx Call Control — atiende llamadas de prueba al agente asignado. */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const data = body.data ?? body;
@@ -13,26 +14,18 @@ export async function POST(req: NextRequest) {
 
   console.info("[telnyx:voice]", { eventType, from, to, callId });
 
-  if (eventType === "call.initiated" && to) {
-    const db = adminClient();
-    const e164 = String(to).startsWith("+") ? String(to) : `+${String(to).replace(/\D/g, "")}`;
-    const { data: phone } = await db
-      .from("phone_numbers")
-      .select("id, user_id, voice_agent_id")
-      .eq("e164", e164)
-      .eq("status", "active")
-      .maybeSingle();
+  if (eventType === "call.initiated" && to && callId) {
+    const ctx = await resolveInboundCall(String(to), String(from));
+    if (ctx?.agent) {
+      const greeting = agentGreeting(ctx.agent.name, ctx.agent.prompt);
 
-    if (phone?.voice_agent_id) {
-      await db.from("voice_agent_calls").insert({
-        user_id: phone.user_id,
-        voice_agent_id: phone.voice_agent_id,
-        phone_number: from ? String(from) : "Desconocido",
-        status: "missed",
-        status_label: "Inbound - Pendiente conectar agente IA",
-        summary: "Llamada entrante Telnyx. Conecta Vapi/Retell para atender.",
-        metadata: { telnyx_call_id: callId, direction: "inbound", to: e164 }
-      });
+      try {
+        await answerAndSpeak(String(callId), greeting);
+      } catch (e) {
+        console.error("[telnyx:voice] answer/speak error:", e);
+      }
+
+      await logInboundCall(ctx, { telnyx_call_id: callId, event_type: eventType });
     }
   }
 
