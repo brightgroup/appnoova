@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Phone, Loader2, Copy, CheckCircle2, Radio, AlertCircle } from "lucide-react";
+import { Phone, Loader2, Copy, CheckCircle2, Radio, AlertCircle, ArrowDown } from "lucide-react";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import { btnPrimarySm, btnGhost, textMuted, textSecondary } from "@/lib/brand-ui";
 import type { PhoneNumberRecord } from "@/types/phone-number";
@@ -15,8 +15,9 @@ interface PhoneTestPanelProps {
 }
 
 export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTestPanelProps) {
-  const [line, setLine] = useState<PhoneNumberRecord | null>(null);
+  const [agentLines, setAgentLines] = useState<PhoneNumberRecord[]>([]);
   const [testNumbers, setTestNumbers] = useState<TestPhoneNumberRecord[]>([]);
+  const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [selectedTestId, setSelectedTestId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [listening, setListening] = useState(false);
@@ -39,12 +40,14 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
       ]);
       const lineData = await lineRes.json();
       const testData = await testRes.json();
-      if (lineRes.ok) setLine((lineData.phone_numbers ?? [])[0] ?? null);
-      if (testRes.ok) {
-        const nums = testData.test_numbers ?? [];
-        setTestNumbers(nums);
-        setSelectedTestId(prev => prev ?? nums[0]?.id ?? null);
-      }
+
+      const lines: PhoneNumberRecord[] = lineRes.ok ? (lineData.phone_numbers ?? []) : [];
+      const tests: TestPhoneNumberRecord[] = testRes.ok ? (testData.test_numbers ?? []) : [];
+
+      setAgentLines(lines);
+      setTestNumbers(tests);
+      setSelectedLineId(prev => prev ?? lines[0]?.id ?? null);
+      setSelectedTestId(prev => prev ?? tests[0]?.id ?? null);
     } finally {
       setLoading(false);
     }
@@ -52,7 +55,9 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
 
   useEffect(() => { load(); }, [load]);
 
+  const selectedLine = agentLines.find(l => l.id === selectedLineId) ?? null;
   const selectedTest = testNumbers.find(n => n.id === selectedTestId) ?? null;
+  const canTest = Boolean(selectedLine && selectedTest);
 
   const stopListening = useCallback(() => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -61,7 +66,7 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
   }, []);
 
   const startListening = useCallback(() => {
-    if (!agentId || !line) return;
+    if (!agentId || !selectedLine || !selectedTest) return;
     setDetected(false);
     setListening(true);
     listenStartRef.current = new Date().toISOString();
@@ -77,12 +82,12 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
         const match = (data.calls ?? []).find((c: {
           phone_number: string;
           created_at: string;
-          metadata?: { is_test_call?: boolean; direction?: string };
+          metadata?: { is_test_call?: boolean; direction?: string; to?: string };
         }) => {
           if (!since || c.created_at < since) return false;
-          const fromTest = selectedTest && c.phone_number === selectedTest.e164;
-          const isInbound = c.metadata?.direction === "inbound" || c.metadata?.is_test_call;
-          return fromTest || isInbound;
+          const fromMatch = c.phone_number === selectedTest.e164;
+          const toMatch = c.metadata?.to === selectedLine.e164;
+          return fromMatch && (toMatch || c.metadata?.direction === "inbound");
         });
 
         if (match) {
@@ -92,13 +97,13 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
         }
       } catch { /* ignore poll errors */ }
     }, 3000);
-  }, [agentId, line, onCallDetected, selectedTest, stopListening]);
+  }, [agentId, onCallDetected, selectedLine, selectedTest, stopListening]);
 
   useEffect(() => () => stopListening(), [stopListening]);
 
-  async function copyNumber() {
-    if (!line?.e164) return;
-    await navigator.clipboard.writeText(line.e164);
+  async function copyDestination() {
+    if (!selectedLine?.e164) return;
+    await navigator.clipboard.writeText(selectedLine.e164);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -121,74 +126,98 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-2xl mx-auto space-y-5">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Phone className="w-5 h-5 text-[#5b5bf6]" />
             <h2 className="text-lg font-semibold text-white">Probar por teléfono</h2>
           </div>
           <p className={`text-sm ${textMuted}`}>
-            Llama al número asignado a <strong className="text-white">{agentName}</strong> desde tu celular de prueba.
+            Elige la línea de <strong className="text-white">{agentName}</strong> y el celular desde el que llamarás.
           </p>
         </div>
 
-        {!line ? (
-          <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[.06] p-6 space-y-3">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-amber-100">Sin línea asignada</p>
-                <p className={`text-xs ${textMuted} mt-1`}>
-                  Asigna un número en la pestaña <strong className="text-white">Canales</strong> antes de probar por teléfono.
-                </p>
-                <Link href={`/dashboard/agentes-voz/configuracion?id=${agentId}&tab=canales`} className="inline-block mt-3 text-xs text-[#5b5bf6] hover:underline">
-                  Ir a Canales →
-                </Link>
+        {/* Número destino — líneas asignadas al agente */}
+        <div className="rounded-2xl border border-white/[.10] bg-noova-surface p-5 space-y-3">
+          <div>
+            <p className={`text-[11px] font-medium ${textMuted} uppercase tracking-wide`}>Número destino</p>
+            <p className={`text-xs ${textSecondary} mt-0.5`}>Línea del agente a la que marcarás</p>
+          </div>
+
+          {agentLines.length > 0 ? (
+            <>
+              <select
+                value={selectedLineId ?? ""}
+                onChange={e => setSelectedLineId(e.target.value)}
+                className="w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-violet-500/50"
+              >
+                {agentLines.map(l => (
+                  <option key={l.id} value={l.id}>{l.e164}</option>
+                ))}
+              </select>
+              {selectedLine && (
+                <button onClick={copyDestination} className={btnPrimarySm}>
+                  {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? "Copiado" : "Copiar destino"}
+                </button>
+              )}
+            </>
+          ) : (
+            <div className="rounded-xl border border-amber-500/25 bg-amber-500/[.06] p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-100">Sin línea asignada a este agente</p>
+                  <p className={`text-xs ${textMuted} mt-1`}>
+                    Asigna una línea en <strong className="text-white">Canales</strong> para que aparezca aquí.
+                  </p>
+                  <Link
+                    href={`/dashboard/agentes-voz/configuracion?id=${agentId}&tab=canales`}
+                    className="inline-block mt-2 text-xs text-[#5b5bf6] hover:underline"
+                  >
+                    Ir a Canales →
+                  </Link>
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-white/[.10] bg-noova-surface p-6 space-y-4">
-            <div>
-              <p className={`text-xs uppercase tracking-wide ${textMuted} mb-1`}>Llama a este número</p>
-              <p className="text-3xl font-bold text-white font-mono">{line.e164}</p>
-            </div>
-            <button onClick={copyNumber} className={btnPrimarySm}>
-              {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              {copied ? "Copiado" : "Copiar número"}
-            </button>
-          </div>
-        )}
+          )}
+        </div>
 
-        {testNumbers.length > 0 ? (
-          <div className="rounded-2xl border border-white/[.10] bg-noova-surface p-5">
-            <label className={`block text-[11px] font-medium ${textMuted} mb-1.5 uppercase tracking-wide`}>
-              Llamarás desde
-            </label>
+        <div className="flex justify-center">
+          <ArrowDown className="w-4 h-4 text-gray-500" />
+        </div>
+
+        {/* Número remitente — celular de prueba */}
+        <div className="rounded-2xl border border-white/[.10] bg-noova-surface p-5 space-y-3">
+          <div>
+            <p className={`text-[11px] font-medium ${textMuted} uppercase tracking-wide`}>Número remitente</p>
+            <p className={`text-xs ${textSecondary} mt-0.5`}>Celular desde el que harás la llamada de prueba</p>
+          </div>
+
+          {testNumbers.length > 0 ? (
             <select
               value={selectedTestId ?? ""}
               onChange={e => setSelectedTestId(e.target.value)}
-              className="w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500/50"
+              className="w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500/50"
             >
               {testNumbers.map(n => (
                 <option key={n.id} value={n.id}>{n.label} · {n.e164}</option>
               ))}
             </select>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-white/[.12] bg-noova-surface/50 p-6 text-center space-y-2">
-            <p className={`text-sm ${textSecondary}`}>No tienes números de prueba</p>
-            <p className={`text-xs ${textMuted}`}>
-              Agrégalos en{" "}
-              <Link href="/dashboard/agentes-voz/numeros-prueba" className="text-[#5b5bf6] hover:underline">
-                Números de prueba
-              </Link>{" "}
-              y vuelve aquí para probar.
-            </p>
-          </div>
-        )}
+          ) : (
+            <div className="rounded-xl border border-dashed border-white/[.12] p-4 text-center space-y-1">
+              <p className={`text-sm ${textSecondary}`}>Sin números de prueba</p>
+              <p className={`text-xs ${textMuted}`}>
+                Créalos en{" "}
+                <Link href="/dashboard/agentes-voz/numeros-prueba" className="text-[#5b5bf6] hover:underline">
+                  Números de prueba
+                </Link>
+              </p>
+            </div>
+          )}
+        </div>
 
-        {line && selectedTest && (
+        {canTest && (
           <div className="rounded-2xl border border-white/[.10] bg-noova-surface p-6 space-y-4">
             <div className="flex items-start gap-3">
               <Radio className={`w-5 h-5 shrink-0 mt-0.5 ${listening ? "text-[#5b5bf6] animate-pulse" : "text-gray-400"}`} />
@@ -197,8 +226,8 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
                   {detected ? "¡Llamada detectada!" : listening ? "Esperando tu llamada..." : "Listo para probar"}
                 </p>
                 <p className={`text-xs ${textSecondary} mt-1 leading-relaxed`}>
-                  Desde <span className="font-mono text-white">{selectedTest.e164}</span> llama a{" "}
-                  <span className="font-mono text-white">{line.e164}</span>. El agente contestará con su saludo.
+                  Desde <span className="font-mono text-white">{selectedTest!.e164}</span> (remitente) llama a{" "}
+                  <span className="font-mono text-white">{selectedLine!.e164}</span> (destino). El agente contestará con su saludo.
                 </p>
               </div>
             </div>
@@ -224,7 +253,6 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
             )}
           </div>
         )}
-
       </div>
     </div>
   );
