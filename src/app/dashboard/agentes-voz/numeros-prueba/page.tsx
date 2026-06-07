@@ -19,15 +19,13 @@ export default function NumerosPruebaPage() {
           <div>
             <h1 className="text-xl font-bold tracking-tight">Números de prueba</h1>
             <p className={`text-xs ${textMuted} mt-0.5`}>
-              Celulares destinatarios para recibir llamadas de prueba del agente
+              Números exentos de cargos para recibir llamadas de prueba de tus agentes
             </p>
           </div>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-xl">
-          <TestPhoneNumbersPanel />
-        </div>
+      <div className="flex-1 overflow-y-auto p-6 min-h-0">
+        <TestPhoneNumbersPanel />
       </div>
     </div>
   );
