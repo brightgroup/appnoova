@@ -19,7 +19,7 @@ export default function NumerosPruebaPage() {
           <div>
             <h1 className="text-xl font-bold tracking-tight">Números de prueba</h1>
             <p className={`text-xs ${textMuted} mt-0.5`}>
-              Celulares desde los que llamarás para probar tus agentes
+              Celulares destinatarios para recibir llamadas de prueba del agente
             </p>
           </div>
         </div>

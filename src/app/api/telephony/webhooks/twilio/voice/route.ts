@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { agentGreeting, logInboundCall, resolveInboundCall } from "@/lib/telephony/inbound-call";
+import { agentGreeting, logPhoneTestCall, resolveAgentLine } from "@/lib/telephony/phone-call";
 
 /** Webhook Twilio — llamada entrante al agente asignado. */
 export async function POST(req: NextRequest) {
@@ -8,11 +8,16 @@ export async function POST(req: NextRequest) {
   const caller = String(form.get("From") ?? "");
   const callSid = String(form.get("CallSid") ?? "");
 
-  const ctx = await resolveInboundCall(called, caller);
+  const ctx = await resolveAgentLine(called);
 
   if (ctx?.agent) {
     const greeting = agentGreeting(ctx.agent.name, ctx.agent.prompt);
-    await logInboundCall(ctx, { twilio_call_sid: callSid, direction: "inbound" });
+    await logPhoneTestCall(ctx, {
+      direction: "inbound",
+      counterpartyE164: caller || "Desconocido",
+      isTest: false,
+      meta: { twilio_call_sid: callSid }
+    });
 
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>

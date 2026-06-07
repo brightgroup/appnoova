@@ -98,7 +98,7 @@ export function TestPhoneNumbersPanel() {
         <div>
           <h2 className="text-lg font-semibold text-white">Números de prueba</h2>
           <p className={`text-sm ${textMuted}`}>
-            Celulares desde los que llamarás para probar tus agentes.
+            Celulares destinatarios que recibirán las llamadas de prueba del agente.
           </p>
         </div>
         <div className="flex gap-2">
@@ -149,7 +149,7 @@ export function TestPhoneNumbersPanel() {
         <div className="rounded-xl border border-dashed border-white/[.12] text-center p-10">
           <Phone className="w-8 h-8 text-gray-600 mx-auto mb-2" />
           <p className={`text-sm ${textSecondary}`}>Sin números de prueba</p>
-          <p className={`text-xs ${textMuted} mt-1`}>Agrega el celular desde el que llamarás a tus agentes.</p>
+          <p className={`text-xs ${textMuted} mt-1`}>Agrega el celular que recibirá las llamadas de prueba.</p>
         </div>
       ) : (
         <ul className="space-y-2">
