@@ -63,29 +63,112 @@ export const btnFilterIdle =
 export const tabActive = "text-white border-[#5b5bf6]";
 export const tabIdle = "text-gray-300 border-transparent hover:text-white";
 
+/* ── Sidebar — acento azul vivo, minimalista ── */
+export const sidebarNavActive =
+  "text-white bg-[#5b5bf6]/[.14]";
+
+export const sidebarNavIdle =
+  "text-gray-300 hover:text-white hover:bg-white/[.06]";
+
+export const sidebarIconActive = "text-[#5b5bf6]";
+
+export const sidebarBadge =
+  "text-[10px] px-1.5 py-0.5 rounded-md bg-[#5b5bf6] text-white font-medium leading-none";
+
+export const sidebarPlanCard =
+  "rounded-lg p-3 bg-white/[.04]";
+
+/* ── Acento de marca (reemplaza violet/indigo en toda la app) ── */
+export const accentText = "text-[#5b5bf6]";
+export const accentTextHover = "hover:text-[#7070f8]";
+export const accentTextLight = "text-[#a5a5ff]";
+export const accentBgSubtle = "bg-[#5b5bf6]/10";
+export const accentBgMedium = "bg-[#5b5bf6]/14";
+export const accentBorder = "border-[#5b5bf6]/20";
+export const accentBorderMedium = "border-[#5b5bf6]/30";
+export const accentFocus =
+  "focus:border-[#5b5bf6]/50 focus:ring-1 focus:ring-[#5b5bf6]/20 focus:outline-none";
+export const accentBadge =
+  "text-xs px-2 py-0.5 rounded-full bg-[#5b5bf6]/14 text-[#a5a5ff]";
+export const accentGradientIcon = "bg-gradient-to-br from-[#5b5bf6] to-[#7070f8]";
+export const accentGlow = "bg-[#5b5bf6]/10";
+export const accentCard =
+  "bg-[#5b5bf6]/10 border border-[#5b5bf6]/20";
+export const accentNavActive =
+  "bg-[#5b5bf6]/14 text-white border border-[#5b5bf6]/20";
+
 /* ── Inputs ── */
 export const inputSearch =
   "w-full bg-noova-surface border border-white/[.12] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white " +
   "placeholder-gray-400 focus:outline-none focus:border-white/[.22] focus:ring-1 focus:ring-white/[.10] transition-colors";
 
-/* ── Tablas (registro de llamadas / agentes) ── */
+/* ── Tablas (registro de llamadas / agentes) — sin recuadros, solo líneas horizontales ── */
 export const registryPage =
   "flex-1 flex flex-col min-h-0 bg-noova-main text-white overflow-hidden";
 
 export const registryToolbar =
-  "px-5 py-4 border-b border-white/[.10] shrink-0 bg-noova-main";
+  "px-5 py-4 border-b border-white/[.08] shrink-0 bg-noova-main";
+
+export const registryContent =
+  "flex-1 overflow-y-auto p-6 min-h-0";
+
+/** Contenedor interno del panel — mismo layout que Números de prueba */
+export const registryPanel =
+  "flex flex-col min-h-0";
+
+export const registryDescription =
+  "text-sm text-gray-200 leading-relaxed mb-5 max-w-3xl";
+
+export const registrySearchRow =
+  "flex items-center gap-3 mb-4";
+
+export const registryTableArea =
+  "min-w-0";
+
+export const registryTableWrap =
+  "flex-1 overflow-auto min-h-0";
+
+export const registryTable =
+  "w-full border-collapse text-xs";
 
 export const registryTableHead =
-  "sticky top-0 z-10 bg-noova-surface border-b border-white/[.12]";
+  "sticky top-0 z-10 bg-noova-main";
 
 export const registryTableHeadRow =
-  "text-gray-300 uppercase tracking-wide text-[10px] font-semibold";
+  "border-b border-white/[.08]";
+
+export const registryTableHeadCell =
+  "px-5 py-3 text-left text-xs font-semibold text-white whitespace-nowrap";
 
 export const registryTableRow =
-  "border-b border-white/[.08] hover:bg-white/[.05] cursor-pointer transition-colors group";
+  "border-b border-white/[.06] hover:bg-white/[.03] transition-colors group";
+
+export const registryTableRowClickable =
+  "border-b border-white/[.06] hover:bg-white/[.03] cursor-pointer transition-colors group";
+
+export const registryTableCellFirst =
+  "px-5 py-3.5";
+
+export const registryTableCell =
+  "px-4 py-3.5";
+
+export const registryTableCellMuted =
+  "px-4 py-3.5 text-gray-300";
+
+export const registryTableCellRight =
+  "px-4 py-3.5 text-right";
+
+export const registryTableLoading =
+  "flex items-center justify-center py-20 text-gray-400";
+
+export const registryTableEmpty =
+  "py-20 text-center text-sm text-gray-400";
+
+export const registryTableFooter =
+  "flex items-center justify-between gap-4 mt-4 text-xs text-gray-400 shrink-0";
 
 export const registryRowIcon =
-  "w-8 h-8 rounded-lg bg-noova-surface border border-white/[.12] flex items-center justify-center shrink-0 text-gray-300";
+  "text-gray-400 shrink-0";
 
 export function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {

@@ -89,7 +89,7 @@ export default function SignupPage() {
 
         {/* Logo */}
         <div className="mb-10">
-          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#5b5bf6] to-[#7070f8] flex items-center justify-center">
             <span className="text-white font-bold text-xl">N</span>
           </div>
         </div>
@@ -123,7 +123,7 @@ export default function SignupPage() {
                   type="text"
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 transition-all focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/20"
+                  className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 transition-all focus:border-[#5b5bf6]/50 focus:outline-none focus:ring-1 focus:ring-[#5b5bf6]/20"
                   placeholder="Juan García"
                 />
               </div>
@@ -137,7 +137,7 @@ export default function SignupPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 transition-all focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/20"
+                  className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 transition-all focus:border-[#5b5bf6]/50 focus:outline-none focus:ring-1 focus:ring-[#5b5bf6]/20"
                   placeholder="tu@email.com"
                 />
               </div>
@@ -152,7 +152,7 @@ export default function SignupPage() {
                     type={showPass ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 pr-10 text-white placeholder-gray-500 transition-all focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/20"
+                    className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 pr-10 text-white placeholder-gray-500 transition-all focus:border-[#5b5bf6]/50 focus:outline-none focus:ring-1 focus:ring-[#5b5bf6]/20"
                     placeholder="••••••••"
                   />
                   <button
@@ -175,7 +175,7 @@ export default function SignupPage() {
                     type={showConfirm ? "text" : "password"}
                     value={confirmPass}
                     onChange={(e) => setConfirmPass(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 pr-10 text-white placeholder-gray-500 transition-all focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/20"
+                    className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 pr-10 text-white placeholder-gray-500 transition-all focus:border-[#5b5bf6]/50 focus:outline-none focus:ring-1 focus:ring-[#5b5bf6]/20"
                     placeholder="••••••••"
                   />
                   <button
@@ -212,7 +212,7 @@ export default function SignupPage() {
                 ¿Ya tienes cuenta?{" "}
                 <Link
                   href="/login"
-                  className="text-violet-400 hover:text-violet-300 transition-colors font-medium"
+                  className="text-[#5b5bf6] hover:text-[#a5a5ff] transition-colors font-medium"
                 >
                   Inicia sesión
                 </Link>

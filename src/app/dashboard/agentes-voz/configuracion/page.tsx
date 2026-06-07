@@ -279,7 +279,7 @@ function ConfigContent() {
                 </select>
                 <Link
                   href="/dashboard/contextos"
-                  className="inline-block mt-2 text-[11px] text-violet-400 hover:text-violet-300"
+                  className="inline-block mt-2 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]"
                 >
                   Gestionar contextos de marca →
                 </Link>
@@ -350,8 +350,8 @@ function ConfigContent() {
               </Field>
             </div>
 
-            <div className="mt-6 p-3 rounded-xl bg-violet-500/10 border border-violet-500/20">
-              <p className="text-[10px] text-violet-300 font-semibold uppercase tracking-wider mb-1">Plantilla base</p>
+            <div className="mt-6 p-3 rounded-xl bg-[#5b5bf6]/10 border border-[#5b5bf6]/20">
+              <p className="text-[10px] text-[#a5a5ff] font-semibold uppercase tracking-wider mb-1">Plantilla base</p>
               <p className="text-xs text-gray-400 leading-relaxed">
                 Los cambios aquí son solo para tu cuenta. La plantilla original no se modifica.
               </p>
@@ -365,7 +365,7 @@ function ConfigContent() {
                 <input
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  className="w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500/50"
+                  className="w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
                 />
               </Field>
               <div className="flex gap-1 ml-4 shrink-0">
@@ -390,7 +390,7 @@ function ConfigContent() {
                 <textarea
                   value={form.prompt}
                   onChange={e => setForm(f => ({ ...f, prompt: e.target.value }))}
-                  className="w-full h-full min-h-[400px] bg-noova-surface border border-white/[.08] rounded-xl p-4 text-sm text-gray-200 font-mono leading-relaxed resize-none focus:outline-none focus:border-violet-500/40"
+                  className="w-full h-full min-h-[400px] bg-noova-surface border border-white/[.08] rounded-xl p-4 text-sm text-gray-200 font-mono leading-relaxed resize-none focus:outline-none focus:border-[#5b5bf6]/40"
                   spellCheck={false}
                 />
               ) : (
@@ -479,7 +479,7 @@ function SliderField({
           step={step}
           value={safe}
           onInput={e => onChange(parseFloat(e.currentTarget.value))}
-          className="flex-1 h-2 cursor-pointer accent-violet-500 bg-white/[.08] rounded-full appearance-none"
+          className="flex-1 h-2 cursor-pointer accent-[#5b5bf6] bg-white/[.08] rounded-full appearance-none"
         />
         <span className="text-xs text-gray-300 w-9 text-right tabular-nums font-medium">
           {safe.toFixed(2)}
@@ -491,7 +491,7 @@ function SliderField({
 }
 
 const selectCls =
-  "w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500/50 appearance-none cursor-pointer";
+  "w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50 appearance-none cursor-pointer";
 
 export default function ConfiguracionPage() {
   return (

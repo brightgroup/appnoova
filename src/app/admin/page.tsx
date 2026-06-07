@@ -8,7 +8,7 @@ export default function AdminDashboard() {
   const { user } = useAuth();
 
   const stats = [
-    { label: "Clientes Totales", value: "0", icon: Users, color: "violet" },
+    { label: "Clientes Totales", value: "0", icon: Users, color: "primary" },
     { label: "Llamadas Hoy", value: "0", icon: Phone, color: "blue" },
     { label: "Templates", value: "3", icon: Settings, color: "cyan" },
     { label: "Duración Promedio", value: "4:23", icon: BarChart3, color: "green" }
@@ -65,7 +65,12 @@ export default function AdminDashboard() {
               <div key={i} className="bg-white/[.02] border border-white/[.08] rounded-xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-gray-400 text-sm">{stat.label}</p>
-                  <Icon className={`w-5 h-5 text-${stat.color}-400`} />
+                  <Icon className={`w-5 h-5 ${
+                    stat.color === "primary" ? "text-[#5b5bf6]" :
+                    stat.color === "blue" ? "text-blue-400" :
+                    stat.color === "cyan" ? "text-cyan-400" :
+                    "text-green-400"
+                  }`} />
                 </div>
                 <p className="text-3xl font-bold">{stat.value}</p>
               </div>
@@ -83,11 +88,11 @@ export default function AdminDashboard() {
                 <Link
                   key={i}
                   href={item.href}
-                  className="group relative overflow-hidden rounded-xl bg-white/[.02] border border-white/[.08] p-6 hover:border-violet-500/50 hover:bg-white/[.04] transition-all"
+                  className="group relative overflow-hidden rounded-xl bg-white/[.02] border border-white/[.08] p-6 hover:border-[#5b5bf6]/50 hover:bg-white/[.04] transition-all"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#5b5bf6]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="relative">
-                    <Icon className="w-8 h-8 text-violet-400 mb-3" />
+                    <Icon className="w-8 h-8 text-[#5b5bf6] mb-3" />
                     <h3 className="font-semibold mb-1">{item.label}</h3>
                     <p className="text-sm text-gray-400">{item.description}</p>
                   </div>

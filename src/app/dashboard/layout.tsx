@@ -6,6 +6,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import {
+  sidebarNavActive, sidebarNavIdle, sidebarIconActive, sidebarBadge, sidebarPlanCard
+} from "@/lib/brand-ui";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -180,23 +183,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* ORI (Copiloto) */}
           <Link
             href="/dashboard/ori"
-            className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            className={`w-full flex items-center justify-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
               pathname === "/dashboard/ori"
-                ? "text-white bg-gradient-to-r from-violet-600/25 to-cyan-600/15 border border-violet-500/30"
-                : `text-gray-300 ${sidebarOpen ? "hover:text-white hover:bg-white/[.08]" : "hover:text-white"}`
+                ? sidebarNavActive
+                : sidebarNavIdle
             }`}
             title="ORI - Copiloto"
           >
             {sidebarOpen ? (
               <>
-                <Bot className="w-5 h-5 flex-shrink-0 mr-3 text-violet-400" />
+                <Bot className={`w-5 h-5 flex-shrink-0 mr-3 ${pathname === "/dashboard/ori" ? sidebarIconActive : "text-gray-400"}`} />
                 <div className="flex-1 flex items-center gap-2">
                   <span>ORI</span>
-                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-semibold">Copiloto</span>
+                  <span className={sidebarBadge}>Copiloto</span>
                 </div>
               </>
             ) : (
-              <Bot className="w-5 h-5 flex-shrink-0 text-violet-400" />
+              <Bot className={`w-5 h-5 flex-shrink-0 ${pathname === "/dashboard/ori" ? sidebarIconActive : "text-gray-400"}`} />
             )}
           </Link>
 
@@ -205,18 +208,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Dashboard */}
           <Link 
             href="/dashboard"
-            className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-violet-600/25 to-blue-600/15 text-white border border-violet-500/30 transition-all ${
-              sidebarOpen ? "hover:border-violet-500/50" : ""
+            className={`w-full flex items-center justify-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              pathname === "/dashboard" ? sidebarNavActive : sidebarNavIdle
             }`}
             title="Dashboard"
           >
             {sidebarOpen ? (
               <>
-                <BarChart3 className="w-5 h-5 flex-shrink-0 mr-3" />
+                <BarChart3 className={`w-5 h-5 flex-shrink-0 mr-3 ${pathname === "/dashboard" ? sidebarIconActive : "text-gray-400"}`} />
                 <span className="flex-1 text-left">Dashboard</span>
               </>
             ) : (
-              <BarChart3 className="w-5 h-5 flex-shrink-0" />
+              <BarChart3 className={`w-5 h-5 flex-shrink-0 ${pathname === "/dashboard" ? sidebarIconActive : "text-gray-400"}`} />
             )}
           </Link>
 
@@ -227,18 +230,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             href="/dashboard/contextos"
             className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
               pathname === "/dashboard/contextos"
-                ? "text-white bg-white/[.08]"
-                : `text-gray-300 ${sidebarOpen ? "hover:text-white hover:bg-white/[.08]" : "hover:text-white"}`
+                ? sidebarNavActive
+                : sidebarNavIdle
             }`}
             title="Contextos de marca"
           >
             {sidebarOpen ? (
               <>
-                <Building2 className="w-5 h-5 flex-shrink-0 mr-3" />
+                <Building2 className={`w-5 h-5 flex-shrink-0 mr-3 ${pathname === "/dashboard/contextos" ? sidebarIconActive : "text-gray-400"}`} />
                 <span className="flex-1 text-left">Contextos</span>
               </>
             ) : (
-              <Building2 className="w-5 h-5 flex-shrink-0" />
+              <Building2 className={`w-5 h-5 flex-shrink-0 ${pathname === "/dashboard/contextos" ? sidebarIconActive : "text-gray-400"}`} />
             )}
           </Link>
 
@@ -264,13 +267,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className={`${sidebarOpen ? "p-3 space-y-3" : "p-3 space-y-3"} border-t border-white/[.08]`}>
           {/* Plan Card */}
           {sidebarOpen && (
-            <div className="bg-gradient-to-br from-violet-600/20 to-blue-600/10 border border-violet-500/20 rounded-lg p-3">
+            <div className={sidebarPlanCard}>
               <div className="flex items-center gap-2 mb-2">
-                <CreditCard className="w-4 h-4 text-violet-400 flex-shrink-0" />
-                <span className="text-xs font-semibold text-white">Pro Plan</span>
+                <CreditCard className={`w-4 h-4 flex-shrink-0 ${sidebarIconActive}`} />
+                <span className="text-xs font-medium text-gray-200">Pro Plan</span>
               </div>
-              <p className="text-xs text-gray-400">Créditos usados</p>
-              <p className="text-sm font-bold text-white">0 / 100.4K</p>
+              <p className="text-[11px] text-gray-500">Créditos usados</p>
+              <p className="text-sm font-semibold text-[#5b5bf6] tabular-nums">0 / 100.4K</p>
             </div>
           )}
 

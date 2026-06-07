@@ -15,7 +15,7 @@ export interface VoiceTemplateMeta {
 export const VOICE_AGENT_TEMPLATES: Record<string, VoiceTemplateMeta> = {
   "lead-qualification": {
     name: "Lia – Calificación de Leads",
-    color: "from-violet-500 to-purple-600",
+    color: "from-[#5b5bf6] to-[#7070f8]",
     tag: "Inbound",
     description: "Califica prospectos y recopila información clave.",
     prompt: `${LANG_RULE}
@@ -51,7 +51,7 @@ Ofrece ayuda para renovar o agendar una llamada con un asesor humano.`
   },
   "follow-up": {
     name: "Lia – Follow-up Inteligente",
-    color: "from-blue-500 to-indigo-600",
+    color: "from-[#5b5bf6] to-[#7070f8]",
     tag: "Outbound",
     description: "Reactiva leads sin respuesta con seguimiento natural.",
     prompt: `${LANG_RULE}

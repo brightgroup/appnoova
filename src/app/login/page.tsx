@@ -73,7 +73,7 @@ export default function LoginPage() {
           style={{
             background: "linear-gradient(145deg, rgba(16,17,28,.97) 0%, rgba(10,11,20,.9) 100%)",
             border: "1px solid rgba(255,255,255,.08)",
-            boxShadow: "0 0 0 1px rgba(99,102,241,.12), 0 24px 64px rgba(0,0,0,.6), 0 0 80px -32px rgba(99,102,241,.2)",
+            boxShadow: "0 0 0 1px rgba(91,91,246,.12), 0 24px 64px rgba(0,0,0,.6), 0 0 80px -32px rgba(91,91,246,.2)",
           }}
         >
           {/* Botón cerrar */}
@@ -102,7 +102,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@noova360.com"
-                className="w-full rounded-xl border border-white/[.08] bg-white/[.04] px-4 py-3 text-sm text-white placeholder-gray-400 outline-none transition focus:border-indigo-500/60 focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full rounded-xl border border-white/[.08] bg-white/[.04] px-4 py-3 text-sm text-white placeholder-gray-400 outline-none transition focus:border-[#5b5bf6]/60 focus:ring-2 focus:ring-[#5b5bf6]/20"
               />
             </div>
 
@@ -118,7 +118,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full rounded-xl border border-white/[.08] bg-white/[.04] px-4 py-3 pr-11 text-sm text-white placeholder-gray-400 outline-none transition focus:border-indigo-500/60 focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full rounded-xl border border-white/[.08] bg-white/[.04] px-4 py-3 pr-11 text-sm text-white placeholder-gray-400 outline-none transition focus:border-[#5b5bf6]/60 focus:ring-2 focus:ring-[#5b5bf6]/20"
                 />
                 <button
                   type="button"
@@ -154,7 +154,7 @@ export default function LoginPage() {
 
           <p className="mt-6 text-center text-xs text-gray-300">
             ¿No tienes cuenta?{" "}
-            <Link href="/signup" className="text-indigo-400 hover:text-indigo-300 transition-colors font-semibold">
+            <Link href="/signup" className="text-[#5b5bf6] hover:text-[#a5a5ff] transition-colors font-semibold">
               Crear una cuenta
             </Link>
           </p>

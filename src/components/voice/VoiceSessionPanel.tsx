@@ -596,7 +596,7 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
       <section className="flex-1 min-w-0 flex flex-col rounded-2xl border border-white/[.10] bg-noova-surface overflow-hidden">
         <div className="px-5 py-3.5 border-b border-white/[.06] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-violet-400/80" />
+            <Sparkles className="w-4 h-4 text-[#5b5bf6]/80" />
             <span className="text-xs font-semibold text-gray-300 tracking-wide">Transcripción en vivo</span>
           </div>
           {transcript.length > 0 && (
@@ -606,7 +606,7 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
 
         <div
           ref={transcriptRef}
-          className="flex-1 overflow-y-auto p-5 space-y-3 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(99,102,241,.06),transparent)] min-h-[360px]"
+          className="flex-1 overflow-y-auto p-5 space-y-3 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(91,91,246,.06),transparent)] min-h-[360px]"
         >
           {transcript.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full min-h-[280px] text-center px-6">
@@ -633,11 +633,11 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
               <div key={i} className={`flex ${line.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[82%] px-4 py-3 rounded-2xl text-[13px] leading-relaxed ${
                   line.role === "user"
-                    ? "bg-violet-600/15 border border-violet-500/20 text-gray-100 rounded-br-md"
+                    ? "bg-[#5b5bf6]/15 border border-[#5b5bf6]/20 text-gray-100 rounded-br-md"
                     : "bg-white/[.03] border border-white/[.07] text-gray-200 rounded-bl-md"
                 }`}>
                   <p className={`text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${
-                    line.role === "user" ? "text-violet-400/90" : "text-gray-500"
+                    line.role === "user" ? "text-[#5b5bf6]/90" : "text-gray-500"
                   }`}>
                     {line.role === "user" ? "Tú" : "Lia"}
                   </p>
@@ -654,7 +654,7 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
                   {[0, 150, 300].map(delay => (
                     <div
                       key={delay}
-                      className="w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-bounce"
+                      className="w-1.5 h-1.5 rounded-full bg-[#5b5bf6]/60 animate-bounce"
                       style={{ animationDelay: `${delay}ms` }}
                     />
                   ))}

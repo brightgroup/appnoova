@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { Users, Shield, User, Search, RefreshCw, ChevronDown, CheckCircle, Clock, MailCheck, AlertCircle, Phone } from "lucide-react";
+import { Users, Shield, User, RefreshCw, ChevronDown, CheckCircle, Clock, MailCheck, AlertCircle, Phone } from "lucide-react";
+import {
+  registryPage, registryToolbar, registryContent,
+  registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
+  registryTableRow, registryTableCell, registryTableCellFirst, registryTableCellMuted,
+  registryTableLoading, registryTableEmpty, textMuted
+} from "@/lib/brand-ui";
+import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 
 interface UserRecord {
   id: string;
@@ -17,7 +24,7 @@ interface UserRecord {
 }
 
 const ROL_BADGE: Record<string, { label: string; color: string }> = {
-  admin:   { label: "Admin",    color: "bg-violet-500/20 text-violet-400 border-violet-500/30" },
+  admin:   { label: "Admin",    color: "bg-[#5b5bf6]/20 text-[#5b5bf6] border-[#5b5bf6]/30" },
   user:    { label: "Usuario",  color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
   agente:  { label: "Agente",   color: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30" },
 };
@@ -93,89 +100,71 @@ export default function AdminUsers() {
   );
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0d0e14] text-white min-h-screen">
+    <div className={registryPage}>
 
-      {/* Header */}
-      <div className="border-b border-white/[.08] px-6 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Users className="w-5 h-5 text-violet-400" />
-              <h1 className="text-xl font-bold">Gestión de Usuarios</h1>
-            </div>
-            <p className="text-sm text-gray-500">
-              {users.length} usuario{users.length !== 1 ? "s" : ""} registrado{users.length !== 1 ? "s" : ""}
-            </p>
+      <div className={registryToolbar}>
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Users className="w-5 h-5 text-[#5b5bf6]" />
+            <h1 className="text-xl font-bold tracking-tight">Gestión de Usuarios</h1>
           </div>
-          <button
-            onClick={fetchUsers}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[.04] border border-white/[.08] text-sm text-gray-300 hover:text-white hover:bg-white/[.08] transition-all disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            Actualizar
-          </button>
-        </div>
-
-        {/* Search */}
-        <div className="mt-4 relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-          <input
-            type="text"
-            placeholder="Buscar por nombre o email..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full bg-white/[.04] border border-white/[.08] rounded-lg pl-10 pr-4 py-2 text-sm placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition-all"
-          />
+          <p className={`text-xs ${textMuted}`}>
+            {users.length} usuario{users.length !== 1 ? "s" : ""} registrado{users.length !== 1 ? "s" : ""}
+          </p>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 p-6">
-
-        {error && (
-          <div className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400">
-            {error}
-          </div>
-        )}
-
+      <div className={registryContent}>
+        <RegistryTableLayout
+          description="Administra usuarios, roles y verificación de correo electrónico."
+          search={search}
+          onSearchChange={setSearch}
+          onRefresh={fetchUsers}
+          refreshing={loading}
+          error={error || undefined}
+          footer={!loading && users.length > 0 ? (
+            <>
+              <span>{filtered.length} de {users.length} usuarios</span>
+              <span className="flex items-center gap-4">
+                <span>{users.filter(u => u.rol === "admin").length} admin(s)</span>
+                <span>{users.filter(u => u.rol === "user").length} usuario(s)</span>
+                <span>{users.filter(u => u.rol === "agente").length} agente(s)</span>
+              </span>
+            </>
+          ) : undefined}
+        >
         {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <RefreshCw className="w-6 h-6 text-violet-400 animate-spin mr-3" />
-            <span className="text-gray-400">Cargando usuarios...</span>
+          <div className={registryTableLoading}>
+            <RefreshCw className="w-5 h-5 animate-spin mr-2" /> Cargando usuarios...
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <Users className="w-12 h-12 text-gray-700 mb-4" />
-            <p className="text-gray-500 font-medium">
-              {search ? "No se encontraron usuarios con ese criterio" : "Aún no hay usuarios registrados"}
-            </p>
+          <div className={registryTableEmpty}>
+            {search ? "No se encontraron usuarios con ese criterio" : "Aún no hay usuarios registrados"}
           </div>
         ) : (
-          <div className="bg-white/[.02] border border-white/[.08] rounded-xl overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/[.08] bg-white/[.02]">
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Usuario</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Rol</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Registrado</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Acciones</th>
+            <table className={registryTable}>
+              <thead className={registryTableHead}>
+                <tr className={registryTableHeadRow}>
+                  <th className={registryTableHeadCell}>Usuario</th>
+                  <th className={registryTableHeadCell}>Email</th>
+                  <th className={registryTableHeadCell}>Rol</th>
+                  <th className={registryTableHeadCell}>Registrado</th>
+                  <th className={registryTableHeadCell}>Verificación</th>
+                  <th className={registryTableHeadCell}>Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[.05]">
+              <tbody>
                 {filtered.map(u => {
                   const badge = ROL_BADGE[u.rol] ?? { label: u.rol, color: "bg-gray-500/20 text-gray-400 border-gray-500/30" };
                   return (
-                    <tr key={u.id} className="hover:bg-white/[.02] transition-colors">
+                    <tr key={u.id} className={registryTableRow}>
 
                       {/* Avatar + Nombre */}
-                      <td className="px-6 py-4">
+                      <td className={registryTableCellFirst}>
                         <div className="flex items-center gap-3">
                           <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
                             u.rol === "admin"
-                              ? "bg-violet-500/20 text-violet-400"
+                              ? "bg-[#5b5bf6]/20 text-[#5b5bf6]"
                               : "bg-white/[.08] text-gray-400"
                           }`}>
                             {u.nombre ? u.nombre[0].toUpperCase() : "?"}
@@ -188,10 +177,10 @@ export default function AdminUsers() {
                       </td>
 
                       {/* Email */}
-                      <td className="px-6 py-4 text-sm text-gray-300">{u.email}</td>
+                      <td className={`${registryTableCell} text-sm text-gray-300`}>{u.email}</td>
 
                       {/* Rol badge */}
-                      <td className="px-6 py-4">
+                      <td className={registryTableCell}>
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${badge.color}`}>
                           {u.rol === "admin" ? <Shield className="w-3 h-3" /> : <User className="w-3 h-3" />}
                           {badge.label}
@@ -199,15 +188,15 @@ export default function AdminUsers() {
                       </td>
 
                       {/* Fecha */}
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <td className={registryTableCellMuted}>
+                        <div className="flex items-center gap-1.5 text-xs">
                           <Clock className="w-3 h-3" />
                           {formatDate(u.created_at)}
                         </div>
                       </td>
 
                       {/* Estado email */}
-                      <td className="px-6 py-4">
+                      <td className={registryTableCell}>
                         {u.email_confirmed === false ? (
                           <div className="flex items-center gap-1.5 text-xs text-amber-400">
                             <AlertCircle className="w-3.5 h-3.5" />
@@ -222,12 +211,12 @@ export default function AdminUsers() {
                       </td>
 
                       {/* Acciones */}
-                      <td className="px-6 py-4">
+                      <td className={registryTableCell}>
                         <div className="flex items-center gap-2">
                           {/* Asignar línea telefónica */}
                           <Link
                             href={`/admin/telephony?user_id=${u.id}`}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-xs text-violet-400 hover:bg-violet-500/20 transition-all"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5b5bf6]/10 border border-[#5b5bf6]/20 text-xs text-[#5b5bf6] hover:bg-[#5b5bf6]/20 transition-all"
                           >
                             <Phone className="w-3 h-3" />
                             Línea
@@ -250,7 +239,7 @@ export default function AdminUsers() {
 
                           {/* Cambiar rol */}
                           {updatingId === u.id ? (
-                            <RefreshCw className="w-4 h-4 text-violet-400 animate-spin" />
+                            <RefreshCw className="w-4 h-4 text-[#5b5bf6] animate-spin" />
                           ) : (
                             <div className="relative group">
                               <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[.04] border border-white/[.08] text-xs text-gray-400 hover:text-white hover:border-white/[.16] transition-all">
@@ -265,7 +254,7 @@ export default function AdminUsers() {
                                     disabled={u.rol === rol}
                                     className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs text-left transition-colors ${
                                       u.rol === rol
-                                        ? "text-violet-400 bg-violet-500/10 cursor-default"
+                                        ? "text-[#5b5bf6] bg-[#5b5bf6]/10 cursor-default"
                                         : "text-gray-400 hover:text-white hover:bg-white/[.06]"
                                     }`}
                                   >
@@ -283,17 +272,8 @@ export default function AdminUsers() {
                 })}
               </tbody>
             </table>
-          </div>
         )}
-
-        {/* Stats footer */}
-        {!loading && users.length > 0 && (
-          <div className="mt-4 flex items-center gap-6 text-xs text-gray-600">
-            <span>{users.filter(u => u.rol === "admin").length} admin(s)</span>
-            <span>{users.filter(u => u.rol === "user").length} usuario(s)</span>
-            <span>{users.filter(u => u.rol === "agente").length} agente(s)</span>
-          </div>
-        )}
+        </RegistryTableLayout>
       </div>
     </div>
   );

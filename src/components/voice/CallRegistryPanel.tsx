@@ -7,9 +7,12 @@ import {
 } from "lucide-react";
 import {
   btnFilterActive, btnFilterGroup, btnFilterIdle, btnGhost, btnIcon, btnIconSm, btnMenuIcon,
-  inputSearch, registryPage, registryTableHead, registryTableHeadRow, registryTableRow, registryToolbar,
+  registryContent, registryTable, registryTableHead, registryTableHeadRow,
+  registryTableHeadCell, registryTableRowClickable, registryTableCell, registryTableCellFirst,
+  registryTableLoading, registryTableEmpty,
   tabActive, tabIdle, textMuted, textSecondary
 } from "@/lib/brand-ui";
+import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import {
   audioExtensionFromUrl, callQualityPercent, displayCallId, downloadCallJson, downloadCallAudio,
@@ -159,64 +162,58 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
   }
 
   return (
-    <div className={registryPage}>
-      {/* Toolbar */}
-      <div className={registryToolbar}>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-[200px] max-w-xl">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar por teléfono, desconexión o resumen..."
-              className={inputSearch}
-            />
-          </div>
-          <div className={btnFilterGroup}>
-            {([
-              ["conectadas", "Conectadas"],
-              ["exitosas", "Exitosas"],
-              ["todas", "Todas"]
-            ] as const).map(([id, label]) => (
-              <button
-                key={id}
-                onClick={() => setFilter(id)}
-                className={filter === id ? btnFilterActive : btnFilterIdle}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <button onClick={loadList} className={btnIcon} title="Actualizar">
-            <RefreshCw className="w-4 h-4" />
-          </button>
-          <button className={btnIcon} title="Columnas">
-            <SlidersHorizontal className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {!dbReady && (
-        <div className="mx-5 mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
-          Ejecuta la migración <code>006_voice_agent_calls.sql</code> en Supabase.
-        </div>
-      )}
-      {error && (
-        <div className="mx-5 mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400">{error}</div>
-      )}
-
-      <div className="flex-1 overflow-auto">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div className={registryContent}>
+        <RegistryTableLayout
+          description="Historial de llamadas del agente. Filtra por estado y busca por teléfono o motivo de desconexión."
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Buscar"
+          onRefresh={loadList}
+          refreshing={loading}
+          error={error || undefined}
+          alerts={!dbReady ? (
+            <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
+              Ejecuta la migración <code>006_voice_agent_calls.sql</code> en Supabase.
+            </div>
+          ) : undefined}
+          filters={
+            <div className={`${btnFilterGroup} w-fit`}>
+              {([
+                ["conectadas", "Conectadas"],
+                ["exitosas", "Exitosas"],
+                ["todas", "Todas"]
+              ] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setFilter(id)}
+                  className={filter === id ? btnFilterActive : btnFilterIdle}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          }
+          action={
+            <button className={btnIcon} title="Columnas">
+              <SlidersHorizontal className="w-4 h-4" />
+            </button>
+          }
+          footer={!loading && filteredCalls.length > 0 ? (
+            <span>{filteredCalls.length} llamada{filteredCalls.length !== 1 ? "s" : ""}</span>
+          ) : undefined}
+        >
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-gray-400">
+          <div className={registryTableLoading}>
             <Loader2 className="w-5 h-5 animate-spin mr-2 text-gray-300" /> Cargando llamadas...
           </div>
         ) : filteredCalls.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center px-6">
-            <Phone className="w-10 h-10 text-gray-500 mb-3" />
-            <p className="text-sm text-gray-300">No hay llamadas en este filtro.</p>
+          <div className={`${registryTableEmpty} px-6`}>
+            <Phone className="w-10 h-10 text-gray-500 mb-3 mx-auto" />
+            <p>No hay llamadas en este filtro.</p>
           </div>
         ) : (
-          <table className="w-full text-xs min-w-[1200px]">
+          <table className={`${registryTable} min-w-[1200px]`}>
             <thead className={registryTableHead}>
               <tr className={registryTableHeadRow}>
                 <Th>Fecha <ArrowUpDown className="w-3 h-3 inline opacity-40" /></Th>
@@ -241,9 +238,9 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
                   <tr
                     key={call.id}
                     onClick={() => openCall(call.id)}
-                    className={registryTableRow}
+                    className={registryTableRowClickable}
                   >
-                    <Td mono>{formatCallDateShort(call.created_at)}</Td>
+                    <Td mono first>{formatCallDateShort(call.created_at)}</Td>
                     <Td mono>{formatCallDuration(call.duration_sec)}</Td>
                     <Td mono>{call.credits}</Td>
                     <Td>
@@ -292,6 +289,7 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
             </tbody>
           </table>
         )}
+        </RegistryTableLayout>
       </div>
     </div>
   );
@@ -424,12 +422,13 @@ function CallDetailView({
 }
 
 function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <th className={`text-left px-4 py-3 font-semibold whitespace-nowrap ${className}`}>{children}</th>;
+  return <th className={`${registryTableHeadCell} ${className}`}>{children}</th>;
 }
 
-function Td({ children, className = "", mono }: { children: React.ReactNode; className?: string; mono?: boolean }) {
+function Td({ children, className = "", mono, first }: { children: React.ReactNode; className?: string; mono?: boolean; first?: boolean }) {
+  const base = first ? registryTableCellFirst : registryTableCell;
   return (
-    <td className={`px-4 py-3.5 text-gray-100 whitespace-nowrap ${mono ? "tabular-nums font-mono text-[11px] text-gray-200" : ""} ${className}`}>
+    <td className={`${base} text-gray-100 whitespace-nowrap ${mono ? "tabular-nums font-mono text-[11px] text-gray-200" : ""} ${className}`}>
       {children}
     </td>
   );

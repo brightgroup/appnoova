@@ -10,7 +10,7 @@ export default function LandingPage() {
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between h-14 px-6 bg-[#06070d]/80 backdrop-blur-xl border-b border-white/[.06]">
         <div className="flex items-center gap-2">
           <div className="text-lg font-bold tracking-tight">Noova 360</div>
-          <span className="text-xs px-2.5 py-1 rounded-full bg-violet-600/30 text-violet-200 border border-violet-500/30 font-medium">
+          <span className="text-xs px-2.5 py-1 rounded-full bg-[#5b5bf6]/20 text-[#c4c4ff] border border-[#5b5bf6]/30 font-medium">
             IA Operativa
           </span>
         </div>
@@ -27,15 +27,15 @@ export default function LandingPage() {
         <section className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-20 sm:py-32 lg:py-40">
           {/* Background gradient */}
           <div className="absolute inset-0 -z-10 overflow-hidden">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-violet-600/15 rounded-full blur-3xl"></div>
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#5b5bf6]/15 rounded-full blur-3xl"></div>
             <div className="absolute bottom-20 right-1/4 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl"></div>
           </div>
 
           <div className="text-center max-w-3xl mx-auto">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 mb-8 px-4 py-2 rounded-full border border-violet-500/30 bg-violet-500/10">
-              <Flame className="w-4 h-4 text-violet-400" />
-              <span className="text-sm font-semibold text-violet-200">La próxima capa inteligente de seguros</span>
+            <div className="inline-flex items-center gap-2 mb-8 px-4 py-2 rounded-full border border-[#5b5bf6]/30 bg-[#5b5bf6]/10">
+              <Flame className="w-4 h-4 text-[#5b5bf6]" />
+              <span className="text-sm font-semibold text-[#c4c4ff]">La próxima capa inteligente de seguros</span>
             </div>
 
             {/* Main headline */}
@@ -50,8 +50,8 @@ export default function LandingPage() {
 
             {/* Key metrics */}
             <div className="flex flex-wrap gap-3 justify-center mb-10">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-lg border border-violet-500/20 bg-white/[.03]">
-                <TrendingUp className="w-4 h-4 text-violet-400" />
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#5b5bf6]/20 bg-white/[.03]">
+                <TrendingUp className="w-4 h-4 text-[#5b5bf6]" />
                 <span className="text-sm font-medium">+30% Productividad</span>
               </div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-lg border border-blue-500/20 bg-white/[.03]">
@@ -87,7 +87,7 @@ export default function LandingPage() {
                 {[1, 2, 3].map((i) => (
                   <div
                     key={i}
-                    className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-blue-500 border border-[#06070d] flex items-center justify-center text-xs font-bold text-white"
+                    className="w-8 h-8 rounded-full bg-gradient-to-br from-[#5b5bf6] to-[#7070f8] border border-[#06070d] flex items-center justify-center text-xs font-bold text-white"
                   >
                     {i}
                   </div>
@@ -101,13 +101,13 @@ export default function LandingPage() {
         {/* Specialization Section */}
         <section className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-20 sm:py-24">
           <div className="absolute inset-0 -z-10">
-            <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-slate-900/50 via-slate-900/30 to-slate-950/50 border border-violet-500/10"></div>
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-slate-900/50 via-slate-900/30 to-slate-950/50 border border-[#5b5bf6]/10"></div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-12 items-center">
             {/* Left side */}
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-violet-400 mb-4">Diferenciador Core</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-[#5b5bf6] mb-4">Diferenciador Core</p>
               <h2 className="text-4xl sm:text-5xl font-bold leading-tight mb-8">
                 IA entrenada como corredor de seguros
               </h2>
@@ -124,7 +124,7 @@ export default function LandingPage() {
                   "Toma decisiones comerciales profesionales"
                 ].map((item, i) => (
                   <div key={i} className="flex gap-3 items-start">
-                    <div className="w-5 h-5 rounded-full bg-gradient-to-r from-violet-500 to-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-r from-[#5b5bf6] to-[#7070f8] flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-white text-xs font-bold">✓</span>
                     </div>
                     <span className="text-gray-300 text-sm">{item}</span>
@@ -136,14 +136,14 @@ export default function LandingPage() {
             {/* Right side - Feature cards */}
             <div className="space-y-5">
               {[
-                { icon: Brain, color: "violet", title: "Conocimiento Especializado", desc: "Entrenada en seguros con data de 1000+ políticas" },
+                { icon: Brain, color: "primary", title: "Conocimiento Especializado", desc: "Entrenada en seguros con data de 1000+ políticas" },
                 { icon: Zap, color: "blue", title: "Operativa 24/7", desc: "Actúa como corredor sin pausas, sin errores" },
                 { icon: Users, color: "cyan", title: "Propuestas Comerciales", desc: "Genera cotizaciones y negocia profesionalmente" }
               ].map((item, i) => {
                 const Icon = item.icon;
-                const colorClass = item.color === "violet" ? "from-violet-600/20 to-blue-600/20 text-violet-300" : 
+                const colorClass = item.color === "primary" ? "from-[#5b5bf6]/20 to-[#7070f8]/20 text-[#a5a5ff]" : 
                                  item.color === "blue" ? "from-blue-600/20 to-cyan-600/20 text-blue-300" :
-                                 "from-cyan-600/20 to-blue-600/20 text-cyan-300";
+                                 "from-cyan-600/20 to-[#7070f8]/20 text-cyan-300";
                 return (
                   <div key={i} className={`bg-gradient-to-br ${colorClass} p-6 rounded-2xl border border-white/[.06] backdrop-blur`}>
                     <Icon className="w-8 h-8 mb-3" />
@@ -159,7 +159,7 @@ export default function LandingPage() {
         {/* Agents Section */}
         <section id="features" className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-20 sm:py-24">
           <div className="text-center mb-16">
-            <p className="text-xs font-semibold uppercase tracking-widest text-violet-400 mb-4">Agentes Especializados</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#5b5bf6] mb-4">Agentes Especializados</p>
             <h2 className="text-4xl sm:text-5xl font-bold leading-tight">
               Tres agentes IA para tu operación
             </h2>
@@ -171,7 +171,7 @@ export default function LandingPage() {
                 icon: Radio,
                 title: "Agentes de Voz",
                 desc: "Llamadas automáticas para calificar leads, recordar vencimientos y más",
-                color: "violet"
+                color: "primary"
               },
               {
                 icon: MessageSquare,
@@ -187,10 +187,10 @@ export default function LandingPage() {
               }
             ].map((agent, i) => {
               const Icon = agent.icon;
-              const bgGradient = agent.color === "violet" ? "from-violet-600/10 to-blue-600/10 border-violet-500/20" :
+              const bgGradient = agent.color === "primary" ? "from-[#5b5bf6]/10 to-[#7070f8]/10 border-[#5b5bf6]/20" :
                                agent.color === "blue" ? "from-blue-600/10 to-cyan-600/10 border-blue-500/20" :
-                               "from-cyan-600/10 to-blue-600/10 border-cyan-500/20";
-              const iconColor = agent.color === "violet" ? "text-violet-400" :
+                               "from-cyan-600/10 to-[#7070f8]/10 border-cyan-500/20";
+              const iconColor = agent.color === "primary" ? "text-[#5b5bf6]" :
                               agent.color === "blue" ? "text-blue-400" :
                               "text-cyan-400";
               
@@ -216,8 +216,8 @@ export default function LandingPage() {
 
         {/* CTA Section */}
         <section className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-20">
-          <div className="relative rounded-3xl border border-violet-500/20 bg-gradient-to-br from-violet-600/10 via-slate-900/50 to-blue-600/10 p-12 text-center backdrop-blur">
-            <div className="absolute inset-0 -z-10 rounded-3xl blur-2xl bg-violet-600/5"></div>
+          <div className="relative rounded-3xl border border-[#5b5bf6]/20 bg-gradient-to-br from-[#5b5bf6]/10 via-slate-900/50 to-[#7070f8]/10 p-12 text-center backdrop-blur">
+            <div className="absolute inset-0 -z-10 rounded-3xl blur-2xl bg-[#5b5bf6]/5"></div>
             
             <h2 className="text-4xl sm:text-5xl font-bold mb-6">
               Comienza tu transformación hoy

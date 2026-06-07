@@ -9,6 +9,9 @@ import {
   LayoutDashboard, Users, Settings, Phone, LogOut,
   ChevronLeft, ChevronRight, Shield, Loader2
 } from "lucide-react";
+import {
+  sidebarNavActive, sidebarNavIdle, sidebarIconActive, accentGradientIcon
+} from "@/lib/brand-ui";
 
 const NAV_ITEMS = [
   { href: "/admin",          label: "Panel",           icon: LayoutDashboard, exact: true },
@@ -102,7 +105,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className={`flex items-center border-b border-white/[.08] h-14 px-3 ${collapsed ? "justify-center" : "justify-between"}`}>
           {!collapsed && (
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center flex-shrink-0">
+              <div className={`w-7 h-7 rounded-lg ${accentGradientIcon} flex items-center justify-center flex-shrink-0`}>
                 <Shield className="w-3.5 h-3.5 text-white" />
               </div>
               <span className="font-bold text-sm tracking-tight">Admin</span>
@@ -127,12 +130,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 href={item.href}
                 title={collapsed ? item.label : undefined}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
-                  active
-                    ? "bg-violet-600/20 text-violet-300 border border-violet-500/20"
-                    : "text-gray-500 hover:text-white hover:bg-white/[.05]"
+                  active ? sidebarNavActive : sidebarNavIdle
                 }`}
               >
-                <Icon className="w-4 h-4 flex-shrink-0" />
+                <Icon className={`w-4 h-4 flex-shrink-0 ${active ? sidebarIconActive : "text-gray-400"}`} />
                 {!collapsed && (
                   <span className="flex items-center gap-2">
                     {item.label}

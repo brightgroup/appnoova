@@ -6,7 +6,8 @@ import { Phone, Loader2, Copy, CheckCircle2, Radio, AlertCircle, RefreshCw, Sear
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import {
   btnPrimary, btnPrimarySm, btnIcon, inputSearch,
-  registryTableHead, registryTableHeadRow, registryTableRow,
+  registryTable, registryTableWrap, registryTableHead, registryTableHeadRow,
+  registryTableHeadCell, registryTableRowClickable, registryTableCell, registryTableCellFirst,
   textMuted, textSecondary
 } from "@/lib/brand-ui";
 import { formatPhoneDisplay } from "@/lib/telephony/format-phone";
@@ -171,13 +172,13 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
                   className={inputSearch}
                 />
               </div>
-              <div className="rounded-xl border border-white/[.10] bg-noova-surface overflow-auto">
-                <table className="w-full min-w-[480px] text-xs">
+              <div className={registryTableWrap}>
+                <table className={`${registryTable} min-w-[480px]`}>
                   <thead className={registryTableHead}>
                     <tr className={registryTableHeadRow}>
-                      <th className="px-5 py-3 text-left font-semibold w-8" />
-                      <th className="px-4 py-3 text-left font-semibold">Número</th>
-                      <th className="px-4 py-3 text-left font-semibold">Estado</th>
+                      <th className={`${registryTableHeadCell} w-8`} />
+                      <th className={registryTableHeadCell}>Número</th>
+                      <th className={registryTableHeadCell}>Estado</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -187,20 +188,20 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
                         <tr
                           key={line.id}
                           onClick={() => setSelectedLineId(line.id)}
-                          className={`${registryTableRow} ${selected ? "bg-[#5b5bf6]/10" : ""}`}
+                          className={`${registryTableRowClickable} ${selected ? "bg-[#5b5bf6]/[.06]" : ""}`}
                         >
-                          <td className="px-5 py-3.5">
+                          <td className={registryTableCellFirst}>
                             <span className={`block w-3.5 h-3.5 rounded-full border-2 ${
                               selected ? "border-[#5b5bf6] bg-[#5b5bf6]" : "border-gray-500"
                             }`} />
                           </td>
-                          <td className="px-4 py-3.5 font-mono text-sm text-white">
+                          <td className={`${registryTableCell} font-mono text-sm text-white`}>
                             {formatPhoneDisplay(line.e164)}
                             {selected && (
                               <span className="ml-2 text-[10px] text-gray-400 font-sans">Actual</span>
                             )}
                           </td>
-                          <td className="px-4 py-3.5">
+                          <td className={registryTableCell}>
                             <span className="inline-flex items-center gap-1.5 text-emerald-400">
                               <span className="w-2 h-2 rounded-full bg-emerald-400" /> Activo
                             </span>
@@ -262,14 +263,14 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
                   className={inputSearch}
                 />
               </div>
-              <div className="rounded-xl border border-white/[.10] bg-noova-surface overflow-auto">
-                <table className="w-full min-w-[560px] text-xs">
+              <div className={registryTableWrap}>
+                <table className={`${registryTable} min-w-[560px]`}>
                   <thead className={registryTableHead}>
                     <tr className={registryTableHeadRow}>
-                      <th className="px-5 py-3 text-left font-semibold w-8" />
-                      <th className="px-4 py-3 text-left font-semibold">Nombre</th>
-                      <th className="px-4 py-3 text-left font-semibold">Número</th>
-                      <th className="px-4 py-3 text-left font-semibold">Estado</th>
+                      <th className={`${registryTableHeadCell} w-8`} />
+                      <th className={registryTableHeadCell}>Nombre</th>
+                      <th className={registryTableHeadCell}>Número</th>
+                      <th className={registryTableHeadCell}>Estado</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -279,21 +280,21 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
                         <tr
                           key={test.id}
                           onClick={() => setSelectedTestId(test.id)}
-                          className={`${registryTableRow} ${selected ? "bg-[#5b5bf6]/10" : ""}`}
+                          className={`${registryTableRowClickable} ${selected ? "bg-[#5b5bf6]/[.06]" : ""}`}
                         >
-                          <td className="px-5 py-3.5">
+                          <td className={registryTableCellFirst}>
                             <span className={`block w-3.5 h-3.5 rounded-full border-2 ${
                               selected ? "border-[#5b5bf6] bg-[#5b5bf6]" : "border-gray-500"
                             }`} />
                           </td>
-                          <td className="px-4 py-3.5 text-gray-200">{test.label}</td>
-                          <td className="px-4 py-3.5 font-mono text-sm text-white">
+                          <td className={`${registryTableCell} text-gray-200`}>{test.label}</td>
+                          <td className={`${registryTableCell} font-mono text-sm text-white`}>
                             {formatPhoneDisplay(test.e164)}
                             {selected && (
                               <span className="ml-2 text-[10px] text-gray-400 font-sans">Actual</span>
                             )}
                           </td>
-                          <td className="px-4 py-3.5">
+                          <td className={registryTableCell}>
                             <span className="inline-flex items-center gap-1.5 text-emerald-400">
                               <span className="w-2 h-2 rounded-full bg-emerald-400" /> Activo
                             </span>

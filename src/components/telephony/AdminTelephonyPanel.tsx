@@ -1,18 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  Phone, Plus, Search, RefreshCw, ChevronLeft, Settings, AlertCircle, CheckCircle2, Clock
+  Plus, ChevronLeft, Settings, AlertCircle, CheckCircle2, Clock
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { authFetch } from "@/lib/telephony-api";
 import {
-  btnPrimary, btnIcon, inputSearch, registryPage, registryToolbar, textMuted,
+  btnPrimary, registryPage, registryToolbar, registryContent, textMuted,
   btnFilterGroup, btnFilterActive, btnFilterIdle
 } from "@/lib/brand-ui";
+import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { PhoneLinesTable, type PhoneLineRow } from "@/components/telephony/PhoneLinesTable";
+import {
+  PhoneNumberCategoryTabs,
+  type PhoneNumberCategoryTab
+} from "@/components/telephony/PhoneNumberCategoryTabs";
+import { isPurchasedNumber, isVerifiedNumber } from "@/lib/telephony/number-type-labels";
 import { PhoneLineRequestsTable } from "@/components/telephony/PhoneLineRequestsTable";
 import { AdminBuyLineModal } from "@/components/telephony/AdminBuyLineModal";
 import type { PhoneNumberRecord } from "@/types/phone-number";
@@ -47,6 +53,7 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
   const [agentNameMap, setAgentNameMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [lineCategory, setLineCategory] = useState<PhoneNumberCategoryTab>("purchased");
   const [showBuy, setShowBuy] = useState(false);
   const [buyUserId, setBuyUserId] = useState<string | null>(preselectedUserId ?? null);
   const [attendRequestId, setAttendRequestId] = useState<string | null>(null);
@@ -145,11 +152,28 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
     await load();
   }
 
-  const filtered = numbers.filter(n =>
-    n.e164.includes(search) ||
-    users.find(u => u.id === n.user_id)?.email?.toLowerCase().includes(search.toLowerCase()) ||
-    users.find(u => u.id === n.user_id)?.nombre?.toLowerCase().includes(search.toLowerCase())
+  const verifiedLines = useMemo(
+    () => numbers.filter(n => isVerifiedNumber(n.number_type)),
+    [numbers]
   );
+  const purchasedLines = useMemo(
+    () => numbers.filter(n => isPurchasedNumber(n.number_type)),
+    [numbers]
+  );
+
+  const categoryLines = lineCategory === "verified" ? verifiedLines : purchasedLines;
+
+  const filtered = categoryLines.filter(n => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    const u = users.find(x => x.id === n.user_id);
+    return (
+      n.e164.includes(q) ||
+      (n.friendly_name ?? "").toLowerCase().includes(q) ||
+      u?.email?.toLowerCase().includes(q) ||
+      u?.nombre?.toLowerCase().includes(q)
+    );
+  });
 
   const filteredRequests = requests.filter(r =>
     (r.client_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
@@ -162,7 +186,9 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
     return {
       id: n.id,
       e164: n.e164,
+      friendly_name: n.friendly_name,
       country_code: n.country_code,
+      number_type: n.number_type,
       status: n.status,
       provider: n.provider,
       clientName: u?.nombre || u?.email,
@@ -174,29 +200,40 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
     <>
       <div className={registryPage}>
         <div className={registryToolbar}>
-          <div className="flex items-center justify-between gap-4 mb-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <Link href="/admin" className="p-1.5 hover:bg-white/[.06] rounded-lg text-gray-400 hover:text-white shrink-0">
-                <ChevronLeft className="w-5 h-5" />
-              </Link>
-              <div>
-                <h1 className="text-xl font-bold tracking-tight">Líneas telefónicas</h1>
-                <p className={`text-xs ${textMuted} mt-0.5`}>Superadmin · Telnyx · solicitudes de clientes</p>
-              </div>
+          <div className="flex items-center gap-3 min-w-0">
+            <Link href="/admin" className="p-1.5 hover:bg-white/[.06] rounded-lg text-gray-400 hover:text-white shrink-0">
+              <ChevronLeft className="w-5 h-5" />
+            </Link>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">Líneas telefónicas</h1>
+              <p className={`text-xs ${textMuted} mt-0.5`}>Superadmin · Telnyx · solicitudes de clientes</p>
             </div>
-            <button
-              onClick={() => {
-                setBuyUserId(preselectedUserId ?? null);
-                setAttendRequestId(null);
-                setShowBuy(true);
-              }}
-              disabled={!config?.configured}
-              className={`${btnPrimary} shrink-0 disabled:opacity-40`}
-            >
-              <Plus className="w-4 h-4" /> Comprar línea
-            </button>
           </div>
+        </div>
 
+        <div className={registryContent}>
+          <RegistryTableLayout
+            description="Compra y asigna líneas Telnyx a clientes, y atiende sus solicitudes de nuevos números."
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder={tab === "lines" ? "Buscar" : "Buscar solicitud..."}
+            onRefresh={load}
+            refreshing={loading}
+            error={error || undefined}
+            action={
+              <button
+                onClick={() => {
+                  setBuyUserId(preselectedUserId ?? null);
+                  setAttendRequestId(null);
+                  setShowBuy(true);
+                }}
+                disabled={!config?.configured}
+                className={`${btnPrimary} disabled:opacity-40`}
+              >
+                <Plus className="w-4 h-4" /> Comprar línea
+              </button>
+            }
+            alerts={<>
           {pendingCount > 0 && (
             <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border border-amber-500/25 bg-amber-500/[.06] text-xs text-amber-200">
               <div className="flex items-center gap-2">
@@ -240,55 +277,49 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
               </div>
             </div>
           )}
-
-          <div className={`${btnFilterGroup} mb-4 w-fit`}>
-            <button
-              onClick={() => setTab("lines")}
-              className={tab === "lines" ? btnFilterActive : btnFilterIdle}
-            >
-              Líneas activas
-            </button>
-            <button
-              onClick={() => setTab("requests")}
-              className={`${tab === "requests" ? btnFilterActive : btnFilterIdle} relative`}
-            >
-              Solicitudes
-              {pendingCount > 0 && (
-                <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-[10px] font-bold text-black">
-                  {pendingCount}
-                </span>
-              )}
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-xl">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-              <input
-                type="text"
-                placeholder={tab === "lines" ? "Buscar por número o cliente..." : "Buscar solicitud..."}
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className={`${inputSearch} placeholder-gray-600`}
-              />
-            </div>
-            <button onClick={load} className={btnIcon} title="Actualizar">
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mx-5 mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400">{error}</div>
-        )}
-
-        <div className="flex-1 overflow-auto">
+            </>}
+            filters={
+              <div className="space-y-4">
+                <div className={`${btnFilterGroup} w-fit`}>
+                  <button
+                    onClick={() => setTab("lines")}
+                    className={tab === "lines" ? btnFilterActive : btnFilterIdle}
+                  >
+                    Líneas activas
+                  </button>
+                  <button
+                    onClick={() => setTab("requests")}
+                    className={`${tab === "requests" ? btnFilterActive : btnFilterIdle} relative`}
+                  >
+                    Solicitudes
+                    {pendingCount > 0 && (
+                      <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-[10px] font-bold text-black">
+                        {pendingCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
+                {tab === "lines" && (
+                  <PhoneNumberCategoryTabs
+                    value={lineCategory}
+                    onChange={setLineCategory}
+                    verifiedCount={verifiedLines.length}
+                    purchasedCount={purchasedLines.length}
+                  />
+                )}
+              </div>
+            }
+          >
           {tab === "lines" ? (
             <PhoneLinesTable
               rows={tableRows}
               mode="admin"
               loading={loading}
-              emptyMessage="Aún no hay líneas. Usa «Comprar línea» para aprovisionar vía Telnyx."
+              emptyMessage={
+                lineCategory === "verified"
+                  ? "No hay números verificados (solo outbound)."
+                  : "Aún no hay líneas compradas. Usa «Comprar línea» para aprovisionar vía Telnyx."
+              }
               onRelease={handleRelease}
               releasingId={releasingId}
             />
@@ -301,6 +332,7 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
               onUpdateStatus={handleUpdateRequestStatus}
             />
           )}
+          </RegistryTableLayout>
         </div>
       </div>
 

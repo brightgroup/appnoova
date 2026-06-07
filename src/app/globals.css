@@ -63,8 +63,8 @@ button {
   position: fixed;
   inset: 0;
   z-index: 0;
-  background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99,102,241,.18) 0%, transparent 70%),
-              radial-gradient(ellipse 50% 40% at 80% 80%, rgba(139,92,246,.10) 0%, transparent 60%);
+  background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(91,91,246,.18) 0%, transparent 70%),
+              radial-gradient(ellipse 50% 40% at 80% 80%, rgba(91,91,246,.10) 0%, transparent 60%);
   pointer-events: none;
 }
 

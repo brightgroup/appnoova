@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Loader2, RefreshCw, Search, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Loader2, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import {
-  btnPrimary, btnIcon, inputSearch, registryTableHead, registryTableHeadRow,
-  registryTableRow, textMuted, textSecondary
+  btnPrimary, registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
+  registryTableRow, registryTableCell, registryTableCellFirst, registryTableCellMuted,
+  registryTableCellRight, registryTableLoading, registryTableEmpty
 } from "@/lib/brand-ui";
 import { formatDateTime, formatPhoneDisplay } from "@/lib/telephony/format-phone";
+import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { TestPhoneNumberModal } from "@/components/telephony/TestPhoneNumberModal";
 import type { TestPhoneNumberRecord } from "@/types/test-phone-number";
 
@@ -98,75 +100,85 @@ export function TestPhoneNumbersPanel() {
     }
   }
 
-  function openCreate() {
-    setEditing(null);
-    setModalOpen(true);
-  }
-
-  function openEdit(row: TestPhoneNumberRecord) {
-    setEditing(row);
-    setModalOpen(true);
-  }
-
   return (
-    <div className="flex flex-col min-h-0">
-      <p className={`text-sm ${textSecondary} leading-relaxed mb-5 max-w-3xl`}>
-        Los números de prueba están exentos de cargos. Puedes agregar un número para recibir
-        llamadas de prueba de tus agentes sin costo adicional.
-      </p>
-
-      <div className="flex items-center gap-3 mb-4">
-        <div className="relative flex-1 max-w-xl">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-          <input
-            type="text"
-            placeholder="Buscar"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className={inputSearch}
-          />
-        </div>
-        <button onClick={load} className={btnIcon} title="Actualizar">
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-        </button>
-        <button onClick={openCreate} className={btnPrimary}>
-          <Plus className="w-4 h-4" /> Nuevo número de prueba
-        </button>
-      </div>
-
-      {error && (
-        <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400">{error}</div>
-      )}
-
-      <div className="flex-1 overflow-auto rounded-xl border border-white/[.10] bg-noova-surface">
+    <>
+      <RegistryTableLayout
+        description="Los números de prueba están exentos de cargos. Puedes agregar un número para recibir llamadas de prueba de tus agentes sin costo adicional."
+        search={search}
+        onSearchChange={setSearch}
+        onRefresh={load}
+        refreshing={loading}
+        error={error || undefined}
+        action={
+          <button onClick={() => { setEditing(null); setModalOpen(true); }} className={btnPrimary}>
+            <Plus className="w-4 h-4" /> Nuevo número de prueba
+          </button>
+        }
+        footer={filtered.length > 0 ? (
+          <>
+            <span>
+              Mostrando {filtered.length === 0 ? 0 : (pageSafe - 1) * pageSize + 1} a{" "}
+              {Math.min(pageSafe * pageSize, filtered.length)} de {filtered.length} entradas
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={pageSafe <= 1}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                className="p-1 rounded hover:bg-white/[.08] disabled:opacity-30"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="w-6 h-6 rounded-full bg-white/[.10] text-white flex items-center justify-center text-[11px]">
+                {pageSafe}
+              </span>
+              <button
+                disabled={pageSafe >= totalPages}
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                className="p-1 rounded hover:bg-white/[.08] disabled:opacity-30"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              <select
+                value={pageSize}
+                onChange={e => setPageSize(Number(e.target.value))}
+                className="ml-2 bg-noova-surface border border-white/[.12] rounded px-2 py-1 text-white"
+              >
+                {PAGE_SIZES.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+          </>
+        ) : undefined}
+      >
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-gray-400">
+          <div className={registryTableLoading}>
             <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando...
           </div>
         ) : pageRows.length === 0 ? (
-          <div className="py-20 text-center text-sm text-gray-400">No hay números de prueba</div>
+          <div className={registryTableEmpty}>No hay números de prueba</div>
         ) : (
-          <table className="w-full min-w-[900px] text-xs">
+          <table className={`${registryTable} min-w-[900px]`}>
             <thead className={registryTableHead}>
               <tr className={registryTableHeadRow}>
-                <th className="px-5 py-3 text-left font-semibold">Número</th>
-                <th className="px-4 py-3 text-left font-semibold">Nombre</th>
-                <th className="px-4 py-3 text-left font-semibold">Estado</th>
-                <th className="px-4 py-3 text-left font-semibold">Creado por</th>
-                <th className="px-4 py-3 text-left font-semibold">Creado el</th>
-                <th className="px-4 py-3 text-left font-semibold">Actualizado por</th>
-                <th className="px-4 py-3 text-left font-semibold">Actualizado el</th>
-                <th className="px-4 py-3 text-right font-semibold">Acciones</th>
+                <th className={registryTableHeadCell}>Número</th>
+                <th className={registryTableHeadCell}>Nombre</th>
+                <th className={registryTableHeadCell}>Estado</th>
+                <th className={registryTableHeadCell}>Creado por</th>
+                <th className={registryTableHeadCell}>Creado el</th>
+                <th className={registryTableHeadCell}>Actualizado por</th>
+                <th className={registryTableHeadCell}>Actualizado el</th>
+                <th className={`${registryTableHeadCell} text-right`}>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {pageRows.map(row => (
                 <tr key={row.id} className={registryTableRow}>
-                  <td className="px-5 py-3.5 font-mono text-sm text-white">
+                  <td className={`${registryTableCellFirst} font-mono text-sm text-white`}>
                     {formatPhoneDisplay(row.e164)}
                   </td>
-                  <td className="px-4 py-3.5 text-gray-200">{row.label}</td>
-                  <td className="px-4 py-3.5">
+                  <td className={`${registryTableCell} text-gray-200`}>{row.label}</td>
+                  <td className={registryTableCell}>
                     <button
                       type="button"
                       disabled={togglingId === row.id}
@@ -183,13 +195,13 @@ export function TestPhoneNumbersPanel() {
                       />
                     </button>
                   </td>
-                  <td className={`px-4 py-3.5 ${textMuted}`}>{row.created_by_name ?? "—"}</td>
-                  <td className={`px-4 py-3.5 ${textMuted}`}>{formatDateTime(row.created_at)}</td>
-                  <td className={`px-4 py-3.5 ${textMuted}`}>{row.updated_by_name ?? row.created_by_name ?? "—"}</td>
-                  <td className={`px-4 py-3.5 ${textMuted}`}>{formatDateTime(row.updated_at)}</td>
-                  <td className="px-4 py-3.5 text-right">
+                  <td className={registryTableCellMuted}>{row.created_by_name ?? "—"}</td>
+                  <td className={registryTableCellMuted}>{formatDateTime(row.created_at)}</td>
+                  <td className={registryTableCellMuted}>{row.updated_by_name ?? row.created_by_name ?? "—"}</td>
+                  <td className={registryTableCellMuted}>{formatDateTime(row.updated_at)}</td>
+                  <td className={registryTableCellRight}>
                     <button
-                      onClick={() => openEdit(row)}
+                      onClick={() => { setEditing(row); setModalOpen(true); }}
                       className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-gray-300 hover:text-white hover:bg-white/[.08]"
                     >
                       <Pencil className="w-3 h-3" /> Editar
@@ -200,42 +212,7 @@ export function TestPhoneNumbersPanel() {
             </tbody>
           </table>
         )}
-      </div>
-
-      <div className="flex items-center justify-between gap-4 mt-4 text-xs text-gray-400 shrink-0">
-        <span>
-          Mostrando {filtered.length === 0 ? 0 : (pageSafe - 1) * pageSize + 1} a{" "}
-          {Math.min(pageSafe * pageSize, filtered.length)} de {filtered.length} entradas
-        </span>
-        <div className="flex items-center gap-2">
-          <button
-            disabled={pageSafe <= 1}
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            className="p-1 rounded hover:bg-white/[.08] disabled:opacity-30"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <span className="w-6 h-6 rounded-full bg-white/[.10] text-white flex items-center justify-center text-[11px]">
-            {pageSafe}
-          </span>
-          <button
-            disabled={pageSafe >= totalPages}
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            className="p-1 rounded hover:bg-white/[.08] disabled:opacity-30"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          <select
-            value={pageSize}
-            onChange={e => setPageSize(Number(e.target.value))}
-            className="ml-2 bg-noova-surface border border-white/[.12] rounded px-2 py-1 text-white"
-          >
-            {PAGE_SIZES.map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+      </RegistryTableLayout>
 
       <TestPhoneNumberModal
         open={modalOpen}
@@ -244,6 +221,6 @@ export function TestPhoneNumbersPanel() {
         initial={editing}
         saving={saving}
       />
-    </div>
+    </>
   );
 }

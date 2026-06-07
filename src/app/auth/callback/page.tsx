@@ -67,13 +67,13 @@ export default function AuthCallbackPage() {
           style={{
             background: "linear-gradient(145deg, rgba(16,17,28,.97) 0%, rgba(10,11,20,.9) 100%)",
             border: "1px solid rgba(255,255,255,.08)",
-            boxShadow: "0 0 0 1px rgba(99,102,241,.12), 0 24px 64px rgba(0,0,0,.6)",
+            boxShadow: "0 0 0 1px rgba(91,91,246,.12), 0 24px 64px rgba(0,0,0,.6)",
           }}
         >
           <div className="flex justify-center mb-5">
             {status === "loading" && (
-              <div className="w-16 h-16 rounded-full bg-violet-500/10 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+              <div className="w-16 h-16 rounded-full bg-[#5b5bf6]/10 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-[#5b5bf6] animate-spin" />
               </div>
             )}
             {status === "success" && (

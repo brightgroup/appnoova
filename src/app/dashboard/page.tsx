@@ -12,7 +12,7 @@ export default function Dashboard() {
             <input
               type="text"
               placeholder="Buscar leads, agentes..."
-              className="w-full max-w-md bg-white/[.05] border border-white/[.08] rounded-lg px-4 py-2 text-sm placeholder-gray-500 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20"
+              className="w-full max-w-md bg-white/[.05] border border-white/[.08] rounded-lg px-4 py-2 text-sm placeholder-gray-500 focus:outline-none focus:border-[#5b5bf6]/50 focus:ring-1 focus:ring-[#5b5bf6]/20"
             />
           </div>
 
@@ -29,7 +29,7 @@ export default function Dashboard() {
                 <p className="text-sm font-medium text-white">Juan García</p>
                 <p className="text-xs text-gray-500">admin@noova360.com</p>
               </div>
-              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-violet-500/50 transition-all">
+              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#5b5bf6] to-[#7070f8] flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-[#5b5bf6]/50 transition-all">
                 <span className="text-sm font-bold">JG</span>
               </div>
             </div>
@@ -48,7 +48,7 @@ export default function Dashboard() {
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {[
-              { label: "Leads Activos", value: "248", change: "+12%", color: "violet" },
+              { label: "Leads Activos", value: "248", change: "+12%", color: "primary" },
               { label: "Conversaciones", value: "1,842", change: "+8%", color: "blue" },
               { label: "Cotizaciones Hoy", value: "45", change: "+23%", color: "cyan" },
               { label: "Tasa Conversión", value: "34.2%", change: "+5.1%", color: "green" },
@@ -58,7 +58,7 @@ export default function Dashboard() {
                 <div className="flex items-baseline gap-3">
                   <span className="text-3xl font-bold">{stat.value}</span>
                   <span className={`text-sm font-medium ${
-                    stat.color === "violet" ? "text-violet-400" :
+                    stat.color === "primary" ? "text-[#5b5bf6]" :
                     stat.color === "blue" ? "text-blue-400" :
                     stat.color === "cyan" ? "text-cyan-400" :
                     "text-green-400"
@@ -89,7 +89,7 @@ export default function Dashboard() {
                         <p className="text-xs text-gray-500">{lead.ramo}</p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-xs px-2 py-1 rounded-full bg-violet-500/20 text-violet-300">{lead.estado}</span>
+                        <span className="text-xs px-2 py-1 rounded-full bg-[#5b5bf6]/20 text-[#a5a5ff]">{lead.estado}</span>
                         <span className="text-xs text-gray-500">{lead.date}</span>
                       </div>
                     </div>
@@ -112,8 +112,8 @@ export default function Dashboard() {
             {/* Right Column */}
             <div className="space-y-6">
               {/* Tip Card */}
-              <div className="bg-gradient-to-br from-violet-600/20 to-blue-600/10 border border-violet-500/20 rounded-xl p-6">
-                <p className="text-sm font-semibold text-violet-300 mb-3">💡 Pro Tip</p>
+              <div className="bg-gradient-to-br from-[#5b5bf6]/20 to-[#7070f8]/10 border border-[#5b5bf6]/20 rounded-xl p-6">
+                <p className="text-sm font-semibold text-[#a5a5ff] mb-3">💡 Pro Tip</p>
                 <p className="text-sm text-gray-300 mb-4">Activa ORI Copiloto para recibir sugerencias automáticas en tus cotizaciones.</p>
                 <button className="w-full px-4 py-2 rounded-lg bg-[#5b5bf6] hover:bg-[#7070f8] text-white text-sm font-medium transition-colors">
                   Activar ORI

@@ -138,18 +138,18 @@ export default function OriCopilotoPage() {
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-noova-main text-white relative">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-violet-600/[.06] rounded-full blur-[100px]" />
+        <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-[#5b5bf6]/[.06] rounded-full blur-[100px]" />
       </div>
 
       {/* Header Ori */}
       <div className="relative z-10 shrink-0 flex items-center justify-between px-8 py-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-violet-500 flex items-center justify-center shadow-lg shadow-violet-900/30">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#5b5bf6] to-[#7070f8] flex items-center justify-center shadow-lg shadow-[#5b5bf6]/30">
             <Sparkles className="w-4 h-4 text-white" strokeWidth={2} />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[15px] font-semibold tracking-tight text-white">Ori</span>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/25">
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#5b5bf6]/15 text-[#a5a5ff] border border-[#5b5bf6]/25">
               Copiloto
             </span>
           </div>
@@ -159,7 +159,7 @@ export default function OriCopilotoPage() {
             <select
               value={contextId}
               onChange={e => setContextId(e.target.value)}
-              className="text-xs font-medium bg-[#14151c] border border-white/[.08] rounded-lg px-2.5 py-1.5 text-gray-300 focus:outline-none focus:border-violet-500/40"
+              className="text-xs font-medium bg-[#14151c] border border-white/[.08] rounded-lg px-2.5 py-1.5 text-gray-300 focus:outline-none focus:border-[#5b5bf6]/40"
             >
               {contexts.map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -169,7 +169,7 @@ export default function OriCopilotoPage() {
           {hasChat && (
             <button
               onClick={startNewChat}
-              className="text-xs font-medium text-gray-500 hover:text-violet-300 transition-colors"
+              className="text-xs font-medium text-gray-500 hover:text-[#a5a5ff] transition-colors"
             >
               Nueva conversación
             </button>
@@ -207,7 +207,7 @@ export default function OriCopilotoPage() {
                   {[0, 100, 200].map(d => (
                     <div
                       key={d}
-                      className="w-1.5 h-1.5 rounded-full bg-violet-400/50 animate-pulse"
+                      className="w-1.5 h-1.5 rounded-full bg-[#5b5bf6]/50 animate-pulse"
                       style={{ animationDelay: `${d}ms` }}
                     />
                   ))}
@@ -221,7 +221,7 @@ export default function OriCopilotoPage() {
 
             {!hasChat && (
               <div className="flex items-center justify-center gap-3 mb-12">
-                <Sparkles className="w-5 h-5 text-violet-400" strokeWidth={1.75} />
+                <Sparkles className="w-5 h-5 text-[#5b5bf6]" strokeWidth={1.75} />
                 <h1 className="text-[1.75rem] sm:text-[2rem] font-semibold text-gray-200 tracking-tight">
                   ¿Cómo puedo ayudarte hoy,{" "}
                   <span className="text-white">{userName}</span>?
@@ -234,7 +234,7 @@ export default function OriCopilotoPage() {
             )}
 
             {/* Input amplio */}
-            <div className="rounded-[1.35rem] border border-white/[.09] bg-[#14151c] focus-within:border-violet-500/30 focus-within:shadow-[0_0_0_1px_rgba(139,92,246,0.15)] transition-all">
+            <div className="rounded-[1.35rem] border border-white/[.09] bg-[#14151c] focus-within:border-[#5b5bf6]/30 focus-within:shadow-[0_0_0_1px_rgba(91,91,246,0.15)] transition-all">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -258,7 +258,7 @@ export default function OriCopilotoPage() {
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-violet-300/80 hover:text-violet-200 hover:bg-violet-500/[.08] transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-[#a5a5ff]/80 hover:text-[#c4c4ff] hover:bg-[#5b5bf6]/[.08] transition-colors"
                   >
                     Gemini 2.5 Flash
                     <ChevronDown className="w-3.5 h-3.5 opacity-70" />
@@ -296,9 +296,9 @@ export default function OriCopilotoPage() {
                       type="button"
                       onClick={() => sendMessage(action.prompt)}
                       disabled={loading}
-                      className="group flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#14151c] border border-white/[.07] hover:border-violet-500/25 hover:bg-violet-500/[.06] text-[13px] font-medium text-gray-400 hover:text-gray-200 transition-all disabled:opacity-40"
+                      className="group flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#14151c] border border-white/[.07] hover:border-[#5b5bf6]/25 hover:bg-[#5b5bf6]/[.06] text-[13px] font-medium text-gray-400 hover:text-gray-200 transition-all disabled:opacity-40"
                     >
-                      <Icon className="w-3.5 h-3.5 text-gray-500 group-hover:text-violet-400 transition-colors" strokeWidth={1.75} />
+                      <Icon className="w-3.5 h-3.5 text-gray-500 group-hover:text-[#5b5bf6] transition-colors" strokeWidth={1.75} />
                       {action.label}
                     </button>
                   );

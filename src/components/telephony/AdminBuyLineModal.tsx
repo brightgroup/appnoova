@@ -9,7 +9,8 @@ import { authFetch } from "@/lib/telephony-api";
 import { supabase } from "@/lib/supabase";
 import {
   btnPrimary, btnGhost, textMuted,
-  registryTableHead, registryTableHeadRow, registryTableRow
+  registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
+  registryTableRow, registryTableRowClickable, registryTableCell, registryTableCellMuted
 } from "@/lib/brand-ui";
 import { TELEPHONY_COUNTRIES } from "@/lib/telephony/countries";
 import { telnyxFeatureLabel } from "@/lib/telephony/feature-labels";
@@ -342,19 +343,18 @@ export function AdminBuyLineModal({ open, onClose, onSuccess, preselectedUserId 
                   Consultando inventario Telnyx...
                 </div>
               ) : searched && available.length > 0 ? (
-                <div className="rounded-xl border border-white/[.10] overflow-hidden">
-                  <div className="overflow-x-auto max-h-[340px] overflow-y-auto">
-                    <table className="w-full min-w-[880px] text-xs">
+                <div className="overflow-x-auto max-h-[340px] overflow-y-auto">
+                    <table className={`${registryTable} min-w-[880px]`}>
                       <thead className={registryTableHead}>
                         <tr className={registryTableHeadRow}>
-                          <th className="px-4 py-2.5 text-left w-8" />
-                          <th className="px-4 py-2.5 text-left">Número</th>
-                          <th className="px-4 py-2.5 text-left">Ubicación</th>
-                          <th className="px-4 py-2.5 text-left">Tipo</th>
-                          <th className="px-4 py-2.5 text-left">Features</th>
-                          <th className="px-4 py-2.5 text-right">Mensual</th>
-                          <th className="px-4 py-2.5 text-right">Inicial</th>
-                          <th className="px-4 py-2.5 text-center">Extra</th>
+                          <th className={`${registryTableHeadCell} w-8`} />
+                          <th className={registryTableHeadCell}>Número</th>
+                          <th className={registryTableHeadCell}>Ubicación</th>
+                          <th className={registryTableHeadCell}>Tipo</th>
+                          <th className={registryTableHeadCell}>Features</th>
+                          <th className={`${registryTableHeadCell} text-right`}>Mensual</th>
+                          <th className={`${registryTableHeadCell} text-right`}>Inicial</th>
+                          <th className={`${registryTableHeadCell} text-center`}>Extra</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -364,9 +364,9 @@ export function AdminBuyLineModal({ open, onClose, onSuccess, preselectedUserId 
                             <tr
                               key={n.e164}
                               onClick={() => setSelectedE164(n.e164)}
-                              className={`${registryTableRow} ${selected ? "bg-[#5b5bf6]/10 hover:bg-[#5b5bf6]/12" : ""}`}
+                              className={`${registryTableRowClickable} ${selected ? "bg-[#5b5bf6]/[.06]" : ""}`}
                             >
-                              <td className="px-4 py-3">
+                              <td className={registryTableCell}>
                                 <span
                                   className={`block w-4 h-4 rounded-full border-2 ${
                                     selected ? "border-[#5b5bf6] bg-[#5b5bf6]" : "border-white/20"
@@ -377,25 +377,25 @@ export function AdminBuyLineModal({ open, onClose, onSuccess, preselectedUserId 
                                   )}
                                 </span>
                               </td>
-                              <td className="px-4 py-3">
+                              <td className={registryTableCell}>
                                 <span className="font-mono text-sm font-semibold text-white">{n.e164}</span>
                               </td>
-                              <td className="px-4 py-3 text-gray-300 max-w-[180px]">
+                              <td className={`${registryTableCell} text-gray-300 max-w-[180px]`}>
                                 <span className="line-clamp-2">{formatLocation(n)}</span>
                               </td>
-                              <td className="px-4 py-3 text-gray-400">
+                              <td className={`${registryTableCell} text-gray-400`}>
                                 {formatNumberType(n.number_type)}
                               </td>
-                              <td className="px-4 py-3">
+                              <td className={registryTableCell}>
                                 <TelnyxFeaturesCell features={n.feature_list} />
                               </td>
-                              <td className="px-4 py-3 text-right font-medium text-white tabular-nums">
+                              <td className={`${registryTableCell} text-right font-medium text-white tabular-nums`}>
                                 {formatMoney(n.monthly_cost_usd, n.currency)}
                               </td>
-                              <td className="px-4 py-3 text-right text-gray-400 tabular-nums">
+                              <td className={`${registryTableCell} text-right text-gray-400 tabular-nums`}>
                                 {formatMoney(n.upfront_cost_usd, n.currency)}
                               </td>
-                              <td className="px-4 py-3 text-center">
+                              <td className={`${registryTableCell} text-center`}>
                                 <div className="flex items-center justify-center gap-1.5">
                                   {n.quickship && (
                                     <span className="text-emerald-400" title="Quickship — activo de inmediato">
@@ -417,7 +417,6 @@ export function AdminBuyLineModal({ open, onClose, onSuccess, preselectedUserId 
                         })}
                       </tbody>
                     </table>
-                  </div>
                 </div>
               ) : searched && available.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -437,64 +436,62 @@ export function AdminBuyLineModal({ open, onClose, onSuccess, preselectedUserId 
 
           {step === 3 && (
             <div className="space-y-4">
-              <div className="rounded-xl border border-white/[.10] bg-noova-main overflow-hidden">
-                <table className="w-full text-sm">
+              <table className={registryTable}>
                   <tbody>
-                    <tr className="border-b border-white/[.08]">
-                      <td className={`px-5 py-3 ${textMuted}`}>Cliente</td>
-                      <td className="px-5 py-3 text-white text-right">{selectedUser?.nombre || selectedUser?.email}</td>
+                    <tr className={registryTableRow}>
+                      <td className={registryTableCellMuted}>Cliente</td>
+                      <td className={`${registryTableCell} text-white text-right`}>{selectedUser?.nombre || selectedUser?.email}</td>
                     </tr>
                     {agentId && (
-                      <tr className="border-b border-white/[.08]">
-                        <td className={`px-5 py-3 ${textMuted}`}>Agente</td>
-                        <td className="px-5 py-3 text-white text-right">
+                      <tr className={registryTableRow}>
+                        <td className={registryTableCellMuted}>Agente</td>
+                        <td className={`${registryTableCell} text-white text-right`}>
                           {agents.find(a => a.id === agentId)?.name ?? "—"}
                         </td>
                       </tr>
                     )}
-                    <tr className="border-b border-white/[.08]">
-                      <td className={`px-5 py-3 ${textMuted}`}>País</td>
-                      <td className="px-5 py-3 text-white text-right">{countryInfo?.label}</td>
+                    <tr className={registryTableRow}>
+                      <td className={registryTableCellMuted}>País</td>
+                      <td className={`${registryTableCell} text-white text-right`}>{countryInfo?.label}</td>
                     </tr>
-                    <tr className="border-b border-white/[.08]">
-                      <td className={`px-5 py-3 ${textMuted}`}>Número</td>
-                      <td className="px-5 py-3 font-mono font-bold text-white text-right">{selectedE164}</td>
+                    <tr className={registryTableRow}>
+                      <td className={registryTableCellMuted}>Número</td>
+                      <td className={`${registryTableCell} font-mono font-bold text-white text-right`}>{selectedE164}</td>
                     </tr>
                     {selectedNumber && (
                       <>
-                        <tr className="border-b border-white/[.08]">
-                          <td className={`px-5 py-3 ${textMuted}`}>Ubicación</td>
-                          <td className="px-5 py-3 text-white text-right">{formatLocation(selectedNumber)}</td>
+                        <tr className={registryTableRow}>
+                          <td className={registryTableCellMuted}>Ubicación</td>
+                          <td className={`${registryTableCell} text-white text-right`}>{formatLocation(selectedNumber)}</td>
                         </tr>
-                        <tr className="border-b border-white/[.08]">
-                          <td className={`px-5 py-3 ${textMuted}`}>Costo mensual</td>
-                          <td className="px-5 py-3 text-white text-right tabular-nums">
+                        <tr className={registryTableRow}>
+                          <td className={registryTableCellMuted}>Costo mensual</td>
+                          <td className={`${registryTableCell} text-white text-right tabular-nums`}>
                             {formatMoney(selectedNumber.monthly_cost_usd, selectedNumber.currency)}
                           </td>
                         </tr>
                         {selectedNumber.upfront_cost_usd != null && (
-                          <tr className="border-b border-white/[.08]">
-                            <td className={`px-5 py-3 ${textMuted}`}>Costo inicial</td>
-                            <td className="px-5 py-3 text-white text-right tabular-nums">
+                          <tr className={registryTableRow}>
+                            <td className={registryTableCellMuted}>Costo inicial</td>
+                            <td className={`${registryTableCell} text-white text-right tabular-nums`}>
                               {formatMoney(selectedNumber.upfront_cost_usd, selectedNumber.currency)}
                             </td>
                           </tr>
                         )}
-                        <tr className="border-b border-white/[.08]">
-                          <td className={`px-5 py-3 ${textMuted}`}>Features</td>
-                          <td className="px-5 py-3 text-right">
+                        <tr className={registryTableRow}>
+                          <td className={registryTableCellMuted}>Features</td>
+                          <td className={`${registryTableCell} text-right`}>
                             <TelnyxFeaturesCell features={selectedNumber.feature_list} />
                           </td>
                         </tr>
                       </>
                     )}
-                    <tr>
-                      <td className={`px-5 py-3 ${textMuted}`}>Proveedor</td>
-                      <td className="px-5 py-3 text-white text-right uppercase">Telnyx</td>
+                    <tr className={registryTableRow}>
+                      <td className={registryTableCellMuted}>Proveedor</td>
+                      <td className={`${registryTableCell} text-white text-right uppercase`}>Telnyx</td>
                     </tr>
                   </tbody>
                 </table>
-              </div>
               <p className={`text-xs ${textMuted} px-1`}>
                 Al confirmar, se realizará la compra en tu cuenta Telnyx y la línea quedará asignada al cliente.
               </p>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { registryPage, registryToolbar, textMuted } from "@/lib/brand-ui";
+import { registryPage, registryToolbar, registryContent, textMuted } from "@/lib/brand-ui";
 import { TestPhoneNumbersPanel } from "@/components/telephony/TestPhoneNumbersPanel";
 
 export default function NumerosPruebaPage() {
@@ -24,7 +24,7 @@ export default function NumerosPruebaPage() {
           </div>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-6 min-h-0">
+      <div className={registryContent}>
         <TestPhoneNumbersPanel />
       </div>
     </div>

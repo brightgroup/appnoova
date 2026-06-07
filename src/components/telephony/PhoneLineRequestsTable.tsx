@@ -2,7 +2,10 @@
 
 import { Clock, Loader2, Phone, CheckCircle2, XCircle, ShoppingCart } from "lucide-react";
 import {
-  registryRowIcon, registryTableHead, registryTableHeadRow, registryTableRow, textMuted, btnPrimarySm
+  registryRowIcon, registryTable, registryTableHead, registryTableHeadRow,
+  registryTableHeadCell, registryTableRow, registryTableCell, registryTableCellFirst,
+  registryTableCellMuted, registryTableCellRight, registryTableLoading, registryTableEmpty,
+  btnPrimarySm
 } from "@/lib/brand-ui";
 import { countryLabel } from "@/lib/telephony/countries";
 import type { PhoneLineRequestAdminRow, PhoneLineRequestStatus } from "@/types/phone-line-request";
@@ -52,7 +55,7 @@ export function PhoneLineRequestsTable({
 }: PhoneLineRequestsTableProps) {
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-gray-400">
+      <div className={registryTableLoading}>
         <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando solicitudes...
       </div>
     );
@@ -60,59 +63,57 @@ export function PhoneLineRequestsTable({
 
   if (rows.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center px-6">
-        <Clock className="w-10 h-10 text-gray-500 mb-3" />
-        <p className="text-sm text-gray-300">No hay solicitudes de clientes.</p>
-        <p className={`text-xs ${textMuted} mt-1`}>Cuando un cliente pida una línea, aparecerá aquí.</p>
+      <div className={`${registryTableEmpty} px-6`}>
+        <Clock className="w-10 h-10 text-gray-500 mb-3 mx-auto" />
+        <p>No hay solicitudes de clientes.</p>
+        <p className="text-xs text-gray-500 mt-1">Cuando un cliente pida una línea, aparecerá aquí.</p>
       </div>
     );
   }
 
   return (
-    <table className="w-full min-w-[960px] text-xs">
+    <table className={`${registryTable} min-w-[960px]`}>
       <thead className={registryTableHead}>
         <tr className={registryTableHeadRow}>
-          <th className="px-5 py-3 text-left font-semibold">Fecha</th>
-          <th className="px-4 py-3 text-left font-semibold">Cliente</th>
-          <th className="px-4 py-3 text-left font-semibold">Tipo</th>
-          <th className="px-4 py-3 text-left font-semibold">País</th>
-          <th className="px-4 py-3 text-left font-semibold">Detalle</th>
-          <th className="px-4 py-3 text-left font-semibold">Agente</th>
-          <th className="px-4 py-3 text-left font-semibold">Estado</th>
-          <th className="px-4 py-3 text-right font-semibold">Acciones</th>
+          <th className={registryTableHeadCell}>Fecha</th>
+          <th className={registryTableHeadCell}>Cliente</th>
+          <th className={registryTableHeadCell}>Tipo</th>
+          <th className={registryTableHeadCell}>País</th>
+          <th className={registryTableHeadCell}>Detalle</th>
+          <th className={registryTableHeadCell}>Agente</th>
+          <th className={registryTableHeadCell}>Estado</th>
+          <th className={`${registryTableHeadCell} text-right`}>Acciones</th>
         </tr>
       </thead>
       <tbody>
         {rows.map(row => (
           <tr key={row.id} className={registryTableRow}>
-            <td className="px-5 py-3.5 text-gray-400 whitespace-nowrap">{formatDate(row.created_at)}</td>
-            <td className="px-4 py-3.5">
+            <td className={`${registryTableCellFirst} text-gray-400 whitespace-nowrap`}>{formatDate(row.created_at)}</td>
+            <td className={registryTableCell}>
               <div className="flex items-center gap-3">
-                <span className={registryRowIcon}>
-                  <Phone className="w-3.5 h-3.5" />
-                </span>
+                <Phone className={`w-3.5 h-3.5 ${registryRowIcon}`} />
                 <div>
                   <p className="text-sm font-medium text-white">{row.client_name || "—"}</p>
-                  <p className={`text-[11px] ${textMuted}`}>{row.client_email}</p>
+                  <p className="text-[11px] text-gray-300">{row.client_email}</p>
                 </div>
               </div>
             </td>
-            <td className="px-4 py-3.5 text-gray-300">{requestTypeLabel(row.request_type)}</td>
-            <td className="px-4 py-3.5 text-gray-300">
+            <td className={`${registryTableCell} text-gray-300`}>{requestTypeLabel(row.request_type)}</td>
+            <td className={`${registryTableCell} text-gray-300`}>
               {row.country_code ? countryLabel(row.country_code) : "—"}
             </td>
-            <td className="px-4 py-3.5 text-gray-300 max-w-[200px]">
+            <td className={`${registryTableCell} text-gray-300 max-w-[200px]`}>
               {row.phone_e164 && (
                 <p className="font-mono text-white text-[11px]">{row.phone_e164}</p>
               )}
               {row.notes && (
-                <p className={`text-[11px] ${textMuted} line-clamp-2 mt-0.5`}>{row.notes}</p>
+                <p className="text-[11px] text-gray-300 line-clamp-2 mt-0.5">{row.notes}</p>
               )}
               {!row.phone_e164 && !row.notes && "—"}
             </td>
-            <td className={`px-4 py-3.5 ${textMuted}`}>{row.agent_name ?? "—"}</td>
-            <td className="px-4 py-3.5">{statusBadge(row.status)}</td>
-            <td className="px-4 py-3.5 text-right">
+            <td className={registryTableCellMuted}>{row.agent_name ?? "—"}</td>
+            <td className={registryTableCell}>{statusBadge(row.status)}</td>
+            <td className={registryTableCellRight}>
               <div className="flex items-center justify-end gap-1.5 flex-wrap">
                 {row.status === "pending" && row.request_type === "purchase_line" && onAttend && (
                   <button

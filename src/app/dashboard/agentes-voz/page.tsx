@@ -1,11 +1,17 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Search, Plus, MoreVertical, ChevronLeft, Mic, MicOff, PhoneCall, ShieldCheck, TrendingUp, ArrowRight, Sparkles, AlertTriangle, CheckCircle2, Loader2, Trash2, RefreshCw, Radio } from "lucide-react";
+import { Plus, MoreVertical, ChevronLeft, Mic, MicOff, PhoneCall, ShieldCheck, TrendingUp, ArrowRight, Sparkles, AlertTriangle, CheckCircle2, Loader2, Trash2, RefreshCw, Radio } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
-import { btnPrimary, btnIcon, btnIconSm, inputSearch, registryPage, registryRowIcon, registryTableHead, registryTableHeadRow, registryTableRow, registryToolbar } from "@/lib/brand-ui";
+import {
+  btnPrimary, btnIcon, btnIconSm, registryPage, registryContent, registryRowIcon,
+  registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
+  registryTableRowClickable, registryTableCell, registryTableCellFirst, registryTableCellRight,
+  registryTableLoading, registryTableEmpty, registryToolbar, textMuted
+} from "@/lib/brand-ui";
+import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { supabase } from "@/lib/supabase";
 import {
   formatContactedLine,
@@ -22,10 +28,10 @@ const AGENT_TEMPLATES = [
     name: "Calificación de Leads",
     tag: "Inbound",
     icon: PhoneCall,
-    iconBg: "from-violet-500 to-purple-600",
-    ringColor: "hover:ring-violet-500/40",
+    iconBg: "from-[#5b5bf6] to-[#7070f8]",
+    ringColor: "hover:ring-[#5b5bf6]/40",
     stat: "+40% conversión",
-    statColor: "text-violet-400",
+    statColor: "text-[#5b5bf6]",
     desc: "Llama a prospectos, califica su intención de compra y obtén información clave automáticamente."
   },
   {
@@ -44,7 +50,7 @@ const AGENT_TEMPLATES = [
     name: "Follow-up Inteligente",
     tag: "Outbound",
     icon: TrendingUp,
-    iconBg: "from-blue-500 to-indigo-600",
+    iconBg: "from-[#5b5bf6] to-[#7070f8]",
     ringColor: "hover:ring-blue-500/40",
     stat: "+30% cierre",
     statColor: "text-blue-400",
@@ -283,86 +289,75 @@ export default function AgentesVozPage() {
   return (
     <div className={registryPage}>
       <div className={registryToolbar}>
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link
-              href="/dashboard"
-              className="p-1.5 hover:bg-white/[.06] rounded-lg transition-colors text-gray-400 hover:text-white shrink-0"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </Link>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">Agentes de Voz</h1>
-              <p className="text-xs text-gray-400 mt-0.5 max-w-xl truncate">
-                Agentes IA para llamadas de cobro, confirmación y calificación
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowTemplateModal(true)}
-            className={`${btnPrimary} shrink-0`}
+        <div className="flex items-center gap-3 min-w-0">
+          <Link
+            href="/dashboard"
+            className="p-1.5 hover:bg-white/[.06] rounded-lg transition-colors text-gray-400 hover:text-white shrink-0"
           >
-            <Plus className="w-4 h-4" />
-            Nuevo agente
-          </button>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-xl">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-            <input
-              type="text"
-              placeholder="Búsqueda de agentes"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`${inputSearch} placeholder-gray-600`}
-            />
+            <ChevronLeft className="w-5 h-5" />
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">Agentes de Voz</h1>
+            <p className={`text-xs ${textMuted} mt-0.5 max-w-xl truncate`}>
+              Agentes IA para llamadas de cobro, confirmación y calificación
+            </p>
           </div>
-          <button onClick={loadAgents} className={btnIcon} title="Actualizar">
-            <RefreshCw className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
-      {listError && (
-        <div className="mx-6 mt-4 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-300">
-          <p className="font-semibold text-red-200 mb-1">No se pudo cargar la lista</p>
-          <p className="text-xs leading-relaxed">{listError}</p>
-          {listError.includes("migración") && (
-            <p className="text-[11px] text-red-400/80 mt-2">
-              Abre Supabase → SQL Editor y ejecuta el archivo <code className="text-red-200">supabase/APPLY_IN_SUPABASE.sql</code>
-            </p>
-          )}
-        </div>
-      )}
-
-      <div className="flex-1 overflow-auto">
+      <div className={registryContent}>
+        <RegistryTableLayout
+          description="Gestiona tus agentes de voz, revisa métricas de llamadas y accede a la configuración de cada uno."
+          search={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar"
+          onRefresh={loadAgents}
+          refreshing={loadingAgents}
+          action={
+            <button onClick={() => setShowTemplateModal(true)} className={btnPrimary}>
+              <Plus className="w-4 h-4" /> Nuevo agente
+            </button>
+          }
+          error={listError ? (
+            <>
+              <p className="font-semibold text-red-200 mb-1">No se pudo cargar la lista</p>
+              <p className="text-xs leading-relaxed">{listError}</p>
+              {listError.includes("migración") && (
+                <p className="text-[11px] text-red-400/80 mt-2">
+                  Abre Supabase → SQL Editor y ejecuta el archivo <code className="text-red-200">supabase/APPLY_IN_SUPABASE.sql</code>
+                </p>
+              )}
+            </>
+          ) : undefined}
+          footer={!loadingAgents && filteredAgents.length > 0 ? (
+            <span>
+              Mostrando <span className="text-gray-200">{filteredAgents.length}</span> de {agents.length} agentes
+            </span>
+          ) : undefined}
+        >
         {loadingAgents ? (
-          <div className="flex items-center justify-center py-20 text-gray-400">
+          <div className={registryTableLoading}>
             <Loader2 className="w-5 h-5 animate-spin mr-2 text-gray-300" /> Cargando agentes...
           </div>
         ) : filteredAgents.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center px-6">
-            <Radio className="w-10 h-10 text-gray-500 mb-3" />
-            <p className="text-sm text-gray-300">
-              {searchTerm
-                ? "No se encontraron agentes con ese nombre"
-                : "Aún no tienes agentes. Crea uno con «Nuevo agente»."}
-            </p>
+          <div className={registryTableEmpty}>
+            {searchTerm
+              ? "No se encontraron agentes con ese nombre"
+              : "Aún no tienes agentes. Crea uno con «Nuevo agente»."}
           </div>
         ) : (
-          <table className="w-full min-w-[900px] text-xs">
+          <table className={`${registryTable} min-w-[900px]`}>
             <thead className={registryTableHead}>
               <tr className={registryTableHeadRow}>
-                <th className="px-5 py-3 text-left font-semibold">Agente</th>
-                <th className="px-4 py-3 text-right font-semibold">Contactos</th>
-                <th className="px-4 py-3 text-right font-semibold">Contactados</th>
-                <th className="px-4 py-3 text-right font-semibold">Llamadas</th>
-                <th className="px-4 py-3 text-right font-semibold">Metas</th>
-                <th className="px-4 py-3 text-right font-semibold">Costo</th>
-                <th className="px-4 py-3 text-right font-semibold">Costo / Resultado</th>
-                <th className="px-4 py-3 text-right font-semibold">Calidad</th>
-                <th className="px-4 py-3 text-center font-semibold">Acciones</th>
+                <th className={registryTableHeadCell}>Agente</th>
+                <th className={`${registryTableHeadCell} text-right`}>Contactos</th>
+                <th className={`${registryTableHeadCell} text-right`}>Contactados</th>
+                <th className={`${registryTableHeadCell} text-right`}>Llamadas</th>
+                <th className={`${registryTableHeadCell} text-right`}>Metas</th>
+                <th className={`${registryTableHeadCell} text-right`}>Costo</th>
+                <th className={`${registryTableHeadCell} text-right`}>Costo / Resultado</th>
+                <th className={`${registryTableHeadCell} text-right`}>Calidad</th>
+                <th className={`${registryTableHeadCell} text-center`}>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -372,35 +367,33 @@ export default function AgentesVozPage() {
                   <tr
                     key={agent.id}
                     onClick={() => openAgent(agent.id)}
-                    className={registryTableRow}
+                    className={registryTableRowClickable}
                   >
-                    <td className="px-5 py-3.5">
+                    <td className={registryTableCellFirst}>
                       <div className="flex items-center gap-3">
-                        <span className={registryRowIcon}>
-                          <PhoneCall className="w-3.5 h-3.5" />
-                        </span>
+                        <PhoneCall className={`w-3.5 h-3.5 ${registryRowIcon}`} />
                         <div className="min-w-0">
                           <div className="text-sm font-medium text-white truncate">{agent.name}</div>
                           <div className="text-[10px] text-gray-400 font-normal mt-0.5">{meta.tag} · {meta.description.slice(0, 36)}…</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-gray-300 text-right tabular-nums">{agent.contacts_count}</td>
-                    <td className="px-4 py-3.5 text-gray-300 text-right tabular-nums">
+                    <td className={`${registryTableCell} text-gray-300 text-right tabular-nums`}>{agent.contacts_count}</td>
+                    <td className={`${registryTableCell} text-gray-300 text-right tabular-nums`}>
                       {formatContactedLine(agent.contacted_count, agent.contacts_count)}
                     </td>
-                    <td className="px-4 py-3.5 text-gray-100 text-right tabular-nums font-medium">{agent.calls_count}</td>
-                    <td className="px-4 py-3.5 text-gray-300 text-right tabular-nums">{agent.goals_achieved}</td>
-                    <td className="px-4 py-3.5 text-gray-300 text-right tabular-nums">{formatCostUsd(agent.cost_usd)}</td>
-                    <td className="px-4 py-3.5 text-gray-300 text-right tabular-nums">
+                    <td className={`${registryTableCell} text-gray-100 text-right tabular-nums font-medium`}>{agent.calls_count}</td>
+                    <td className={`${registryTableCell} text-gray-300 text-right tabular-nums`}>{agent.goals_achieved}</td>
+                    <td className={`${registryTableCell} text-gray-300 text-right tabular-nums`}>{formatCostUsd(agent.cost_usd)}</td>
+                    <td className={`${registryTableCell} text-gray-300 text-right tabular-nums`}>
                       {formatCostPerResult(agent.cost_usd, agent.goals_achieved)}
                     </td>
-                    <td className="px-4 py-3.5 text-right">
+                    <td className={registryTableCellRight}>
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${qualityBadgeClass(agent.quality_label)}`}>
                         {agent.quality_label}
                       </span>
                     </td>
-                    <td className="px-4 py-3.5 text-center relative" onClick={e => e.stopPropagation()}>
+                    <td className={`${registryTableCell} text-center relative`} onClick={e => e.stopPropagation()}>
                       <button
                         onClick={e => {
                           e.stopPropagation();
@@ -440,13 +433,7 @@ export default function AgentesVozPage() {
             </tbody>
           </table>
         )}
-        {!loadingAgents && filteredAgents.length > 0 && (
-          <div className="px-5 py-3 flex items-center justify-between border-t border-white/[.06]">
-            <p className="text-xs text-gray-400">
-              Mostrando <span className="text-gray-200">{filteredAgents.length}</span> de {agents.length} agentes
-            </p>
-          </div>
-        )}
+        </RegistryTableLayout>
       </div>
 
       {/* Confirm delete agent */}
@@ -485,15 +472,15 @@ export default function AgentesVozPage() {
           <div className="relative bg-noova-surface border border-white/[.10] rounded-3xl p-8 max-w-2xl w-full mx-4 shadow-2xl overflow-hidden">
 
             {/* Ambient glow */}
-            <div className="absolute -top-20 -right-20 w-64 h-64 bg-violet-600/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#5b5bf6]/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
 
             {/* Header */}
             <div className="relative mb-8">
               <div className="flex items-center gap-2 mb-3">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/20">
-                  <Sparkles className="w-3 h-3 text-violet-400" />
-                  <span className="text-xs font-medium text-violet-400">IA de Voz</span>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#5b5bf6]/10 border border-[#5b5bf6]/20">
+                  <Sparkles className="w-3 h-3 text-[#5b5bf6]" />
+                  <span className="text-xs font-medium text-[#5b5bf6]">IA de Voz</span>
                 </div>
               </div>
               <h2 className="text-2xl font-bold text-white tracking-tight">Elige tu plantilla</h2>
@@ -565,7 +552,7 @@ export default function AgentesVozPage() {
                 className="absolute inset-0 pointer-events-none transition-all duration-75"
                 style={{
                   background: micState === "active"
-                    ? `radial-gradient(ellipse 60% 40% at 50% 50%, rgba(99,102,241,${0.06 + audioLevel * 0.12}) 0%, transparent 70%)`
+                    ? `radial-gradient(ellipse 60% 40% at 50% 50%, rgba(91,91,246,${0.06 + audioLevel * 0.12}) 0%, transparent 70%)`
                     : "none"
                 }}
               />
@@ -597,7 +584,7 @@ export default function AgentesVozPage() {
                 {micState === "active" && (
                   <>
                     <div
-                      className="absolute rounded-full border border-violet-500/20 transition-all duration-75"
+                      className="absolute rounded-full border border-[#5b5bf6]/20 transition-all duration-75"
                       style={{
                         width:  `${120 + audioLevel * 60}px`,
                         height: `${120 + audioLevel * 60}px`,
@@ -605,7 +592,7 @@ export default function AgentesVozPage() {
                       }}
                     />
                     <div
-                      className="absolute rounded-full border border-violet-500/10 transition-all duration-100"
+                      className="absolute rounded-full border border-[#5b5bf6]/10 transition-all duration-100"
                       style={{
                         width:  `${140 + audioLevel * 80}px`,
                         height: `${140 + audioLevel * 80}px`,
@@ -627,7 +614,7 @@ export default function AgentesVozPage() {
                   style={micState === "active" ? { transform: `scale(${pulse})` } : {}}
                 >
                   {micState === "idle"       && <MicOff  className="w-10 h-10 text-gray-500" />}
-                  {micState === "requesting" && <Mic     className="w-10 h-10 text-violet-400 animate-pulse" />}
+                  {micState === "requesting" && <Mic     className="w-10 h-10 text-[#5b5bf6] animate-pulse" />}
                   {micState === "active"     && <Mic     className="w-10 h-10 text-white" />}
                   {micState === "denied"     && <AlertTriangle className="w-10 h-10 text-red-400" />}
                   {micState === "error"      && <AlertTriangle className="w-10 h-10 text-red-400" />}
