@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Phone, Loader2, Copy, CheckCircle2, Radio, AlertCircle } from "lucide-react";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import { btnPrimarySm, btnGhost, textMuted, textSecondary } from "@/lib/brand-ui";
-import { TestPhoneNumbersPanel } from "@/components/telephony/TestPhoneNumbersPanel";
 import type { PhoneNumberRecord } from "@/types/phone-number";
 import type { TestPhoneNumberRecord } from "@/types/test-phone-number";
 
@@ -161,14 +160,33 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
           </div>
         )}
 
-        <div className="rounded-2xl border border-white/[.10] bg-noova-surface p-5">
-          <TestPhoneNumbersPanel
-            compact
-            showSelector
-            selectedId={selectedTestId}
-            onSelect={setSelectedTestId}
-          />
-        </div>
+        {testNumbers.length > 0 ? (
+          <div className="rounded-2xl border border-white/[.10] bg-noova-surface p-5">
+            <label className={`block text-[11px] font-medium ${textMuted} mb-1.5 uppercase tracking-wide`}>
+              Llamarás desde
+            </label>
+            <select
+              value={selectedTestId ?? ""}
+              onChange={e => setSelectedTestId(e.target.value)}
+              className="w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500/50"
+            >
+              {testNumbers.map(n => (
+                <option key={n.id} value={n.id}>{n.label} · {n.e164}</option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-white/[.12] bg-noova-surface/50 p-6 text-center space-y-2">
+            <p className={`text-sm ${textSecondary}`}>No tienes números de prueba</p>
+            <p className={`text-xs ${textMuted}`}>
+              Agrégalos en{" "}
+              <Link href="/dashboard/agentes-voz/numeros-prueba" className="text-[#5b5bf6] hover:underline">
+                Números de prueba
+              </Link>{" "}
+              y vuelve aquí para probar.
+            </p>
+          </div>
+        )}
 
         {line && selectedTest && (
           <div className="rounded-2xl border border-white/[.10] bg-noova-surface p-6 space-y-4">
@@ -207,12 +225,6 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
           </div>
         )}
 
-        <p className={`text-xs ${textMuted}`}>
-          Los números de prueba también se gestionan en{" "}
-          <Link href="/dashboard/agentes-voz/numeros-prueba" className="text-[#5b5bf6] hover:underline">
-            Números de prueba
-          </Link>.
-        </p>
       </div>
     </div>
   );

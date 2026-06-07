@@ -6,19 +6,7 @@ import { getAuthHeaders } from "@/lib/voice-agents-api";
 import { btnPrimarySm, btnGhost, inputSearch, textMuted, textSecondary } from "@/lib/brand-ui";
 import type { TestPhoneNumberRecord } from "@/types/test-phone-number";
 
-interface TestPhoneNumbersPanelProps {
-  compact?: boolean;
-  onSelect?: (id: string) => void;
-  selectedId?: string | null;
-  showSelector?: boolean;
-}
-
-export function TestPhoneNumbersPanel({
-  compact = false,
-  onSelect,
-  selectedId,
-  showSelector = false
-}: TestPhoneNumbersPanelProps) {
+export function TestPhoneNumbersPanel() {
   const [numbers, setNumbers] = useState<TestPhoneNumberRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -70,7 +58,6 @@ export function TestPhoneNumbersPanel({
       setLabel("Mi celular");
       setShowForm(false);
       await load();
-      if (data.test_number?.id) onSelect?.(data.test_number.id);
     } finally {
       setSaving(false);
     }
@@ -93,57 +80,38 @@ export function TestPhoneNumbersPanel({
 
   if (loading) {
     return (
-      <div className={`flex items-center justify-center ${compact ? "py-6" : "py-16"} text-gray-400`}>
+      <div className="flex items-center justify-center py-16 text-gray-400">
         <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando...
       </div>
     );
   }
 
   return (
-    <div className={compact ? "space-y-3" : "space-y-5"}>
+    <div className="space-y-5">
       {!dbReady && (
         <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
           Ejecuta la migración <code>010_test_phone_numbers.sql</code> en Supabase.
         </div>
       )}
 
-      {showSelector && numbers.length > 0 && (
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <label className={`block text-[11px] font-medium ${textMuted} mb-1.5 uppercase tracking-wide`}>
-            Número desde el que llamarás
-          </label>
-          <select
-            value={selectedId ?? ""}
-            onChange={e => onSelect?.(e.target.value)}
-            className="w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500/50"
-          >
-            {numbers.map(n => (
-              <option key={n.id} value={n.id}>{n.label} · {n.e164}</option>
-            ))}
-          </select>
+          <h2 className="text-lg font-semibold text-white">Números de prueba</h2>
+          <p className={`text-sm ${textMuted}`}>
+            Celulares desde los que llamarás para probar tus agentes.
+          </p>
         </div>
-      )}
-
-      {!compact && (
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-white">Números de prueba</h2>
-            <p className={`text-sm ${textMuted}`}>
-              Teléfonos desde los que llamarás para probar tus agentes.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={load} className={btnGhost} title="Actualizar">
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
-            <button onClick={() => setShowForm(v => !v)} className={btnPrimarySm}>
-              <Plus className="w-3.5 h-3.5" /> Agregar
-            </button>
-          </div>
+        <div className="flex gap-2">
+          <button onClick={load} className={btnGhost} title="Actualizar">
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => setShowForm(v => !v)} className={btnPrimarySm}>
+            <Plus className="w-3.5 h-3.5" /> Agregar
+          </button>
         </div>
-      )}
+      </div>
 
-      {(showForm || compact) && (
+      {showForm && (
         <form onSubmit={handleCreate} className="rounded-xl border border-white/[.10] bg-noova-surface p-4 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -178,23 +146,17 @@ export function TestPhoneNumbersPanel({
       )}
 
       {numbers.length === 0 ? (
-        <div className={`rounded-xl border border-dashed border-white/[.12] text-center ${compact ? "p-5" : "p-10"}`}>
+        <div className="rounded-xl border border-dashed border-white/[.12] text-center p-10">
           <Phone className="w-8 h-8 text-gray-600 mx-auto mb-2" />
           <p className={`text-sm ${textSecondary}`}>Sin números de prueba</p>
-          {!compact && (
-            <p className={`text-xs ${textMuted} mt-1`}>Agrega el celular desde el que llamarás a tus agentes.</p>
-          )}
+          <p className={`text-xs ${textMuted} mt-1`}>Agrega el celular desde el que llamarás a tus agentes.</p>
         </div>
       ) : (
         <ul className="space-y-2">
           {numbers.map(n => (
             <li
               key={n.id}
-              className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
-                showSelector && selectedId === n.id
-                  ? "border-[#5b5bf6]/40 bg-[#5b5bf6]/[.06]"
-                  : "border-white/[.10] bg-noova-surface"
-              }`}
+              className="flex items-center justify-between gap-3 rounded-xl border border-white/[.10] bg-noova-surface px-4 py-3"
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium text-white">{n.label}</p>
