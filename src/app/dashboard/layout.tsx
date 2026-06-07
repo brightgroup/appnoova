@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard, Building2 } from "lucide-react";
+import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard, Building2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
@@ -11,11 +11,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
+    if (pathname.startsWith("/dashboard/agentes-voz")) {
+      setExpandedMenu("voz");
+    }
+  }, [pathname]);
+
+  useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthReady(true);
       if (!session) {
         router.replace("/login");
       } else {
@@ -29,7 +37,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push("/login");
   };
 
-  if (!checked) return null;
+  if (!authReady || !checked) {
+    return (
+      <div className="flex h-screen bg-noova-main items-center justify-center text-gray-400">
+        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        Cargando...
+      </div>
+    );
+  }
 
   const toggleMenu = (menu: string) => {
     setExpandedMenu(expandedMenu === menu ? null : menu);
@@ -89,8 +104,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             {sidebarOpen && expandedMenu === "voz" && (
               <div className="ml-8 mt-1 space-y-1.5 pb-2 border-l border-white/[.1]">
-                {[{ name: "Agentes", href: "/dashboard/agentes-voz" }, { name: "Historial", href: "#" }, { name: "Números telefónicos", href: "#" }, { name: "Números de prueba", href: "#" }, { name: "Troncales SIP", href: "#" }, { name: "Canales", href: "#" }].map((item, i) => (
-                  <Link key={i} href={item.href} className="w-full text-left px-3 py-2 text-sm text-white hover:text-gray-100 transition-colors font-medium block">
+                {[
+                  { name: "Agentes", href: "/dashboard/agentes-voz" },
+                  { name: "Historial", href: "#" },
+                  { name: "Números telefónicos", href: "/dashboard/agentes-voz/numeros" },
+                  { name: "Números de prueba", href: "#" },
+                  { name: "Troncales SIP", href: "#" },
+                  { name: "Canales", href: "#" }
+                ].map((item, i) => (
+                  <Link
+                    key={i}
+                    href={item.href}
+                    className={`w-full text-left px-3 py-2 text-sm transition-colors font-medium block ${
+                      pathname === item.href
+                        ? "text-[#5b5bf6]"
+                        : "text-white hover:text-gray-100"
+                    }`}
+                  >
                     {item.name}
                   </Link>
                 ))}

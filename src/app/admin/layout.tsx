@@ -1,35 +1,51 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, Settings, Phone, LogOut,
-  ChevronLeft, ChevronRight, Shield
+  ChevronLeft, ChevronRight, Shield, Loader2
 } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/admin",          label: "Panel",           icon: LayoutDashboard, exact: true },
-  { href: "/admin/users",    label: "Usuarios",        icon: Users },
-  { href: "/admin/templates",label: "Agentes IA",      icon: Settings },
-  { href: "/admin/calls",    label: "Llamadas",        icon: Phone },
+  { href: "/admin/users",      label: "Usuarios",           icon: Users },
+  { href: "/admin/telephony",  label: "Líneas telefónicas", icon: Phone, badgeKey: "telephony" as const },
+  { href: "/admin/templates",  label: "Agentes IA",         icon: Settings },
+  { href: "/admin/calls",      label: "Llamadas",           icon: Phone },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [checked, setChecked]     = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [denied, setDenied]       = useState(false);
+  const [pendingRequests, setPendingRequests] = useState(0);
   const pathname  = usePathname();
   const router    = useRouter();
 
+  const loadPendingRequests = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const res = await fetch("/api/admin/telephony/requests", {
+      headers: { Authorization: `Bearer ${session.access_token}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setPendingRequests(data.pending_count ?? 0);
+    }
+  }, []);
+
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      setAuthReady(true);
       if (!session) {
         router.replace("/login");
         return;
       }
-      // Verificar que el usuario tiene rol admin
       const { data: profile } = await supabase
         .from("users")
         .select("rol")
@@ -37,19 +53,41 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .single();
 
       if (!profile || profile.rol !== "admin") {
+        setDenied(true);
         router.replace("/dashboard");
         return;
       }
       setChecked(true);
+      loadPendingRequests();
     });
-  }, [router]);
+  }, [router, loadPendingRequests]);
+
+  useEffect(() => {
+    if (checked) loadPendingRequests();
+  }, [pathname, checked, loadPendingRequests]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
   };
 
-  if (!checked) return null;
+  if (!authReady) {
+    return (
+      <div className="flex h-screen bg-noova-main items-center justify-center text-gray-400">
+        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        Cargando admin...
+      </div>
+    );
+  }
+
+  if (denied || !checked) {
+    return (
+      <div className="flex h-screen bg-noova-main items-center justify-center text-gray-400">
+        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        Redirigiendo...
+      </div>
+    );
+  }
 
   const isActive = (item: typeof NAV_ITEMS[0]) =>
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
@@ -95,7 +133,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 }`}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
+                {!collapsed && (
+                  <span className="flex items-center gap-2">
+                    {item.label}
+                    {"badgeKey" in item && item.badgeKey === "telephony" && pendingRequests > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-[10px] font-bold text-black">
+                        {pendingRequests}
+                      </span>
+                    )}
+                  </span>
+                )}
               </Link>
             );
           })}

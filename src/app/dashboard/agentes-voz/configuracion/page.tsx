@@ -16,11 +16,12 @@ import type { VoiceAgentFormData, VoiceAgentRecord } from "@/types/voice-agent";
 import type { CompanyContext } from "@/types/company-context";
 import { VoiceSessionPanel } from "@/components/voice/VoiceSessionPanel";
 import { CallRegistryPanel } from "@/components/voice/CallRegistryPanel";
+import { AgentPhoneChannelPanel } from "@/components/telephony/AgentPhoneChannelPanel";
 
 type TabId = "probar" | "config" | "analisis" | "registro" | "metrica" | "canales";
 
 function parseTab(tab: string | null): TabId {
-  if (tab === "probar" || tab === "config" || tab === "registro") return tab;
+  if (tab === "probar" || tab === "config" || tab === "registro" || tab === "canales") return tab;
   return "config";
 }
 
@@ -224,7 +225,7 @@ function ConfigContent() {
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
-          const disabled = !["config", "probar", "registro"].includes(tab.id);
+          const disabled = !["config", "probar", "registro", "canales"].includes(tab.id);
 
           return (
             <button
@@ -405,6 +406,10 @@ function ConfigContent() {
       {/* Registro de llamadas */}
       {activeTab === "registro" && agentId && (
         <CallRegistryPanel agentId={agentId} refreshKey={registryRefresh} />
+      )}
+
+      {activeTab === "canales" && agentId && (
+        <AgentPhoneChannelPanel agentId={agentId} />
       )}
 
       {/* Probar agente — sesión en vivo */}

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { Users, Shield, User, Search, RefreshCw, ChevronDown, CheckCircle, Clock, MailCheck, AlertCircle } from "lucide-react";
+import { Users, Shield, User, Search, RefreshCw, ChevronDown, CheckCircle, Clock, MailCheck, AlertCircle, Phone } from "lucide-react";
 
 interface UserRecord {
   id: string;
@@ -223,6 +224,15 @@ export default function AdminUsers() {
                       {/* Acciones */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
+                          {/* Asignar línea telefónica */}
+                          <Link
+                            href={`/admin/telephony?user_id=${u.id}`}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-xs text-violet-400 hover:bg-violet-500/20 transition-all"
+                          >
+                            <Phone className="w-3 h-3" />
+                            Línea
+                          </Link>
+
                           {/* Confirmar email */}
                           {u.email_confirmed === false && (
                             confirmingId === u.id ? (

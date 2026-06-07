@@ -108,8 +108,9 @@ export default function AgentesVozPage() {
     } catch {
       setListError("Error de red al cargar agentes");
       setAgents([]);
+    } finally {
+      setLoadingAgents(false);
     }
-    setLoadingAgents(false);
   }, []);
 
   useEffect(() => {

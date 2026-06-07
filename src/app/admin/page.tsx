@@ -28,6 +28,12 @@ export default function AdminDashboard() {
       icon: Users
     },
     {
+      href: "/admin/telephony",
+      label: "Líneas telefónicas",
+      description: "Comprar y asignar números Twilio/Telnyx",
+      icon: Phone
+    },
+    {
       href: "/admin/templates",
       label: "Configurar Agentes",
       description: "Editar prompts y configuraciones",
