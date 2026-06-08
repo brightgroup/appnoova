@@ -84,7 +84,17 @@ async def run_bot(
         ),
     )
 
-    context = LLMContext()
+    context = LLMContext(
+        [
+            {
+                "role": "user",
+                "content": (
+                    "La llamada acaba de conectarse. Saluda con UNA sola frase breve "
+                    "en español colombiano y luego espera en silencio a que el usuario hable."
+                ),
+            }
+        ]
+    )
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
