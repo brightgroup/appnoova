@@ -25,14 +25,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [pathname]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      if (cancelled) return;
       setAuthReady(true);
-      if (!session) {
+      router.replace("/login");
+    }, 12_000);
+
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (cancelled) return;
+        clearTimeout(timeout);
+        setAuthReady(true);
+        if (!session) {
+          router.replace("/login");
+        } else {
+          setChecked(true);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        clearTimeout(timeout);
+        setAuthReady(true);
         router.replace("/login");
-      } else {
-        setChecked(true);
-      }
-    });
+      });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, [router]);
 
   const logout = async () => {

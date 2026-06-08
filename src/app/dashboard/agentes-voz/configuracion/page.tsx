@@ -105,11 +105,14 @@ function ConfigContent() {
         setAgentId(a.id);
         setForm(normalizeVoiceAgentForm(a));
         setSaved(true);
+      } else {
+        setError("Agente no encontrado");
       }
     } catch {
       setError("Error de red al cargar el agente");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [agentIdParam]);
 
   useEffect(() => { loadAgent(); }, [loadAgent]);

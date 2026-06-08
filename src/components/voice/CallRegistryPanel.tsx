@@ -137,8 +137,9 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
       setDetailTab("transcripcion");
     } catch {
       setError("Error de red");
+    } finally {
+      setDetailLoading(false);
     }
-    setDetailLoading(false);
   };
 
   const handleReanalyze = async () => {
@@ -168,11 +169,19 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
     await downloadCallAudio(call.audio_url, `${displayCallId(call.id)}.${ext}`);
   };
 
+  if (detailLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-noova-main text-gray-400">
+        <Loader2 className="w-5 h-5 animate-spin mr-2 text-gray-300" /> Cargando llamada...
+      </div>
+    );
+  }
+
   if (selected) {
     return (
       <CallDetailView
         selected={selected}
-        detailLoading={detailLoading}
+        detailLoading={false}
         detailTab={detailTab}
         setDetailTab={setDetailTab}
         reanalyzing={reanalyzing}
@@ -344,7 +353,7 @@ function CallDetailView({
 
   return (
     <div className="flex-1 flex min-h-0 overflow-hidden bg-noova-main text-white">
-      <aside className="w-[400px] shrink-0 border-r border-white/[.10] overflow-y-auto p-5 space-y-5 bg-noova-surface">
+      <aside className="w-[40%] min-w-0 shrink-0 border-r border-white/[.10] overflow-y-auto p-5 space-y-5 bg-noova-surface">
         <div className="flex items-center gap-2">
           <button onClick={onBack} className={btnMenuIcon}>
             <ChevronLeft className="w-5 h-5" />
@@ -356,7 +365,7 @@ function CallDetailView({
         </div>
 
         <MetaSection title="Análisis de conversación">
-          <MetaRow label="ID de Llamada" value={displayCallId(selected.id)} mono />
+          <MetaRow label="ID de Llamada" value={displayCallId(selected.id)} mono fullText />
           <MetaRow label="Teléfono" value={selected.phone_number} />
           <MetaRow label="Duración" value={formatCallDuration(selected.duration_sec)} />
           <MetaRow label="Fecha" value={formatCallTimestamp(selected.created_at)} />
@@ -369,13 +378,19 @@ function CallDetailView({
 
         <MetaSection title="Grabación">
           {selected.audio_url ? (
-            <div className="space-y-3">
-              <audio controls src={selected.audio_url} className="w-full h-9" preload="metadata" />
+            <div className="flex items-center gap-2.5 min-h-[36px]">
+              <audio
+                controls
+                src={selected.audio_url}
+                className="flex-1 min-w-0 h-8"
+                preload="metadata"
+              />
               <button
+                type="button"
                 onClick={() => onDownloadAudio(selected)}
-                className={btnGhost}
+                className={`${btnGhost} shrink-0 whitespace-nowrap`}
               >
-                <Download className="w-3.5 h-3.5" /> Descargar audio
+                <Download className="w-3.5 h-3.5" /> Descargar
               </button>
             </div>
           ) : (
@@ -397,9 +412,11 @@ function CallDetailView({
         <MetaSection title="Datos extraídos">
           {Object.keys(selected.extracted_data).length ? (
             Object.entries(selected.extracted_data).map(([k, v]) => (
-              <div key={k} className="py-1.5 border-b border-white/[.04] last:border-0">
-                <span className="text-[10px] text-[#5b5bf6]/80 uppercase tracking-wide">{k.replace(/_/g, " ")}</span>
-                <p className="text-xs text-gray-300 mt-0.5">{Array.isArray(v) ? v.join(" · ") : String(v ?? "")}</p>
+              <div key={k} className="py-2 border-b border-white/[.04] last:border-0">
+                <span className="text-xs font-semibold text-gray-100 block">
+                  {k.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
+                </span>
+                <p className="text-xs text-gray-400 mt-1 leading-relaxed">{Array.isArray(v) ? v.join(" · ") : String(v ?? "")}</p>
               </div>
             ))
           ) : (
@@ -408,7 +425,7 @@ function CallDetailView({
         </MetaSection>
       </aside>
 
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="w-[60%] min-w-0 flex flex-col bg-noova-surface">
         <div className="border-b border-white/[.06] px-5 flex gap-6 shrink-0">
           {(["transcripcion", "comentarios", "calidad"] as const).map(id => (
             <button
@@ -424,7 +441,7 @@ function CallDetailView({
         </div>
         <div className="flex-1 overflow-y-auto p-5">
           {detailTab === "transcripcion" && (
-            <div className="space-y-3 max-w-3xl">
+            <div className="space-y-3">
               {selected.transcript.map((line, i) => (
                 <div key={i} className="flex gap-3 text-sm">
                   <span className="text-gray-400 tabular-nums w-10 shrink-0">{formatTranscriptTime(line.time_sec)}</span>
@@ -488,7 +505,15 @@ function QualityBar({ percent }: { percent: number }) {
   );
 }
 
-function MetaSection({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+function MetaSection({
+  title,
+  action,
+  children
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
@@ -500,11 +525,34 @@ function MetaSection({ title, action, children }: { title: string; action?: Reac
   );
 }
 
-function MetaRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function MetaRow({
+  label,
+  value,
+  mono,
+  fullText
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  fullText?: boolean;
+}) {
   return (
-    <div className="flex gap-2 py-1.5 text-xs border-b border-white/[.04] last:border-0">
-      <span className="text-gray-400 w-[130px] shrink-0">{label}</span>
-      <span className={`text-gray-200 break-all ${mono ? "font-mono text-[10px]" : ""}`}>{value}</span>
+    <div
+      className={`grid grid-cols-[118px_1fr] gap-3 text-xs border-b border-white/[.05] last:border-0 ${
+        fullText ? "py-2.5 items-start" : "min-h-[40px] items-center"
+      }`}
+    >
+      <span className="text-gray-400 shrink-0 leading-none">{label}</span>
+      <span
+        className={`text-gray-100 min-w-0 ${
+          fullText
+            ? "font-mono text-[10px] break-all select-all leading-relaxed"
+            : `truncate leading-none ${mono ? "font-mono text-[10px] tracking-tight" : ""}`
+        }`}
+        title={fullText ? undefined : value}
+      >
+        {value}
+      </span>
     </div>
   );
 }

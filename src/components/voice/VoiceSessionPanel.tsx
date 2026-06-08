@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Mic, MicOff, PhoneOff, Loader2, Sparkles } from "lucide-react";
 import { GoogleGenAI, Modality, type Session, type LiveServerMessage } from "@google/genai";
 import { getTemplateMeta } from "@/lib/voice-agent-templates";
+import { agentAvatarGradient, agentAvatarStyle } from "@/lib/voice-agent-display";
 import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
 import { geminiTemperature } from "@/lib/voice-agent-audio";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
@@ -46,6 +47,8 @@ export function VoiceSessionPanel({
 }: VoiceSessionPanelProps) {
   const meta = getTemplateMeta(sourceTemplate);
   const accent = agentConfig.color || meta.color;
+  const avatarGradient = agentAvatarGradient(agentConfig.color || meta.color);
+  const avatarStyle = agentAvatarStyle(agentConfig.color || meta.color);
   const agentName = agentConfig.name?.trim() || "Agente";
   const agentInitial = agentName.charAt(0).toUpperCase() || "A";
 
@@ -516,18 +519,23 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
       <aside className="w-[300px] shrink-0 flex flex-col gap-3">
         <div className="flex-1 rounded-2xl border border-white/[.10] bg-noova-surface p-5 flex flex-col min-h-[420px]">
           <div className="flex flex-col items-center text-center pb-5 border-b border-white/[.06]">
-            <div className="relative mb-4">
+            <div className="relative mb-3">
               {(state === "speaking" || state === "listening") && (
-                <>
-                  <div className={`absolute -inset-2 rounded-full bg-gradient-to-br ${accent} opacity-20 blur-md`} />
-                  <div className="absolute inset-0 rounded-full border border-white/20 animate-pulse" />
-                </>
+                <div
+                  className="absolute -inset-2 rounded-full opacity-70 blur-xl animate-pulse"
+                  style={{ background: avatarGradient }}
+                />
               )}
-              <div className={`relative w-[88px] h-[88px] rounded-full flex items-center justify-center bg-gradient-to-br ${accent} shadow-lg ring-4 ring-noova-surface`}>
-                <span className="text-2xl font-bold text-white">{agentInitial}</span>
+              <div
+                className="relative w-[80px] h-[80px] rounded-full flex items-center justify-center border-2 border-white/35 ring-1 ring-white/15"
+                style={avatarStyle}
+              >
+                <span className="text-[32px] font-bold text-white leading-none select-none drop-shadow-sm">
+                  {agentInitial}
+                </span>
               </div>
             </div>
-            <p className="text-sm font-semibold text-white">{agentName}</p>
+            <p className="text-sm font-semibold text-white tracking-tight">{agentName}</p>
             <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[.04] border border-white/[.08]">
               <span className={`w-1.5 h-1.5 rounded-full ${
                 isActive ? "bg-[#5b5bf6] animate-pulse" :

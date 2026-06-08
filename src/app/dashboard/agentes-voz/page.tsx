@@ -28,10 +28,10 @@ const AGENT_TEMPLATES = [
     name: "Calificación de Leads",
     tag: "Inbound",
     icon: PhoneCall,
-    iconBg: "from-[#5b5bf6] to-[#7070f8]",
-    ringColor: "hover:ring-[#5b5bf6]/40",
+    iconBg: "from-[#1d4ed8] to-[#38bdf8]",
+    ringColor: "hover:ring-[#38bdf8]/50",
     stat: "+40% conversión",
-    statColor: "text-[#5b5bf6]",
+    statColor: "text-[#38bdf8]",
     desc: "Llama a prospectos, califica su intención de compra y obtén información clave automáticamente."
   },
   {
@@ -39,10 +39,10 @@ const AGENT_TEMPLATES = [
     name: "Recordatorio de Póliza",
     tag: "Outbound",
     icon: ShieldCheck,
-    iconBg: "from-cyan-500 to-blue-600",
-    ringColor: "hover:ring-cyan-500/40",
+    iconBg: "from-[#0369a1] to-[#00eaff]",
+    ringColor: "hover:ring-[#00eaff]/50",
     stat: "+65% renovaciones",
-    statColor: "text-cyan-400",
+    statColor: "text-[#00eaff]",
     desc: "Contacta clientes antes del vencimiento y agenda renovaciones de pólizas sin esfuerzo."
   },
   {
@@ -50,10 +50,10 @@ const AGENT_TEMPLATES = [
     name: "Follow-up Inteligente",
     tag: "Outbound",
     icon: TrendingUp,
-    iconBg: "from-[#5b5bf6] to-[#7070f8]",
-    ringColor: "hover:ring-blue-500/40",
+    iconBg: "from-[#1e40af] to-[#67e8f9]",
+    ringColor: "hover:ring-[#67e8f9]/50",
     stat: "+30% cierre",
-    statColor: "text-blue-400",
+    statColor: "text-[#67e8f9]",
     desc: "Da seguimiento automático a oportunidades abiertas y reactiva leads sin respuesta."
   }
 ];
