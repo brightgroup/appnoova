@@ -90,3 +90,20 @@ export function geminiOutboundToTelnyx(pcmBase64: string, mimeType?: string): st
   const pcm8k = downsampleTo8k(pcm, rate);
   return pcm16ToPcmuBase64(pcm8k);
 }
+
+/** PCMU silencio (20 ms @ 8 kHz) para mantener vivo el stream RTP de Telnyx. */
+export function telnyxSilencePayload20ms(): string {
+  return Buffer.alloc(160, 0xff).toString("base64");
+}
+
+/** Divide un payload PCMU en frames de ~20 ms para Telnyx. */
+export function chunkPcmuPayload(base64: string, frameBytes = 160): string[] {
+  const bytes = Buffer.from(base64, "base64");
+  if (bytes.length <= frameBytes) return [base64];
+
+  const chunks: string[] = [];
+  for (let i = 0; i < bytes.length; i += frameBytes) {
+    chunks.push(bytes.subarray(i, i + frameBytes).toString("base64"));
+  }
+  return chunks;
+}

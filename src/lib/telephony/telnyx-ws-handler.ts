@@ -48,18 +48,27 @@ export function handleTelnyxMediaSocket(ws: WebSocket) {
         const bridge = new TelnyxGeminiBridge(ws, pending);
         bridges.set(ws, bridge);
         bridge.markAnswered();
-        await bridge.start();
+        try {
+          await bridge.start();
+        } catch (e) {
+          console.error("[telnyx-ws] bridge.start error:", e);
+          await bridge.close("Bridge Start Failed");
+        }
         return;
       }
 
       const bridge = bridges.get(ws);
       if (bridge) bridge.handleTelnyxFrame(text);
-    })();
+    })().catch(err => console.error("[telnyx-ws] message handler error:", err));
   });
 
   ws.on("close", () => {
     const bridge = bridges.get(ws);
-    if (bridge) void bridge.close("Stream Closed");
+    if (bridge) {
+      void bridge.close("Stream Closed").catch(err => {
+        console.error("[telnyx-ws] bridge.close error:", err);
+      });
+    }
     console.info("[telnyx-ws] connection closed");
   });
 

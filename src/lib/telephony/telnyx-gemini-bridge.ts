@@ -1,11 +1,13 @@
-import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from "@google/genai";
+import type { LiveServerMessage, Session } from "@google/genai";
 import type { WebSocket } from "ws";
-import { getVoiceGoogleApiKey } from "@/lib/google-ai";
-import { mergeCompanyContext } from "@/lib/merge-company-context";
-import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
-import { geminiTemperature } from "@/lib/voice-agent-audio";
+import { connectGeminiLive, takePrewarmedGemini } from "@/lib/telephony/gemini-live-connect";
 import { isGoodbyeUtterance } from "@/lib/voice-goodbye-detection";
-import { geminiOutboundToTelnyx, telnyxInboundToGemini } from "@/lib/telephony/telnyx-media-audio";
+import {
+  chunkPcmuPayload,
+  geminiOutboundToTelnyx,
+  telnyxInboundToGemini,
+  telnyxSilencePayload20ms
+} from "@/lib/telephony/telnyx-media-audio";
 import { finalizePhoneTestCall } from "@/lib/telephony/finalize-phone-test-call";
 import {
   registerActiveBridge,
@@ -25,6 +27,8 @@ export class TelnyxGeminiBridge {
   private closed = false;
   private closing = false;
   private goodbyeTriggered = false;
+  private sentAudio = false;
+  private silenceTimer: ReturnType<typeof setInterval> | null = null;
   private callControlId: string;
 
   constructor(
@@ -36,44 +40,23 @@ export class TelnyxGeminiBridge {
 
   async start(): Promise<void> {
     registerActiveBridge(this.callControlId, { close: r => this.close(r) });
+    this.startSilenceKeepalive();
 
-    const apiKey = getVoiceGoogleApiKey();
-    if (!apiKey) {
-      console.error("[telnyx-gemini] Sin GOOGLE_AI_KEY");
-      await this.close("Config Error");
-      return;
+    const callbacks = {
+      onmessage: (msg: LiveServerMessage) => this.onGeminiMessage(msg),
+      onerror: (e: unknown) => console.error("[telnyx-gemini] error:", e),
+      onclose: (code?: number, reason?: string) => {
+        console.warn("[telnyx-gemini] cerrado", { callControlId: this.callControlId, code, reason });
+        if (!this.closing) void this.close("Gemini Closed");
+      }
+    };
+
+    this.gemini = await takePrewarmedGemini(this.callControlId, callbacks);
+    if (!this.gemini) {
+      this.gemini = await connectGeminiLive(this.pending, callbacks);
     }
 
-    const cfg = this.pending.config;
-    const ai = new GoogleGenAI({ apiKey });
-
-    try {
-      this.gemini = await ai.live.connect({
-        model: cfg.model || DEFAULT_LIVE_MODEL,
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: cfg.voice_name || "Aoede" } }
-          },
-          thinkingConfig: { includeThoughts: false, thinkingBudget: 0 },
-          temperature: geminiTemperature(cfg.temperature),
-          systemInstruction: `${mergeCompanyContext(cfg.prompt, this.pending.companyContextText)}
-
-Al iniciar la llamada, saluda con UNA sola frase breve en español colombiano y luego espera en silencio a que el usuario hable. No continúes hablando hasta que el usuario responda.
-Si el usuario se despide o indica que quiere terminar la conversación, despídete de forma breve y cordial (máximo una oración).`,
-          inputAudioTranscription: {},
-          outputAudioTranscription: {}
-        },
-        callbacks: {
-          onmessage: msg => this.onGeminiMessage(msg),
-          onerror: e => console.error("[telnyx-gemini] error:", e),
-          onclose: () => {
-            if (!this.closing) void this.close("Gemini Closed");
-          }
-        }
-      });
-    } catch (e) {
-      console.error("[telnyx-gemini] connect failed:", e);
+    if (!this.gemini) {
       await this.close("Gemini Connect Failed");
     }
   }
@@ -90,7 +73,8 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
     const event = String(msg.event ?? "");
     if (event === "media") {
       const media = msg.media as { track?: string; payload?: string } | undefined;
-      if (media?.track === "inbound" && media.payload && this.setupDone && this.gemini && !this.micBlocked) {
+      const track = media?.track;
+      if (media?.payload && this.setupDone && this.gemini && !this.micBlocked && (!track || track === "inbound")) {
         const geminiAudio = telnyxInboundToGemini(media.payload);
         this.gemini.sendRealtimeInput({
           audio: { data: geminiAudio, mimeType: "audio/pcm;rate=16000" }
@@ -101,6 +85,22 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
 
     if (event === "stop") {
       void this.close("Stream Stopped");
+    }
+  }
+
+  private startSilenceKeepalive() {
+    this.stopSilenceKeepalive();
+    const payload = telnyxSilencePayload20ms();
+    this.silenceTimer = setInterval(() => {
+      if (this.closed || this.sentAudio || this.ws.readyState !== 1) return;
+      this.ws.send(JSON.stringify({ event: "media", media: { payload } }));
+    }, 20);
+  }
+
+  private stopSilenceKeepalive() {
+    if (this.silenceTimer) {
+      clearInterval(this.silenceTimer);
+      this.silenceTimer = null;
     }
   }
 
@@ -123,7 +123,14 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
   private sendAudioToTelnyx(b64: string, mimeType?: string) {
     if (this.ws.readyState !== 1) return;
     const payload = geminiOutboundToTelnyx(b64, mimeType);
-    this.ws.send(JSON.stringify({ event: "media", media: { payload } }));
+    for (const chunk of chunkPcmuPayload(payload)) {
+      this.ws.send(JSON.stringify({ event: "media", media: { payload: chunk } }));
+    }
+    if (!this.sentAudio) {
+      this.sentAudio = true;
+      this.stopSilenceKeepalive();
+      console.info("[telnyx-gemini] primer audio enviado a Telnyx", { callControlId: this.callControlId });
+    }
   }
 
   private checkGoodbye() {
@@ -140,6 +147,8 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
       this.setupDone = true;
       this.sessionStart = Date.now();
       if (!this.answeredAt) this.answeredAt = Date.now();
+
+      console.info("[telnyx-gemini] setupComplete", { callControlId: this.callControlId });
 
       void updatePhoneTestCallSession(this.callControlId, {
         phase: "connected",
@@ -200,6 +209,7 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
     if (this.closed) return;
     this.closed = true;
     this.closing = true;
+    this.stopSilenceKeepalive();
     unregisterActiveBridge(this.callControlId);
 
     try {
@@ -217,11 +227,24 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
       ? Math.max(0, Math.floor((Date.now() - this.answeredAt) / 1000))
       : 0;
 
-    await finalizePhoneTestCall({
+    console.info("[telnyx-gemini] cerrando puente", {
       callControlId: this.callControlId,
-      transcript: this.transcript,
-      disconnectReason: reason,
-      durationSec
+      reason,
+      durationSec,
+      transcriptLines: this.transcript.length,
+      setupDone: this.setupDone,
+      sentAudio: this.sentAudio
     });
+
+    try {
+      await finalizePhoneTestCall({
+        callControlId: this.callControlId,
+        transcript: this.transcript,
+        disconnectReason: reason,
+        durationSec
+      });
+    } catch (e) {
+      console.error("[telnyx-gemini] finalize error:", e);
+    }
   }
 }

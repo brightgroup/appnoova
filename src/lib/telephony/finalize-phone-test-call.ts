@@ -17,10 +17,19 @@ export async function finalizePhoneTestCall(input: {
   }
 
   const meta = session.metadata;
-  if (meta.finalized) return;
+  if (meta.finalized) {
+    console.info("[finalize-phone-test] ya finalizada", input.callControlId);
+    return;
+  }
 
   const agent = await loadVoiceAgentForCall(session.voice_agent_id, session.user_id);
-  if (!agent) return;
+  if (!agent) {
+    console.error("[finalize-phone-test] agente no encontrado", {
+      callControlId: input.callControlId,
+      voiceAgentId: session.voice_agent_id
+    });
+    return;
+  }
 
   const answeredAt = meta.answered_at ? new Date(meta.answered_at).getTime() : null;
   const endedAt = Date.now();
@@ -51,7 +60,7 @@ export async function finalizePhoneTestCall(input: {
   });
 
   const db = adminClient();
-  await db
+  const { error: updateError } = await db
     .from("voice_agent_calls")
     .update({
       ...fields,
@@ -66,11 +75,24 @@ export async function finalizePhoneTestCall(input: {
     })
     .eq("id", session.id);
 
+  if (updateError) {
+    console.error("[finalize-phone-test] update failed:", updateError.message, session.id);
+    throw new Error(updateError.message);
+  }
+
   await updateAgentCallsCount(db, session.voice_agent_id, fields.callsCountNext);
 
   await updatePhoneTestCallSession(input.callControlId, {
     phase: "ended",
     last_event: "call.finalized",
     status_label: labelForPhase("ended")
+  });
+
+  console.info("[finalize-phone-test] ok", {
+    callControlId: input.callControlId,
+    sessionId: session.id,
+    durationSec,
+    transcriptLines: input.transcript.length,
+    reason: input.disconnectReason
   });
 }

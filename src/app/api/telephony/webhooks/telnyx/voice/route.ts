@@ -11,9 +11,9 @@ import { telnyxMediaStreamWsUrl } from "@/lib/telephony/app-url";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import {
   closeActiveBridge,
-  hasActiveBridge,
   setPendingBridgeSession
 } from "@/lib/telephony/bridge-session-store";
+import { scheduleGeminiPrewarm } from "@/lib/telephony/gemini-live-connect";
 import { finalizePhoneTestCall } from "@/lib/telephony/finalize-phone-test-call";
 import {
   decodeTelnyxClientState,
@@ -93,7 +93,7 @@ async function handleOutboundAnswered(
     return;
   }
 
-  setPendingBridgeSession({
+  const pendingSession = {
     callControlId: callId,
     callRecordId: session.id,
     userId: ctx.phone.user_id,
@@ -104,7 +104,10 @@ async function handleOutboundAnswered(
     config: agent.config,
     companyContextText: agent.companyContextText,
     preparedAt: Date.now()
-  });
+  };
+
+  setPendingBridgeSession(pendingSession);
+  scheduleGeminiPrewarm(pendingSession);
 
   await updatePhoneTestCallSession(callId, {
     phase: "answered",
@@ -176,15 +179,27 @@ export async function POST(req: NextRequest) {
   if (eventType === "call.hangup") {
     const row = testCall ? await getPhoneTestCallSession(callId) : null;
     if (row) {
-      const bridged = hasActiveBridge(callId);
-      await closeActiveBridge(callId, "Phone Hangup");
-      if (!bridged && !row.metadata.finalized) {
-        await finalizePhoneTestCall({
-          callControlId: callId,
-          transcript: [],
-          disconnectReason: "Phone Hangup"
-        });
+      try {
+        await closeActiveBridge(callId, "Phone Hangup");
+      } catch (e) {
+        console.error("[telnyx:voice] closeActiveBridge error:", e);
       }
+      // Respaldo retardado: evita pisar el finalize del puente WS (con transcripción).
+      setTimeout(() => {
+        void (async () => {
+          const fresh = await getPhoneTestCallSession(callId);
+          if (!fresh || fresh.metadata.finalized) return;
+          try {
+            await finalizePhoneTestCall({
+              callControlId: callId,
+              transcript: [],
+              disconnectReason: "Phone Hangup"
+            });
+          } catch (e) {
+            console.error("[telnyx:voice] finalize hangup (delayed) error:", e);
+          }
+        })();
+      }, 4000);
     }
   }
 
