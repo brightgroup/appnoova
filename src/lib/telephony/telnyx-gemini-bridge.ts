@@ -30,6 +30,7 @@ export class TelnyxGeminiBridge {
   private goodbyeTriggered = false;
   private sentAudio = false;
   private inboundFrames = 0;
+  private outboundChunksSent = 0;
   private silenceTimer: ReturnType<typeof setInterval> | null = null;
   private outboundQueue: string[] = [];
   private outboundTimer: ReturnType<typeof setInterval> | null = null;
@@ -76,7 +77,9 @@ export class TelnyxGeminiBridge {
     const event = String(msg.event ?? "");
     if (event === "media") {
       const media = msg.media as { track?: string; payload?: string } | undefined;
-      if (media?.payload && this.canSendUserAudio()) {
+      const track = media?.track;
+      // Solo audio del usuario (inbound). Evita reenviar eco del agente por outbound track.
+      if (media?.payload && this.isUserInboundTrack(track) && this.canSendUserAudio()) {
         this.inboundFrames++;
         const geminiAudio = telnyxInboundToGemini(media.payload);
         this.gemini?.sendRealtimeInput({
@@ -94,6 +97,10 @@ export class TelnyxGeminiBridge {
     if (event === "error") {
       console.error("[telnyx-ws] media error frame", msg);
     }
+  }
+
+  private isUserInboundTrack(track?: string): boolean {
+    return !track || track === "inbound";
   }
 
   private canSendUserAudio(): boolean {
@@ -182,6 +189,7 @@ export class TelnyxGeminiBridge {
       if (!chunk) return;
 
       this.ws.send(JSON.stringify({ event: "media", media: { payload: chunk } }));
+      this.outboundChunksSent++;
       if (!this.sentAudio) {
         this.sentAudio = true;
         this.stopSilenceKeepalive();
@@ -310,6 +318,7 @@ export class TelnyxGeminiBridge {
       durationSec,
       transcriptLines: this.transcript.length,
       inboundFrames: this.inboundFrames,
+      outboundChunksSent: this.outboundChunksSent,
       setupDone: this.setupDone,
       sentAudio: this.sentAudio
     });
