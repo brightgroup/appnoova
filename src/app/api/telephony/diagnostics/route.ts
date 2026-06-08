@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI, Modality } from "@google/genai";
 import { getVoiceGoogleApiKey } from "@/lib/google-ai";
-import { getAppBaseUrl, telnyxMediaStreamWsUrl } from "@/lib/telephony/app-url";
+import {
+  getAppBaseUrl,
+  pipecatMediaStreamWsUrl,
+  telephonyBridgeMode,
+  telnyxMediaStreamWsUrl,
+  telnyxStreamUrl
+} from "@/lib/telephony/app-url";
+import { getPipecatInternalSecret } from "@/lib/telephony/pipecat-auth";
 import { telnyxConfigStatus } from "@/lib/telephony/telnyx-provider";
 import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
 
@@ -46,16 +53,23 @@ async function probeGeminiLive(): Promise<{ ok: boolean; ms?: number; error?: st
 export async function GET() {
   const telnyx = telnyxConfigStatus();
   const geminiLive = await probeGeminiLive();
+  const bridgeMode = telephonyBridgeMode();
   return NextResponse.json({
     app_url: getAppBaseUrl(),
-    media_stream_ws: telnyxMediaStreamWsUrl(),
+    bridge_mode: bridgeMode,
+    media_stream_ws: telnyxStreamUrl(),
+    media_stream_ws_diy: telnyxMediaStreamWsUrl(),
+    media_stream_ws_pipecat: pipecatMediaStreamWsUrl(),
+    pipecat_internal_secret: Boolean(getPipecatInternalSecret()),
     telnyx_configured: telnyx.configured,
     telnyx_has_connection: telnyx.has_connection,
     google_voice_key: Boolean(getVoiceGoogleApiKey()),
     gemini_live_ok: geminiLive.ok,
     gemini_live_ms: geminiLive.ms,
     gemini_live_error: geminiLive.error,
-    server_mode: "custom_ws_server",
-    start_command: "npm start (tsx server.ts)"
+    server_mode: bridgeMode === "pipecat" ? "pipecat_self_hosted" : "custom_ws_server",
+    start_command: bridgeMode === "pipecat"
+      ? "Noova: npm start | Pipecat: python services/pipecat-voice/bot.py"
+      : "npm start (tsx server.ts)"
   });
 }

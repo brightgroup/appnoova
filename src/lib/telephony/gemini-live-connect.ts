@@ -1,6 +1,6 @@
 import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from "@google/genai";
 import { getVoiceGoogleApiKey } from "@/lib/google-ai";
-import { mergeCompanyContext } from "@/lib/merge-company-context";
+import { buildPhoneAgentSystemInstruction } from "@/lib/telephony/phone-agent-instruction";
 import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
 import { geminiTemperature } from "@/lib/voice-agent-audio";
 import type { PendingBridgeSession } from "@/lib/telephony/bridge-session-store";
@@ -52,10 +52,7 @@ export async function connectGeminiLive(
         },
         thinkingConfig: { includeThoughts: false, thinkingBudget: 0 },
         temperature: geminiTemperature(cfg.temperature),
-        systemInstruction: `${mergeCompanyContext(cfg.prompt, pending.companyContextText)}
-
-Al iniciar la llamada, saluda con UNA sola frase breve en español colombiano y luego espera en silencio a que el usuario hable. No continúes hablando hasta que el usuario responda.
-Si el usuario se despide o indica que quiere terminar la conversación, despídete de forma breve y cordial (máximo una oración).`,
+        systemInstruction: buildPhoneAgentSystemInstruction(cfg.prompt, pending.companyContextText),
         inputAudioTranscription: {},
         outputAudioTranscription: {}
       },

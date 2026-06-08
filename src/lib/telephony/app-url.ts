@@ -14,9 +14,24 @@ export function twilioStatusWebhookUrl(): string {
   return `${getAppBaseUrl()}/api/telephony/webhooks/twilio/status`;
 }
 
-/** WebSocket para media streaming Telnyx ↔ Gemini Live. */
+/** WebSocket DIY (Node server.ts) — fallback si no hay Pipecat. */
 export function telnyxMediaStreamWsUrl(): string {
   const base = getAppBaseUrl().replace(/\/$/, "");
   const wsBase = base.replace(/^https:/, "wss:").replace(/^http:/, "ws:");
   return `${wsBase}/api/telephony/ws/telnyx-media`;
+}
+
+/** WebSocket Pipecat self-hosted (prioridad si PIPECAT_WS_URL está definido). */
+export function pipecatMediaStreamWsUrl(): string | null {
+  const url = process.env.PIPECAT_WS_URL?.trim();
+  return url || null;
+}
+
+/** URL que Telnyx usa en streaming_start. */
+export function telnyxStreamUrl(): string {
+  return pipecatMediaStreamWsUrl() ?? telnyxMediaStreamWsUrl();
+}
+
+export function telephonyBridgeMode(): "pipecat" | "diy" {
+  return pipecatMediaStreamWsUrl() ? "pipecat" : "diy";
 }

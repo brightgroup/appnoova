@@ -7,7 +7,7 @@ import {
   resolveOutboundTestFromState
 } from "@/lib/telephony/phone-call";
 import { answerAndSpeak, speakText, telnyxStartMediaStream } from "@/lib/telephony/telnyx-call-control";
-import { telnyxMediaStreamWsUrl } from "@/lib/telephony/app-url";
+import { telnyxStreamUrl } from "@/lib/telephony/app-url";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import {
   closeActiveBridge,
@@ -114,7 +114,7 @@ async function handleOutboundAnswered(
   });
 
   try {
-    const streamUrl = telnyxMediaStreamWsUrl();
+    const streamUrl = telnyxStreamUrl();
     console.info("[telnyx:voice] iniciando media stream", { callId, streamUrl });
     await telnyxStartMediaStream(callId, streamUrl);
   } catch (e) {
