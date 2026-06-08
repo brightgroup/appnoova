@@ -151,6 +151,15 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
       });
       if (data.phase === "ended" || data.phase === "failed") {
         stopPolling();
+        try {
+          await fetch("/api/telephony/test-call/finalize", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ call_control_id: callControlId })
+          });
+        } catch {
+          /* ignore */
+        }
         onCallDetected?.();
       }
     } catch {

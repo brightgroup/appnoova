@@ -69,12 +69,18 @@ export async function createPhoneTestCallSession(input: {
 
 export async function getPhoneTestCallSession(callControlId: string) {
   const db = adminClient();
-  const { data: rows } = await db
+  const { data: rows, error } = await db
     .from("voice_agent_calls")
     .select("id, user_id, voice_agent_id, metadata, status, status_label, created_at")
-    .contains("metadata", { phone_test: true, call_control_id: callControlId })
+    .filter("metadata->>phone_test", "eq", "true")
+    .filter("metadata->>call_control_id", "eq", callControlId)
     .order("created_at", { ascending: false })
     .limit(1);
+
+  if (error) {
+    console.error("[test-call-session] lookup failed:", error.message, callControlId);
+    return null;
+  }
 
   const row = rows?.[0];
   if (!row) return null;

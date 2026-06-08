@@ -13,14 +13,16 @@ export async function GET(req: NextRequest) {
   }
 
   const db = adminClient();
-  const { data: row } = await db
+  const { data: rows } = await db
     .from("voice_agent_calls")
     .select("id, status, status_label, metadata, created_at")
     .eq("user_id", userId)
-    .contains("metadata", { phone_test: true, call_control_id: callControlId })
+    .filter("metadata->>phone_test", "eq", "true")
+    .filter("metadata->>call_control_id", "eq", callControlId)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
+
+  const row = rows?.[0];
 
   if (!row) {
     return NextResponse.json({ error: "Llamada no encontrada" }, { status: 404 });

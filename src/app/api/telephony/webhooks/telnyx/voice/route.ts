@@ -6,7 +6,7 @@ import {
   resolveOutboundTest,
   resolveOutboundTestFromState
 } from "@/lib/telephony/phone-call";
-import { answerAndSpeak, telnyxStartMediaStream } from "@/lib/telephony/telnyx-call-control";
+import { answerAndSpeak, speakText, telnyxStartMediaStream } from "@/lib/telephony/telnyx-call-control";
 import { telnyxMediaStreamWsUrl } from "@/lib/telephony/app-url";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import {
@@ -79,11 +79,17 @@ async function handleOutboundAnswered(
     return;
   }
 
-  const { ctx, state } = resolved;
-  const session = await getPhoneTestCallSession(callId);
+  const { ctx } = resolved;
+
+  let session = await getPhoneTestCallSession(callId);
+  for (let i = 0; i < 12 && !session; i++) {
+    await new Promise(r => setTimeout(r, 250));
+    session = await getPhoneTestCallSession(callId);
+  }
+
   const agent = await loadVoiceAgentForCall(ctx.agent.id, ctx.phone.user_id);
   if (!agent || !session) {
-    console.warn("[telnyx:voice] sin agente o sesión para bridge", callId);
+    console.warn("[telnyx:voice] sin agente o sesión para bridge", { callId, hasAgent: Boolean(agent), hasSession: Boolean(session) });
     return;
   }
 
@@ -114,12 +120,23 @@ async function handleOutboundAnswered(
     console.error("[telnyx:voice] streaming_start error:", e);
     const greeting = agentGreeting(ctx.agent.name, ctx.agent.prompt);
     await updatePhoneTestCallSession(callId, {
-      phase: "failed",
-      last_event: "streaming_start.error",
-      error: e instanceof Error ? e.message : "No se pudo iniciar el audio del agente",
-      status_label: labelForPhase("failed")
+      phase: "speaking",
+      last_event: "streaming_start.fallback_tts",
+      greeting,
+      error: e instanceof Error ? e.message : "Stream falló — usando TTS",
+      status_label: labelForPhase("speaking")
     });
-    console.warn("[telnyx:voice] fallback greeting only — stream failed", greeting);
+    try {
+      await speakText(callId, greeting);
+    } catch (speakErr) {
+      console.error("[telnyx:voice] fallback speak error:", speakErr);
+      await updatePhoneTestCallSession(callId, {
+        phase: "failed",
+        last_event: "speak.error",
+        error: speakErr instanceof Error ? speakErr.message : "Audio no disponible",
+        status_label: labelForPhase("failed")
+      });
+    }
   }
 }
 
@@ -156,12 +173,12 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  if (eventType === "call.hangup" && testCall) {
-    const bridged = hasActiveBridge(callId);
-    await closeActiveBridge(callId, "Phone Hangup");
-    if (!bridged) {
-      const row = await getPhoneTestCallSession(callId);
-      if (row && !row.metadata.finalized) {
+  if (eventType === "call.hangup") {
+    const row = testCall ? await getPhoneTestCallSession(callId) : null;
+    if (row) {
+      const bridged = hasActiveBridge(callId);
+      await closeActiveBridge(callId, "Phone Hangup");
+      if (!bridged && !row.metadata.finalized) {
         await finalizePhoneTestCall({
           callControlId: callId,
           transcript: [],

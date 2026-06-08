@@ -18,5 +18,5 @@ export function twilioStatusWebhookUrl(): string {
 export function telnyxMediaStreamWsUrl(): string {
   const base = getAppBaseUrl().replace(/\/$/, "");
   const wsBase = base.replace(/^https:/, "wss:").replace(/^http:/, "ws:");
-  return `${wsBase}/telephony/ws/telnyx-media`;
+  return `${wsBase}/api/telephony/ws/telnyx-media`;
 }

@@ -19,9 +19,14 @@ app.prepare().then(() => {
 
   const wss = new WebSocketServer({ noServer: true });
 
+  const wsPaths = new Set([
+    "/telephony/ws/telnyx-media",
+    "/api/telephony/ws/telnyx-media"
+  ]);
+
   server.on("upgrade", (request, socket, head) => {
     const { pathname } = parse(request.url || "");
-    if (pathname === "/telephony/ws/telnyx-media") {
+    if (pathname && wsPaths.has(pathname)) {
       wss.handleUpgrade(request, socket, head, ws => {
         handleTelnyxMediaSocket(ws);
       });
@@ -32,6 +37,6 @@ app.prepare().then(() => {
 
   server.listen(port, hostname, () => {
     console.log(`> Noova ready on http://${hostname}:${port}`);
-    console.log(`> Telnyx media WS: ws://${hostname}:${port}/telephony/ws/telnyx-media`);
+    console.log(`> Telnyx media WS: ws://${hostname}:${port}/api/telephony/ws/telnyx-media`);
   });
 });

@@ -11,7 +11,10 @@ export async function finalizePhoneTestCall(input: {
   durationSec?: number;
 }): Promise<void> {
   const session = await getPhoneTestCallSession(input.callControlId);
-  if (!session) return;
+  if (!session) {
+    console.warn("[finalize-phone-test] sesión no encontrada", input.callControlId);
+    return;
+  }
 
   const meta = session.metadata;
   if (meta.finalized) return;
@@ -34,7 +37,9 @@ export async function finalizePhoneTestCall(input: {
     disconnectReason: input.disconnectReason,
     transcript: input.transcript,
     callsCount: agent.callsCount,
-    statusLabel: durationSec > 0 ? "Ended - Llamada telefónica" : "Ended - Sin conexión",
+    statusLabel: durationSec > 0 || input.transcript.length > 0
+      ? "Ended - Llamada exitosa"
+      : "Ended - Sin conexión",
     metadata: {
       source: "phone_test",
       call_control_id: input.callControlId,
