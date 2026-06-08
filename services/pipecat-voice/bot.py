@@ -2,6 +2,7 @@
 # Noova 360 — Pipecat + Telnyx + Gemini Live (self-hosted)
 #
 
+import asyncio
 import os
 import time
 from typing import Any
@@ -116,6 +117,8 @@ async def run_bot(
     async def on_client_connected(transport, client):
         logger.info("Telnyx conectado", call_control_id=call_control_id)
         await update_phase(call_control_id, "connected")
+        # Esperar a que el pipeline y Gemini Live estén listos antes del saludo.
+        await asyncio.sleep(0.8)
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")

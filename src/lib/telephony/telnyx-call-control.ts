@@ -118,11 +118,13 @@ export async function telnyxStartMediaStream(callControlId: string, streamUrl: s
   const json = pipecat
     ? {
         stream_url: streamUrl,
-        stream_track: "both_tracks",
+        // Solo voz del usuario hacia Pipecat (evita eco del track outbound).
+        stream_track: "inbound_track",
         stream_codec: "PCMU",
         stream_bidirectional_mode: "rtp",
         stream_bidirectional_codec: "PCMU",
-        stream_bidirectional_target_legs: "opposite"
+        // "opposite" no reproduce audio en el celular en llamadas salientes.
+        stream_bidirectional_target_legs: "both"
       }
     : {
         stream_url: streamUrl,
