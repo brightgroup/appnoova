@@ -1,3 +1,5 @@
+import { telephonyBridgeMode } from "@/lib/telephony/app-url";
+
 function apiKey(): string {
   const key = process.env.TELNYX_API_KEY?.trim();
   if (!key) throw new Error("TELNYX_API_KEY no configurado");
@@ -110,17 +112,31 @@ export async function telnyxHangup(callControlId: string): Promise<void> {
 }
 
 export async function telnyxStartMediaStream(callControlId: string, streamUrl: string): Promise<void> {
+  const pipecat = telephonyBridgeMode() === "pipecat";
+
+  // Pipecat TelnyxFrameSerializer solo soporta PCMU/PCMA (8 kHz), no L16.
+  const json = pipecat
+    ? {
+        stream_url: streamUrl,
+        stream_track: "both_tracks",
+        stream_codec: "PCMU",
+        stream_bidirectional_mode: "rtp",
+        stream_bidirectional_codec: "PCMU",
+        stream_bidirectional_target_legs: "opposite"
+      }
+    : {
+        stream_url: streamUrl,
+        stream_track: "both_tracks",
+        stream_codec: "PCMU",
+        stream_bidirectional_mode: "rtp",
+        stream_bidirectional_codec: "L16",
+        stream_bidirectional_sampling_rate: 16000,
+        stream_bidirectional_target_legs: "both"
+      };
+
   await telnyxJson(`/calls/${callControlId}/actions/streaming_start`, {
     method: "POST",
-    json: {
-      stream_url: streamUrl,
-      stream_track: "both_tracks",
-      stream_codec: "PCMU",
-      stream_bidirectional_mode: "rtp",
-      stream_bidirectional_codec: "L16",
-      stream_bidirectional_sampling_rate: 16000,
-      stream_bidirectional_target_legs: "both"
-    }
+    json
   });
 }
 

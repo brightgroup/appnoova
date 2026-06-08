@@ -104,8 +104,8 @@ async def run_bot(
     worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
-            audio_in_sample_rate=16000,
-            audio_out_sample_rate=16000,
+            audio_in_sample_rate=8000,
+            audio_out_sample_rate=8000,
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
@@ -179,7 +179,7 @@ async def bot(runner_args: RunnerArguments):
 
     serializer = TelnyxFrameSerializer(
         stream_id=call_data["stream_id"],
-        outbound_encoding=call_data["outbound_encoding"],
+        outbound_encoding=call_data.get("outbound_encoding") or "PCMU",
         inbound_encoding="PCMU",
         call_control_id=call_control_id,
         api_key=os.getenv("TELNYX_API_KEY"),
