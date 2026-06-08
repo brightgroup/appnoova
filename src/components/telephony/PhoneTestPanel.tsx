@@ -1,23 +1,65 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Phone, Loader2, Copy, CheckCircle2, Radio, AlertCircle, RefreshCw, Search } from "lucide-react";
+import { Phone, Loader2, Copy, CheckCircle2, Radio, AlertCircle, ArrowLeft } from "lucide-react";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import {
-  btnPrimary, btnPrimarySm, btnIcon, inputSearch,
+  btnPrimary, btnPrimarySm, btnGhost,
   registryTable, registryTableWrap, registryTableHead, registryTableHeadRow,
   registryTableHeadCell, registryTableRowClickable, registryTableCell, registryTableCellFirst,
-  textMuted, textSecondary
+  registryTableLoading, textMuted, textSecondary
 } from "@/lib/brand-ui";
+import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { formatPhoneDisplay } from "@/lib/telephony/format-phone";
 import type { PhoneNumberRecord } from "@/types/phone-number";
 import type { TestPhoneNumberRecord } from "@/types/test-phone-number";
+
+type CallPhase = "dialing" | "ringing" | "answered" | "speaking" | "connected" | "ended" | "failed";
+
+interface ActiveCall {
+  callId: string;
+  callControlId: string;
+  from: string;
+  to: string;
+  agentName: string;
+  phase: CallPhase;
+  statusLabel: string;
+  error?: string;
+  greeting?: string;
+  durationSec: number;
+}
 
 interface PhoneTestPanelProps {
   agentId: string | null;
   agentName: string;
   onCallDetected?: () => void;
+}
+
+const PHASE_LABEL: Record<CallPhase, string> = {
+  dialing: "Marcando",
+  ringing: "Sonando",
+  answered: "Contestada",
+  speaking: "Agente hablando",
+  connected: "En llamada",
+  ended: "Finalizada",
+  failed: "Error"
+};
+
+const CONNECTED_PHASES: CallPhase[] = ["answered", "speaking", "connected", "ended"];
+
+function phaseColor(phase: CallPhase): string {
+  if (phase === "failed") return "bg-red-400";
+  if (phase === "ended") return "bg-gray-500";
+  if (phase === "speaking") return "bg-[#5b5bf6] animate-pulse";
+  if (phase === "connected" || phase === "answered") return "bg-emerald-400";
+  return "bg-amber-400 animate-pulse";
+}
+
+function formatDuration(sec: number) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTestPanelProps) {
@@ -26,12 +68,13 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [selectedTestId, setSelectedTestId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [calling, setCalling] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [lineSearch, setLineSearch] = useState("");
   const [testSearch, setTestSearch] = useState("");
+  const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
     if (!agentId) {
@@ -82,11 +125,55 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
   const selectedTest = testNumbers.find(n => n.id === selectedTestId) ?? null;
   const canTest = Boolean(agentId && selectedLine && selectedTest);
 
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = null;
+  }, []);
+
+  const pollStatus = useCallback(async (callControlId: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(
+        `/api/telephony/test-call/status?call_control_id=${encodeURIComponent(callControlId)}`,
+        { headers }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      setActiveCall(prev => {
+        if (!prev || prev.callControlId !== callControlId) return prev;
+        const phase = (data.phase ?? prev.phase) as CallPhase;
+        return {
+          ...prev,
+          phase,
+          statusLabel: data.status_label ?? PHASE_LABEL[phase],
+          error: data.error,
+          greeting: data.greeting,
+          durationSec: data.duration_sec ?? 0
+        };
+      });
+      if (data.phase === "ended" || data.phase === "failed") {
+        stopPolling();
+        onCallDetected?.();
+      }
+    } catch {
+      /* ignore transient poll errors */
+    }
+  }, [onCallDetected, stopPolling]);
+
+  useEffect(() => {
+    if (!activeCall) return;
+    if (activeCall.phase === "ended" || activeCall.phase === "failed") return;
+
+    pollRef.current = setInterval(() => pollStatus(activeCall.callControlId), 1500);
+    pollStatus(activeCall.callControlId);
+
+    return stopPolling;
+  }, [activeCall?.callControlId, activeCall?.phase, pollStatus, stopPolling]);
+
   async function startTestCall() {
     if (!canTest) return;
-    setCalling(true);
+    setStarting(true);
     setError("");
-    setSuccess(false);
     try {
       const headers = await getAuthHeaders();
       const res = await fetch("/api/telephony/test-call", {
@@ -103,13 +190,27 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
         setError(data.error || "No se pudo iniciar la llamada");
         return;
       }
-      setSuccess(true);
-      onCallDetected?.();
+      setActiveCall({
+        callId: data.call_id,
+        callControlId: data.call_control_id,
+        from: data.from,
+        to: data.to,
+        agentName: data.agent_name ?? agentName,
+        phase: "dialing",
+        statusLabel: "Marcando",
+        durationSec: 0
+      });
     } catch {
       setError("Error de red al marcar");
     } finally {
-      setCalling(false);
+      setStarting(false);
     }
+  }
+
+  function resetCall() {
+    stopPolling();
+    setActiveCall(null);
+    setError("");
   }
 
   async function copySender() {
@@ -121,7 +222,7 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-400">
+      <div className={registryTableLoading}>
         <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando...
       </div>
     );
@@ -135,92 +236,105 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
     );
   }
 
-  return (
-    <div className="flex-1 overflow-y-auto p-6">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Phone className="w-5 h-5 text-[#5b5bf6]" />
-            <h2 className="text-lg font-semibold text-white">Probar por teléfono</h2>
-          </div>
-          <p className={`text-sm ${textSecondary} leading-relaxed max-w-2xl`}>
-            El agente <strong className="text-white">{agentName}</strong> llamará desde tu línea Telnyx
-            (remitente) al número destinatario que elijas. Los números de prueba están exentos de cargos.
-          </p>
-        </div>
+  if (activeCall) {
+    const isLive = !["ended", "failed"].includes(activeCall.phase);
+    const showTimer = CONNECTED_PHASES.includes(activeCall.phase) && activeCall.phase !== "ended"
+      || (activeCall.phase === "ended" && activeCall.durationSec > 0);
 
-        {/* Remitente */}
-        <section>
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div>
-              <p className="text-sm font-semibold text-white">Número remitente</p>
-              <p className={`text-xs ${textMuted}`}>Línea Noova / Telnyx asignada al agente en Canales</p>
-            </div>
-            <button onClick={load} className={btnIcon} title="Actualizar">
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
-
-          {agentLines.length > 0 ? (
-            <>
-              <div className="relative mb-3 max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                <input
-                  placeholder="Buscar"
-                  value={lineSearch}
-                  onChange={e => setLineSearch(e.target.value)}
-                  className={inputSearch}
-                />
-              </div>
-              <div className={registryTableWrap}>
-                <table className={`${registryTable} min-w-[480px]`}>
-                  <thead className={registryTableHead}>
-                    <tr className={registryTableHeadRow}>
-                      <th className={`${registryTableHeadCell} w-8`} />
-                      <th className={registryTableHeadCell}>Número</th>
-                      <th className={registryTableHeadCell}>Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredLines.map(line => {
-                      const selected = line.id === selectedLineId;
-                      return (
-                        <tr
-                          key={line.id}
-                          onClick={() => setSelectedLineId(line.id)}
-                          className={`${registryTableRowClickable} ${selected ? "bg-[#5b5bf6]/[.06]" : ""}`}
-                        >
-                          <td className={registryTableCellFirst}>
-                            <span className={`block w-3.5 h-3.5 rounded-full border-2 ${
-                              selected ? "border-[#5b5bf6] bg-[#5b5bf6]" : "border-gray-500"
-                            }`} />
-                          </td>
-                          <td className={`${registryTableCell} font-mono text-sm text-white`}>
-                            {formatPhoneDisplay(line.e164)}
-                            {selected && (
-                              <span className="ml-2 text-[10px] text-gray-400 font-sans">Actual</span>
-                            )}
-                          </td>
-                          <td className={registryTableCell}>
-                            <span className="inline-flex items-center gap-1.5 text-emerald-400">
-                              <span className="w-2 h-2 rounded-full bg-emerald-400" /> Activo
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              {selectedLine && (
-                <button onClick={copySender} className={`${btnPrimarySm} mt-3`}>
-                  {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copied ? "Copiado" : "Copiar remitente"}
-                </button>
-              )}
-            </>
+    return (
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-lg mx-auto">
+          {isLive ? (
+            <p className={`text-xs ${textMuted} mb-4`}>
+              Llamada entre números — cuelga desde tu celular cuando termines.
+            </p>
           ) : (
-            <div className="rounded-xl border border-amber-500/25 bg-amber-500/[.06] p-4">
+            <button onClick={resetCall} className={`${btnGhost} mb-4`}>
+              <ArrowLeft className="w-3.5 h-3.5" /> Nueva llamada de prueba
+            </button>
+          )}
+
+          <div className="rounded-2xl border border-white/[.10] bg-noova-surface p-6">
+            <div className="flex flex-col items-center text-center pb-6 border-b border-white/[.06]">
+              <div className="relative mb-5">
+                {isLive && (
+                  <>
+                    <div className="absolute -inset-3 rounded-full bg-[#5b5bf6]/20 blur-lg" />
+                    <div className="absolute inset-0 rounded-full border border-[#5b5bf6]/30 animate-pulse" />
+                  </>
+                )}
+                <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-[#5b5bf6] to-[#7070f8] flex items-center justify-center shadow-lg">
+                  <Phone className="w-8 h-8 text-white" />
+                </div>
+              </div>
+
+              <p className="text-base font-semibold text-white">{activeCall.agentName}</p>
+              <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[.04] border border-white/[.08]">
+                <span className={`w-2 h-2 rounded-full ${phaseColor(activeCall.phase)}`} />
+                <span className="text-xs text-gray-300">{activeCall.statusLabel || PHASE_LABEL[activeCall.phase]}</span>
+              </div>
+
+              {showTimer && activeCall.durationSec > 0 && (
+                <p className="text-2xl font-semibold text-white tabular-nums mt-4">
+                  {formatDuration(activeCall.durationSec)}
+                </p>
+              )}
+
+              <p className="text-xs text-gray-400 mt-3 leading-relaxed">
+                <span className="font-mono text-gray-300">{formatPhoneDisplay(activeCall.from)}</span>
+                {" → "}
+                <span className="font-mono text-gray-300">{formatPhoneDisplay(activeCall.to)}</span>
+              </p>
+
+              {activeCall.phase === "dialing" && (
+                <p className="text-[11px] text-gray-500 mt-2">Conectando con Telnyx...</p>
+              )}
+              {activeCall.phase === "ringing" && (
+                <p className="text-[11px] text-gray-500 mt-2">Tu celular debería estar sonando</p>
+              )}
+              {(activeCall.phase === "speaking" || activeCall.phase === "connected") && activeCall.greeting && (
+                <p className="text-[11px] text-gray-400 mt-3 max-w-sm leading-relaxed italic">
+                  &ldquo;{activeCall.greeting}&rdquo;
+                </p>
+              )}
+            </div>
+
+            {activeCall.error && (
+              <div className="mt-4 p-3 rounded-xl bg-red-500/[.06] border border-red-500/20 text-xs text-red-400 leading-relaxed">
+                {activeCall.error}
+              </div>
+            )}
+
+            {activeCall.phase === "ended" && !activeCall.error && (
+              <p className="mt-4 text-xs text-emerald-400 text-center">
+                Llamada finalizada{activeCall.durationSec > 0 ? ` · ${formatDuration(activeCall.durationSec)}` : ""}.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto p-6 space-y-8">
+      <RegistryTableLayout
+        description={`El agente ${agentName} llamará desde tu línea Telnyx (remitente) al número destinatario que elijas. Los números de prueba están exentos de cargos.`}
+        search={lineSearch}
+        onSearchChange={setLineSearch}
+        searchPlaceholder="Buscar remitente"
+        onRefresh={load}
+        action={
+          selectedLine ? (
+            <button onClick={copySender} className={btnPrimarySm}>
+              {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? "Copiado" : "Copiar remitente"}
+            </button>
+          ) : undefined
+        }
+        alerts={
+          agentLines.length === 0 ? (
+            <div className="rounded-xl border border-amber-500/25 bg-amber-500/[.06] p-4 mb-4">
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
                 <div>
@@ -237,124 +351,139 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
                 </div>
               </div>
             </div>
-          )}
-        </section>
+          ) : undefined
+        }
+      >
+        <p className="text-sm font-semibold text-white mb-3">Número remitente</p>
+        <p className={`text-xs ${textMuted} -mt-2 mb-3`}>Línea Noova / Telnyx asignada al agente en Canales</p>
+        {agentLines.length > 0 ? (
+          <div className={registryTableWrap}>
+            <table className={registryTable}>
+              <thead className={registryTableHead}>
+                <tr className={registryTableHeadRow}>
+                  <th className={`${registryTableHeadCell} w-8`} />
+                  <th className={registryTableHeadCell}>Número</th>
+                  <th className={registryTableHeadCell}>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLines.map(line => {
+                  const selected = line.id === selectedLineId;
+                  return (
+                    <tr
+                      key={line.id}
+                      onClick={() => setSelectedLineId(line.id)}
+                      className={`${registryTableRowClickable} ${selected ? "bg-[#5b5bf6]/[.06]" : ""}`}
+                    >
+                      <td className={registryTableCellFirst}>
+                        <span className={`block w-3.5 h-3.5 rounded-full border-2 ${
+                          selected ? "border-[#5b5bf6] bg-[#5b5bf6]" : "border-gray-500"
+                        }`} />
+                      </td>
+                      <td className={`${registryTableCell} font-mono text-sm text-white`}>
+                        {formatPhoneDisplay(line.e164)}
+                        {selected && <span className="ml-2 text-[10px] text-gray-400 font-sans">Actual</span>}
+                      </td>
+                      <td className={registryTableCell}>
+                        <span className="inline-flex items-center gap-1.5 text-emerald-400">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400" /> Activo
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </RegistryTableLayout>
 
-        {/* Destinatario */}
-        <section>
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div>
-              <p className="text-sm font-semibold text-white">Número destinatario</p>
-              <p className={`text-xs ${textMuted}`}>Celular de prueba que recibirá la llamada</p>
-            </div>
-            <Link href="/dashboard/agentes-voz/numeros-prueba" className={btnPrimarySm}>
-              Gestionar números
+      <RegistryTableLayout
+        search={testSearch}
+        onSearchChange={setTestSearch}
+        searchPlaceholder="Buscar destinatario"
+        onRefresh={load}
+        action={
+          <Link href="/dashboard/agentes-voz/numeros-prueba" className={btnPrimarySm}>
+            Gestionar números
+          </Link>
+        }
+      >
+        <p className="text-sm font-semibold text-white mb-3">Número destinatario</p>
+        <p className={`text-xs ${textMuted} -mt-2 mb-3`}>Celular de prueba que recibirá la llamada</p>
+        {testNumbers.length > 0 ? (
+          <div className={registryTableWrap}>
+            <table className={registryTable}>
+              <thead className={registryTableHead}>
+                <tr className={registryTableHeadRow}>
+                  <th className={`${registryTableHeadCell} w-8`} />
+                  <th className={registryTableHeadCell}>Nombre</th>
+                  <th className={registryTableHeadCell}>Número</th>
+                  <th className={registryTableHeadCell}>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTests.map(test => {
+                  const selected = test.id === selectedTestId;
+                  return (
+                    <tr
+                      key={test.id}
+                      onClick={() => setSelectedTestId(test.id)}
+                      className={`${registryTableRowClickable} ${selected ? "bg-[#5b5bf6]/[.06]" : ""}`}
+                    >
+                      <td className={registryTableCellFirst}>
+                        <span className={`block w-3.5 h-3.5 rounded-full border-2 ${
+                          selected ? "border-[#5b5bf6] bg-[#5b5bf6]" : "border-gray-500"
+                        }`} />
+                      </td>
+                      <td className={`${registryTableCell} text-gray-200`}>{test.label}</td>
+                      <td className={`${registryTableCell} font-mono text-sm text-white`}>
+                        {formatPhoneDisplay(test.e164)}
+                        {selected && <span className="ml-2 text-[10px] text-gray-400 font-sans">Actual</span>}
+                      </td>
+                      <td className={registryTableCell}>
+                        <span className="inline-flex items-center gap-1.5 text-emerald-400">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400" /> Activo
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="py-12 text-center space-y-3">
+            <p className={`text-sm ${textSecondary}`}>Sin números destinatarios activos</p>
+            <Link href="/dashboard/agentes-voz/numeros-prueba" className={btnPrimary}>
+              Nuevo número de prueba
             </Link>
           </div>
-
-          {testNumbers.length > 0 ? (
-            <>
-              <div className="relative mb-3 max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                <input
-                  placeholder="Buscar"
-                  value={testSearch}
-                  onChange={e => setTestSearch(e.target.value)}
-                  className={inputSearch}
-                />
-              </div>
-              <div className={registryTableWrap}>
-                <table className={`${registryTable} min-w-[560px]`}>
-                  <thead className={registryTableHead}>
-                    <tr className={registryTableHeadRow}>
-                      <th className={`${registryTableHeadCell} w-8`} />
-                      <th className={registryTableHeadCell}>Nombre</th>
-                      <th className={registryTableHeadCell}>Número</th>
-                      <th className={registryTableHeadCell}>Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTests.map(test => {
-                      const selected = test.id === selectedTestId;
-                      return (
-                        <tr
-                          key={test.id}
-                          onClick={() => setSelectedTestId(test.id)}
-                          className={`${registryTableRowClickable} ${selected ? "bg-[#5b5bf6]/[.06]" : ""}`}
-                        >
-                          <td className={registryTableCellFirst}>
-                            <span className={`block w-3.5 h-3.5 rounded-full border-2 ${
-                              selected ? "border-[#5b5bf6] bg-[#5b5bf6]" : "border-gray-500"
-                            }`} />
-                          </td>
-                          <td className={`${registryTableCell} text-gray-200`}>{test.label}</td>
-                          <td className={`${registryTableCell} font-mono text-sm text-white`}>
-                            {formatPhoneDisplay(test.e164)}
-                            {selected && (
-                              <span className="ml-2 text-[10px] text-gray-400 font-sans">Actual</span>
-                            )}
-                          </td>
-                          <td className={registryTableCell}>
-                            <span className="inline-flex items-center gap-1.5 text-emerald-400">
-                              <span className="w-2 h-2 rounded-full bg-emerald-400" /> Activo
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : (
-            <div className="rounded-xl border border-dashed border-white/[.12] p-6 text-center space-y-3">
-              <p className={`text-sm ${textSecondary}`}>Sin números destinatarios activos</p>
-              <Link href="/dashboard/agentes-voz/numeros-prueba" className={btnPrimary}>
-                Nuevo número de prueba
-              </Link>
-            </div>
-          )}
-        </section>
-
-        {canTest && (
-          <div className="rounded-2xl border border-white/[.10] bg-noova-surface p-6 space-y-4">
-            <div className="flex items-start gap-3">
-              <Radio className={`w-5 h-5 shrink-0 mt-0.5 ${calling ? "text-[#5b5bf6] animate-pulse" : "text-gray-400"}`} />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-white">
-                  {success ? "Llamada iniciada" : calling ? "Marcando..." : "Listo para probar"}
-                </p>
-                <p className={`text-xs ${textSecondary} mt-1 leading-relaxed`}>
-                  Desde <span className="font-mono text-white">{formatPhoneDisplay(selectedLine!.e164)}</span> hacia{" "}
-                  <span className="font-mono text-white">{formatPhoneDisplay(selectedTest!.e164)}</span>.
-                  Contesta en tu celular para escuchar al agente.
-                </p>
-              </div>
-            </div>
-
-            {error && (
-              <p className="text-xs text-red-400 leading-relaxed">
-                {error.includes("Outbound Profile")
-                  ? "La conexión Telnyx no tiene perfil de salida. Reintenta en unos segundos; si persiste, agrega Colombia (CO) en Voice → Outbound Voice Profiles → destinos permitidos."
-                  : error}
-              </p>
-            )}
-
-            {!success && (
-              <button onClick={startTestCall} disabled={calling} className={btnPrimary}>
-                {calling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
-                {calling ? "Marcando..." : "Iniciar llamada de prueba"}
-              </button>
-            )}
-
-            {success && (
-              <p className="text-xs text-emerald-400">
-                La llamada salió desde tu línea Telnyx. Revisa el registro cuando contestes.
-              </p>
-            )}
-          </div>
         )}
-      </div>
+      </RegistryTableLayout>
+
+      {canTest && (
+        <div className="border-t border-white/[.08] pt-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <Radio className="w-4 h-4 text-[#5b5bf6]" />
+                <p className="text-sm font-medium text-white">Listo para probar</p>
+              </div>
+              <p className={`text-xs ${textSecondary}`}>
+                Desde <span className="font-mono text-white">{formatPhoneDisplay(selectedLine!.e164)}</span> hacia{" "}
+                <span className="font-mono text-white">{formatPhoneDisplay(selectedTest!.e164)}</span>.
+                Contesta en tu celular para escuchar al agente.
+              </p>
+            </div>
+            <button onClick={startTestCall} disabled={starting} className={`${btnPrimary} shrink-0`}>
+              {starting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
+              {starting ? "Marcando..." : "Iniciar llamada de prueba"}
+            </button>
+          </div>
+          {error && <p className="text-xs text-red-400 mt-3 leading-relaxed">{error}</p>}
+        </div>
+      )}
     </div>
   );
 }

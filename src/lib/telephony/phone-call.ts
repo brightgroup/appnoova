@@ -28,13 +28,13 @@ export async function resolveAgentLine(fromRaw: string): Promise<AgentCallContex
   if (!e164) return null;
 
   const db = adminClient();
-  const { data: phone } = await db
+  const { data: phones } = await db
     .from("phone_numbers")
     .select("id, user_id, voice_agent_id, e164, provider, voice_config")
-    .eq("e164", e164)
     .eq("status", "active")
-    .maybeSingle();
+    .not("voice_agent_id", "is", null);
 
+  const phone = (phones ?? []).find(p => e164Matches(p.e164, e164));
   if (!phone?.voice_agent_id) return null;
 
   const { data: agent } = await db
@@ -79,6 +79,61 @@ export async function resolveOutboundTest(
   if (!isTestDestination) return null;
 
   return { ...ctx, destinationE164, isTestDestination };
+}
+
+/** Resuelve contexto de prueba saliente desde client_state de Telnyx. */
+export async function resolveOutboundTestFromState(
+  state: Record<string, unknown>
+): Promise<OutboundTestContext | null> {
+  const voiceAgentId = String(state.voice_agent_id ?? "");
+  const phoneNumberId = String(state.phone_number_id ?? "");
+  const testNumberId = String(state.test_number_id ?? "");
+  const userId = String(state.user_id ?? "");
+  if (!voiceAgentId || !phoneNumberId || !testNumberId || !userId) return null;
+
+  const db = adminClient();
+  const [{ data: phone }, { data: test }, { data: agent }] = await Promise.all([
+    db
+      .from("phone_numbers")
+      .select("id, user_id, voice_agent_id, e164, provider, voice_config")
+      .eq("id", phoneNumberId)
+      .eq("user_id", userId)
+      .eq("voice_agent_id", voiceAgentId)
+      .eq("status", "active")
+      .maybeSingle(),
+    db
+      .from("test_phone_numbers")
+      .select("e164")
+      .eq("id", testNumberId)
+      .eq("user_id", userId)
+      .maybeSingle(),
+    db
+      .from("voice_agents")
+      .select("id, name, prompt")
+      .eq("id", voiceAgentId)
+      .eq("user_id", userId)
+      .maybeSingle()
+  ]);
+
+  if (!phone || !test || !agent) return null;
+
+  const destinationE164 = toE164(test.e164);
+  if (!destinationE164) return null;
+
+  const telnyx = (phone.voice_config as { telnyx?: { connection_id?: string; call_control_app_id?: string } })?.telnyx;
+  const connectionId =
+    telnyx?.connection_id ||
+    telnyx?.call_control_app_id ||
+    process.env.TELNYX_CONNECTION_ID?.trim() ||
+    null;
+
+  return {
+    phone: phone as AgentCallContext["phone"],
+    agent,
+    connectionId,
+    destinationE164,
+    isTestDestination: true
+  };
 }
 
 export function agentGreeting(agentName: string, prompt: string): string {

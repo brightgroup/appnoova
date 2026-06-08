@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { telnyxPlaceCall } from "@/lib/telephony/telnyx-call-control";
+import { createPhoneTestCallSession } from "@/lib/telephony/test-call-session";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
 
 /** POST — llamada saliente de prueba: remitente (línea Telnyx) → destinatario (número de prueba). */
@@ -64,18 +65,40 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const clientState = {
+      type: "test_outbound",
+      user_id: userId,
+      voice_agent_id,
+      phone_number_id,
+      test_number_id
+    };
+
     const { callControlId } = await telnyxPlaceCall({
       connectionId,
       from: phone.e164,
-      to: test.e164
+      to: test.e164,
+      clientState
+    });
+
+    const callId = await createPhoneTestCallSession({
+      userId,
+      voiceAgentId: voice_agent_id,
+      callControlId,
+      phoneNumberId: phone_number_id,
+      testNumberId: test_number_id,
+      from: phone.e164,
+      to: test.e164,
+      agentName: agent.name
     });
 
     return NextResponse.json({
       success: true,
+      call_id: callId,
       call_control_id: callControlId,
       from: phone.e164,
       to: test.e164,
-      agent_name: agent.name
+      agent_name: agent.name,
+      phase: "dialing"
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Error al marcar";

@@ -79,33 +79,57 @@ export async function answerAndSpeak(
   await telnyxCallAction(callControlId, "answer");
   await telnyxCallAction(callControlId, "speak", {
     payload: text,
-    voice: "female",
-    language: "es-CO"
+    voice: "AWS.Polly.Lupe-Neural",
+    language: "es-MX",
+    payload_type: "text"
   });
 }
 
 export async function speakText(callControlId: string, text: string): Promise<void> {
-  await telnyxCallAction(callControlId, "speak", {
+  const premium = {
+    payload: text,
+    voice: "AWS.Polly.Lupe-Neural",
+    language: "es-MX",
+    payload_type: "text"
+  };
+  const fallback = {
     payload: text,
     voice: "female",
-    language: "es-CO"
-  });
+    language: "es-CO",
+    payload_type: "text"
+  };
+  try {
+    await telnyxCallAction(callControlId, "speak", premium);
+  } catch {
+    await telnyxCallAction(callControlId, "speak", fallback);
+  }
+}
+
+export async function telnyxHangup(callControlId: string): Promise<void> {
+  await telnyxCallAction(callControlId, "hangup");
 }
 
 export async function telnyxPlaceCall(params: {
   connectionId: string;
   from: string;
   to: string;
+  clientState?: Record<string, unknown>;
 }): Promise<{ callControlId: string }> {
   await ensureTelnyxOutboundProfile(params.connectionId);
 
+  const body: Record<string, unknown> = {
+    connection_id: params.connectionId,
+    from: params.from,
+    to: params.to,
+    timeout_secs: 45
+  };
+  if (params.clientState) {
+    body.client_state = Buffer.from(JSON.stringify(params.clientState)).toString("base64");
+  }
+
   const data = await telnyxJson<{ data?: { call_control_id?: string } }>("/calls", {
     method: "POST",
-    json: {
-      connection_id: params.connectionId,
-      from: params.from,
-      to: params.to
-    }
+    json: body
   });
 
   const callControlId = data.data?.call_control_id;
