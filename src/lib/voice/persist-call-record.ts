@@ -52,6 +52,12 @@ export async function buildCallRecordFields(input: PersistCallInput) {
   };
 }
 
+/** Separa campos de BD del contador interno (no es columna de voice_agent_calls). */
+export function splitCallRecordFields(fields: Awaited<ReturnType<typeof buildCallRecordFields>>) {
+  const { callsCountNext, ...dbFields } = fields;
+  return { dbFields, callsCountNext };
+}
+
 export async function updateAgentCallsCount(
   db: SupabaseClient,
   agentId: string,

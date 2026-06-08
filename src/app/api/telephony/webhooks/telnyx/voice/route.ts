@@ -13,7 +13,6 @@ import {
   closeActiveBridge,
   setPendingBridgeSession
 } from "@/lib/telephony/bridge-session-store";
-import { scheduleGeminiPrewarm } from "@/lib/telephony/gemini-live-connect";
 import { finalizePhoneTestCall } from "@/lib/telephony/finalize-phone-test-call";
 import {
   decodeTelnyxClientState,
@@ -107,7 +106,6 @@ async function handleOutboundAnswered(
   };
 
   setPendingBridgeSession(pendingSession);
-  scheduleGeminiPrewarm(pendingSession);
 
   await updatePhoneTestCallSession(callId, {
     phase: "answered",

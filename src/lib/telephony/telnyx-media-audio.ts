@@ -83,12 +83,20 @@ export function telnyxInboundToGemini(pcmuPayload: string): string {
   return int16ToPcmBase64(pcm16k);
 }
 
+function applyPcmGain(samples: Int16Array, gain = 1.6): Int16Array {
+  const out = new Int16Array(samples.length);
+  for (let i = 0; i < samples.length; i++) {
+    out[i] = Math.max(-32768, Math.min(32767, Math.round(samples[i] * gain)));
+  }
+  return out;
+}
+
 export function geminiOutboundToTelnyx(pcmBase64: string, mimeType?: string): string {
   const rateMatch = mimeType?.match(/rate=(\d+)/);
   const rate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
   const pcm = pcmBase64ToInt16(pcmBase64);
   const pcm8k = downsampleTo8k(pcm, rate);
-  return pcm16ToPcmuBase64(pcm8k);
+  return pcm16ToPcmuBase64(applyPcmGain(pcm8k));
 }
 
 /** PCMU silencio (20 ms @ 8 kHz) para mantener vivo el stream RTP de Telnyx. */

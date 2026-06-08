@@ -11,8 +11,6 @@ export interface GeminiLiveCallbacks {
   onclose: (code?: number, reason?: string) => void;
 }
 
-const prewarm = new Map<string, { promise: Promise<Session | null>; callbacks: GeminiLiveCallbacks }>();
-
 function buildCallbacks(target: GeminiLiveCallbacks) {
   return {
     onmessage: (msg: LiveServerMessage) => target.onmessage(msg),
@@ -23,6 +21,7 @@ function buildCallbacks(target: GeminiLiveCallbacks) {
   };
 }
 
+/** Conecta Gemini Live desde el servidor WS (server.ts), no desde rutas Next.js. */
 export async function connectGeminiLive(
   pending: PendingBridgeSession,
   callbacks: GeminiLiveCallbacks
@@ -68,43 +67,4 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
     console.error("[telnyx-gemini] connect failed:", e);
     return null;
   }
-}
-
-/** Inicia Gemini Live en paralelo al streaming_start de Telnyx. */
-export function scheduleGeminiPrewarm(pending: PendingBridgeSession): void {
-  if (prewarm.has(pending.callControlId)) return;
-
-  const callbacks: GeminiLiveCallbacks = {
-    onmessage: () => {},
-    onerror: () => {},
-    onclose: () => {}
-  };
-
-  const promise = connectGeminiLive(pending, callbacks);
-  prewarm.set(pending.callControlId, { promise, callbacks });
-  console.info("[telnyx-gemini] prewarm iniciado", { callControlId: pending.callControlId });
-}
-
-/** Reutiliza sesión pre-calentada y enlaza callbacks del puente activo. */
-export async function takePrewarmedGemini(
-  callControlId: string,
-  callbacks: GeminiLiveCallbacks
-): Promise<Session | null> {
-  const entry = prewarm.get(callControlId);
-  if (!entry) return null;
-
-  prewarm.delete(callControlId);
-  entry.callbacks.onmessage = callbacks.onmessage;
-  entry.callbacks.onerror = callbacks.onerror;
-  entry.callbacks.onclose = callbacks.onclose;
-
-  const session = await entry.promise;
-  if (session) {
-    console.info("[telnyx-gemini] prewarm reutilizado", { callControlId });
-  }
-  return session;
-}
-
-export function cancelGeminiPrewarm(callControlId: string): void {
-  prewarm.delete(callControlId);
 }

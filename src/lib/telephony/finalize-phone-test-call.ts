@@ -1,5 +1,5 @@
 import { adminClient } from "@/lib/voice-agents-server";
-import { buildCallRecordFields, updateAgentCallsCount } from "@/lib/voice/persist-call-record";
+import { buildCallRecordFields, splitCallRecordFields, updateAgentCallsCount } from "@/lib/voice/persist-call-record";
 import { getPhoneTestCallSession, updatePhoneTestCallSession, labelForPhase } from "@/lib/telephony/test-call-session";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
@@ -37,7 +37,7 @@ export async function finalizePhoneTestCall(input: {
     answeredAt ? Math.max(0, Math.floor((endedAt - answeredAt) / 1000)) : 0
   );
 
-  const fields = await buildCallRecordFields({
+  const built = await buildCallRecordFields({
     userId: session.user_id,
     voiceAgentId: session.voice_agent_id,
     agentName: agent.agentName,
@@ -58,16 +58,17 @@ export async function finalizePhoneTestCall(input: {
       finalized_at: new Date().toISOString()
     }
   });
+  const { dbFields, callsCountNext } = splitCallRecordFields(built);
 
   const db = adminClient();
   const { error: updateError } = await db
     .from("voice_agent_calls")
     .update({
-      ...fields,
+      ...dbFields,
       status: durationSec > 0 || input.transcript.length > 0 ? "ended_success" : "missed",
       metadata: {
         ...meta,
-        ...fields.metadata,
+        ...dbFields.metadata,
         phone_test: true,
         phase: "ended",
         finalized: true
@@ -80,7 +81,7 @@ export async function finalizePhoneTestCall(input: {
     throw new Error(updateError.message);
   }
 
-  await updateAgentCallsCount(db, session.voice_agent_id, fields.callsCountNext);
+  await updateAgentCallsCount(db, session.voice_agent_id, callsCountNext);
 
   await updatePhoneTestCallSession(input.callControlId, {
     phase: "ended",

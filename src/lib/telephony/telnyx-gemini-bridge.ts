@@ -1,6 +1,6 @@
 import type { LiveServerMessage, Session } from "@google/genai";
 import type { WebSocket } from "ws";
-import { connectGeminiLive, takePrewarmedGemini } from "@/lib/telephony/gemini-live-connect";
+import { connectGeminiLive } from "@/lib/telephony/gemini-live-connect";
 import { isGoodbyeUtterance } from "@/lib/voice-goodbye-detection";
 import {
   chunkPcmuPayload,
@@ -29,6 +29,8 @@ export class TelnyxGeminiBridge {
   private goodbyeTriggered = false;
   private sentAudio = false;
   private silenceTimer: ReturnType<typeof setInterval> | null = null;
+  private outboundQueue: string[] = [];
+  private outboundTimer: ReturnType<typeof setInterval> | null = null;
   private callControlId: string;
 
   constructor(
@@ -51,10 +53,7 @@ export class TelnyxGeminiBridge {
       }
     };
 
-    this.gemini = await takePrewarmedGemini(this.callControlId, callbacks);
-    if (!this.gemini) {
-      this.gemini = await connectGeminiLive(this.pending, callbacks);
-    }
+    this.gemini = await connectGeminiLive(this.pending, callbacks);
 
     if (!this.gemini) {
       await this.close("Gemini Connect Failed");
@@ -123,14 +122,37 @@ export class TelnyxGeminiBridge {
   private sendAudioToTelnyx(b64: string, mimeType?: string) {
     if (this.ws.readyState !== 1) return;
     const payload = geminiOutboundToTelnyx(b64, mimeType);
-    for (const chunk of chunkPcmuPayload(payload)) {
+    this.outboundQueue.push(...chunkPcmuPayload(payload));
+    this.ensureOutboundPump();
+  }
+
+  private ensureOutboundPump() {
+    if (this.outboundTimer) return;
+    this.outboundTimer = setInterval(() => {
+      if (this.closed || this.ws.readyState !== 1) {
+        this.stopOutboundPump();
+        return;
+      }
+      const chunk = this.outboundQueue.shift();
+      if (!chunk) {
+        this.stopOutboundPump();
+        return;
+      }
       this.ws.send(JSON.stringify({ event: "media", media: { payload: chunk } }));
+      if (!this.sentAudio) {
+        this.sentAudio = true;
+        this.stopSilenceKeepalive();
+        console.info("[telnyx-gemini] primer audio enviado a Telnyx", { callControlId: this.callControlId });
+      }
+    }, 20);
+  }
+
+  private stopOutboundPump() {
+    if (this.outboundTimer) {
+      clearInterval(this.outboundTimer);
+      this.outboundTimer = null;
     }
-    if (!this.sentAudio) {
-      this.sentAudio = true;
-      this.stopSilenceKeepalive();
-      console.info("[telnyx-gemini] primer audio enviado a Telnyx", { callControlId: this.callControlId });
-    }
+    this.outboundQueue = [];
   }
 
   private checkGoodbye() {
@@ -210,6 +232,7 @@ export class TelnyxGeminiBridge {
     this.closed = true;
     this.closing = true;
     this.stopSilenceKeepalive();
+    this.stopOutboundPump();
     unregisterActiveBridge(this.callControlId);
 
     try {
