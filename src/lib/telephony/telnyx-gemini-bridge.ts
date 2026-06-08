@@ -3,7 +3,7 @@ import type { WebSocket } from "ws";
 import { connectGeminiLive } from "@/lib/telephony/gemini-live-connect";
 import { isGoodbyeUtterance } from "@/lib/voice-goodbye-detection";
 import {
-  chunkPcmuPayload,
+  chunkOutboundPayload,
   geminiOutboundToTelnyx,
   telnyxInboundToGemini,
   telnyxSilencePayload20ms
@@ -43,6 +43,7 @@ export class TelnyxGeminiBridge {
   async start(): Promise<void> {
     registerActiveBridge(this.callControlId, { close: r => this.close(r) });
     this.startSilenceKeepalive();
+    this.startOutboundPump();
 
     const callbacks = {
       onmessage: (msg: LiveServerMessage) => this.onGeminiMessage(msg),
@@ -84,6 +85,11 @@ export class TelnyxGeminiBridge {
 
     if (event === "stop") {
       void this.close("Stream Stopped");
+      return;
+    }
+
+    if (event === "error") {
+      console.error("[telnyx-ws] media error frame", msg);
     }
   }
 
@@ -122,27 +128,27 @@ export class TelnyxGeminiBridge {
   private sendAudioToTelnyx(b64: string, mimeType?: string) {
     if (this.ws.readyState !== 1) return;
     const payload = geminiOutboundToTelnyx(b64, mimeType);
-    this.outboundQueue.push(...chunkPcmuPayload(payload));
-    this.ensureOutboundPump();
+    const chunks = chunkOutboundPayload(payload);
+    if (chunks.length > 0) {
+      this.outboundQueue.push(...chunks);
+    }
   }
 
-  private ensureOutboundPump() {
+  private startOutboundPump() {
     if (this.outboundTimer) return;
     this.outboundTimer = setInterval(() => {
-      if (this.closed || this.ws.readyState !== 1) {
-        this.stopOutboundPump();
-        return;
-      }
+      if (this.closed || this.ws.readyState !== 1) return;
       const chunk = this.outboundQueue.shift();
-      if (!chunk) {
-        this.stopOutboundPump();
-        return;
-      }
+      if (!chunk) return;
+
       this.ws.send(JSON.stringify({ event: "media", media: { payload: chunk } }));
       if (!this.sentAudio) {
         this.sentAudio = true;
         this.stopSilenceKeepalive();
-        console.info("[telnyx-gemini] primer audio enviado a Telnyx", { callControlId: this.callControlId });
+        console.info("[telnyx-gemini] primer audio enviado a Telnyx", {
+          callControlId: this.callControlId,
+          bytes: Buffer.from(chunk, "base64").length
+        });
       }
     }, 20);
   }
