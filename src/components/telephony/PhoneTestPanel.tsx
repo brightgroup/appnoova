@@ -332,7 +332,13 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
               </div>
             </div>
 
-            {error && <p className="text-xs text-red-400">{error}</p>}
+            {error && (
+              <p className="text-xs text-red-400 leading-relaxed">
+                {error.includes("Outbound Profile")
+                  ? "La conexión Telnyx no tiene perfil de salida. Reintenta en unos segundos; si persiste, agrega Colombia (CO) en Voice → Outbound Voice Profiles → destinos permitidos."
+                  : error}
+              </p>
+            )}
 
             {!success && (
               <button onClick={startTestCall} disabled={calling} className={btnPrimary}>

@@ -1,26 +1,75 @@
+function apiKey(): string {
+  const key = process.env.TELNYX_API_KEY?.trim();
+  if (!key) throw new Error("TELNYX_API_KEY no configurado");
+  return key;
+}
+
+async function telnyxJson<T>(path: string, init?: RequestInit & { json?: Record<string, unknown> }): Promise<T> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey()}`,
+    Accept: "application/json"
+  };
+
+  let body: string | undefined;
+  if (init?.json) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(init.json);
+  }
+
+  const res = await fetch(`https://api.telnyx.com/v2${path}`, {
+    ...init,
+    headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
+    body: body ?? init?.body
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const errs = data.errors as { detail?: string }[] | undefined;
+    throw new Error(errs?.[0]?.detail || `Telnyx ${path} falló (${res.status})`);
+  }
+  return data as T;
+}
+
+function outboundProfileId(): string | null {
+  return process.env.TELNYX_OUTBOUND_VOICE_PROFILE_ID?.trim() || null;
+}
+
+async function resolveOutboundProfileId(): Promise<string | null> {
+  const fromEnv = outboundProfileId();
+  if (fromEnv) return fromEnv;
+
+  const data = await telnyxJson<{ data: { id: string; enabled?: boolean }[] }>("/outbound_voice_profiles");
+  const profile = (data.data ?? []).find(p => p.enabled !== false);
+  return profile?.id ?? null;
+}
+
+/** Asigna Outbound Voice Profile a la Call Control App si falta (error D38). */
+export async function ensureTelnyxOutboundProfile(connectionId: string): Promise<void> {
+  const profileId = await resolveOutboundProfileId();
+  if (!profileId) return;
+
+  const app = await telnyxJson<{
+    data: { outbound?: { outbound_voice_profile_id?: string | null } };
+  }>(`/call_control_applications/${connectionId}`);
+
+  if (app.data?.outbound?.outbound_voice_profile_id) return;
+
+  await telnyxJson(`/call_control_applications/${connectionId}`, {
+    method: "PATCH",
+    json: { outbound: { outbound_voice_profile_id: profileId } }
+  });
+}
+
 /** Acciones Call Control de Telnyx para atender llamadas entrantes. */
 export async function telnyxCallAction(
   callControlId: string,
   action: string,
   json?: Record<string, unknown>
 ): Promise<void> {
-  const key = process.env.TELNYX_API_KEY?.trim();
-  if (!key) throw new Error("TELNYX_API_KEY no configurado");
-
-  const res = await fetch(`https://api.telnyx.com/v2/calls/${callControlId}/actions/${action}`, {
+  await telnyxJson(`/calls/${callControlId}/actions/${action}`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json"
-    },
-    body: json ? JSON.stringify(json) : undefined
+    ...(json ? { json } : {})
   });
-
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    const errs = data.errors as { detail?: string }[] | undefined;
-    throw new Error(errs?.[0]?.detail || `Telnyx ${action} falló (${res.status})`);
-  }
 }
 
 export async function answerAndSpeak(
@@ -48,29 +97,18 @@ export async function telnyxPlaceCall(params: {
   from: string;
   to: string;
 }): Promise<{ callControlId: string }> {
-  const key = process.env.TELNYX_API_KEY?.trim();
-  if (!key) throw new Error("TELNYX_API_KEY no configurado");
+  await ensureTelnyxOutboundProfile(params.connectionId);
 
-  const res = await fetch("https://api.telnyx.com/v2/calls", {
+  const data = await telnyxJson<{ data?: { call_control_id?: string } }>("/calls", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
+    json: {
       connection_id: params.connectionId,
       from: params.from,
       to: params.to
-    })
+    }
   });
 
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const errs = data.errors as { detail?: string }[] | undefined;
-    throw new Error(errs?.[0]?.detail || `Telnyx dial falló (${res.status})`);
-  }
-
-  const callControlId = data.data?.call_control_id as string | undefined;
+  const callControlId = data.data?.call_control_id;
   if (!callControlId) throw new Error("Telnyx no devolvió call_control_id");
   return { callControlId };
 }

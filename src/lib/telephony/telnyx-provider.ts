@@ -240,8 +240,10 @@ export function telnyxConfigStatus() {
   return {
     configured: Boolean(key),
     has_connection: Boolean(connectionId()),
+    has_outbound_profile: Boolean(process.env.TELNYX_OUTBOUND_VOICE_PROFILE_ID?.trim()),
     missing: [
       !key ? "TELNYX_API_KEY" : null,
+      !connectionId() ? "TELNYX_CONNECTION_ID" : null,
     ].filter(Boolean) as string[]
   };
 }
