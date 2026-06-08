@@ -30,13 +30,14 @@ export async function getBridgeConfigForPipecat(
       temperature: geminiTemperature(fromMemory.config.temperature),
       system_instruction: buildPhoneAgentSystemInstruction(
         fromMemory.config.prompt,
-        fromMemory.companyContextText
+        fromMemory.companyContextText,
+        fromMemory.agentName
       )
     };
   }
 
   const session = await getPhoneTestCallSession(callControlId);
-  if (!session?.metadata.phone_number_id || !session.metadata.test_number_id) {
+  if (!session) {
     return null;
   }
 
@@ -52,7 +53,8 @@ export async function getBridgeConfigForPipecat(
     temperature: geminiTemperature(agent.config.temperature),
     system_instruction: buildPhoneAgentSystemInstruction(
       agent.config.prompt,
-      agent.companyContextText
+      agent.companyContextText,
+      agent.agentName
     )
   };
 }

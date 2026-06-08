@@ -22,6 +22,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
     UserTurnStoppedMessage,
 )
+from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import parse_telephony_websocket
 from pipecat.serializers.telnyx import TelnyxFrameSerializer
@@ -33,7 +34,7 @@ from pipecat.transports.websocket.fastapi import (
 )
 from pipecat.workers.runner import WorkerRunner
 
-from audio_recorder import CallAudioTap, mix_pcm_mono, pcm_to_wav_bytes
+from audio_recorder import pcm_to_wav_bytes
 from goodbye import is_goodbye_utterance
 from noova_client import fetch_bridge_config, finalize_call, telnyx_hangup, update_phase
 
@@ -72,8 +73,10 @@ async def run_bot(
     hangup_scheduled = False
     hangup_task: asyncio.Task | None = None
     finalized = False
-    user_tap = CallAudioTap()
-    agent_tap = CallAudioTap()
+    recorded_pcm = b""
+    audio_ready = asyncio.Event()
+
+    audio_buffer = AudioBufferProcessor(sample_rate=8000, num_channels=1, buffer_size=0)
 
     logger.info(
         "Iniciando pipeline",
@@ -113,15 +116,15 @@ async def run_bot(
         ),
     )
 
+    # Pipeline original que funcionaba + buffer de audio al final (no en medio del flujo).
     pipeline = Pipeline(
         [
             transport.input(),
-            user_tap,
             user_aggregator,
             llm,
-            agent_tap,
             transport.output(),
             assistant_aggregator,
+            audio_buffer,
         ]
     )
 
@@ -136,15 +139,30 @@ async def run_bot(
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
+    @audio_buffer.event_handler("on_audio_data")
+    async def on_audio_data(buffer, audio: bytes, sample_rate: int, num_channels: int):
+        nonlocal recorded_pcm
+        if audio:
+            recorded_pcm = audio
+        audio_ready.set()
+
     async def do_finalize(disconnect_reason: str) -> None:
         nonlocal finalized
         if finalized:
             return
         finalized = True
 
+        try:
+            await audio_buffer.stop_recording()
+            try:
+                await asyncio.wait_for(audio_ready.wait(), timeout=2.0)
+            except asyncio.TimeoutError:
+                pass
+        except Exception as e:
+            logger.warning(f"No se pudo detener grabación: {e}")
+
         duration_sec = max(0, int(time.time() - session_start))
-        mixed_pcm = mix_pcm_mono(user_tap.pcm_bytes(), agent_tap.pcm_bytes())
-        wav_bytes = pcm_to_wav_bytes(mixed_pcm, sample_rate=8000)
+        wav_bytes = pcm_to_wav_bytes(recorded_pcm, sample_rate=8000)
         audio_b64 = base64.b64encode(wav_bytes).decode("ascii") if wav_bytes else None
 
         await finalize_call(
@@ -183,6 +201,7 @@ async def run_bot(
     async def on_client_connected(transport, client):
         logger.info("Telnyx conectado", call_control_id=call_control_id)
         await update_phase(call_control_id, "connected")
+        await audio_buffer.start_recording()
         await asyncio.sleep(0.8)
         await worker.queue_frames([LLMRunFrame()])
 

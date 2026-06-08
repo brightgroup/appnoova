@@ -52,7 +52,11 @@ export async function connectGeminiLive(
         },
         thinkingConfig: { includeThoughts: false, thinkingBudget: 0 },
         temperature: geminiTemperature(cfg.temperature),
-        systemInstruction: buildPhoneAgentSystemInstruction(cfg.prompt, pending.companyContextText),
+        systemInstruction: buildPhoneAgentSystemInstruction(
+          cfg.prompt,
+          pending.companyContextText,
+          pending.agentName
+        ),
         inputAudioTranscription: {},
         outputAudioTranscription: {}
       },

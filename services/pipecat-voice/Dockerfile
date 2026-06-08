@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
-COPY bot.py noova_client.py ./
+COPY *.py ./
 
 RUN pip install --no-cache-dir \
     "pipecat-ai[google,websocket,silero,runner]>=1.3.0" \
