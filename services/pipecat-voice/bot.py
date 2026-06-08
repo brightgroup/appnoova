@@ -3,6 +3,7 @@
 #
 
 import asyncio
+import base64
 import os
 import time
 from typing import Any
@@ -32,11 +33,15 @@ from pipecat.transports.websocket.fastapi import (
 )
 from pipecat.workers.runner import WorkerRunner
 
-from noova_client import fetch_bridge_config, finalize_call, update_phase
+from audio_recorder import CallAudioTap, mix_pcm_mono, pcm_to_wav_bytes
+from goodbye import is_goodbye_utterance
+from noova_client import fetch_bridge_config, finalize_call, telnyx_hangup, update_phase
 
 load_dotenv(override=True)
 
 DEFAULT_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025"
+HANGUP_DELAY_AGENT_SEC = 2.2
+HANGUP_DELAY_USER_SEC = 2.8
 
 
 def _google_api_key() -> str:
@@ -63,6 +68,12 @@ async def run_bot(
     voice = agent_config.get("voice_name") or "Aoede"
     temperature = float(agent_config.get("temperature") or 1.0)
     system_instruction = agent_config.get("system_instruction") or ""
+
+    hangup_scheduled = False
+    hangup_task: asyncio.Task | None = None
+    finalized = False
+    user_tap = CallAudioTap()
+    agent_tap = CallAudioTap()
 
     logger.info(
         "Iniciando pipeline",
@@ -105,8 +116,10 @@ async def run_bot(
     pipeline = Pipeline(
         [
             transport.input(),
+            user_tap,
             user_aggregator,
             llm,
+            agent_tap,
             transport.output(),
             assistant_aggregator,
         ]
@@ -123,24 +136,63 @@ async def run_bot(
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
+    async def do_finalize(disconnect_reason: str) -> None:
+        nonlocal finalized
+        if finalized:
+            return
+        finalized = True
+
+        duration_sec = max(0, int(time.time() - session_start))
+        mixed_pcm = mix_pcm_mono(user_tap.pcm_bytes(), agent_tap.pcm_bytes())
+        wav_bytes = pcm_to_wav_bytes(mixed_pcm, sample_rate=8000)
+        audio_b64 = base64.b64encode(wav_bytes).decode("ascii") if wav_bytes else None
+
+        await finalize_call(
+            call_control_id,
+            transcript,
+            disconnect_reason,
+            duration_sec=duration_sec,
+            audio_base64=audio_b64,
+        )
+
+    async def schedule_hangup(role: str) -> None:
+        nonlocal hangup_scheduled, hangup_task
+        if hangup_scheduled or finalized:
+            return
+        if len(transcript) < 2:
+            return
+
+        hangup_scheduled = True
+        delay = HANGUP_DELAY_AGENT_SEC if role == "agent" else HANGUP_DELAY_USER_SEC
+        logger.info(f"Despedida detectada ({role}) — colgando en {delay}s")
+
+        async def _hangup_after_delay() -> None:
+            await asyncio.sleep(delay)
+            await update_phase(call_control_id, "ended")
+            await telnyx_hangup(call_control_id)
+
+        hangup_task = asyncio.create_task(_hangup_after_delay())
+
+    def check_goodbye(role: str, text: str) -> None:
+        if hangup_scheduled or finalized or len(transcript) < 2:
+            return
+        if is_goodbye_utterance(text):
+            asyncio.create_task(schedule_hangup(role))
+
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Telnyx conectado", call_control_id=call_control_id)
         await update_phase(call_control_id, "connected")
-        # Esperar a que el pipeline y Gemini Live estén listos antes del saludo.
         await asyncio.sleep(0.8)
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
+        nonlocal hangup_task
         logger.info("Telnyx desconectado", call_control_id=call_control_id)
-        duration_sec = max(0, int(time.time() - session_start))
-        await finalize_call(
-            call_control_id,
-            transcript,
-            "Phone Hangup",
-            duration_sec=duration_sec,
-        )
+        if hangup_task and not hangup_task.done():
+            hangup_task.cancel()
+        await do_finalize("Agent Hangup" if hangup_scheduled else "Phone Hangup")
         await worker.cancel()
 
     @user_aggregator.event_handler("on_user_turn_stopped")
@@ -156,6 +208,7 @@ async def run_bot(
         )
         logger.info(f"user: {message.content}")
         await update_phase(call_control_id, "connected")
+        check_goodbye("user", message.content)
 
     @assistant_aggregator.event_handler("on_assistant_turn_stopped")
     async def on_assistant_turn_stopped(aggregator, message: AssistantTurnStoppedMessage):
@@ -170,6 +223,7 @@ async def run_bot(
         )
         logger.info(f"agent: {message.content}")
         await update_phase(call_control_id, "speaking")
+        check_goodbye("agent", message.content)
 
     runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
     await runner.add_workers(worker)

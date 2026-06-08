@@ -18,12 +18,16 @@ export async function POST(req: NextRequest) {
   const transcript = Array.isArray(body.transcript) ? (body.transcript as TranscriptEntry[]) : [];
   const disconnectReason = String(body.disconnect_reason ?? "Phone Hangup").trim() || "Phone Hangup";
   const durationSec = typeof body.duration_sec === "number" ? body.duration_sec : undefined;
+  const audioBase64 = typeof body.audio_base64 === "string" ? body.audio_base64 : undefined;
+  const audioMime = typeof body.audio_mime === "string" ? body.audio_mime : "audio/wav";
 
   await finalizePhoneTestCall({
     callControlId,
     transcript,
     disconnectReason,
-    durationSec
+    durationSec,
+    audioBase64,
+    audioMime
   });
 
   return NextResponse.json({ success: true });

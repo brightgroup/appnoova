@@ -52,11 +52,33 @@ async def update_phase(call_control_id: str, phase: str) -> None:
         logger.warning(f"No se pudo actualizar fase ({phase}): {e}")
 
 
+async def telnyx_hangup(call_control_id: str) -> None:
+    api_key = os.getenv("TELNYX_API_KEY", "").strip()
+    if not api_key:
+        logger.warning("TELNYX_API_KEY no configurado — no se puede colgar")
+        return
+    url = f"https://api.telnyx.com/v2/calls/{call_control_id}/actions/hangup"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.post(
+                url,
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+            if res.status_code >= 400:
+                logger.warning(f"Telnyx hangup {res.status_code}: {res.text}")
+            else:
+                logger.info(f"Colgada llamada {call_control_id}")
+    except Exception as e:
+        logger.warning(f"Error colgando llamada {call_control_id}: {e}")
+
+
 async def finalize_call(
     call_control_id: str,
     transcript: list[dict[str, Any]],
     disconnect_reason: str,
     duration_sec: int | None = None,
+    audio_base64: str | None = None,
+    audio_mime: str = "audio/wav",
 ) -> None:
     url = f"{_app_base_url()}/api/telephony/pipecat/finalize"
     payload: dict[str, Any] = {
@@ -66,9 +88,12 @@ async def finalize_call(
     }
     if duration_sec is not None:
         payload["duration_sec"] = duration_sec
+    if audio_base64:
+        payload["audio_base64"] = audio_base64
+        payload["audio_mime"] = audio_mime
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             res = await client.post(url, json=payload, headers=_internal_headers())
             res.raise_for_status()
             logger.info(f"Finalizada llamada {call_control_id}")

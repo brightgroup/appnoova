@@ -2,6 +2,7 @@ import { adminClient } from "@/lib/voice-agents-server";
 import { buildCallRecordFields, splitCallRecordFields, updateAgentCallsCount } from "@/lib/voice/persist-call-record";
 import { getPhoneTestCallSession, updatePhoneTestCallSession, labelForPhase } from "@/lib/telephony/test-call-session";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
+import { uploadCallRecording } from "@/lib/voice-call-storage";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
 
 export async function finalizePhoneTestCall(input: {
@@ -9,6 +10,8 @@ export async function finalizePhoneTestCall(input: {
   transcript: TranscriptEntry[];
   disconnectReason: string;
   durationSec?: number;
+  audioBase64?: string;
+  audioMime?: string;
 }): Promise<void> {
   const session = await getPhoneTestCallSession(input.callControlId);
   if (!session) {
@@ -79,6 +82,24 @@ export async function finalizePhoneTestCall(input: {
   if (updateError) {
     console.error("[finalize-phone-test] update failed:", updateError.message, session.id);
     throw new Error(updateError.message);
+  }
+
+  if (input.audioBase64 && input.audioBase64.length > 0) {
+    const buf = Buffer.from(input.audioBase64, "base64");
+    if (buf.length > 500) {
+      const audioUrl = await uploadCallRecording(
+        db,
+        session.user_id,
+        session.id,
+        buf,
+        input.audioMime || "audio/wav"
+      );
+      if (audioUrl) {
+        await db.from("voice_agent_calls").update({ audio_url: audioUrl }).eq("id", session.id);
+      } else {
+        console.error("[finalize-phone-test] no se pudo subir audio", session.id);
+      }
+    }
   }
 
   await updateAgentCallsCount(db, session.voice_agent_id, callsCountNext);

@@ -22,6 +22,29 @@ import type { VoiceAgentCallListItem, VoiceAgentCallRecord } from "@/types/voice
 
 type CallFilter = "todas" | "exitosas" | "conectadas";
 
+function callMeta(call: VoiceAgentCallListItem): Record<string, unknown> {
+  return call.metadata ?? {};
+}
+
+function isPhoneTest(call: VoiceAgentCallListItem): boolean {
+  const meta = callMeta(call);
+  return meta.source === "phone_test" || meta.phone_test === true;
+}
+
+function callOriginNumber(call: VoiceAgentCallListItem): string {
+  if (isPhoneTest(call)) return String(callMeta(call).from ?? "—");
+  return "Prueba web";
+}
+
+function callDestNumber(call: VoiceAgentCallListItem): string {
+  if (isPhoneTest(call)) return String(callMeta(call).to ?? call.phone_number);
+  return call.phone_number;
+}
+
+function callDirection(call: VoiceAgentCallListItem): string {
+  return isPhoneTest(call) ? "phone_test" : "web_test";
+}
+
 interface CallRegistryPanelProps {
   agentId: string;
   refreshKey?: number;
@@ -246,15 +269,15 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
                     <Td>
                       <QualityBar percent={quality} />
                     </Td>
-                    <Td mono className="text-gray-400">Prueba web</Td>
-                    <Td mono>{call.phone_number}</Td>
+                    <Td mono className="text-gray-400">{callOriginNumber(call)}</Td>
+                    <Td mono>{callDestNumber(call)}</Td>
                     <Td className="text-gray-400">N/A</Td>
                     <Td><span className="text-gray-200">ended</span></Td>
                     <Td mono className="text-gray-400 lowercase">{call.disconnect_reason.replace(/\s+/g, "_").toLowerCase()}</Td>
                     <Td>{isSuccess ? <span className="text-gray-200">Sí</span> : <span className="text-gray-400">No</span>}</Td>
-                    <Td className="text-gray-400">web_test</Td>
+                    <Td className="text-gray-400">{callDirection(call)}</Td>
                     <Td>
-                      <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center justify-center gap-1 flex-nowrap whitespace-nowrap" onClick={e => e.stopPropagation()}>
                         <IconBtn
                           title={call.audio_url ? "Reproducir" : "Sin grabación"}
                           disabled={!call.audio_url}

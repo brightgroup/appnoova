@@ -10,7 +10,7 @@ import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { parsePcmRate, pcmBase64ToFloat32, resampleTo16kPcm } from "@/lib/voice-session-audio";
 import { getAuthHeaders, getAuthToken } from "@/lib/voice-agents-api";
 import { encodeWav, mergePcmBuffers, downsamplePcm } from "@/lib/call-recording";
-import { blobToBase64 } from "@/lib/brand-ui";
+import { blobToBase64, btnPrimary } from "@/lib/brand-ui";
 import { isGoodbyeUtterance } from "@/lib/voice-goodbye-detection";
 import type { VoiceAgentFormData } from "@/types/voice-agent";
 
@@ -46,6 +46,8 @@ export function VoiceSessionPanel({
 }: VoiceSessionPanelProps) {
   const meta = getTemplateMeta(sourceTemplate);
   const accent = agentConfig.color || meta.color;
+  const agentName = agentConfig.name?.trim() || "Agente";
+  const agentInitial = agentName.charAt(0).toUpperCase() || "A";
 
   const [state, setState] = useState<SessionState>("idle");
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
@@ -162,10 +164,11 @@ export function VoiceSessionPanel({
   const scheduleAutoHangup = useCallback((role: "user" | "agent") => {
     if (goodbyeTriggeredRef.current) return;
     goodbyeTriggeredRef.current = true;
+    const name = configRef.current.name?.trim() || "Agente";
     setStatusHint(
       role === "user"
         ? "Despedida detectada · Colgando..."
-        : "Lia se despidió · Colgando..."
+        : `${name} se despidió · Colgando...`
     );
     const delayMs = role === "agent" ? 2200 : 2800;
     autoHangupTimerRef.current = setTimeout(() => {
@@ -218,7 +221,7 @@ export function VoiceSessionPanel({
     if (msg.setupComplete && !setupDoneRef.current) {
       setupDoneRef.current = true;
       setState("listening");
-      setStatusHint("Conectado · Habla o espera el saludo de Lia");
+      setStatusHint(`Conectado · Habla o espera el saludo de ${configRef.current.name?.trim() || "Agente"}`);
 
       sessionStartRef.current = Date.now();
 
@@ -521,10 +524,10 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
                 </>
               )}
               <div className={`relative w-[88px] h-[88px] rounded-full flex items-center justify-center bg-gradient-to-br ${accent} shadow-lg ring-4 ring-noova-surface`}>
-                <span className="text-2xl font-bold text-white">L</span>
+                <span className="text-2xl font-bold text-white">{agentInitial}</span>
               </div>
             </div>
-            <p className="text-sm font-semibold text-white">Lia</p>
+            <p className="text-sm font-semibold text-white">{agentName}</p>
             <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[.04] border border-white/[.08]">
               <span className={`w-1.5 h-1.5 rounded-full ${
                 isActive ? "bg-[#5b5bf6] animate-pulse" :
@@ -543,9 +546,9 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
               <button
                 onClick={startSession}
                 disabled={!ready}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold text-white border border-white/10 bg-white/[.06] hover:bg-white/[.10] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold ${btnPrimary} disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#5b5bf6]`}
               >
-                <span className={`flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br ${accent}`}>
+                <span className={`flex items-center justify-center w-8 h-8 rounded-full bg-white/20`}>
                   <Mic className="w-4 h-4" />
                 </span>
                 Iniciar sesión
@@ -586,7 +589,7 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
 
         <div className="rounded-xl border border-white/[.10] bg-noova-surface px-4 py-3">
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Motor de voz</p>
-          <p className="text-[11px] text-gray-300 font-mono leading-snug line-clamp-2">
+          <p className="text-[11px] text-gray-300 font-mono truncate" title={agentConfig.model || DEFAULT_LIVE_MODEL}>
             {agentConfig.model || DEFAULT_LIVE_MODEL}
           </p>
           <p className="text-[10px] text-gray-400 mt-1.5">Voz {agentConfig.voice_name} · Español</p>
@@ -624,7 +627,7 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
               <p className="text-sm text-gray-300 font-medium">Sin conversación aún</p>
               <p className="text-xs text-gray-400 mt-1.5 max-w-xs leading-relaxed">
                 {isActive
-                  ? "Lia saludará primero. Luego habla con naturalidad."
+                  ? `${agentName} saludará primero. Luego habla con naturalidad.`
                   : "Inicia la sesión para probar tu agente con la configuración actual."}
               </p>
             </div>
@@ -639,7 +642,7 @@ Si el usuario se despide o indica que quiere terminar la conversación, despíde
                   <p className={`text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${
                     line.role === "user" ? "text-[#5b5bf6]/90" : "text-gray-500"
                   }`}>
-                    {line.role === "user" ? "Tú" : "Lia"}
+                    {line.role === "user" ? "Tú" : agentName}
                   </p>
                   {line.text}
                 </div>

@@ -8,5 +8,5 @@ export function buildPhoneAgentSystemInstruction(
   return `${mergeCompanyContext(prompt, companyContextText)}
 
 Al iniciar la llamada, saluda con UNA sola frase breve en español colombiano y luego espera en silencio a que el usuario hable. No continúes hablando hasta que el usuario responda.
-Si el usuario se despide o indica que quiere terminar la conversación, despídete de forma breve y cordial (máximo una oración).`;
+Si el usuario se despide, indica que quiere terminar, o ya diste la información final solicitada, despídete de forma breve y cordial (máximo una oración) y termina la conversación sin hacer más preguntas.`;
 }

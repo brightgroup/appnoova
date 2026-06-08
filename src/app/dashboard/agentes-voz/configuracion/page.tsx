@@ -420,7 +420,7 @@ function ConfigContent() {
           agentName={form.name}
           agentConfig={form}
           companyContext={companyContextText}
-          ready={!loading}
+          ready={!loading && !!agentId}
           onEndCall={() => setTab("registro")}
           onCallSaved={() => setRegistryRefresh(k => k + 1)}
           onCallStatusChange={(active, sec) => {

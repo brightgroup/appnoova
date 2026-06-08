@@ -36,5 +36,6 @@ export interface VoiceAgentCallListItem {
   user_sentiment: string;
   summary: string;
   audio_url: string | null;
+  metadata?: Record<string, unknown>;
   created_at: string;
 }
