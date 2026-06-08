@@ -110,7 +110,7 @@ export function upsample8kTo16k(input: Int16Array): Int16Array {
 
 export function telnyxInboundToGemini(pcmuPayload: string): string {
   const pcm8k = pcmuBase64ToPcm16(pcmuPayload);
-  const pcm16k = upsample8kTo16k(pcm8k);
+  const pcm16k = applyPcmGain(upsample8kTo16k(pcm8k), 2.2);
   return int16ToPcmBase64(pcm16k);
 }
 

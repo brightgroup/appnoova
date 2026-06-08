@@ -23,14 +23,17 @@ export class TelnyxGeminiBridge {
   private sessionStart = 0;
   private answeredAt = 0;
   private setupDone = false;
-  private micBlocked = true;
+  private listeningEnabled = false;
+  private agentSpeaking = false;
   private closed = false;
   private closing = false;
   private goodbyeTriggered = false;
   private sentAudio = false;
+  private inboundFrames = 0;
   private silenceTimer: ReturnType<typeof setInterval> | null = null;
   private outboundQueue: string[] = [];
   private outboundTimer: ReturnType<typeof setInterval> | null = null;
+  private listenEnableTimer: ReturnType<typeof setTimeout> | null = null;
   private callControlId: string;
 
   constructor(
@@ -73,10 +76,10 @@ export class TelnyxGeminiBridge {
     const event = String(msg.event ?? "");
     if (event === "media") {
       const media = msg.media as { track?: string; payload?: string } | undefined;
-      const track = media?.track;
-      if (media?.payload && this.setupDone && this.gemini && !this.micBlocked && (!track || track === "inbound")) {
+      if (media?.payload && this.canSendUserAudio()) {
+        this.inboundFrames++;
         const geminiAudio = telnyxInboundToGemini(media.payload);
-        this.gemini.sendRealtimeInput({
+        this.gemini?.sendRealtimeInput({
           audio: { data: geminiAudio, mimeType: "audio/pcm;rate=16000" }
         });
       }
@@ -91,6 +94,40 @@ export class TelnyxGeminiBridge {
     if (event === "error") {
       console.error("[telnyx-ws] media error frame", msg);
     }
+  }
+
+  private canSendUserAudio(): boolean {
+    return Boolean(
+      this.setupDone &&
+      this.gemini &&
+      this.listeningEnabled &&
+      !this.agentSpeaking &&
+      this.outboundQueue.length === 0
+    );
+  }
+
+  private scheduleListeningEnabled() {
+    if (this.listenEnableTimer) {
+      clearTimeout(this.listenEnableTimer);
+      this.listenEnableTimer = null;
+    }
+
+    const waitForPlayback = () => {
+      if (this.closed) return;
+      if (this.outboundQueue.length > 0) {
+        this.listenEnableTimer = setTimeout(waitForPlayback, 50);
+        return;
+      }
+      this.listenEnableTimer = setTimeout(() => {
+        this.listeningEnabled = true;
+        console.info("[telnyx-gemini] escucha activa", {
+          callControlId: this.callControlId,
+          inboundFrames: this.inboundFrames
+        });
+      }, 400);
+    };
+
+    waitForPlayback();
   }
 
   private startSilenceKeepalive() {
@@ -127,6 +164,9 @@ export class TelnyxGeminiBridge {
 
   private sendAudioToTelnyx(b64: string, mimeType?: string) {
     if (this.ws.readyState !== 1) return;
+    this.agentSpeaking = true;
+    this.listeningEnabled = false;
+
     const payload = geminiOutboundToTelnyx(b64, mimeType);
     const chunks = chunkOutboundPayload(payload);
     if (chunks.length > 0) {
@@ -193,7 +233,13 @@ export class TelnyxGeminiBridge {
     const sc = msg.serverContent;
     if (!sc) return;
 
-    if (sc.inputTranscription?.text && !this.micBlocked) {
+    if (sc.interrupted) {
+      this.agentSpeaking = false;
+      this.outboundQueue = [];
+      this.scheduleListeningEnabled();
+    }
+
+    if (sc.inputTranscription?.text && this.listeningEnabled) {
       this.appendTranscript("user", sc.inputTranscription.text);
       void updatePhoneTestCallSession(this.callControlId, {
         phase: "connected",
@@ -217,7 +263,8 @@ export class TelnyxGeminiBridge {
     }
 
     if (sc.turnComplete) {
-      this.micBlocked = false;
+      this.agentSpeaking = false;
+      this.scheduleListeningEnabled();
       this.checkGoodbye();
     }
   }
@@ -239,6 +286,7 @@ export class TelnyxGeminiBridge {
     this.closing = true;
     this.stopSilenceKeepalive();
     this.stopOutboundPump();
+    if (this.listenEnableTimer) clearTimeout(this.listenEnableTimer);
     unregisterActiveBridge(this.callControlId);
 
     try {
@@ -261,6 +309,7 @@ export class TelnyxGeminiBridge {
       reason,
       durationSec,
       transcriptLines: this.transcript.length,
+      inboundFrames: this.inboundFrames,
       setupDone: this.setupDone,
       sentAudio: this.sentAudio
     });

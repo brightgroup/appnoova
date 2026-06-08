@@ -119,7 +119,7 @@ export async function telnyxStartMediaStream(callControlId: string, streamUrl: s
       stream_bidirectional_mode: "rtp",
       stream_bidirectional_codec: "L16",
       stream_bidirectional_sampling_rate: 16000,
-      stream_bidirectional_target_legs: "both"
+      stream_bidirectional_target_legs: "opposite"
     }
   });
 }
