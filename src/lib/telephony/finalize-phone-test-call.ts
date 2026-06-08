@@ -1,0 +1,71 @@
+import { adminClient } from "@/lib/voice-agents-server";
+import { buildCallRecordFields, updateAgentCallsCount } from "@/lib/voice/persist-call-record";
+import { getPhoneTestCallSession, updatePhoneTestCallSession, labelForPhase } from "@/lib/telephony/test-call-session";
+import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
+import type { TranscriptEntry } from "@/types/voice-agent-call";
+
+export async function finalizePhoneTestCall(input: {
+  callControlId: string;
+  transcript: TranscriptEntry[];
+  disconnectReason: string;
+  durationSec?: number;
+}): Promise<void> {
+  const session = await getPhoneTestCallSession(input.callControlId);
+  if (!session) return;
+
+  const meta = session.metadata;
+  if (meta.finalized) return;
+
+  const agent = await loadVoiceAgentForCall(session.voice_agent_id, session.user_id);
+  if (!agent) return;
+
+  const answeredAt = meta.answered_at ? new Date(meta.answered_at).getTime() : null;
+  const endedAt = Date.now();
+  const durationSec = input.durationSec ?? (
+    answeredAt ? Math.max(0, Math.floor((endedAt - answeredAt) / 1000)) : 0
+  );
+
+  const fields = await buildCallRecordFields({
+    userId: session.user_id,
+    voiceAgentId: session.voice_agent_id,
+    agentName: agent.agentName,
+    phoneNumber: meta.to,
+    durationSec,
+    disconnectReason: input.disconnectReason,
+    transcript: input.transcript,
+    callsCount: agent.callsCount,
+    statusLabel: durationSec > 0 ? "Ended - Llamada telefónica" : "Ended - Sin conexión",
+    metadata: {
+      source: "phone_test",
+      call_control_id: input.callControlId,
+      from: meta.from,
+      to: meta.to,
+      finalized: true,
+      finalized_at: new Date().toISOString()
+    }
+  });
+
+  const db = adminClient();
+  await db
+    .from("voice_agent_calls")
+    .update({
+      ...fields,
+      status: durationSec > 0 || input.transcript.length > 0 ? "ended_success" : "missed",
+      metadata: {
+        ...meta,
+        ...fields.metadata,
+        phone_test: true,
+        phase: "ended",
+        finalized: true
+      }
+    })
+    .eq("id", session.id);
+
+  await updateAgentCallsCount(db, session.voice_agent_id, fields.callsCountNext);
+
+  await updatePhoneTestCallSession(input.callControlId, {
+    phase: "ended",
+    last_event: "call.finalized",
+    status_label: labelForPhase("ended")
+  });
+}

@@ -13,3 +13,10 @@ export function twilioVoiceWebhookUrl(): string {
 export function twilioStatusWebhookUrl(): string {
   return `${getAppBaseUrl()}/api/telephony/webhooks/twilio/status`;
 }
+
+/** WebSocket para media streaming Telnyx ↔ Gemini Live. */
+export function telnyxMediaStreamWsUrl(): string {
+  const base = getAppBaseUrl().replace(/\/$/, "");
+  const wsBase = base.replace(/^https:/, "wss:").replace(/^http:/, "ws:");
+  return `${wsBase}/telephony/ws/telnyx-media`;
+}

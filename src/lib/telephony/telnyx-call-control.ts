@@ -109,6 +109,21 @@ export async function telnyxHangup(callControlId: string): Promise<void> {
   await telnyxCallAction(callControlId, "hangup");
 }
 
+export async function telnyxStartMediaStream(callControlId: string, streamUrl: string): Promise<void> {
+  await telnyxJson(`/calls/${callControlId}/actions/streaming_start`, {
+    method: "POST",
+    json: {
+      stream_url: streamUrl,
+      stream_track: "both_tracks",
+      stream_codec: "PCMU",
+      stream_bidirectional_mode: "rtp",
+      stream_bidirectional_codec: "PCMU",
+      stream_bidirectional_sampling_rate: 8000,
+      stream_bidirectional_target_legs: "opposite"
+    }
+  });
+}
+
 export async function telnyxPlaceCall(params: {
   connectionId: string;
   from: string;

@@ -23,6 +23,7 @@ export interface PhoneTestCallMeta {
   greeting?: string;
   answered_at?: string;
   ended_at?: string;
+  finalized?: boolean;
 }
 
 export async function createPhoneTestCallSession(input: {

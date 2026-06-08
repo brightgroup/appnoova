@@ -26,7 +26,6 @@ interface ActiveCall {
   phase: CallPhase;
   statusLabel: string;
   error?: string;
-  greeting?: string;
   durationSec: number;
 }
 
@@ -147,7 +146,6 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
           phase,
           statusLabel: data.status_label ?? PHASE_LABEL[phase],
           error: data.error,
-          greeting: data.greeting,
           durationSec: data.duration_sec ?? 0
         };
       });
@@ -238,8 +236,7 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
 
   if (activeCall) {
     const isLive = !["ended", "failed"].includes(activeCall.phase);
-    const showTimer = CONNECTED_PHASES.includes(activeCall.phase) && activeCall.phase !== "ended"
-      || (activeCall.phase === "ended" && activeCall.durationSec > 0);
+    const showTimer = CONNECTED_PHASES.includes(activeCall.phase) && activeCall.durationSec > 0;
 
     return (
       <div className="flex-1 overflow-y-auto p-6">
@@ -292,10 +289,8 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
               {activeCall.phase === "ringing" && (
                 <p className="text-[11px] text-gray-500 mt-2">Tu celular debería estar sonando</p>
               )}
-              {(activeCall.phase === "speaking" || activeCall.phase === "connected") && activeCall.greeting && (
-                <p className="text-[11px] text-gray-400 mt-3 max-w-sm leading-relaxed italic">
-                  &ldquo;{activeCall.greeting}&rdquo;
-                </p>
+              {(activeCall.phase === "speaking" || activeCall.phase === "connected") && (
+                <p className="text-[11px] text-gray-500 mt-2">Conversación activa — revisa el registro al finalizar</p>
               )}
             </div>
 
