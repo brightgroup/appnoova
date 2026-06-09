@@ -51,8 +51,9 @@ export default function OriCopilotoPage() {
   const [error, setError] = useState("");
   const [contexts, setContexts] = useState<CompanyContext[]>([]);
   const [contextId, setContextId] = useState<string>("");
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const chatAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const hasChat = messages.length > 0;
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -79,8 +80,11 @@ export default function OriCopilotoPage() {
   }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+    if (!hasChat) return;
+    const el = chatAreaRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [messages, loading, hasChat]);
 
   const sendMessage = useCallback(async (text: string) => {
     const trimmed = text.trim();
@@ -133,10 +137,8 @@ export default function OriCopilotoPage() {
     textareaRef.current?.focus();
   };
 
-  const hasChat = messages.length > 0;
-
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-noova-main text-white relative">
+    <div className="flex-1 flex flex-col min-h-0 h-full bg-noova-main text-white relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-[#5b5bf6]/[.06] rounded-full blur-[100px]" />
       </div>
@@ -181,11 +183,14 @@ export default function OriCopilotoPage() {
         </div>
       </div>
 
-      <div className="relative z-10 flex-1 flex flex-col items-center overflow-y-auto px-8 pb-12">
-        <div className="w-full max-w-[820px] flex flex-col flex-1 min-h-0">
+      <div className={`relative z-10 flex-1 flex flex-col items-center min-h-0 ${hasChat ? "overflow-hidden" : "overflow-y-auto px-8"}`}>
+        <div className={`w-full max-w-[820px] flex flex-col flex-1 min-h-0 ${hasChat ? "h-full" : ""}`}>
 
           {hasChat && (
-            <div className="flex-1 overflow-y-auto py-8 space-y-7 min-h-0">
+            <div
+              ref={chatAreaRef}
+              className="flex-1 overflow-y-auto px-8 py-8 space-y-7 min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            >
               {messages.map(msg => (
                 <div
                   key={msg.id}
@@ -213,11 +218,10 @@ export default function OriCopilotoPage() {
                   ))}
                 </div>
               )}
-              <div ref={bottomRef} />
             </div>
           )}
 
-          <div className={`w-full shrink-0 ${hasChat ? "mt-auto pt-8" : "my-auto"}`}>
+          <div className={`w-full shrink-0 ${hasChat ? "px-8 pb-4 pt-2" : "my-auto px-8 pb-12"}`}>
 
             {!hasChat && (
               <div className="flex items-center justify-center gap-3 mb-12">
@@ -287,7 +291,7 @@ export default function OriCopilotoPage() {
             </div>
 
             {!hasChat && (
-              <div className="flex flex-wrap justify-center gap-2.5 mt-5">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap justify-center gap-2.5 mt-5">
                 {QUICK_ACTIONS.map(action => {
                   const Icon = action.icon;
                   return (
@@ -296,7 +300,7 @@ export default function OriCopilotoPage() {
                       type="button"
                       onClick={() => sendMessage(action.prompt)}
                       disabled={loading}
-                      className="group flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#14151c] border border-white/[.07] hover:border-[#5b5bf6]/25 hover:bg-[#5b5bf6]/[.06] text-[13px] font-medium text-gray-400 hover:text-gray-200 transition-all disabled:opacity-40"
+                      className="group flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#14151c] border border-white/[.07] hover:border-[#5b5bf6]/25 hover:bg-[#5b5bf6]/[.06] text-[13px] font-medium text-gray-400 hover:text-gray-200 transition-all disabled:opacity-40 sm:w-auto w-full justify-center sm:justify-start"
                     >
                       <Icon className="w-3.5 h-3.5 text-gray-500 group-hover:text-[#5b5bf6] transition-colors" strokeWidth={1.75} />
                       {action.label}
