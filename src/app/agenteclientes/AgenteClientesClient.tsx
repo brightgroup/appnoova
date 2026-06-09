@@ -116,7 +116,7 @@ function InputComposer({
           value={input}
           onChange={onInput}
           onKeyDown={onKeyDown}
-          placeholder="¿En qué puedo ayudarte hoy?"
+          placeholder={variant === "footer" ? "Escribe un mensaje..." : "¿En qué puedo ayudarte hoy?"}
           disabled={loading}
           rows={2}
           className="ac-textarea"
@@ -289,7 +289,14 @@ export default function AgenteClientesClient() {
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
   const hasChat = messages.length > 0;
+
+  const headerTitle = useMemo(() => {
+    const active = conversations.find(c => c.id === activeConversationId);
+    if (active?.messages.length) return active.title;
+    return BROKER.agentName;
+  }, [conversations, activeConversationId]);
 
   const applyConversationState = useCallback(
     (state: ReturnType<typeof loadConversationState>) => {
@@ -335,6 +342,51 @@ export default function AgenteClientesClient() {
   }, []);
 
   useEffect(() => {
+    const root = rootRef.current;
+    const header = headerRef.current;
+    if (!root || !header) return;
+
+    const mobileQuery = window.matchMedia("(max-width: 640px)");
+
+    const syncViewport = () => {
+      const headerH = header.offsetHeight;
+      root.style.setProperty("--ac-header-h", `${headerH}px`);
+
+      if (!mobileQuery.matches) {
+        header.style.top = "";
+        root.style.top = "";
+        root.style.height = "";
+        return;
+      }
+
+      const vv = window.visualViewport;
+      if (!vv) return;
+
+      header.style.top = `${vv.offsetTop}px`;
+      root.style.top = `${vv.offsetTop}px`;
+      root.style.height = `${vv.height}px`;
+    };
+
+    syncViewport();
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", syncViewport);
+    vv?.addEventListener("scroll", syncViewport);
+    window.addEventListener("resize", syncViewport);
+    mobileQuery.addEventListener("change", syncViewport);
+
+    const observer = new ResizeObserver(syncViewport);
+    observer.observe(header);
+
+    return () => {
+      vv?.removeEventListener("resize", syncViewport);
+      vv?.removeEventListener("scroll", syncViewport);
+      window.removeEventListener("resize", syncViewport);
+      mobileQuery.removeEventListener("change", syncViewport);
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!hasChat) return;
     const el = chatAreaRef.current;
     if (!el) return;
@@ -342,6 +394,7 @@ export default function AgenteClientesClient() {
   }, [messages, loading, hasChat]);
 
   useEffect(() => {
+    if (window.matchMedia("(max-width: 640px)").matches) return;
     textareaRef.current?.focus();
   }, []);
 
@@ -422,18 +475,29 @@ export default function AgenteClientesClient() {
         <div className="ac-bg-grid" />
       </div>
 
-      <header className="ac-header">
+      <header ref={headerRef} className="ac-header">
         <div className="ac-header-inner">
-          <div className="ac-brand">
+          <button
+            type="button"
+            onClick={() => setHistoryOpen(open => !open)}
+            className={`ac-icon-btn ac-header-mobile-only ac-header-slot-left${historyOpen ? " ac-icon-btn--active" : ""}`}
+            aria-label="Ver conversaciones"
+          >
+            <History size={18} strokeWidth={1.75} />
+          </button>
+
+          <div className="ac-brand ac-header-desktop-only">
             <div className="ac-logo">{BROKER.initials}</div>
             <div className="ac-brand-text">
               <p className="ac-brand-name">{BROKER.name}</p>
               <p className="ac-brand-sub">Asistente virtual · {BROKER.agentName}</p>
-              <p className="ac-brand-compact">{BROKER.agentName}</p>
             </div>
           </div>
-          <div className="ac-header-actions">
-            <div className="ac-header-tools">
+
+          <h1 className="ac-header-title ac-header-mobile-only">{headerTitle}</h1>
+
+          <div className="ac-header-slot-right">
+            <div className="ac-header-tools ac-header-desktop-only">
               <button
                 type="button"
                 onClick={() => setHistoryOpen(open => !open)}
@@ -452,15 +516,16 @@ export default function AgenteClientesClient() {
               >
                 <Plus size={16} strokeWidth={1.75} />
               </button>
-              <ConversationHistory
-                open={historyOpen}
-                conversations={conversations}
-                activeId={activeConversationId}
-                onSelect={openConversation}
-                onClose={() => setHistoryOpen(false)}
-              />
             </div>
-            <div className="ac-status" title="En línea">
+            <button
+              type="button"
+              onClick={startNewChat}
+              className="ac-icon-btn ac-header-mobile-only"
+              aria-label="Nueva conversación"
+            >
+              <Plus size={18} strokeWidth={1.75} />
+            </button>
+            <div className="ac-status ac-header-desktop-only" title="En línea">
               <span className="ac-status-dot">
                 <span className="ac-status-ping" />
                 <span className="ac-status-core" />
@@ -470,6 +535,14 @@ export default function AgenteClientesClient() {
           </div>
         </div>
       </header>
+
+      <ConversationHistory
+        open={historyOpen}
+        conversations={conversations}
+        activeId={activeConversationId}
+        onSelect={openConversation}
+        onClose={() => setHistoryOpen(false)}
+      />
 
       <main className={`ac-main${hasChat ? " ac-main--chat" : " ac-main--idle"}`}>
         {!hasChat ? (
@@ -505,10 +578,10 @@ export default function AgenteClientesClient() {
               <QuickActions loading={loading} onAction={sendMessage} />
             </div>
 
-            <p className="ac-powered">
-              Powered by <strong>Noova 360</strong>
-              {" · "}
-              Respuestas con IA · No sustituye asesoría profesional
+            <p className="ac-powered ac-powered--idle">
+              Valentina es IA y puede cometer errores. Por favor, verifica las respuestas.
+              {" "}
+              <span className="ac-powered-credit">Powered by Noova 360</span>
             </p>
           </div>
         ) : (
@@ -546,10 +619,10 @@ export default function AgenteClientesClient() {
                 onSend={() => sendMessage(input)}
                 variant="footer"
               />
-              <p className="ac-powered">
-                Powered by <strong>Noova 360</strong>
-                {" · "}
-                Respuestas con IA · No sustituye asesoría profesional
+              <p className="ac-powered ac-powered--chat">
+                Valentina es IA y puede cometer errores. Por favor, verifica las respuestas.
+                {" "}
+                <span className="ac-powered-credit">Powered by Noova 360</span>
               </p>
             </div>
           </>
