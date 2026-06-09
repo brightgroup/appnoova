@@ -21,6 +21,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (pathname.startsWith("/dashboard/agentes-voz")) {
       setExpandedMenu("voz");
+    } else if (pathname.startsWith("/dashboard/agentes-texto")) {
+      setExpandedMenu("texto");
     }
   }, [pathname]);
 

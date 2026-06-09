@@ -1,0 +1,111 @@
+import type { TextChatMessage } from "@/types/text-agent-conversation";
+
+export function formatChatDateShort(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString("es-CO", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).replace(",", "");
+}
+
+export function formatChatTimestamp(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString("es-CO", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true
+  });
+}
+
+export function formatChatDuration(sec: number): string {
+  if (sec < 60) return `${sec}s`;
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}m ${String(s).padStart(2, "0")}s`;
+}
+
+export function formatMessageTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+export function estimateChatCredits(messagesCount: number): number {
+  return Math.max(1, Math.round(messagesCount * 0.5));
+}
+
+export function chatQualityPercent(conv: {
+  messages_count: number;
+  user_messages_count: number;
+  duration_sec: number;
+  user_sentiment: string;
+}): number {
+  let score = 60;
+  if (conv.messages_count >= 4) score += 10;
+  if (conv.messages_count >= 8) score += 10;
+  if (conv.user_messages_count >= 2) score += 5;
+  if (conv.duration_sec >= 60) score += 5;
+  if (conv.user_sentiment === "Positivo") score += 15;
+  if (conv.user_sentiment === "Negativo") score -= 15;
+  return Math.min(100, Math.max(25, score));
+}
+
+export function isSuccessfulChat(conv: {
+  messages_count: number;
+  user_messages_count: number;
+}): boolean {
+  return conv.user_messages_count >= 1 && conv.messages_count >= 2;
+}
+
+export function displayChatId(id: string): string {
+  return `chat_${id}`;
+}
+
+export function channelLabel(channel: string): string {
+  if (channel === "web_test") return "Prueba web";
+  if (channel === "whatsapp") return "WhatsApp";
+  if (channel === "web_widget") return "Widget web";
+  return channel;
+}
+
+export function buildChatFallbackSummary(messages: TextChatMessage[]): string {
+  if (!messages.length) return "Conversación sin mensajes.";
+  const joined = messages
+    .map(m => `${m.role === "user" ? "Usuario" : "Agente"}: ${m.content}`)
+    .join(" ");
+  if (joined.length <= 320) return joined;
+  return `${joined.slice(0, 317)}...`;
+}
+
+export function downloadChatJson(data: Record<string, unknown>, filename: string) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function normalizeChatMessages(raw: unknown): TextChatMessage[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(item => {
+      const row = item as Record<string, unknown>;
+      const role = row.role === "assistant" ? "assistant" : "user";
+      const content = String(row.content ?? "").trim();
+      if (!content) return null;
+      return {
+        role,
+        content,
+        created_at: String(row.created_at ?? new Date().toISOString())
+      } satisfies TextChatMessage;
+    })
+    .filter((m): m is TextChatMessage => m !== null);
+}
