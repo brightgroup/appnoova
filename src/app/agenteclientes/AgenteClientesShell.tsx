@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { BROKER } from "./broker-config";
-import { AgentAvatar } from "./AgentAvatar";
+import { BrokerLogo } from "./BrokerLogo";
 
 function AgenteClientesLoading() {
   return (
@@ -10,7 +10,12 @@ function AgenteClientesLoading() {
       <header className="ac-header">
         <div className="ac-header-inner">
           <div className="ac-brand">
-            <AgentAvatar variant="header" agentName={BROKER.agentName} />
+            <BrokerLogo
+              logoUrl={BROKER.faviconUrl ?? BROKER.logoUrl}
+              initials={BROKER.initials}
+              name={BROKER.name}
+              className="ac-logo--favicon"
+            />
             <div>
               <p className="ac-brand-name">{BROKER.name}</p>
               <p className="ac-brand-sub">Asistente virtual · {BROKER.agentName}</p>

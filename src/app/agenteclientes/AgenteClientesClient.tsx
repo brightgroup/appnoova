@@ -15,7 +15,6 @@ import {
 } from "@/lib/agente-clientes-chat-storage";
 import { BROKER } from "./broker-config";
 import { BrokerLogo } from "./BrokerLogo";
-import { AgentAvatar } from "./AgentAvatar";
 import {
   ArrowUp,
   Calculator,
@@ -284,12 +283,6 @@ export default function AgenteClientesClient() {
   const scrollIntentRef = useRef<ScrollIntent | null>(null);
   const hasChat = messages.length > 0;
 
-  const headerTitle = useMemo(() => {
-    const active = conversations.find(c => c.id === activeConversationId);
-    if (active?.messages.length) return active.title;
-    return BROKER.agentName;
-  }, [conversations, activeConversationId]);
-
   const applyConversationState = useCallback(
     (state: ReturnType<typeof loadConversationState>) => {
       setActiveConversationId(state.activeId);
@@ -485,28 +478,22 @@ export default function AgenteClientesClient() {
   );
 
   return (
-    <div ref={rootRef} className={`agente-clientes-root${hasChat ? " ac-root--chat" : " ac-root--idle"}`}>
+    <div ref={rootRef} className="agente-clientes-root">
       <header ref={headerRef} className="ac-header">
         <div className="ac-header-inner">
           <div className="ac-header-start">
             <div className="ac-brand">
-              <div className="ac-header-mark ac-header-mark--agent">
-                <AgentAvatar variant="header" agentName={BROKER.agentName} />
-              </div>
-              <div className="ac-header-mark ac-header-mark--client">
-                <BrokerLogo
-                  logoUrl={BROKER.logoUrl}
-                  initials={BROKER.initials}
-                  name={BROKER.name}
-                  className="ac-logo--header"
-                />
-              </div>
+              <BrokerLogo
+                logoUrl={BROKER.faviconUrl ?? BROKER.logoUrl}
+                initials={BROKER.initials}
+                name={BROKER.name}
+                className="ac-logo--favicon"
+              />
               <div className="ac-brand-text ac-brand-text--desktop">
                 <p className="ac-brand-name">{BROKER.name}</p>
                 <p className="ac-brand-sub">Asistente virtual · {BROKER.agentName}</p>
               </div>
             </div>
-            <h1 className="ac-header-title">{headerTitle}</h1>
           </div>
 
           <div className="ac-header-end">
