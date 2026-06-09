@@ -100,3 +100,28 @@ button {
   transform: translateY(-1px);
   box-shadow: 0 8px 24px rgba(91, 91, 246, 0.35);
 }
+
+/* Agente clientes — animaciones */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in-up 0.35s ease-out both;
+}
+
+.agente-clientes-root .scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.agente-clientes-root .scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
