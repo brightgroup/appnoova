@@ -13,6 +13,9 @@ import {
   switchConversation,
   type StoredConversation
 } from "@/lib/agente-clientes-chat-storage";
+import { BROKER } from "./broker-config";
+import { BrokerLogo } from "./BrokerLogo";
+import { AgentAvatar } from "./AgentAvatar";
 import {
   ArrowUp,
   Calculator,
@@ -24,7 +27,6 @@ import {
   Plus,
   X,
   RefreshCw,
-  Shield,
   AlertTriangle
 } from "lucide-react";
 
@@ -34,13 +36,7 @@ interface Message {
   content: string;
 }
 
-/** Datos de demo — luego vendrán del link del corredor (/agenteclientes/[slug]) */
-const BROKER = {
-  name: "Seguros García & Asociados",
-  agentName: "Valentina",
-  initials: "SG",
-  accent: "#5b5bf6"
-};
+type ScrollIntent = "assistant-start" | "user-sent" | "conversation-load";
 
 const QUICK_ACTIONS = [
   {
@@ -284,6 +280,8 @@ export default function AgenteClientesClient() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
+  const lastAssistantRef = useRef<HTMLDivElement>(null);
+  const scrollIntentRef = useRef<ScrollIntent | null>(null);
   const hasChat = messages.length > 0;
 
   const headerTitle = useMemo(() => {
@@ -306,8 +304,15 @@ export default function AgenteClientesClient() {
     chatScopeRef.current = chatScope;
     skipPersistRef.current = true;
     applyConversationState(loadConversationState(chatScope));
+    scrollIntentRef.current = "conversation-load";
     setHistoryOpen(false);
   }, [chatScope, applyConversationState]);
+
+  useEffect(() => {
+    if (initialState.messages.length > 0) {
+      scrollIntentRef.current = "conversation-load";
+    }
+  }, [initialState.messages.length]);
 
   useEffect(() => {
     if (skipPersistRef.current) {
@@ -383,9 +388,19 @@ export default function AgenteClientesClient() {
   useEffect(() => {
     if (!hasChat) return;
     const el = chatAreaRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages, loading, hasChat]);
+    const intent = scrollIntentRef.current;
+    if (!el || !intent) return;
+
+    requestAnimationFrame(() => {
+      if (intent === "assistant-start" && lastAssistantRef.current) {
+        const top = lastAssistantRef.current.offsetTop - 20;
+        el.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      } else if (intent === "user-sent" || intent === "conversation-load") {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      }
+      scrollIntentRef.current = null;
+    });
+  }, [messages, hasChat]);
 
   useEffect(() => {
     if (window.matchMedia("(max-width: 640px)").matches) return;
@@ -402,6 +417,7 @@ export default function AgenteClientesClient() {
     setMessages(nextMessages);
     setInput("");
     setLoading(true);
+    scrollIntentRef.current = "user-sent";
 
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -422,6 +438,7 @@ export default function AgenteClientesClient() {
         ...prev,
         { id: crypto.randomUUID(), role: "assistant", content: data.reply }
       ]);
+      scrollIntentRef.current = "assistant-start";
     } catch {
       setError("Error de conexión. Intenta de nuevo.");
     } finally {
@@ -456,36 +473,35 @@ export default function AgenteClientesClient() {
     skipPersistRef.current = true;
     const state = switchConversation(chatScope, conversationId);
     applyConversationState(state);
+    scrollIntentRef.current = "conversation-load";
     setInput("");
     setError("");
     setHistoryOpen(false);
   };
 
-  return (
-    <div ref={rootRef} className="agente-clientes-root">
-      <div className="ac-bg" aria-hidden="true">
-        <div className="ac-bg-orb-1" />
-        <div className="ac-bg-orb-2" />
-        <div className="ac-bg-grid" />
-      </div>
+  const lastAssistantIndex = messages.reduce(
+    (idx, msg, i) => (msg.role === "assistant" ? i : idx),
+    -1
+  );
 
+  return (
+    <div ref={rootRef} className={`agente-clientes-root${hasChat ? " ac-root--chat" : " ac-root--idle"}`}>
       <header ref={headerRef} className="ac-header">
         <div className="ac-header-inner">
-          <button
-            type="button"
-            onClick={() => setHistoryOpen(open => !open)}
-            className={`ac-icon-btn ac-header-history${historyOpen ? " ac-icon-btn--active" : ""}`}
-            aria-label="Ver conversaciones"
-            title="Conversaciones"
-          >
-            <History size={18} strokeWidth={1.75} />
-            <span className="ac-btn-label">Historial</span>
-          </button>
-
-          <div className="ac-header-center">
+          <div className="ac-header-start">
             <div className="ac-brand">
-              <div className="ac-logo">{BROKER.initials}</div>
-              <div className="ac-brand-text">
+              <div className="ac-header-mark ac-header-mark--agent">
+                <AgentAvatar variant="header" agentName={BROKER.agentName} />
+              </div>
+              <div className="ac-header-mark ac-header-mark--client">
+                <BrokerLogo
+                  logoUrl={BROKER.logoUrl}
+                  initials={BROKER.initials}
+                  name={BROKER.name}
+                  className="ac-logo--header"
+                />
+              </div>
+              <div className="ac-brand-text ac-brand-text--desktop">
                 <p className="ac-brand-name">{BROKER.name}</p>
                 <p className="ac-brand-sub">Asistente virtual · {BROKER.agentName}</p>
               </div>
@@ -494,16 +510,28 @@ export default function AgenteClientesClient() {
           </div>
 
           <div className="ac-header-end">
-            <button
-              type="button"
-              onClick={startNewChat}
-              className="ac-icon-btn ac-header-new"
-              aria-label="Nueva conversación"
-              title="Nueva conversación"
-            >
-              <Plus size={18} strokeWidth={1.75} />
-              <span className="ac-btn-label">Nueva conversación</span>
-            </button>
+            <div className="ac-header-actions">
+              <button
+                type="button"
+                onClick={() => setHistoryOpen(open => !open)}
+                className={`ac-icon-btn ac-header-history${historyOpen ? " ac-icon-btn--active" : ""}`}
+                aria-label="Ver conversaciones"
+                title="Conversaciones"
+              >
+                <History size={18} strokeWidth={1.75} />
+                <span className="ac-btn-label">Historial</span>
+              </button>
+              <button
+                type="button"
+                onClick={startNewChat}
+                className="ac-icon-btn ac-header-new"
+                aria-label="Nueva conversación"
+                title="Nueva conversación"
+              >
+                <Plus size={18} strokeWidth={1.75} />
+                <span className="ac-btn-label">Nueva conversación</span>
+              </button>
+            </div>
             <div className="ac-status" title="En línea">
               <span className="ac-status-dot">
                 <span className="ac-status-ping" />
@@ -527,13 +555,12 @@ export default function AgenteClientesClient() {
         {!hasChat ? (
           <div className="ac-center-hub">
             <div className="ac-welcome-head">
-              <div className="ac-avatar-wrap">
-                <div className="ac-avatar">
-                  <MessageCircle size={36} strokeWidth={1.5} />
-                </div>
-                <div className="ac-avatar-badge">
-                  <Shield size={14} strokeWidth={2} />
-                </div>
+              <div className="ac-welcome-logo">
+                <BrokerLogo
+                  logoUrl={BROKER.logoUrl}
+                  initials={BROKER.initials}
+                  name={BROKER.name}
+                />
               </div>
 
               <h1 className="ac-greeting-text">Hola, soy {BROKER.agentName}</h1>
@@ -570,6 +597,7 @@ export default function AgenteClientesClient() {
                 {messages.map((msg, i) => (
                   <div
                     key={msg.id}
+                    ref={i === lastAssistantIndex ? lastAssistantRef : undefined}
                     className={`ac-msg-row ac-msg-row--${msg.role}`}
                     style={{ animationDelay: `${Math.min(i * 40, 200)}ms` }}
                   >

@@ -1,6 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { BROKER } from "./broker-config";
+import { AgentAvatar } from "./AgentAvatar";
 
 function AgenteClientesLoading() {
   return (
@@ -8,10 +10,10 @@ function AgenteClientesLoading() {
       <header className="ac-header">
         <div className="ac-header-inner">
           <div className="ac-brand">
-            <div className="ac-logo">SG</div>
+            <AgentAvatar variant="header" agentName={BROKER.agentName} />
             <div>
-              <p className="ac-brand-name">Seguros García & Asociados</p>
-              <p className="ac-brand-sub">Asistente virtual · Valentina</p>
+              <p className="ac-brand-name">{BROKER.name}</p>
+              <p className="ac-brand-sub">Asistente virtual · {BROKER.agentName}</p>
             </div>
           </div>
         </div>
