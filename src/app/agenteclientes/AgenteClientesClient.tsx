@@ -426,9 +426,10 @@ export default function AgenteClientesClient() {
         <div className="ac-header-inner">
           <div className="ac-brand">
             <div className="ac-logo">{BROKER.initials}</div>
-            <div>
+            <div className="ac-brand-text">
               <p className="ac-brand-name">{BROKER.name}</p>
               <p className="ac-brand-sub">Asistente virtual · {BROKER.agentName}</p>
+              <p className="ac-brand-compact">{BROKER.agentName}</p>
             </div>
           </div>
           <div className="ac-header-actions">
