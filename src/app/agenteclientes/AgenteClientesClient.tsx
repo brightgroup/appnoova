@@ -25,7 +25,6 @@ import {
   X,
   RefreshCw,
   Shield,
-  Sparkles,
   AlertTriangle
 } from "lucide-react";
 
@@ -74,15 +73,10 @@ const QUICK_ACTIONS = [
 function TypingIndicator() {
   return (
     <div className="ac-typing">
-      <div className="ac-msg-avatar">
-        <Sparkles size={14} strokeWidth={2} />
-      </div>
-      <div className="ac-typing-bubble">
-        <div className="ac-typing-dots">
-          <span className="ac-typing-dot" />
-          <span className="ac-typing-dot" />
-          <span className="ac-typing-dot" />
-        </div>
+      <div className="ac-typing-dots">
+        <span className="ac-typing-dot" />
+        <span className="ac-typing-dot" />
+        <span className="ac-typing-dot" />
       </div>
     </div>
   );
@@ -480,52 +474,37 @@ export default function AgenteClientesClient() {
           <button
             type="button"
             onClick={() => setHistoryOpen(open => !open)}
-            className={`ac-icon-btn ac-header-mobile-only ac-header-slot-left${historyOpen ? " ac-icon-btn--active" : ""}`}
+            className={`ac-icon-btn ac-header-history${historyOpen ? " ac-icon-btn--active" : ""}`}
             aria-label="Ver conversaciones"
+            title="Conversaciones"
           >
             <History size={18} strokeWidth={1.75} />
+            <span className="ac-btn-label">Historial</span>
           </button>
 
-          <div className="ac-brand ac-header-desktop-only">
-            <div className="ac-logo">{BROKER.initials}</div>
-            <div className="ac-brand-text">
-              <p className="ac-brand-name">{BROKER.name}</p>
-              <p className="ac-brand-sub">Asistente virtual · {BROKER.agentName}</p>
+          <div className="ac-header-center">
+            <div className="ac-brand">
+              <div className="ac-logo">{BROKER.initials}</div>
+              <div className="ac-brand-text">
+                <p className="ac-brand-name">{BROKER.name}</p>
+                <p className="ac-brand-sub">Asistente virtual · {BROKER.agentName}</p>
+              </div>
             </div>
+            <h1 className="ac-header-title">{headerTitle}</h1>
           </div>
 
-          <h1 className="ac-header-title ac-header-mobile-only">{headerTitle}</h1>
-
-          <div className="ac-header-slot-right">
-            <div className="ac-header-tools ac-header-desktop-only">
-              <button
-                type="button"
-                onClick={() => setHistoryOpen(open => !open)}
-                className={`ac-icon-btn${historyOpen ? " ac-icon-btn--active" : ""}`}
-                aria-label="Ver conversaciones"
-                title="Conversaciones"
-              >
-                <History size={16} strokeWidth={1.75} />
-              </button>
-              <button
-                type="button"
-                onClick={startNewChat}
-                className="ac-icon-btn"
-                aria-label="Nueva conversación"
-                title="Nueva conversación"
-              >
-                <Plus size={16} strokeWidth={1.75} />
-              </button>
-            </div>
+          <div className="ac-header-end">
             <button
               type="button"
               onClick={startNewChat}
-              className="ac-icon-btn ac-header-mobile-only"
+              className="ac-icon-btn ac-header-new"
               aria-label="Nueva conversación"
+              title="Nueva conversación"
             >
               <Plus size={18} strokeWidth={1.75} />
+              <span className="ac-btn-label">Nueva conversación</span>
             </button>
-            <div className="ac-status ac-header-desktop-only" title="En línea">
+            <div className="ac-status" title="En línea">
               <span className="ac-status-dot">
                 <span className="ac-status-ping" />
                 <span className="ac-status-core" />
@@ -594,11 +573,6 @@ export default function AgenteClientesClient() {
                     className={`ac-msg-row ac-msg-row--${msg.role}`}
                     style={{ animationDelay: `${Math.min(i * 40, 200)}ms` }}
                   >
-                    {msg.role === "assistant" && (
-                      <div className="ac-msg-avatar">
-                        <Sparkles size={14} strokeWidth={2} />
-                      </div>
-                    )}
                     <div className={`ac-bubble ac-bubble--${msg.role}`}>
                       {msg.content}
                     </div>

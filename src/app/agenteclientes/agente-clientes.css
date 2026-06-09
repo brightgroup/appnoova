@@ -77,38 +77,50 @@ html:has(.agente-clientes-root) body {
   position: relative;
   z-index: 50;
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(229, 231, 235, 0.8);
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--ac-bg);
 }
 
 .ac-header-inner {
   max-width: 48rem;
   margin: 0 auto;
-  padding: 0.875rem 1.5rem;
+  padding: 0.625rem 1rem;
+  display: grid;
+  grid-template-columns: 2.25rem 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ac-header-center {
+  min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  justify-content: center;
+}
+
+.ac-header-end {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  justify-content: flex-end;
 }
 
 .ac-brand-text {
   min-width: 0;
 }
 
-.ac-header-mobile-only {
-  display: none;
-}
-
 .ac-header-title {
   display: none;
-}
-
-.ac-header-slot-left,
-.ac-header-slot-right {
-  display: flex;
-  align-items: center;
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #1f2937;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  width: 100%;
 }
 
 .ac-brand {
@@ -119,18 +131,18 @@ html:has(.agente-clientes-root) body {
 }
 
 .ac-logo {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2rem;
+  height: 2rem;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 700;
   flex-shrink: 0;
   background: linear-gradient(135deg, var(--ac-accent), var(--ac-accent-light));
-  box-shadow: 0 8px 20px rgba(91, 91, 246, 0.25);
+  box-shadow: none;
 }
 
 .ac-brand-name {
@@ -150,23 +162,9 @@ html:has(.agente-clientes-root) body {
   text-overflow: ellipsis;
 }
 
-.ac-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  flex-shrink: 0;
-}
-
-.ac-header-tools {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.125rem;
-}
-
 .ac-icon-btn {
-  width: 1.875rem;
-  height: 1.875rem;
+  width: 2.25rem;
+  height: 2.25rem;
   border: none;
   border-radius: 0.5rem;
   background: transparent;
@@ -174,8 +172,14 @@ html:has(.agente-clientes-root) body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.375rem;
   cursor: pointer;
   transition: color 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.ac-btn-label {
+  display: none;
 }
 
 .ac-icon-btn:hover {
@@ -418,12 +422,8 @@ html:has(.agente-clientes-root) body {
 .ac-status {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
   flex-shrink: 0;
-  padding: 0.25rem 0.625rem;
-  border-radius: 9999px;
-  background: #ecfdf5;
-  border: 1px solid rgba(167, 243, 208, 0.8);
+  padding: 0.25rem;
 }
 
 .ac-status-dot {
@@ -450,9 +450,7 @@ html:has(.agente-clientes-root) body {
 }
 
 .ac-status-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: #047857;
+  display: none;
 }
 
 /* Main */
@@ -634,12 +632,15 @@ html:has(.agente-clientes-root) body {
   color: var(--ac-accent);
 }
 
-/* Messages */
+/* Messages — estilo minimal (GPT / Claude / Gemini) */
 .ac-messages {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.5rem;
   padding-bottom: 1rem;
+  max-width: 48rem;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .ac-msg-row {
@@ -653,55 +654,33 @@ html:has(.agente-clientes-root) body {
 
 .ac-msg-row--assistant {
   justify-content: flex-start;
-  gap: 0.75rem;
-}
-
-.ac-msg-avatar {
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-top: 0.2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--ac-accent);
-  color: #fff;
 }
 
 .ac-bubble {
-  max-width: 85%;
   font-size: 15px;
-  line-height: 1.55;
+  line-height: 1.6;
   white-space: pre-wrap;
-  padding: 0.5rem 0.875rem;
-  border-radius: 1.125rem;
 }
 
 .ac-bubble--user {
-  background: var(--ac-accent);
-  color: #fff;
+  max-width: 85%;
+  padding: 0.625rem 1rem;
+  border-radius: 1.25rem;
+  background: #f0f0f0;
+  color: var(--ac-text);
 }
 
 .ac-bubble--assistant {
-  background: rgba(255, 255, 255, 0.72);
-  color: #4b5563;
-  border: 1px solid rgba(229, 231, 235, 0.7);
+  max-width: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--ac-text);
 }
 
 /* Typing */
 .ac-typing {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
   animation: ac-fade-in 0.35s ease-out both;
-}
-
-.ac-typing-bubble {
-  padding: 0.5rem 0.875rem;
-  border-radius: 1.125rem;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(229, 231, 235, 0.7);
 }
 
 .ac-typing-dots {
@@ -715,7 +694,7 @@ html:has(.agente-clientes-root) body {
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 50%;
-  background: rgba(91, 91, 246, 0.4);
+  background: #c4c4c4;
   animation: ac-bounce 0.8s infinite;
 }
 
@@ -939,6 +918,64 @@ html:has(.agente-clientes-root) body {
   }
 }
 
+@media (min-width: 641px) {
+  .ac-header-inner {
+    display: flex;
+    max-width: none;
+    padding: 0.625rem 1.25rem;
+    gap: 0.5rem;
+  }
+
+  .ac-header-center {
+    flex: 1;
+    order: 1;
+    justify-content: flex-start;
+  }
+
+  .ac-header-history {
+    order: 2;
+    width: auto;
+    height: 2rem;
+    padding: 0 0.75rem;
+    color: #6b7280;
+  }
+
+  .ac-header-new {
+    width: auto;
+    height: 2rem;
+    padding: 0 0.75rem;
+    color: #6b7280;
+  }
+
+  .ac-btn-label {
+    display: inline;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .ac-header-end {
+    order: 3;
+    gap: 0.5rem;
+  }
+
+  .ac-status {
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.18);
+  }
+
+  .ac-status-label {
+    display: inline;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #059669;
+    white-space: nowrap;
+  }
+}
+
 @media (max-width: 640px) {
   .agente-clientes-root {
     bottom: auto;
@@ -953,68 +990,37 @@ html:has(.agente-clientes-root) body {
     right: 0;
     z-index: 100;
     flex-shrink: 0;
-    background: #f9f9f8;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border-bottom: 1px solid #ebebea;
+    background: var(--ac-bg);
     padding-top: env(safe-area-inset-top, 0);
     transform: translateZ(0);
     will-change: top;
   }
 
   .ac-header-inner {
-    display: grid;
-    grid-template-columns: 2.5rem 1fr 2.5rem;
-    align-items: center;
-    padding: 0 1rem;
-    min-height: 3rem;
-    height: 3rem;
-    gap: 0.5rem;
+    padding: 0 0.875rem;
+    min-height: 2.75rem;
+    height: 2.75rem;
     max-width: none;
   }
 
-  .ac-header-mobile-only {
-    display: inline-flex;
-  }
-
-  .ac-header-desktop-only {
-    display: none !important;
-  }
-
-  .ac-header-slot-left {
-    grid-column: 1;
-    justify-content: flex-start;
+  .ac-brand {
+    display: none;
   }
 
   .ac-header-title {
     display: block;
-    grid-column: 2;
-    margin: 0;
-    font-size: 0.9375rem;
-    font-weight: 600;
-    color: #1f2937;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.2;
-    letter-spacing: -0.01em;
   }
 
-  .ac-header-slot-right {
-    grid-column: 3;
-    justify-content: flex-end;
+  .ac-header-end .ac-status {
+    display: none;
   }
 
   .ac-icon-btn {
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 0.5rem;
     color: #6b7280;
   }
 
   .ac-main {
-    padding-top: calc(var(--ac-header-h, 3rem) + env(safe-area-inset-top, 0px));
+    padding-top: calc(var(--ac-header-h, 2.75rem) + env(safe-area-inset-top, 0px));
     min-height: 0;
   }
 
