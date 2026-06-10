@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Save, Loader2, CheckCircle2, Settings2,
-  Zap, Eye, ExternalLink, Copy, Link2, Plus, Trash2, Bot
+  Zap, Eye, ExternalLink, Copy, Link2, Plus, Trash2, Bot, Globe, Lock
 } from "lucide-react";
 import { btnPrimary, tabActive, tabIdle } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/text-agents-api";
@@ -321,31 +321,15 @@ function ConfigContent() {
                 <ColorInput value={form.button_color} onChange={v => updateForm({ button_color: v })} />
               </Field>
 
-              <div className="rounded-xl border border-white/[.10] bg-white/[.02] p-4 space-y-3">
-                <div>
-                  <p className="text-sm font-semibold text-white">Publicar micrositio</p>
-                  <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
-                    En borrador solo tú ves la vista previa interna. Al publicar, tu link queda visible en{" "}
-                    <span className="text-gray-400 font-mono">{publicUrl}</span>
-                  </p>
-                </div>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.is_published}
-                    onChange={e => updateForm({ is_published: e.target.checked })}
-                    className="w-4 h-4 rounded accent-[#5b5bf6]"
-                  />
-                  <span className="text-sm text-gray-300">
-                    {form.is_published ? "Publicado — visible para clientes" : "Borrador — no visible públicamente"}
-                  </span>
-                </label>
-                {form.is_published && (
-                  <p className="text-[11px] text-emerald-400">
-                    Recuerda pulsar <strong>Guardar cambios</strong> arriba para aplicar.
-                  </p>
-                )}
-              </div>
+              <PublishStatusCard
+                isPublished={form.is_published}
+                hasAgent={!!form.text_agent_id}
+                publicUrl={publicUrl}
+                saved={saved}
+                onSelect={published => updateForm({ is_published: published })}
+                onCopy={copyUrl}
+                copied={copied}
+              />
             </div>
           </div>
 
@@ -523,6 +507,129 @@ function ConfigContent() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function PublishStatusCard({
+  isPublished,
+  hasAgent,
+  publicUrl,
+  saved,
+  onSelect,
+  onCopy,
+  copied
+}: {
+  isPublished: boolean;
+  hasAgent: boolean;
+  publicUrl: string;
+  saved: boolean;
+  onSelect: (published: boolean) => void;
+  onCopy: () => void;
+  copied: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-white/[.10] bg-white/[.02] overflow-hidden">
+      <div className={`px-4 py-3 flex items-center justify-between gap-2 ${
+        isPublished ? "bg-emerald-500/10 border-b border-emerald-500/20" : "bg-amber-500/10 border-b border-amber-500/20"
+      }`}>
+        <p className="text-sm font-semibold text-white">Estado del link</p>
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide ${
+          isPublished
+            ? "bg-emerald-500/20 text-emerald-300"
+            : "bg-amber-500/20 text-amber-300"
+        }`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${isPublished ? "bg-emerald-400" : "bg-amber-400"}`} />
+          {isPublished ? "En vivo" : "Borrador"}
+        </span>
+      </div>
+
+      <div className="p-4 space-y-3">
+        <p className="text-xs text-gray-400 leading-relaxed">
+          Elige si tu micrositio es privado (solo vista previa) o visible para tus clientes con el link público.
+        </p>
+
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => onSelect(false)}
+            className={`w-full text-left rounded-lg border p-3 transition-colors ${
+              !isPublished
+                ? "border-[#5b5bf6]/50 bg-[#5b5bf6]/10 ring-1 ring-[#5b5bf6]/30"
+                : "border-white/[.08] hover:border-white/[.15] bg-white/[.02]"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <Lock className={`w-4 h-4 mt-0.5 shrink-0 ${!isPublished ? "text-[#a5a5ff]" : "text-gray-500"}`} />
+              <div>
+                <p className="text-sm font-medium text-white">Borrador</p>
+                <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">
+                  Solo tú lo ves en la pestaña Vista previa. Nadie puede entrar con el link.
+                </p>
+              </div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => hasAgent && onSelect(true)}
+            disabled={!hasAgent}
+            className={`w-full text-left rounded-lg border p-3 transition-colors ${
+              isPublished
+                ? "border-emerald-500/50 bg-emerald-500/10 ring-1 ring-emerald-500/30"
+                : hasAgent
+                  ? "border-white/[.08] hover:border-white/[.15] bg-white/[.02]"
+                  : "border-white/[.06] bg-white/[.01] opacity-50 cursor-not-allowed"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <Globe className={`w-4 h-4 mt-0.5 shrink-0 ${isPublished ? "text-emerald-400" : "text-gray-500"}`} />
+              <div>
+                <p className="text-sm font-medium text-white">Publicar</p>
+                <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">
+                  {hasAgent
+                    ? "Tu link queda activo. Cualquier persona con la URL puede chatear con tu agente."
+                    : "Primero asigna un agente de texto arriba."}
+                </p>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        <div className="rounded-lg bg-black/25 border border-white/[.08] p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
+            Link público de tu micrositio
+          </p>
+          <p className="text-xs font-mono text-white break-all leading-relaxed">{publicUrl}</p>
+          <button
+            type="button"
+            onClick={onCopy}
+            className="mt-2 flex items-center gap-1 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]"
+          >
+            <Copy className="w-3 h-3" />
+            {copied ? "Copiado" : "Copiar link"}
+          </button>
+        </div>
+
+        {!saved && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/25">
+            <Save className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-amber-200/90 leading-relaxed">
+              <strong className="text-amber-100">Paso final:</strong> pulsa{" "}
+              <strong>Guardar cambios</strong> arriba a la derecha para {isPublished ? "publicar" : "guardar"} el micrositio.
+            </p>
+          </div>
+        )}
+
+        {saved && isPublished && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/25">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-emerald-200/90 leading-relaxed">
+              Tu micrositio está publicado. Comparte el link con tus clientes.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
