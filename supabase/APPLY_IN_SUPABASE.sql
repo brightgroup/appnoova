@@ -333,3 +333,15 @@ create policy "microsite_assets_service_insert" on storage.objects
 create policy "microsite_assets_service_delete" on storage.objects
   for delete using (bucket_id = 'microsite-assets');
 
+-- =============================================================================
+-- Inbox: asignación humana y no leídos (016)
+-- =============================================================================
+
+alter table public.text_agent_conversations
+  add column if not exists assigned_to text,
+  add column if not exists handoff_mode text not null default 'ai',
+  add column if not exists unread_count integer not null default 0;
+
+create index if not exists text_agent_conversations_inbox_idx
+  on public.text_agent_conversations (user_id, updated_at desc);
+
