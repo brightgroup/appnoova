@@ -13,21 +13,19 @@ import {
   switchConversation,
   type StoredConversation
 } from "@/lib/agente-clientes-chat-storage";
-import { BROKER } from "./broker-config";
+import { resolveMicrositeIcon } from "@/lib/microsite-icons";
+import { useMicrosite } from "./microsite-context";
 import { BrokerLogo } from "./BrokerLogo";
 import {
   ArrowUp,
-  Calculator,
-  FileCheck,
-  HelpCircle,
-  History,
   Loader2,
   MessageCircle,
   Plus,
   X,
-  RefreshCw,
-  AlertTriangle
+  History
 } from "lucide-react";
+
+import type { MicrositeQuickAction } from "@/types/microsite";
 
 interface Message {
   id: string;
@@ -37,33 +35,14 @@ interface Message {
 
 type ScrollIntent = "assistant-start" | "user-sent" | "conversation-load";
 
-const QUICK_ACTIONS = [
-  {
-    icon: Calculator,
-    label: "Cotizar",
-    prompt: "Quiero cotizar un seguro. ¿Qué información necesitas?"
-  },
-  {
-    icon: HelpCircle,
-    label: "Consultar",
-    prompt: "Tengo una duda sobre mi seguro, ¿me puedes ayudar?"
-  },
-  {
-    icon: FileCheck,
-    label: "Mis pólizas",
-    prompt: "Quiero consultar el estado de mis pólizas vigentes."
-  },
-  {
-    icon: AlertTriangle,
-    label: "Siniestro",
-    prompt: "Necesito reportar un siniestro. ¿Cuál es el proceso?"
-  },
-  {
-    icon: RefreshCw,
-    label: "Renovar",
-    prompt: "Mi póliza está por vencer, quiero saber cómo renovarla."
-  }
-];
+function lightenHex(hex: string, amount = 0.12): string {
+  const n = hex.replace("#", "");
+  if (n.length !== 6) return hex;
+  const r = Math.min(255, Math.round(parseInt(n.slice(0, 2), 16) * (1 + amount)));
+  const g = Math.min(255, Math.round(parseInt(n.slice(2, 4), 16) * (1 + amount)));
+  const b = Math.min(255, Math.round(parseInt(n.slice(4, 6), 16) * (1 + amount)));
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+}
 
 function TypingIndicator() {
   return (
@@ -233,19 +212,21 @@ function ConversationHistory({
 }
 
 function QuickActions({
+  actions,
   loading,
   onAction
 }: {
+  actions: MicrositeQuickAction[];
   loading: boolean;
   onAction: (prompt: string) => void;
 }) {
   return (
     <div className="ac-actions">
-      {QUICK_ACTIONS.map(action => {
-        const Icon = action.icon;
+      {actions.map(action => {
+        const Icon = resolveMicrositeIcon(action.icon);
         return (
           <button
-            key={action.label}
+            key={action.id}
             type="button"
             onClick={() => onAction(action.prompt)}
             disabled={loading}
@@ -263,12 +244,14 @@ function QuickActions({
 }
 
 export default function AgenteClientesClient() {
+  const config = useMicrosite();
   const pathname = usePathname();
   const chatScope = useMemo(() => getChatScopeFromPath(pathname), [pathname]);
   const initialState = useMemo(() => loadConversationState(chatScope), [chatScope]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(initialState.activeId);
   const [conversations, setConversations] = useState<StoredConversation[]>(initialState.conversations);
   const [messages, setMessages] = useState<Message[]>(initialState.messages);
+  const [serverConversationId, setServerConversationId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const chatScopeRef = useRef(chatScope);
   const skipPersistRef = useRef(true);
@@ -330,8 +313,12 @@ export default function AgenteClientesClient() {
   }, [historyOpen]);
 
   useEffect(() => {
-    rootRef.current?.style.setProperty("--ac-accent", BROKER.accent);
-  }, []);
+    if (!rootRef.current) return;
+    rootRef.current.style.setProperty("--ac-accent", config.accent);
+    rootRef.current.style.setProperty("--ac-accent-light", lightenHex(config.accent));
+    rootRef.current.style.setProperty("--ac-button", config.buttonColor);
+    rootRef.current.style.setProperty("--ac-button-light", lightenHex(config.buttonColor));
+  }, [config.accent, config.buttonColor]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -417,15 +404,21 @@ export default function AgenteClientesClient() {
     }
 
     try {
-      const res = await fetch("/api/agenteclientes/chat", {
+      const res = await fetch(config.chatEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages })
+        body: JSON.stringify({
+          messages: nextMessages,
+          conversation_id: serverConversationId ?? undefined
+        })
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "No se pudo obtener respuesta");
         return;
+      }
+      if (data.conversation_id) {
+        setServerConversationId(data.conversation_id);
       }
       setMessages(prev => [
         ...prev,
@@ -437,7 +430,7 @@ export default function AgenteClientesClient() {
     } finally {
       setLoading(false);
     }
-  }, [messages, loading]);
+  }, [messages, loading, config.chatEndpoint, serverConversationId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -454,6 +447,7 @@ export default function AgenteClientesClient() {
 
   const startNewChat = () => {
     skipPersistRef.current = true;
+    setServerConversationId(null);
     const state = startNewConversation(chatScope);
     applyConversationState(state);
     setInput("");
@@ -484,14 +478,14 @@ export default function AgenteClientesClient() {
           <div className="ac-header-start">
             <div className="ac-brand">
               <BrokerLogo
-                logoUrl={BROKER.faviconUrl ?? BROKER.logoUrl}
-                initials={BROKER.initials}
-                name={BROKER.name}
+                logoUrl={config.faviconUrl ?? config.logoUrl}
+                initials={config.initials}
+                name={config.name}
                 className="ac-logo--favicon"
               />
               <div className="ac-brand-text ac-brand-text--desktop">
-                <p className="ac-brand-name">{BROKER.name}</p>
-                <p className="ac-brand-sub">Asistente virtual · {BROKER.agentName}</p>
+                <p className="ac-brand-name">{config.name}</p>
+                <p className="ac-brand-sub">Asistente virtual · {config.agentName}</p>
               </div>
             </div>
           </div>
@@ -544,15 +538,15 @@ export default function AgenteClientesClient() {
             <div className="ac-welcome-head">
               <div className="ac-welcome-logo">
                 <BrokerLogo
-                  logoUrl={BROKER.logoUrl}
-                  initials={BROKER.initials}
-                  name={BROKER.name}
+                  logoUrl={config.logoUrl}
+                  initials={config.initials}
+                  name={config.name}
                 />
               </div>
 
-              <h1 className="ac-greeting-text">Hola, soy {BROKER.agentName}</h1>
+              <h1 className="ac-greeting-text">Hola, soy {config.agentName}</h1>
               <p className="ac-greeting-sub">
-                Tu asistente de {BROKER.name}. Puedo ayudarte a cotizar, consultar pólizas,
+                Tu asistente de {config.name}. Puedo ayudarte a cotizar, consultar pólizas,
                 reportar siniestros y más.
               </p>
             </div>
@@ -568,11 +562,11 @@ export default function AgenteClientesClient() {
                 onSend={() => sendMessage(input)}
                 variant="hero"
               />
-              <QuickActions loading={loading} onAction={sendMessage} />
+              <QuickActions actions={config.quickActions} loading={loading} onAction={sendMessage} />
             </div>
 
             <p className="ac-powered ac-powered--idle">
-              Valentina es IA y puede cometer errores. Por favor, verifica las respuestas.
+              {config.agentName} es IA y puede cometer errores. Por favor, verifica las respuestas.
               {" "}
               <span className="ac-powered-credit">Powered by Noova 360</span>
             </p>
@@ -609,7 +603,7 @@ export default function AgenteClientesClient() {
                 variant="footer"
               />
               <p className="ac-powered ac-powered--chat">
-                Valentina es IA y puede cometer errores. Por favor, verifica las respuestas.
+                {config.agentName} es IA y puede cometer errores. Por favor, verifica las respuestas.
                 {" "}
                 <span className="ac-powered-credit">Powered by Noova 360</span>
               </p>

@@ -832,7 +832,7 @@ html:has(.agente-clientes-root) body {
   flex-shrink: 0;
   border-radius: 50%;
   border: none;
-  background: var(--ac-accent);
+  background: var(--ac-button, var(--ac-accent));
   color: #fff;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(91, 91, 246, 0.25);
@@ -840,7 +840,7 @@ html:has(.agente-clientes-root) body {
 }
 
 .ac-send:hover:not(:disabled) {
-  background: var(--ac-accent-light);
+  background: var(--ac-button-light, var(--ac-accent-light));
   transform: scale(1.05);
 }
 

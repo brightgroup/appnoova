@@ -1,3 +1,5 @@
+import { extractMicrositeSlugFromPath } from "@/lib/microsite-path";
+
 export interface StoredChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -35,8 +37,7 @@ const MAX_MESSAGES = 100;
 const DEFAULT_TITLE = "Nueva conversación";
 
 export function getChatScopeFromPath(pathname: string): string {
-  const slug = pathname.replace(/^\/agenteclientes\/?/, "").split("/").filter(Boolean)[0];
-  return slug || "default";
+  return extractMicrositeSlugFromPath(pathname) || "default";
 }
 
 function storageKey(scope: string): string {

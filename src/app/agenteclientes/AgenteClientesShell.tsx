@@ -1,24 +1,28 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { BROKER } from "./broker-config";
+import type { PublicMicrositeConfig } from "@/types/microsite";
+import { DEMO_MICROSITE_CONFIG } from "./broker-config";
+import { MicrositeProvider } from "./microsite-context";
 import { BrokerLogo } from "./BrokerLogo";
+import { useMicrosite } from "./microsite-context";
 
-function AgenteClientesLoading() {
+function AgenteClientesLoadingInner() {
+  const config = useMicrosite();
   return (
     <div className="agente-clientes-root" aria-busy="true" aria-label="Cargando asistente">
       <header className="ac-header">
         <div className="ac-header-inner">
           <div className="ac-brand">
             <BrokerLogo
-              logoUrl={BROKER.faviconUrl ?? BROKER.logoUrl}
-              initials={BROKER.initials}
-              name={BROKER.name}
+              logoUrl={config.faviconUrl ?? config.logoUrl}
+              initials={config.initials}
+              name={config.name}
               className="ac-logo--favicon"
             />
             <div>
-              <p className="ac-brand-name">{BROKER.name}</p>
-              <p className="ac-brand-sub">Asistente virtual · {BROKER.agentName}</p>
+              <p className="ac-brand-name">{config.name}</p>
+              <p className="ac-brand-sub">Asistente virtual · {config.agentName}</p>
             </div>
           </div>
         </div>
@@ -28,11 +32,27 @@ function AgenteClientesLoading() {
   );
 }
 
+function AgenteClientesLoading() {
+  return (
+    <MicrositeProvider config={DEMO_MICROSITE_CONFIG}>
+      <AgenteClientesLoadingInner />
+    </MicrositeProvider>
+  );
+}
+
 const AgenteClientesClient = dynamic(
   () => import("./AgenteClientesClient"),
-  { ssr: false, loading: AgenteClientesLoading }
+  { ssr: false, loading: () => <AgenteClientesLoading /> }
 );
 
-export default function AgenteClientesShell() {
-  return <AgenteClientesClient />;
+export default function AgenteClientesShell({
+  config
+}: {
+  config?: PublicMicrositeConfig;
+}) {
+  return (
+    <MicrositeProvider config={config ?? DEMO_MICROSITE_CONFIG}>
+      <AgenteClientesClient />
+    </MicrositeProvider>
+  );
 }
