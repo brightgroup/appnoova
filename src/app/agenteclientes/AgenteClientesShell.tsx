@@ -32,17 +32,9 @@ function AgenteClientesLoadingInner() {
   );
 }
 
-function AgenteClientesLoading() {
-  return (
-    <MicrositeProvider config={DEMO_MICROSITE_CONFIG}>
-      <AgenteClientesLoadingInner />
-    </MicrositeProvider>
-  );
-}
-
 const AgenteClientesClient = dynamic(
   () => import("./AgenteClientesClient"),
-  { ssr: false, loading: () => <AgenteClientesLoading /> }
+  { ssr: false, loading: () => <AgenteClientesLoadingInner /> }
 );
 
 export default function AgenteClientesShell({

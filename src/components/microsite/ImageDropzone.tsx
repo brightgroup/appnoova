@@ -104,7 +104,7 @@ export function ImageDropzone({
         ) : value ? (
           <div className="flex items-center gap-4">
             <div className={`relative ${previewSize} rounded-lg bg-white/90 overflow-hidden shrink-0`}>
-              <Image src={value} alt={label} fill className="object-contain p-1" unoptimized />
+              <Image key={value} src={value} alt={label} fill className="object-contain p-1" unoptimized />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs text-gray-300 font-medium">Archivo cargado</p>

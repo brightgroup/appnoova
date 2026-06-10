@@ -71,6 +71,15 @@ export function toMicrositeRecord(raw: Record<string, unknown>): BrokerMicrosite
   };
 }
 
+function withAssetCacheBust(url: string | null, version: string): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (/[?&]v=/.test(trimmed)) return trimmed;
+  const sep = trimmed.includes("?") ? "&" : "?";
+  return `${trimmed}${sep}v=${encodeURIComponent(version)}`;
+}
+
 export function toPublicMicrositeConfig(
   microsite: BrokerMicrositeRecord,
   brandName: string,
@@ -78,14 +87,15 @@ export function toPublicMicrositeConfig(
 ): PublicMicrositeConfig {
   const name = brandName.trim() || "Tu corredor";
   const displayAgent = microsite.agent_display_name?.trim() || agentName.trim() || "Asistente";
+  const version = microsite.updated_at || microsite.slug;
 
   return {
     slug: microsite.slug,
     name,
     agentName: displayAgent,
     initials: brandInitials(name),
-    logoUrl: microsite.logo_url,
-    faviconUrl: microsite.favicon_url,
+    logoUrl: withAssetCacheBust(microsite.logo_url, version),
+    faviconUrl: withAssetCacheBust(microsite.favicon_url, version),
     accent: microsite.accent_color,
     buttonColor: microsite.button_color,
     quickActions: microsite.quick_actions.filter(

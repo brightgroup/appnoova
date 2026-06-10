@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function BrokerLogo({
   logoUrl,
@@ -14,6 +14,11 @@ export function BrokerLogo({
   className?: string;
 }) {
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [logoUrl]);
+
   const showInitials = !logoUrl || failed;
 
   if (showInitials) {
@@ -26,7 +31,7 @@ export function BrokerLogo({
 
   return (
     <div className={`ac-logo ac-logo--image ${className}`.trim()}>
-      <img src={logoUrl} alt={name} onError={() => setFailed(true)} />
+      <img key={logoUrl} src={logoUrl} alt={name} onError={() => setFailed(true)} />
     </div>
   );
 }

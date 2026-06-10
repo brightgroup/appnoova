@@ -130,13 +130,12 @@ export function MicrositePreviewFrame({
             </h2>
             <p className="text-xs text-gray-400 mt-1 leading-relaxed">
               {saved
-                ? "iPhone 17 Pro Max · al guardar cambios, se actualiza aquí."
+                ? "Vista móvil en tiempo real. Al guardar cambios, se actualiza aquí."
                 : "Guarda los cambios y pulsa Actualizar para ver la versión más reciente."}
             </p>
           </div>
         </div>
 
-        {/* iPhone 17 Pro Max */}
         <div
           className="relative shrink-0 rounded-[3.25rem] shadow-2xl shadow-black/60"
           style={{
@@ -199,10 +198,6 @@ export function MicrositePreviewFrame({
             </div>
           </div>
         </div>
-
-        <p className="text-[10px] text-gray-600 mt-3 uppercase tracking-wider font-medium">
-          iPhone 17 Pro Max
-        </p>
 
         <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
           <button

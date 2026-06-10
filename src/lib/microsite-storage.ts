@@ -56,5 +56,5 @@ export async function uploadMicrositeAsset(
   }
 
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  return publicMicrositeAssetUrl(base, path);
+  return `${publicMicrositeAssetUrl(base, path)}?v=${Date.now()}`;
 }
