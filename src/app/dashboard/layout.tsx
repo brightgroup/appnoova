@@ -10,6 +10,45 @@ import {
   sidebarNavActive, sidebarNavIdle, sidebarIconActive, sidebarBadge, sidebarPlanCard
 } from "@/lib/brand-ui";
 
+function SidebarSubMenu({
+  items,
+  pathname
+}: {
+  items: { name: string; href: string }[];
+  pathname: string;
+}) {
+  return (
+    <div className="ml-8 mt-1 space-y-1.5 pb-2">
+      {items.map((item, i) => {
+        const active =
+          item.href !== "#" &&
+          (pathname === item.href || pathname.startsWith(`${item.href}/`));
+        return (
+          <Link
+            key={i}
+            href={item.href}
+            className={`group flex items-center gap-3 px-3 py-2 text-sm font-medium transition-colors ${
+              active
+                ? "text-[#a5a5ff]"
+                : "text-white hover:text-gray-100"
+            }`}
+          >
+            <span
+              aria-hidden
+              className={`shrink-0 rounded-[3px] transition-all duration-200 ${
+                active
+                  ? "h-2 w-2 bg-[#5b5bf6] shadow-[0_0_8px_rgba(91,91,246,0.4)]"
+                  : "h-1.5 w-1.5 bg-white/20 group-hover:bg-white/35"
+              }`}
+            />
+            <span className="truncate">{item.name}</span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
@@ -133,28 +172,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
             </button>
             {sidebarOpen && expandedMenu === "voz" && (
-              <div className="ml-8 mt-1 space-y-1.5 pb-2 border-l border-white/[.1]">
-                {[
+              <SidebarSubMenu
+                pathname={pathname}
+                items={[
                   { name: "Agentes", href: "/dashboard/agentes-voz" },
                   { name: "Historial", href: "#" },
                   { name: "Números telefónicos", href: "/dashboard/agentes-voz/numeros" },
                   { name: "Números de prueba", href: "/dashboard/agentes-voz/numeros-prueba" },
                   { name: "Troncales SIP", href: "#" },
                   { name: "Canales", href: "#" }
-                ].map((item, i) => (
-                  <Link
-                    key={i}
-                    href={item.href}
-                    className={`w-full text-left px-3 py-2 text-sm transition-colors font-medium block ${
-                      pathname === item.href
-                        ? "text-[#5b5bf6]"
-                        : "text-white hover:text-gray-100"
-                    }`}
-                  >
-                    {item.name}
-                  </Link>
-                ))}
-              </div>
+                ]}
+              />
             )}
           </div>
 
@@ -180,21 +208,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
             </button>
             {sidebarOpen && expandedMenu === "texto" && (
-              <div className="ml-8 mt-1 space-y-1.5 pb-2 border-l border-white/[.1]">
-                {[{ name: "Agentes", href: "/dashboard/agentes-texto" }, { name: "Mi link", href: "/dashboard/micrositio" }, { name: "Inbox", href: "/dashboard/inbox" }, { name: "Text Logs", href: "#" }, { name: "Equipos", href: "#" }, { name: "Plantillas", href: "#" }, { name: "Canales", href: "/dashboard/micrositio/configuracion?tab=link" }].map((item, i) => (
-                  <Link
-                    key={i}
-                    href={item.href}
-                    className={`w-full text-left px-3 py-2 text-sm transition-colors font-medium block ${
-                      item.href !== "#" && pathname === item.href
-                        ? "text-[#a5a5ff]"
-                        : "text-white hover:text-gray-100"
-                    }`}
-                  >
-                    {item.name}
-                  </Link>
-                ))}
-              </div>
+              <SidebarSubMenu
+                pathname={pathname}
+                items={[
+                  { name: "Agentes", href: "/dashboard/agentes-texto" },
+                  { name: "Mi link", href: "/dashboard/micrositio" },
+                  { name: "Inbox", href: "/dashboard/inbox" },
+                  { name: "Text Logs", href: "#" },
+                  { name: "Equipos", href: "#" },
+                  { name: "Plantillas", href: "#" },
+                  { name: "Canales", href: "/dashboard/micrositio/configuracion?tab=link" }
+                ]}
+              />
             )}
           </div>
 

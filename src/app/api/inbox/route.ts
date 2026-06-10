@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   filterInboxItems,
+  formatInboxDisplayTitle,
   inboxDetailChannelLabel,
   sortInboxItems,
   textRowToInboxItem
@@ -60,6 +61,11 @@ export async function GET(req: NextRequest) {
       kind: "text",
       id: record.id,
       contact_label: record.contact_label,
+      display_title: formatInboxDisplayTitle(
+        record.contact_label,
+        record.channel,
+        record.id
+      ),
       channel: record.channel,
       channel_label: inboxDetailChannelLabel(record.channel),
       agent_id: record.text_agent_id,

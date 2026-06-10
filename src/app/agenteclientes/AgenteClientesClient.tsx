@@ -251,7 +251,9 @@ export default function AgenteClientesClient() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(initialState.activeId);
   const [conversations, setConversations] = useState<StoredConversation[]>(initialState.conversations);
   const [messages, setMessages] = useState<Message[]>(initialState.messages);
-  const [serverConversationId, setServerConversationId] = useState<string | null>(null);
+  const [serverConversationId, setServerConversationId] = useState<string | null>(
+    initialState.serverConversationId
+  );
   const [historyOpen, setHistoryOpen] = useState(false);
   const chatScopeRef = useRef(chatScope);
   const skipPersistRef = useRef(true);
@@ -271,12 +273,12 @@ export default function AgenteClientesClient() {
       setActiveConversationId(state.activeId);
       setConversations(state.conversations);
       setMessages(state.messages);
+      setServerConversationId(state.serverConversationId);
     },
     []
   );
 
   useEffect(() => {
-    if (chatScopeRef.current === chatScope) return;
     chatScopeRef.current = chatScope;
     skipPersistRef.current = true;
     applyConversationState(loadConversationState(chatScope));
@@ -296,10 +298,15 @@ export default function AgenteClientesClient() {
       return;
     }
 
-    const state = saveActiveConversation(chatScope, activeConversationId, messages);
+    const state = saveActiveConversation(
+      chatScope,
+      activeConversationId,
+      messages,
+      serverConversationId || undefined
+    );
     setActiveConversationId(state.activeId);
     setConversations(state.conversations);
-  }, [messages, chatScope, activeConversationId]);
+  }, [messages, chatScope, activeConversationId, serverConversationId]);
 
   useEffect(() => {
     if (!historyOpen) return;
@@ -458,14 +465,26 @@ export default function AgenteClientesClient() {
         setError(data.error || "No se pudo obtener respuesta");
         return;
       }
+      const assistantMsg = data.reply
+        ? { id: crypto.randomUUID(), role: "assistant" as const, content: data.reply }
+        : null;
+      const finalMessages = assistantMsg ? [...nextMessages, assistantMsg] : nextMessages;
+
       if (data.conversation_id) {
-        setServerConversationId(data.conversation_id);
-      }
-      if (data.reply) {
-        setMessages(prev => [
-          ...prev,
-          { id: crypto.randomUUID(), role: "assistant", content: data.reply }
-        ]);
+        const serverId = String(data.conversation_id);
+        skipPersistRef.current = true;
+        const state = saveActiveConversation(
+          chatScope,
+          activeConversationId,
+          finalMessages,
+          serverId
+        );
+        setServerConversationId(serverId);
+        setActiveConversationId(state.activeId);
+        setConversations(state.conversations);
+        setMessages(finalMessages);
+      } else if (assistantMsg) {
+        setMessages(finalMessages);
       }
       scrollIntentRef.current = "assistant-start";
     } catch {
@@ -473,7 +492,7 @@ export default function AgenteClientesClient() {
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, config.chatEndpoint, serverConversationId]);
+  }, [messages, loading, config.chatEndpoint, serverConversationId, chatScope, activeConversationId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {

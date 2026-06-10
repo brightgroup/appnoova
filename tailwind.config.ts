@@ -9,7 +9,7 @@ const config: Config = {
       colors: {
         noova: {
           main: "#212121",
-          surface: "#2d2d2d",
+          surface: "#272727",
         },
       },
     },

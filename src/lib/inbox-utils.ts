@@ -6,6 +6,34 @@ export function makeVisitorLabel(): string {
   return `anonymous-${(Date.now() / 1000).toFixed(6)}`;
 }
 
+/** Título legible para la bandeja (evita mostrar anonymous-... crudo). */
+export function formatInboxDisplayTitle(
+  contactLabel: string,
+  channel: string,
+  conversationId: string
+): string {
+  const shortId = conversationId.replace(/-/g, "").slice(0, 6).toUpperCase();
+
+  if (channel === "web_widget") {
+    if (contactLabel.startsWith("anonymous-")) {
+      const suffix = contactLabel.replace("anonymous-", "").replace(".", "").slice(-6);
+      return `Visitante micrositio #${suffix || shortId}`;
+    }
+    return `Visitante micrositio #${shortId}`;
+  }
+
+  if (channel === "web_test") {
+    return `Prueba de agente #${shortId}`;
+  }
+
+  const base = contactLabel.trim() || "Conversación";
+  if (base.toLowerCase() === "prueba web") {
+    return `Prueba de agente #${shortId}`;
+  }
+
+  return `${base} #${shortId}`;
+}
+
 export function formatInboxTime(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
@@ -61,6 +89,11 @@ export function textRowToInboxItem(
     id: String(row.id),
     kind: "text",
     contact_label: String(row.contact_label ?? "Visitante"),
+    display_title: formatInboxDisplayTitle(
+      String(row.contact_label ?? "Visitante"),
+      channel,
+      String(row.id)
+    ),
     preview: lastTextPreview(row.messages) || String(row.summary ?? "Sin mensajes"),
     channel,
     channel_label: inboxChannelBadge(channel),
@@ -85,6 +118,11 @@ export function voiceRowToInboxItem(
     id: String(row.id),
     kind: "voice",
     contact_label: String(row.phone_number ?? "Prueba web"),
+    display_title: formatInboxDisplayTitle(
+      String(row.phone_number ?? "Prueba web"),
+      "voice_test",
+      String(row.id)
+    ),
     preview: lastVoicePreview(row.transcript) || String(row.summary ?? "Llamada de voz"),
     channel: "voice_test",
     channel_label: inboxChannelBadge("voice_test"),

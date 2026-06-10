@@ -8,6 +8,7 @@ export interface InboxListItem {
   id: string;
   kind: InboxKind;
   contact_label: string;
+  display_title: string;
   preview: string;
   channel: string;
   channel_label: string;
@@ -26,6 +27,7 @@ export interface InboxTextDetail {
   kind: "text";
   id: string;
   contact_label: string;
+  display_title: string;
   channel: string;
   channel_label: string;
   agent_id: string;

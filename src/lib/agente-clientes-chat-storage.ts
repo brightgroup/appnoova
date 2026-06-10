@@ -12,12 +12,15 @@ export interface StoredConversation {
   messages: StoredChatMessage[];
   createdAt: number;
   updatedAt: number;
+  /** ID en text_agent_conversations — mantiene el mismo hilo en inbox al volver */
+  serverConversationId?: string | null;
 }
 
 export interface ConversationState {
   activeId: string | null;
   messages: StoredChatMessage[];
   conversations: StoredConversation[];
+  serverConversationId: string | null;
 }
 
 interface ConversationStore {
@@ -120,7 +123,9 @@ function loadStore(scope: string): ConversationStore {
           title: typeof c.title === "string" ? c.title : DEFAULT_TITLE,
           messages: sanitizeMessages(c.messages),
           createdAt: typeof c.createdAt === "number" ? c.createdAt : Date.now(),
-          updatedAt: typeof c.updatedAt === "number" ? c.updatedAt : Date.now()
+          updatedAt: typeof c.updatedAt === "number" ? c.updatedAt : Date.now(),
+          serverConversationId:
+            typeof c.serverConversationId === "string" ? c.serverConversationId : null
         }))
         .sort((a, b) => b.updatedAt - a.updatedAt)
         .slice(0, MAX_CONVERSATIONS);
@@ -176,14 +181,16 @@ export function loadConversationState(scope: string): ConversationState {
   return {
     activeId: store.activeId,
     messages: active?.messages ?? [],
-    conversations: store.conversations
+    conversations: store.conversations,
+    serverConversationId: active?.serverConversationId ?? null
   };
 }
 
 export function saveActiveConversation(
   scope: string,
   activeId: string | null,
-  messages: StoredChatMessage[]
+  messages: StoredChatMessage[],
+  serverConversationId?: string | null
 ): ConversationState {
   const store = loadStore(scope);
   const sanitized = sanitizeMessages(messages);
@@ -194,11 +201,13 @@ export function saveActiveConversation(
       return {
         activeId: store.activeId,
         messages: getActiveConversation(store)?.messages ?? [],
-        conversations: store.conversations
+        conversations: store.conversations,
+        serverConversationId: getActiveConversation(store)?.serverConversationId ?? null
       };
     }
 
     const created = createConversation(sanitized);
+    if (serverConversationId) created.serverConversationId = serverConversationId;
     store.conversations.unshift(created);
     store.activeId = created.id;
   } else {
@@ -208,7 +217,11 @@ export function saveActiveConversation(
             ...c,
             messages: sanitized,
             title: conversationTitle(sanitized),
-            updatedAt: now
+            updatedAt: now,
+            serverConversationId:
+              typeof serverConversationId === "string"
+                ? serverConversationId
+                : (c.serverConversationId ?? null)
           }
         : c
     );
@@ -220,7 +233,8 @@ export function saveActiveConversation(
   return {
     activeId: store.activeId,
     messages: active?.messages ?? [],
-    conversations: store.conversations
+    conversations: store.conversations,
+    serverConversationId: active?.serverConversationId ?? null
   };
 }
 
@@ -232,7 +246,8 @@ export function startNewConversation(scope: string): ConversationState {
     return {
       activeId: active.id,
       messages: [],
-      conversations: store.conversations
+      conversations: store.conversations,
+      serverConversationId: null
     };
   }
 
@@ -244,7 +259,8 @@ export function startNewConversation(scope: string): ConversationState {
   return {
     activeId: created.id,
     messages: [],
-    conversations: store.conversations
+    conversations: store.conversations,
+    serverConversationId: null
   };
 }
 
@@ -259,8 +275,23 @@ export function switchConversation(scope: string, conversationId: string): Conve
   return {
     activeId: conversationId,
     messages: target.messages,
-    conversations: store.conversations
+    conversations: store.conversations,
+    serverConversationId: target.serverConversationId ?? null
   };
+}
+
+export function bindServerConversationId(
+  scope: string,
+  activeId: string | null,
+  serverConversationId: string
+): void {
+  if (!activeId || !serverConversationId) return;
+  const store = loadStore(scope);
+  if (!store.conversations.some(c => c.id === activeId)) return;
+  store.conversations = store.conversations.map(c =>
+    c.id === activeId ? { ...c, serverConversationId } : c
+  );
+  saveStore(scope, store);
 }
 
 export function getConversationPreview(messages: StoredChatMessage[]): string {
