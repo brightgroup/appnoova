@@ -21,7 +21,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (pathname.startsWith("/dashboard/agentes-voz")) {
       setExpandedMenu("voz");
-    } else if (pathname.startsWith("/dashboard/agentes-texto") || pathname.startsWith("/dashboard/micrositio")) {
+    } else if (
+      pathname.startsWith("/dashboard/agentes-texto") ||
+      pathname.startsWith("/dashboard/micrositio") ||
+      pathname.startsWith("/dashboard/inbox")
+    ) {
       setExpandedMenu("texto");
     }
   }, [pathname]);
@@ -178,7 +182,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {sidebarOpen && expandedMenu === "texto" && (
               <div className="ml-8 mt-1 space-y-1.5 pb-2 border-l border-white/[.1]">
                 {[{ name: "Agentes", href: "/dashboard/agentes-texto" }, { name: "Mi link", href: "/dashboard/micrositio" }, { name: "Inbox", href: "/dashboard/inbox" }, { name: "Text Logs", href: "#" }, { name: "Equipos", href: "#" }, { name: "Plantillas", href: "#" }, { name: "Canales", href: "/dashboard/micrositio/configuracion?tab=link" }].map((item, i) => (
-                  <Link key={i} href={item.href} className="w-full text-left px-3 py-2 text-sm text-white hover:text-gray-100 transition-colors font-medium block">
+                  <Link
+                    key={i}
+                    href={item.href}
+                    className={`w-full text-left px-3 py-2 text-sm transition-colors font-medium block ${
+                      item.href !== "#" && pathname === item.href
+                        ? "text-[#a5a5ff]"
+                        : "text-white hover:text-gray-100"
+                    }`}
+                  >
                     {item.name}
                   </Link>
                 ))}

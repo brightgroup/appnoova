@@ -19,7 +19,7 @@ import {
   inboxMessageLabel,
   isToday
 } from "@/lib/inbox-utils";
-import type { InboxDetail, InboxFilter, InboxListItem } from "@/types/inbox";
+import type { InboxFilter, InboxListItem, InboxTextDetail } from "@/types/inbox";
 import type { TextChatMessage } from "@/types/text-agent-conversation";
 
 type AssignValue = "ai" | "me";
@@ -44,8 +44,7 @@ function ChannelBadge({ label }: { label: string }) {
 export default function InboxPage() {
   const [items, setItems] = useState<InboxListItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedKind, setSelectedKind] = useState<"text" | "voice">("text");
-  const [detail, setDetail] = useState<InboxDetail | null>(null);
+  const [detail, setDetail] = useState<InboxTextDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -89,13 +88,12 @@ export default function InboxPage() {
     }
   }, [filter]);
 
-  const loadDetail = useCallback(async (id: string, kind: "text" | "voice", silent = false) => {
+  const loadDetail = useCallback(async (id: string, silent = false) => {
     if (!silent) setDetailLoading(true);
     if (!silent) setError("");
     try {
       const headers = await getAuthHeaders();
-      const qs = kind === "voice" ? `id=${id}&kind=voice` : `id=${id}`;
-      const res = await fetch(`/api/inbox?${qs}`, { headers });
+      const res = await fetch(`/api/inbox?id=${id}`, { headers });
       if (res.status === 404) {
         if (!silent) {
           setError("Conversación o API no disponible en este entorno.");
@@ -107,7 +105,8 @@ export default function InboxPage() {
         if (!silent) setError(data.error || "Error al cargar conversación");
         return;
       }
-      setDetail(data.detail ?? null);
+      const loaded = data.detail ?? null;
+      setDetail(loaded?.kind === "text" ? loaded : null);
       if (data.current_user_name) setCurrentUserName(data.current_user_name);
     } catch {
       if (!silent) setError("Error de red al cargar conversación");
@@ -120,12 +119,10 @@ export default function InboxPage() {
 
   useEffect(() => {
     if (!selectedId) return;
-    loadDetail(selectedId, selectedKind);
-    const timer = window.setInterval(() => {
-      if (selectedKind === "text") loadDetail(selectedId, selectedKind, true);
-    }, 5000);
+    loadDetail(selectedId);
+    const timer = window.setInterval(() => loadDetail(selectedId, true), 5000);
     return () => window.clearInterval(timer);
-  }, [selectedId, selectedKind, loadDetail]);
+  }, [selectedId, loadDetail]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -154,13 +151,12 @@ export default function InboxPage() {
 
   const selectItem = (item: InboxListItem) => {
     setSelectedId(item.id);
-    setSelectedKind(item.kind);
     setReply("");
     setAssignOpen(false);
   };
 
   const assignConversation = async (value: AssignValue) => {
-    if (!selectedId || selectedKind !== "text") return;
+    if (!selectedId) return;
     setAssignOpen(false);
     try {
       const headers = await getAuthHeaders();
@@ -177,7 +173,7 @@ export default function InboxPage() {
         setError(data.error || "No se pudo asignar");
         return;
       }
-      await loadDetail(selectedId, "text");
+      await loadDetail(selectedId);
       await loadList();
     } catch {
       setError("Error de red al asignar");
@@ -186,7 +182,7 @@ export default function InboxPage() {
 
   const sendReply = async () => {
     const text = reply.trim();
-    if (!text || !selectedId || selectedKind !== "text" || sending) return;
+    if (!text || !selectedId || sending) return;
     if (detail?.kind !== "text" || detail.handoff_mode !== "human" || !detail.assigned_to) return;
 
     setSending(true);
@@ -204,7 +200,7 @@ export default function InboxPage() {
         return;
       }
       setReply("");
-      await loadDetail(selectedId, "text");
+      await loadDetail(selectedId);
       await loadList();
     } catch {
       setError("Error de red al enviar");
@@ -213,13 +209,12 @@ export default function InboxPage() {
   };
 
   const canReply =
-    detail?.kind === "text" &&
-    detail.handoff_mode === "human" &&
-    Boolean(detail.assigned_to) &&
+    detail?.handoff_mode === "human" &&
+    Boolean(detail?.assigned_to) &&
     !offline;
 
   const assignLabel =
-    detail?.kind === "text" && detail.handoff_mode === "human" && detail.assigned_to
+    detail?.handoff_mode === "human" && detail?.assigned_to
       ? detail.assigned_to
       : "Asignar a";
 
@@ -230,9 +225,9 @@ export default function InboxPage() {
   ];
 
   return (
-    <div className="flex h-full min-h-0 flex-1 overflow-hidden bg-[#0d0d0f]">
+    <div className="flex h-full min-h-0 flex-1 overflow-hidden bg-noova-main text-gray-100">
       {/* Lista */}
-      <aside className="flex w-[340px] shrink-0 flex-col border-r border-white/[.08] bg-[#111114]">
+      <aside className="flex w-[340px] shrink-0 flex-col border-r border-white/[.08] bg-noova-surface">
         <div className="flex items-center justify-between border-b border-white/[.06] px-4 py-3">
           <h1 className="text-sm font-semibold text-white">Inbox</h1>
           <label className="flex cursor-pointer items-center gap-2 text-[11px] text-gray-500">
@@ -308,14 +303,14 @@ export default function InboxPage() {
             </div>
           ) : filteredItems.length === 0 && !error ? (
             <p className="px-4 py-10 text-center text-xs text-gray-600">
-              No hay conversaciones todavía. Aparecerán aquí los chats del micrositio y las pruebas de voz.
+              No hay conversaciones todavía. Aparecerán aquí los chats del micrositio y las pruebas de agentes de texto.
             </p>
           ) : filteredItems.length === 0 ? null : (
             filteredItems.map(item => {
-              const active = selectedId === item.id && selectedKind === item.kind;
+              const active = selectedId === item.id;
               return (
                 <button
-                  key={`${item.kind}-${item.id}`}
+                  key={item.id}
                   type="button"
                   onClick={() => selectItem(item)}
                   className={`w-full border-b border-white/[.04] px-4 py-3 text-left transition-colors ${
@@ -330,7 +325,7 @@ export default function InboxPage() {
                       {formatInboxTime(item.updated_at)}
                     </span>
                   </div>
-                  <p className="mb-2 line-clamp-2 text-[11px] leading-relaxed text-gray-500">
+                  <p className="mb-2 line-clamp-2 text-sm leading-snug text-gray-300">
                     {item.preview}
                   </p>
                   <div className="flex items-center justify-between gap-2">
@@ -353,13 +348,13 @@ export default function InboxPage() {
       </aside>
 
       {/* Detalle */}
-      <section className="flex min-w-0 flex-1 flex-col bg-[#0d0d0f]">
+      <section className="flex min-w-0 flex-1 flex-col bg-noova-main">
         {!selectedId ? (
           <div className="flex flex-1 flex-col items-center justify-center text-gray-600">
             <MessageSquare className="mb-3 h-10 w-10 opacity-30" />
             <p className="text-sm">Selecciona una conversación</p>
             <p className="mt-1 max-w-sm text-center text-xs text-gray-600">
-              Chats del micrositio y llamadas de prueba del agente de voz aparecen en la lista.
+              Chats del micrositio y pruebas de agentes de texto aparecen en la lista.
             </p>
           </div>
         ) : (
@@ -371,7 +366,7 @@ export default function InboxPage() {
                 </p>
                 {detail && (
                   <p className="text-[11px] text-gray-600">
-                    {detail.kind === "voice" ? "Llamada de voz" : detail.channel_label}
+                    {detail.channel_label}
                     {" · "}
                     {detail.agent_name}
                   </p>
@@ -390,7 +385,7 @@ export default function InboxPage() {
                       <ChevronDown className="h-3.5 w-3.5 opacity-60" />
                     </button>
                     {assignOpen && (
-                      <div className="absolute right-0 top-full z-20 mt-1 min-w-[180px] overflow-hidden rounded-xl border border-white/[.10] bg-[#1a1a1f] py-1 shadow-xl">
+                      <div className="absolute right-0 top-full z-20 mt-1 min-w-[180px] overflow-hidden rounded-xl border border-white/[.10] bg-noova-surface py-1 shadow-xl">
                         <button
                           type="button"
                           onClick={() => assignConversation("ai")}
@@ -438,15 +433,13 @@ export default function InboxPage() {
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Cargando mensajes...
                 </div>
-              ) : detail?.kind === "text" ? (
+              ) : detail ? (
                 <TextThread messages={detail.messages} createdAt={detail.created_at} />
-              ) : detail?.kind === "voice" ? (
-                <VoiceThread detail={detail} />
               ) : null}
               <div ref={messagesEndRef} />
             </div>
 
-            {detail?.kind === "text" && (
+            {detail && (
               <footer className="border-t border-white/[.06] px-5 py-4">
                 {canReply ? (
                   <div className="flex items-end gap-2">
@@ -476,19 +469,11 @@ export default function InboxPage() {
                   <p className="text-center text-xs text-gray-600">
                     {offline
                       ? "Activa Online para responder conversaciones."
-                      : detail?.kind === "text" && detail.handoff_mode === "human" && !detail.assigned_to
+                      : detail.handoff_mode === "human" && !detail.assigned_to
                         ? "Asigna la conversación a ti para habilitar el chat humano."
                         : "Asigna la conversación a ti (arriba) para tomar el control y responder al visitante."}
                   </p>
                 )}
-              </footer>
-            )}
-
-            {detail?.kind === "voice" && (
-              <footer className="border-t border-white/[.06] px-5 py-3">
-                <p className="text-center text-xs text-gray-600">
-                  Las llamadas de voz son de solo lectura. El takeover humano aplica a chats de texto.
-                </p>
               </footer>
             )}
           </>
@@ -546,53 +531,6 @@ function TextThread({
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function VoiceThread({ detail }: { detail: Extract<InboxDetail, { kind: "voice" }> }) {
-  const entries = detail.transcript ?? [];
-  if (entries.length === 0) {
-    return (
-      <div className="mx-auto max-w-2xl py-10 text-center">
-        <p className="text-xs text-gray-600">Llamada sin transcripción.</p>
-        {detail.summary && (
-          <p className="mt-3 rounded-xl border border-white/[.08] bg-white/[.03] p-4 text-sm text-gray-400">
-            {detail.summary}
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <p className="text-center text-[11px] font-medium uppercase tracking-wide text-gray-600">
-        {isToday(detail.created_at) ? "Hoy" : "Llamada"}
-      </p>
-      {entries.map((entry, i) => {
-        const isUser = entry.role === "user";
-        return (
-          <div
-            key={`${entry.time_sec}-${i}`}
-            className={`flex flex-col ${isUser ? "items-start" : "items-end"}`}
-          >
-            <span className="mb-1 text-[10px] text-gray-600">
-              {isUser ? "Usuario" : "Asistente"}
-            </span>
-            <div
-              className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
-                isUser ? "bg-[#3d4a2a] text-gray-100" : "bg-[#2a2a30] text-gray-200"
-              }`}
-            >
-              <p className="whitespace-pre-wrap">{entry.text}</p>
-            </div>
-          </div>
-        );
-      })}
-      {detail.audio_url && (
-        <audio controls src={detail.audio_url} className="mt-4 w-full" />
-      )}
     </div>
   );
 }

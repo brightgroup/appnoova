@@ -3,39 +3,29 @@ import {
   filterInboxItems,
   inboxDetailChannelLabel,
   sortInboxItems,
-  textRowToInboxItem,
-  voiceRowToInboxItem
+  textRowToInboxItem
 } from "@/lib/inbox-utils";
 import { isMissingColumnError, isMissingTableError } from "@/lib/supabase-table-error";
-import { channelLabel } from "@/lib/text-chat-utils";
 import { toTextConversationRecord } from "@/lib/text-conversation-record";
 import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
 import { getAuthUserFromRequest, userDisplayName } from "@/lib/voice-agents-server";
 import type { InboxDetail, InboxFilter } from "@/types/inbox";
-import type { TranscriptEntry } from "@/types/voice-agent-call";
 
 function parseFilter(raw: string | null): InboxFilter {
   if (raw === "mine" || raw === "unassigned") return raw;
   return "all";
 }
 
-async function loadAgentNameMaps(db: ReturnType<typeof textAgentsAdminClient>, userId: string) {
-  const [textRes, voiceRes] = await Promise.all([
-    db.from("text_agents").select("id, name").eq("user_id", userId),
-    db.from("voice_agents").select("id, name").eq("user_id", userId)
-  ]);
-
-  const textNames: Record<string, string> = {};
-  for (const row of textRes.data ?? []) {
-    textNames[String(row.id)] = String(row.name ?? "Agente");
+async function loadTextAgentNames(
+  db: ReturnType<typeof textAgentsAdminClient>,
+  userId: string
+): Promise<Record<string, string>> {
+  const { data } = await db.from("text_agents").select("id, name").eq("user_id", userId);
+  const names: Record<string, string> = {};
+  for (const row of data ?? []) {
+    names[String(row.id)] = String(row.name ?? "Agente");
   }
-
-  const voiceNames: Record<string, string> = {};
-  for (const row of voiceRes.data ?? []) {
-    voiceNames[String(row.id)] = String(row.name ?? "Agente");
-  }
-
-  return { textNames, voiceNames };
+  return names;
 }
 
 export async function GET(req: NextRequest) {
@@ -47,42 +37,8 @@ export async function GET(req: NextRequest) {
 
   const db = textAgentsAdminClient();
   const id = req.nextUrl.searchParams.get("id");
-  const kind = req.nextUrl.searchParams.get("kind");
   const filter = parseFilter(req.nextUrl.searchParams.get("filter"));
   const currentUserName = user ? userDisplayName(user) : "Usuario";
-
-  if (id && kind === "voice") {
-    const { data, error } = await db
-      .from("voice_agent_calls")
-      .select("*")
-      .eq("id", id)
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (error) {
-      if (error.code === "42P01") return NextResponse.json({ detail: null, dbReady: false });
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-    if (!data) return NextResponse.json({ error: "Llamada no encontrada" }, { status: 404 });
-
-    const { voiceNames } = await loadAgentNameMaps(db, userId);
-    const agentId = String(data.voice_agent_id);
-    const detail: InboxDetail = {
-      kind: "voice",
-      id: String(data.id),
-      contact_label: String(data.phone_number ?? "Prueba web"),
-      channel: "voice_test",
-      channel_label: channelLabel("voice_test"),
-      agent_id: agentId,
-      agent_name: voiceNames[agentId] ?? "Agente de voz",
-      transcript: (data.transcript as TranscriptEntry[]) ?? [],
-      summary: String(data.summary ?? ""),
-      duration_sec: Number(data.duration_sec) || 0,
-      audio_url: data.audio_url ? String(data.audio_url) : null,
-      created_at: String(data.created_at ?? "")
-    };
-    return NextResponse.json({ detail, current_user_name: currentUserName, dbReady: true });
-  }
 
   if (id) {
     const { data, error } = await db
@@ -99,7 +55,7 @@ export async function GET(req: NextRequest) {
     if (!data) return NextResponse.json({ error: "Conversación no encontrada" }, { status: 404 });
 
     const record = toTextConversationRecord(data);
-    const { textNames } = await loadAgentNameMaps(db, userId);
+    const textNames = await loadTextAgentNames(db, userId);
     const detail: InboxDetail = {
       kind: "text",
       id: record.id,
@@ -130,55 +86,39 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const { textNames, voiceNames } = await loadAgentNameMaps(db, userId);
+  const textNames = await loadTextAgentNames(db, userId);
 
   const listSelectWithHandoff =
     "id, text_agent_id, channel, contact_label, messages_count, status, assigned_to, handoff_mode, unread_count, messages, summary, created_at, updated_at";
   const listSelectLegacy =
     "id, text_agent_id, channel, contact_label, messages_count, status, messages, summary, created_at, updated_at";
 
-  let textRes = await db
+  const textResPrimary = await db
     .from("text_agent_conversations")
     .select(listSelectWithHandoff)
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
     .limit(200);
 
-  if (textRes.error && isMissingColumnError(textRes.error)) {
-    textRes = await db
-      .from("text_agent_conversations")
-      .select(listSelectLegacy)
-      .eq("user_id", userId)
-      .order("updated_at", { ascending: false })
-      .limit(200);
-  }
-
-  const voiceRes = await db
-    .from("voice_agent_calls")
-    .select("id, voice_agent_id, phone_number, transcript, summary, status, metadata, created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(100);
+  const textRes =
+    textResPrimary.error && isMissingColumnError(textResPrimary.error)
+      ? await db
+          .from("text_agent_conversations")
+          .select(listSelectLegacy)
+          .eq("user_id", userId)
+          .order("updated_at", { ascending: false })
+          .limit(200)
+      : textResPrimary;
 
   if (textRes.error && !isMissingTableError(textRes.error)) {
     return NextResponse.json({ error: textRes.error.message }, { status: 500 });
-  }
-  if (voiceRes.error && voiceRes.error.code !== "42P01") {
-    return NextResponse.json({ error: voiceRes.error.message }, { status: 500 });
   }
 
   const textItems = (textRes.data ?? []).map(row =>
     textRowToInboxItem(row, textNames[String(row.text_agent_id)] ?? "Agente")
   );
-  const voiceItems = (voiceRes.data ?? [])
-    .filter(row => {
-      const meta = row && typeof row === "object" ? (row as { metadata?: { source?: string } }).metadata : undefined;
-      const source = meta?.source;
-      return source === "web_test" || source === "phone_test" || !source;
-    })
-    .map(row => voiceRowToInboxItem(row, voiceNames[String(row.voice_agent_id)] ?? "Agente de voz"));
 
-  const items = filterInboxItems(sortInboxItems([...textItems, ...voiceItems]), filter, currentUserName);
+  const items = filterInboxItems(sortInboxItems(textItems), filter, currentUserName);
 
   return NextResponse.json({
     items,
