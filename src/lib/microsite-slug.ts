@@ -1,4 +1,4 @@
-import { MICROSITE_PATH_PREFIX } from "@/lib/microsite-path";
+import { MICROSITE_PATH_PREFIX, MICROSITE_ROUTE_PREFIXES } from "@/lib/microsite-path";
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -24,12 +24,34 @@ export function brandInitials(name: string): string {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 }
 
+function stripTrailingSlash(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+function appOrigin(): string {
+  return stripTrailingSlash(
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NOOVA_APP_URL ||
+    "https://app.noova360.com"
+  );
+}
+
 export function getMicrositePublicBaseUrl(): string {
-  const base =
+  const pathPrefix = MICROSITE_PATH_PREFIX;
+  const configured =
     process.env.NEXT_PUBLIC_LINK_BASE_URL ||
-    process.env.NEXT_PUBLIC_MICROSITE_BASE_URL ||
-    `https://app.noova360.com${MICROSITE_PATH_PREFIX}`;
-  return base.replace(/\/$/, "");
+    process.env.NEXT_PUBLIC_MICROSITE_BASE_URL;
+
+  if (configured) {
+    const base = stripTrailingSlash(configured);
+    if (base.endsWith(pathPrefix)) return base;
+    if (!MICROSITE_ROUTE_PREFIXES.some(prefix => base.endsWith(prefix))) {
+      return `${base}${pathPrefix}`;
+    }
+    return base;
+  }
+
+  return `${appOrigin()}${pathPrefix}`;
 }
 
 export function buildMicrositePublicUrl(slug: string): string {

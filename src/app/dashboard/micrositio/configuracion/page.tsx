@@ -268,23 +268,6 @@ function ConfigContent() {
             <h2 className="text-sm font-semibold text-gray-300 mb-4">Agente y apariencia</h2>
 
             <div className="space-y-4">
-              <Field label="URL pública (definitiva)">
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[.04] border border-white/[.10]">
-                  <Link2 className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                  <span className="text-xs text-gray-300 font-mono truncate">{publicUrl}</span>
-                </div>
-                <div className="flex gap-2 mt-2">
-                  <button type="button" onClick={copyUrl} className="flex items-center gap-1 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]">
-                    <Copy className="w-3 h-3" /> {copied ? "Copiado" : "Copiar link"}
-                  </button>
-                  {form.is_published && (
-                    <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]">
-                      <ExternalLink className="w-3 h-3" /> Abrir
-                    </a>
-                  )}
-                </div>
-              </Field>
-
               <Field label="Agente de texto">
                 <select
                   value={form.text_agent_id ?? ""}
@@ -324,17 +307,21 @@ function ConfigContent() {
               <PublishStatusCard
                 isPublished={form.is_published}
                 hasAgent={!!form.text_agent_id}
-                publicUrl={publicUrl}
                 saved={saved}
                 onSelect={published => updateForm({ is_published: published })}
-                onCopy={copyUrl}
-                copied={copied}
               />
             </div>
           </div>
 
           <div className="flex-1 p-6 overflow-y-auto">
-            <div className="max-w-xl space-y-6">
+            <div className="max-w-xl space-y-6 ml-auto">
+              <PublicUrlPanel
+                publicUrl={publicUrl}
+                isPublished={form.is_published}
+                copied={copied}
+                onCopy={copyUrl}
+              />
+
               <div>
                 <h3 className="text-sm font-semibold text-gray-300 mb-1">Identidad visual</h3>
                 <p className="text-xs text-gray-500 mb-4">
@@ -511,22 +498,70 @@ function ConfigContent() {
   );
 }
 
+function PublicUrlPanel({
+  publicUrl,
+  isPublished,
+  copied,
+  onCopy
+}: {
+  publicUrl: string;
+  isPublished: boolean;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-white/[.10] bg-white/[.02] p-4">
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-lg bg-[#5b5bf6]/15 flex items-center justify-center shrink-0">
+          <Link2 className="w-4 h-4 text-[#a5a5ff]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+            URL pública (definitiva)
+          </p>
+          <p className="text-sm font-mono text-white break-all leading-relaxed">{publicUrl}</p>
+          <div className="flex flex-wrap gap-3 mt-2.5">
+            <button
+              type="button"
+              onClick={onCopy}
+              className="flex items-center gap-1 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]"
+            >
+              <Copy className="w-3 h-3" />
+              {copied ? "Copiado" : "Copiar link"}
+            </button>
+            {isPublished ? (
+              <a
+                href={publicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Abrir link
+              </a>
+            ) : (
+              <span className="flex items-center gap-1 text-[11px] text-gray-600">
+                <ExternalLink className="w-3 h-3" />
+                Abrir link al publicar
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PublishStatusCard({
   isPublished,
   hasAgent,
-  publicUrl,
   saved,
-  onSelect,
-  onCopy,
-  copied
+  onSelect
 }: {
   isPublished: boolean;
   hasAgent: boolean;
-  publicUrl: string;
   saved: boolean;
   onSelect: (published: boolean) => void;
-  onCopy: () => void;
-  copied: boolean;
 }) {
   return (
     <div className="rounded-xl border border-white/[.10] bg-white/[.02] overflow-hidden">
@@ -593,21 +628,6 @@ function PublishStatusCard({
                 </p>
               </div>
             </div>
-          </button>
-        </div>
-
-        <div className="rounded-lg bg-black/25 border border-white/[.08] p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
-            Link público de tu micrositio
-          </p>
-          <p className="text-xs font-mono text-white break-all leading-relaxed">{publicUrl}</p>
-          <button
-            type="button"
-            onClick={onCopy}
-            className="mt-2 flex items-center gap-1 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]"
-          >
-            <Copy className="w-3 h-3" />
-            {copied ? "Copiado" : "Copiar link"}
           </button>
         </div>
 
