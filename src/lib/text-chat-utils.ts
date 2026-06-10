@@ -70,14 +70,25 @@ export function displayChatId(id: string): string {
 export function channelLabel(channel: string): string {
   if (channel === "web_test") return "Prueba web";
   if (channel === "whatsapp") return "WhatsApp";
-  if (channel === "web_widget") return "Widget web";
+  if (channel === "web_widget") return "Micrositio";
+  if (channel === "voice_test") return "Voz prueba";
   return channel;
+}
+
+export function inboxChannelBadge(channel: string): string {
+  if (channel === "web_widget") return "Web";
+  if (channel === "web_test") return "API";
+  if (channel === "voice_test") return "Voz";
+  return "API";
 }
 
 export function buildChatFallbackSummary(messages: TextChatMessage[]): string {
   if (!messages.length) return "Conversación sin mensajes.";
   const joined = messages
-    .map(m => `${m.role === "user" ? "Usuario" : "Agente"}: ${m.content}`)
+    .map(m => {
+      const who = m.role === "user" ? "Usuario" : m.role === "human" ? "Asesor" : "Agente";
+      return `${who}: ${m.content}`;
+    })
     .join(" ");
   if (joined.length <= 320) return joined;
   return `${joined.slice(0, 317)}...`;
@@ -98,7 +109,10 @@ export function normalizeChatMessages(raw: unknown): TextChatMessage[] {
   return raw
     .map(item => {
       const row = item as Record<string, unknown>;
-      const role = row.role === "assistant" ? "assistant" : "user";
+      const role =
+        row.role === "assistant" ? "assistant"
+        : row.role === "human" ? "human"
+        : "user";
       const content = String(row.content ?? "").trim();
       if (!content) return null;
       return {

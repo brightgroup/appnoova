@@ -17,6 +17,17 @@ export function isValidMicrositeSlug(slug: string): boolean {
   return slug.length >= 3 && slug.length <= 50 && SLUG_RE.test(slug);
 }
 
+/** Nombre legible a partir del slug del link permanente (ej. arcary-seguros → Arcary Seguros). */
+export function slugToDisplayName(slug: string): string {
+  const trimmed = slug.trim();
+  if (!trimmed) return "";
+  return trimmed
+    .split("-")
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 export function brandInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "NV";

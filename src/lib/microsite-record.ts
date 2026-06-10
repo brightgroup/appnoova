@@ -2,7 +2,7 @@ import {
   DEFAULT_MICROSITE_ACCENT,
   DEFAULT_MICROSITE_BUTTON
 } from "@/lib/microsite-defaults";
-import { isValidMicrositeSlug, slugifyBrandName } from "@/lib/microsite-slug";
+import { isValidMicrositeSlug, slugifyBrandName, slugToDisplayName } from "@/lib/microsite-slug";
 import type {
   BrokerMicrositeFormData,
   BrokerMicrositeRecord,
@@ -85,7 +85,7 @@ export function toPublicMicrositeConfig(
   brandName: string,
   agentName: string
 ): PublicMicrositeConfig {
-  const name = brandName.trim() || "Tu corredor";
+  const name = slugToDisplayName(microsite.slug) || brandName.trim() || "Mi empresa";
   const displayAgent = microsite.agent_display_name?.trim() || agentName.trim() || "Asistente";
   const version = microsite.updated_at || microsite.slug;
 

@@ -37,7 +37,10 @@ export function toTextConversationRecord(raw: Record<string, unknown>): TextAgen
     metadata: obj(raw.metadata),
     created_at: String(raw.created_at ?? ""),
     updated_at: String(raw.updated_at ?? ""),
-    ended_at: raw.ended_at ? String(raw.ended_at) : null
+    ended_at: raw.ended_at ? String(raw.ended_at) : null,
+    assigned_to: raw.assigned_to ? String(raw.assigned_to) : null,
+    handoff_mode: raw.handoff_mode === "human" ? "human" : "ai",
+    unread_count: num(raw.unread_count)
   };
 }
 
@@ -60,13 +63,16 @@ export function toTextConversationListItem(raw: Record<string, unknown>): TextAg
     metadata: record.metadata,
     created_at: record.created_at,
     updated_at: record.updated_at,
-    ended_at: record.ended_at
+    ended_at: record.ended_at,
+    assigned_to: record.assigned_to,
+    handoff_mode: record.handoff_mode,
+    unread_count: record.unread_count
   };
 }
 
 export function mergeChatMessages(
   existing: TextChatMessage[],
-  incoming: { role: "user" | "assistant"; content: string }[],
+  incoming: { role: "user" | "assistant" | "human"; content: string }[],
   nowIso: string
 ): TextChatMessage[] {
   const merged = [...existing];

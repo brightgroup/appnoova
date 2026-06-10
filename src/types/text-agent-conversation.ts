@@ -1,5 +1,5 @@
 export interface TextChatMessage {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "human";
   content: string;
   created_at: string;
 }
@@ -25,6 +25,9 @@ export interface TextAgentConversationRecord {
   created_at: string;
   updated_at: string;
   ended_at: string | null;
+  assigned_to: string | null;
+  handoff_mode: "ai" | "human";
+  unread_count: number;
 }
 
 export interface TextAgentConversationListItem {
@@ -45,4 +48,7 @@ export interface TextAgentConversationListItem {
   created_at: string;
   updated_at: string;
   ended_at: string | null;
+  assigned_to: string | null;
+  handoff_mode: "ai" | "human";
+  unread_count: number;
 }

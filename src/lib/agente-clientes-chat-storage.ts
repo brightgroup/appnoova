@@ -2,7 +2,7 @@ import { extractMicrositeSlugFromPath } from "@/lib/microsite-path";
 
 export interface StoredChatMessage {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "human";
   content: string;
 }
 
@@ -53,7 +53,7 @@ function isValidMessage(m: unknown): m is StoredChatMessage {
   const msg = m as StoredChatMessage;
   return (
     typeof msg.id === "string" &&
-    (msg.role === "user" || msg.role === "assistant") &&
+    (msg.role === "user" || msg.role === "assistant" || msg.role === "human") &&
     typeof msg.content === "string"
   );
 }

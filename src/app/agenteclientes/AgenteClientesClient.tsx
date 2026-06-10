@@ -29,7 +29,7 @@ import type { MicrositeQuickAction } from "@/types/microsite";
 
 interface Message {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "human";
   content: string;
 }
 
@@ -387,6 +387,47 @@ export default function AgenteClientesClient() {
     textareaRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    if (!serverConversationId || !config.chatEndpoint.includes("/api/public/microsite/")) return;
+
+    let cancelled = false;
+    const poll = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch(
+          `${config.chatEndpoint}?conversation_id=${encodeURIComponent(serverConversationId)}&since_index=0`
+        );
+        const data = await res.json();
+        if (!res.ok || !Array.isArray(data.messages)) return;
+
+        setMessages(prev => {
+          const next = [...prev];
+          let changed = false;
+          for (const raw of data.messages as { role: string; content: string }[]) {
+            const role: Message["role"] =
+              raw.role === "human" ? "human" : raw.role === "user" ? "user" : "assistant";
+            const content = String(raw.content ?? "").trim();
+            if (!content) continue;
+            if (next.some(m => m.role === role && m.content === content)) continue;
+            next.push({ id: crypto.randomUUID(), role, content });
+            changed = true;
+          }
+          if (changed) scrollIntentRef.current = "assistant-start";
+          return changed ? next : prev;
+        });
+      } catch {
+        /* polling silencioso */
+      }
+    };
+
+    const timer = window.setInterval(poll, 4000);
+    poll();
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [serverConversationId, config.chatEndpoint]);
+
   const sendMessage = useCallback(async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
@@ -420,10 +461,12 @@ export default function AgenteClientesClient() {
       if (data.conversation_id) {
         setServerConversationId(data.conversation_id);
       }
-      setMessages(prev => [
-        ...prev,
-        { id: crypto.randomUUID(), role: "assistant", content: data.reply }
-      ]);
+      if (data.reply) {
+        setMessages(prev => [
+          ...prev,
+          { id: crypto.randomUUID(), role: "assistant", content: data.reply }
+        ]);
+      }
       scrollIntentRef.current = "assistant-start";
     } catch {
       setError("Error de conexión. Intenta de nuevo.");
@@ -467,7 +510,7 @@ export default function AgenteClientesClient() {
   };
 
   const lastAssistantIndex = messages.reduce(
-    (idx, msg, i) => (msg.role === "assistant" ? i : idx),
+    (idx, msg, i) => (msg.role === "assistant" || msg.role === "human" ? i : idx),
     -1
   );
 

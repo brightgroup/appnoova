@@ -11,3 +11,13 @@ export function isMissingTableError(
     (msg.includes("relation") && msg.includes("does not exist"))
   );
 }
+
+/** Columna inexistente (migración pendiente). Postgres 42703 / PostgREST PGRST204. */
+export function isMissingColumnError(
+  error: { code?: string; message?: string } | null | undefined
+): boolean {
+  if (!error) return false;
+  if (error.code === "42703" || error.code === "PGRST204") return true;
+  const msg = String(error.message ?? "").toLowerCase();
+  return msg.includes("does not exist") && msg.includes("column");
+}
