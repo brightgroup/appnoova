@@ -234,7 +234,7 @@ export default function InboxPage() {
   return (
     <div className="flex h-full min-h-0 flex-1 overflow-hidden bg-noova-main text-white">
       {/* Bandeja — tono intermedio entre menú lateral y área de chat */}
-      <aside className="flex w-[420px] shrink-0 flex-col border-r border-white/[.06] bg-noova-main">
+      <aside className="flex w-[360px] shrink-0 flex-col border-r border-white/[.06] bg-noova-main">
         <div className="flex items-center justify-between border-b border-white/[.05] px-5 py-4">
           <h1 className="text-base font-semibold text-white">Inbox</h1>
           <label className="flex cursor-pointer items-center gap-2.5 text-sm text-white/50">
