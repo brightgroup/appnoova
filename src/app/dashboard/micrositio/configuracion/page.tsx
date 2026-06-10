@@ -321,7 +321,14 @@ function ConfigContent() {
                 <ColorInput value={form.button_color} onChange={v => updateForm({ button_color: v })} />
               </Field>
 
-              <Field label="Estado">
+              <div className="rounded-xl border border-white/[.10] bg-white/[.02] p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-semibold text-white">Publicar micrositio</p>
+                  <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                    En borrador solo tú ves la vista previa interna. Al publicar, tu link queda visible en{" "}
+                    <span className="text-gray-400 font-mono">{publicUrl}</span>
+                  </p>
+                </div>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -330,10 +337,15 @@ function ConfigContent() {
                     className="w-4 h-4 rounded accent-[#5b5bf6]"
                   />
                   <span className="text-sm text-gray-300">
-                    {form.is_published ? "Publicado y visible" : "Borrador (solo vista previa interna)"}
+                    {form.is_published ? "Publicado — visible para clientes" : "Borrador — no visible públicamente"}
                   </span>
                 </label>
-              </Field>
+                {form.is_published && (
+                  <p className="text-[11px] text-emerald-400">
+                    Recuerda pulsar <strong>Guardar cambios</strong> arriba para aplicar.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
