@@ -36,7 +36,7 @@ export default function MicrositioSetupPage() {
       const ctxData = await ctxRes.json();
 
       if (siteRes.ok && siteData.microsite) {
-        router.replace("/dashboard/micrositio/configuracion?tab=general");
+        router.replace("/dashboard/micrositio/configuracion?tab=link");
         return;
       }
 
@@ -86,7 +86,7 @@ export default function MicrositioSetupPage() {
         setError(data.error || "No se pudo crear el link");
         return;
       }
-      router.push("/dashboard/micrositio/configuracion?tab=general");
+      router.push("/dashboard/micrositio/configuracion?tab=link");
     } catch {
       setError("Error de red al crear el link");
     }

@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  ChevronLeft, Save, Loader2, CheckCircle2, Settings2,
-  Zap, Eye, ExternalLink, Copy, Link2, Plus, Trash2, Bot, Globe, Lock
+  ChevronLeft, Save, Loader2, CheckCircle2,
+  Zap, Eye, ExternalLink, Copy, Link2, Plus, Trash2, Globe, Lock, Palette
 } from "lucide-react";
 import { btnPrimary, tabActive, tabIdle } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/text-agents-api";
@@ -20,13 +20,14 @@ import type { BrokerMicrositeFormData, BrokerMicrositeRecord, MicrositeQuickActi
 import type { TextAgentListItem } from "@/types/text-agent";
 import { ImageDropzone } from "@/components/microsite/ImageDropzone";
 import { MicrositeIconPicker } from "@/components/microsite/MicrositeIconPicker";
+import { MicrositePreviewFrame } from "@/components/microsite/MicrositePreviewFrame";
 
-type TabId = "general" | "accesos" | "vista";
+type TabId = "link" | "estilo" | "accesos" | "vista";
 
 function parseTab(tab: string | null): TabId {
-  if (tab === "general" || tab === "accesos" || tab === "vista") return tab;
-  if (tab === "config") return "general";
-  return "general";
+  if (tab === "link" || tab === "estilo" || tab === "accesos" || tab === "vista") return tab;
+  if (tab === "general" || tab === "config") return "link";
+  return "link";
 }
 
 function normalizeRecord(record: BrokerMicrositeRecord): BrokerMicrositeFormData {
@@ -134,8 +135,8 @@ function ConfigContent() {
   useEffect(() => { loadAll(); }, [loadAll]);
 
   const handleSave = async () => {
-    if (!form.text_agent_id) {
-      setError("Selecciona un agente de texto");
+    if (form.is_published && !form.text_agent_id) {
+      setError("Selecciona un agente de texto antes de publicar");
       return;
     }
 
@@ -196,7 +197,8 @@ function ConfigContent() {
   };
 
   const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
-    { id: "general", label: "Configuración", icon: Settings2 },
+    { id: "link", label: "Link y publicación", icon: Link2 },
+    { id: "estilo", label: "Estilo y marca", icon: Palette },
     { id: "accesos", label: "Accesos rápidos", icon: Zap },
     { id: "vista", label: "Vista previa", icon: Eye }
   ];
@@ -262,97 +264,96 @@ function ConfigContent() {
         </div>
       )}
 
-      {activeTab === "general" && (
-        <div className="flex-1 flex min-h-0 overflow-hidden">
-          <div className="w-80 border-r border-white/[.08] p-5 overflow-y-auto shrink-0">
-            <h2 className="text-sm font-semibold text-gray-300 mb-4">Agente y apariencia</h2>
+      {activeTab === "link" && (
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-xl mx-auto space-y-6">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-300">Link y publicación</h2>
+              <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                Asigna el agente, revisa tu URL definitiva y elige si el micrositio está en borrador o publicado.
+              </p>
+            </div>
 
-            <div className="space-y-4">
-              <Field label="Agente de texto">
-                <select
-                  value={form.text_agent_id ?? ""}
-                  onChange={e => updateForm({ text_agent_id: e.target.value || null })}
-                  className={selectCls}
-                >
-                  <option value="">Seleccionar agente</option>
-                  {agents.map(a => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-gray-500 mt-1.5 leading-snug">
-                  El agente ya incluye su contexto de marca y personalidad.
-                </p>
-                <Link href="/dashboard/agentes-texto" className="inline-block mt-2 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]">
-                  Gestionar agentes →
-                </Link>
-              </Field>
+            <PublicUrlPanel
+              publicUrl={publicUrl}
+              isPublished={form.is_published}
+              copied={copied}
+              onCopy={copyUrl}
+            />
 
-              <Field label="Nombre del asistente en el chat">
-                <input
-                  value={form.agent_display_name ?? ""}
-                  onChange={e => updateForm({ agent_display_name: e.target.value.trim() || null })}
-                  placeholder={selectedAgent?.name ?? "Asistente virtual"}
-                  className={inputCls}
-                />
-              </Field>
+            <Field label="Agente de texto">
+              <select
+                value={form.text_agent_id ?? ""}
+                onChange={e => updateForm({ text_agent_id: e.target.value || null })}
+                className={selectCls}
+              >
+                <option value="">Seleccionar agente</option>
+                {agents.map(a => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+              <p className="text-[10px] text-gray-500 mt-1.5 leading-snug">
+                El agente ya incluye su contexto de marca y personalidad.
+              </p>
+              <Link href="/dashboard/agentes-texto" className="inline-block mt-2 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]">
+                Gestionar agentes →
+              </Link>
+            </Field>
 
+            <PublishStatusCard
+              isPublished={form.is_published}
+              hasAgent={!!form.text_agent_id}
+              saved={saved}
+              onSelect={published => updateForm({ is_published: published })}
+            />
+          </div>
+        </div>
+      )}
+
+      {activeTab === "estilo" && (
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-xl mx-auto space-y-6">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-300">Estilo y marca</h2>
+              <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                Personaliza colores, logo, favicon y cómo se muestra el asistente en el chat.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Color de acento">
                 <ColorInput value={form.accent_color} onChange={v => updateForm({ accent_color: v })} />
               </Field>
-
               <Field label="Color de botones">
                 <ColorInput value={form.button_color} onChange={v => updateForm({ button_color: v })} />
               </Field>
-
-              <PublishStatusCard
-                isPublished={form.is_published}
-                hasAgent={!!form.text_agent_id}
-                saved={saved}
-                onSelect={published => updateForm({ is_published: published })}
-              />
             </div>
-          </div>
 
-          <div className="flex-1 p-6 overflow-y-auto">
-            <div className="max-w-xl space-y-6 ml-auto">
-              <PublicUrlPanel
-                publicUrl={publicUrl}
-                isPublished={form.is_published}
-                copied={copied}
-                onCopy={copyUrl}
+            <Field label="Nombre del asistente en el chat">
+              <input
+                value={form.agent_display_name ?? ""}
+                onChange={e => updateForm({ agent_display_name: e.target.value.trim() || null })}
+                placeholder={selectedAgent?.name ?? "Asistente virtual"}
+                className={inputCls}
               />
+            </Field>
 
-              <div>
-                <h3 className="text-sm font-semibold text-gray-300 mb-1">Identidad visual</h3>
-                <p className="text-xs text-gray-500 mb-4">
-                  Arrastra o adjunta el logo y favicon de tu marca. Se suben automáticamente.
-                </p>
-              </div>
+            <ImageDropzone
+              label="Logo"
+              hint="PNG, JPG, WebP o SVG · máx. 5 MB"
+              value={form.logo_url}
+              kind="logo"
+              onChange={url => updateForm({ logo_url: url })}
+            />
 
-              <ImageDropzone
-                label="Logo"
-                hint="PNG, JPG, WebP o SVG · máx. 5 MB"
-                value={form.logo_url}
-                kind="logo"
-                onChange={url => updateForm({ logo_url: url })}
-              />
-
-              <ImageDropzone
-                label="Favicon"
-                hint="Ícono cuadrado · ICO, PNG o SVG"
-                value={form.favicon_url}
-                kind="favicon"
-                onChange={url => updateForm({ favicon_url: url })}
-                compact
-              />
-
-              {!form.text_agent_id && (
-                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200/90 flex gap-2">
-                  <Bot className="w-4 h-4 shrink-0 mt-0.5" />
-                  Asigna un agente de texto para habilitar la vista previa y publicar tu link.
-                </div>
-              )}
-            </div>
+            <ImageDropzone
+              label="Favicon"
+              hint="Ícono cuadrado · ICO, PNG o SVG"
+              value={form.favicon_url}
+              kind="favicon"
+              onChange={url => updateForm({ favicon_url: url })}
+              compact
+            />
           </div>
         </div>
       )}
@@ -451,48 +452,19 @@ function ConfigContent() {
       )}
 
       {activeTab === "vista" && (
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <div className="px-6 py-4 border-b border-white/[.08] flex flex-wrap items-center justify-between gap-3 shrink-0">
-            <div>
-              <p className="text-sm font-medium text-white">Vista previa en tiempo real</p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                URL interna · {!saved ? "Guarda los cambios para actualizar" : "Refleja tu configuración guardada"}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPreviewKey(k => k + 1)}
-                className="px-3 py-1.5 rounded-lg text-xs bg-white/[.06] hover:bg-white/[.10] text-gray-300"
-              >
-                Actualizar vista
-              </button>
-              <a
-                href={previewUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`${btnPrimary} text-xs py-1.5`}
-              >
-                <ExternalLink className="w-3.5 h-3.5" /> Abrir en pestaña
-              </a>
-            </div>
+        !form.text_agent_id ? (
+          <div className="flex-1 flex items-center justify-center text-sm text-gray-400 px-6 text-center">
+            Asigna un agente en la pestaña Link y publicación y guarda para ver la vista previa.
           </div>
-
-          {!form.text_agent_id ? (
-            <div className="flex-1 flex items-center justify-center text-sm text-gray-400 px-6 text-center">
-              Asigna un agente en la pestaña Configuración y guarda para ver la vista previa.
-            </div>
-          ) : (
-            <div className="flex-1 min-h-0 p-4 bg-[#1a1a1a]">
-              <iframe
-                key={previewKey}
-                title="Vista previa del micrositio"
-                src={previewUrl}
-                className="w-full h-full min-h-[480px] rounded-xl border border-white/[.10] bg-white shadow-2xl"
-              />
-            </div>
-          )}
-        </div>
+        ) : (
+          <MicrositePreviewFrame
+            previewUrl={previewUrl}
+            publicUrl={publicUrl}
+            previewKey={previewKey}
+            saved={saved}
+            onRefresh={() => setPreviewKey(k => k + 1)}
+          />
+        )
       )}
     </div>
   );
