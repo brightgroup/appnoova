@@ -54,11 +54,7 @@ export default function LoginPage() {
   };
 
   return (
-    <>
-      <div className="bg-aurora" aria-hidden="true" />
-      <div className="bg-grid"   aria-hidden="true" />
-
-      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-12">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#06070d] px-4 py-12">
 
         {/* Logo */}
         <Link href="/" className="mb-10 flex items-center">
@@ -142,7 +138,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary mt-2 w-full justify-center py-3 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#5b5bf6] py-3 text-sm font-semibold text-white transition-all hover:bg-[#7070f8] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Ingresando...</>
@@ -163,7 +159,6 @@ export default function LoginPage() {
         <p className="mt-8 text-xs text-gray-700">
           © 2026 BG Soluciones · Noova 360
         </p>
-      </div>
-    </>
+    </div>
   );
 }

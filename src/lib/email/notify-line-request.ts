@@ -2,6 +2,7 @@ import { adminClient } from "@/lib/voice-agents-server";
 import { getAppBaseUrl } from "@/lib/telephony/app-url";
 import { countryLabel } from "@/lib/telephony/countries";
 import type { PhoneLineRequestRecord } from "@/types/phone-line-request";
+import { sendEmail, type SendEmailResult } from "@/lib/email/send";
 
 export interface LineRequestNotifyContext {
   request: PhoneLineRequestRecord;
@@ -56,43 +57,19 @@ function buildHtml(ctx: LineRequestNotifyContext): string {
 }
 
 /** Envía email a admins vía Resend. No lanza error si falta configuración. */
-export async function notifyAdminsLineRequest(ctx: LineRequestNotifyContext): Promise<{ sent: boolean; reason?: string }> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
+export async function notifyAdminsLineRequest(ctx: LineRequestNotifyContext): Promise<SendEmailResult> {
   const admins = await getAdminEmails();
-
   if (!admins.length) {
     console.warn("[email:line-request] Sin destinatarios — configura NOOVA_ADMIN_EMAIL o usuarios admin");
     return { sent: false, reason: "no_recipients" };
   }
 
-  if (!apiKey) {
-    console.warn("[email:line-request] RESEND_API_KEY no configurada — solicitud guardada sin email");
-    return { sent: false, reason: "no_api_key" };
-  }
-
-  const from = process.env.RESEND_FROM_EMAIL ?? "Noova <onboarding@resend.dev>";
   const clientLabel = ctx.clientName || ctx.clientEmail || "Cliente";
   const subject = `Nueva solicitud de línea — ${clientLabel}`;
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      from,
-      to: admins,
-      subject,
-      html: buildHtml(ctx)
-    })
+  return sendEmail({
+    to: admins,
+    subject,
+    html: buildHtml(ctx)
   });
-
-  if (!res.ok) {
-    const err = await res.text().catch(() => "");
-    console.error("[email:line-request] Resend error:", res.status, err);
-    return { sent: false, reason: "send_failed" };
-  }
-
-  return { sent: true };
 }

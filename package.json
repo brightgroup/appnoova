@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "NODE_ENV=production tsx server.ts",
     "lint": "next lint",
-    "backup:db": "node scripts/backup-supabase.mjs"
+    "backup:db": "node scripts/backup-supabase.mjs",
+    "email:test": "node scripts/test-resend-email.mjs",
+    "email:configure-supabase": "node scripts/configure-supabase-resend-smtp.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.8.0",
