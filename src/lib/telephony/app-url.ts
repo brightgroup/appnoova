@@ -14,6 +14,10 @@ export function twilioStatusWebhookUrl(): string {
   return `${getAppBaseUrl()}/api/telephony/webhooks/twilio/status`;
 }
 
+export function twilioWhatsAppWebhookUrl(): string {
+  return `${getAppBaseUrl()}/api/telephony/webhooks/twilio/whatsapp`;
+}
+
 /** WebSocket DIY (Node server.ts) — fallback si no hay Pipecat. */
 export function telnyxMediaStreamWsUrl(): string {
   const base = getAppBaseUrl().replace(/\/$/, "");

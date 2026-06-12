@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { persistHumanReply } from "@/lib/text-conversation-persist";
+import { sendWhatsAppOutboundForConversation } from "@/lib/whatsapp/process-inbound";
 import { toTextConversationRecord } from "@/lib/text-conversation-record";
 import { isMissingTableError } from "@/lib/supabase-table-error";
 import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
@@ -62,6 +63,14 @@ export async function POST(req: NextRequest) {
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error ?? "No se pudo enviar" }, { status: 500 });
+  }
+
+  const waSend = await sendWhatsAppOutboundForConversation(db, userId, conversationId, content);
+  if (!waSend.ok) {
+    return NextResponse.json(
+      { error: waSend.error ?? "Mensaje guardado pero no se pudo enviar por WhatsApp" },
+      { status: 502 }
+    );
   }
 
   const { data: updated, error: reloadErr } = await db

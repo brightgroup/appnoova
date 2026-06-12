@@ -247,13 +247,10 @@ export default function AgenteClientesClient() {
   const config = useMicrosite();
   const pathname = usePathname();
   const chatScope = useMemo(() => getChatScopeFromPath(pathname), [pathname]);
-  const initialState = useMemo(() => loadConversationState(chatScope), [chatScope]);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(initialState.activeId);
-  const [conversations, setConversations] = useState<StoredConversation[]>(initialState.conversations);
-  const [messages, setMessages] = useState<Message[]>(initialState.messages);
-  const [serverConversationId, setServerConversationId] = useState<string | null>(
-    initialState.serverConversationId
-  );
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<StoredConversation[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [serverConversationId, setServerConversationId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const chatScopeRef = useRef(chatScope);
   const skipPersistRef = useRef(true);
@@ -283,16 +280,13 @@ export default function AgenteClientesClient() {
   useEffect(() => {
     chatScopeRef.current = chatScope;
     skipPersistRef.current = true;
-    applyConversationState(loadConversationState(chatScope));
-    scrollIntentRef.current = "conversation-load";
-    setHistoryOpen(false);
-  }, [chatScope, applyConversationState]);
-
-  useEffect(() => {
-    if (initialState.messages.length > 0) {
+    const state = loadConversationState(chatScope);
+    applyConversationState(state);
+    if (state.messages.length > 0) {
       scrollIntentRef.current = "conversation-load";
     }
-  }, [initialState.messages.length]);
+    setHistoryOpen(false);
+  }, [chatScope, applyConversationState]);
 
   useEffect(() => {
     if (skipPersistRef.current) {

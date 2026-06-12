@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Users, BarChart3, Phone, Settings } from "lucide-react";
+import { Users, BarChart3, Phone, Settings, MessageCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function AdminDashboard() {
@@ -32,6 +32,12 @@ export default function AdminDashboard() {
       label: "Líneas telefónicas",
       description: "Comprar y asignar números Twilio/Telnyx",
       icon: Phone
+    },
+    {
+      href: "/admin/whatsapp",
+      label: "WhatsApp (Twilio)",
+      description: "Registrar líneas WA Fase 0 y webhook",
+      icon: MessageCircle
     },
     {
       href: "/admin/templates",

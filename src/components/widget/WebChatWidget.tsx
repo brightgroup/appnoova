@@ -28,25 +28,33 @@ function enabledQuickActions(config: PublicMicrositeConfig) {
 }
 
 export default function WebChatWidget({ config, previewMode = false }: WebChatWidgetProps) {
-  const initial = loadWidgetChat(config.slug);
-  const [tab, setTab] = useState<TabId>(initial.messages.length > 0 ? "chat" : "home");
-  const [messages, setMessages] = useState<WidgetMessage[]>(initial.messages);
-  const [serverConversationId, setServerConversationId] = useState<string | null>(
-    initial.serverConversationId
-  );
+  const [tab, setTab] = useState<TabId>("home");
+  const [messages, setMessages] = useState<WidgetMessage[]>([]);
+  const [serverConversationId, setServerConversationId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [handoffMode, setHandoffMode] = useState<"ai" | "human">("ai");
   const [error, setError] = useState("");
   const showAiTyping = loading && handoffMode === "ai";
   const scrollRef = useRef<HTMLDivElement>(null);
-  const prevCountRef = useRef(messages.length);
+  const prevCountRef = useRef(0);
+  const chatHydratedRef = useRef(false);
 
   const accent = config.accent || "#5b5bf6";
   const buttonColor = config.buttonColor || accent;
   const quickActions = enabledQuickActions(config);
 
   useEffect(() => {
+    const stored = loadWidgetChat(config.slug);
+    setMessages(stored.messages);
+    setServerConversationId(stored.serverConversationId);
+    if (stored.messages.length > 0) setTab("chat");
+    prevCountRef.current = stored.messages.length;
+    chatHydratedRef.current = true;
+  }, [config.slug]);
+
+  useEffect(() => {
+    if (!chatHydratedRef.current) return;
     saveWidgetChat(config.slug, { messages, serverConversationId });
   }, [config.slug, messages, serverConversationId]);
 
