@@ -202,7 +202,7 @@ function LandingPageContent() {
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight mb-5 text-white tracking-tight">
               La ia que{" "}
-              <span className="text-[#a5a5ff]">atiende y opera</span>{" "}
+              <span className="text-[#a5a5ff]">atiende y gestiona</span>{" "}
               su operación de seguros
             </h1>
 
