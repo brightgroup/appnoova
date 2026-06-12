@@ -76,12 +76,15 @@ export async function POST(req: NextRequest) {
 
   const emailResult = await notifyLandingLead(data);
 
+  const devEmailDebug =
+    process.env.NODE_ENV !== "production" && emailResult.sent === false
+      ? { email_reason: emailResult.reason, email_detail: emailResult.detail }
+      : {};
+
   return NextResponse.json({
     ok: true,
     id: data.id,
     email_sent: emailResult.sent,
-    ...(process.env.NODE_ENV !== "production" && !emailResult.sent
-      ? { email_reason: emailResult.reason, email_detail: "detail" in emailResult ? emailResult.detail : undefined }
-      : {})
+    ...devEmailDebug
   });
 }
