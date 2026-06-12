@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import PricingSection from "@/components/landing/PricingSection";
 import LeadCaptureButton from "@/components/landing/LeadCaptureButton";
-import { LeadCaptureProvider } from "@/components/landing/LeadCaptureProvider";
+import { LeadCaptureProvider, LeadCaptureUrlOpener } from "@/components/landing/LeadCaptureProvider";
 import LandingWidgetEmbed from "@/components/landing/LandingWidgetEmbed";
 
 const USE_CASES = [
@@ -479,6 +479,7 @@ function LandingPageContent() {
 export default function LandingPage() {
   return (
     <LeadCaptureProvider>
+      <LeadCaptureUrlOpener />
       <LandingPageContent />
       <LandingWidgetEmbed />
     </LeadCaptureProvider>

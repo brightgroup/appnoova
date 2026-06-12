@@ -35,6 +35,10 @@ const defaultTitles: Record<string, { title: string; subtitle: string }> = {
   demo: {
     title: "Agendar demo gratuita",
     subtitle: "Le contactamos en horario hábil"
+  },
+  acceso: {
+    title: "Solicitar acceso a Noova 360",
+    subtitle: "Complete el formulario y activaremos su cuenta manualmente"
   }
 };
 

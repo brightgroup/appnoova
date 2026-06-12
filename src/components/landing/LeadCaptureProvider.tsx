@@ -59,3 +59,22 @@ export function useLeadCapture(): LeadCaptureContextValue {
   }
   return ctx;
 }
+
+/** Abre el formulario cuando la URL trae ?solicitar=acceso (login / signup). */
+export function LeadCaptureUrlOpener() {
+  const { openLeadCapture } = useLeadCapture();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("solicitar") !== "acceso") return;
+
+    openLeadCapture({
+      source: "request_access",
+      planInterest: "acceso",
+      title: "Solicitar acceso a Noova 360",
+      subtitle: "Complete el formulario y activaremos su cuenta manualmente"
+    });
+  }, [openLeadCapture]);
+
+  return null;
+}

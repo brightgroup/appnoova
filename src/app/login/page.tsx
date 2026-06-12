@@ -148,10 +148,13 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-xs text-gray-300">
-            ¿No tienes cuenta?{" "}
-            <Link href="/signup" className="text-[#5b5bf6] hover:text-[#a5a5ff] transition-colors font-semibold">
-              Crear una cuenta
+          <p className="mt-6 text-center text-xs text-gray-300 leading-relaxed">
+            ¿Aún no tiene acceso?{" "}
+            <Link
+              href="/?solicitar=acceso"
+              className="text-[#5b5bf6] hover:text-[#a5a5ff] transition-colors font-semibold"
+            >
+              Solicitar acceso
             </Link>
           </p>
         </div>
