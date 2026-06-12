@@ -17,7 +17,15 @@ import { isPurchasedNumber, isVerifiedNumber } from "@/lib/telephony/number-type
 import { ClientLineWizard } from "@/components/telephony/ClientLineWizard";
 import type { PhoneNumberRecord } from "@/types/phone-number";
 
-export function ClientTelephonyPanel() {
+export function ClientTelephonyPanel({
+  backHref = "/dashboard/agentes-voz",
+  title = "Números telefónicos",
+  subtitle = "Verificados (outbound) y comprados (inbound + outbound)"
+}: {
+  backHref?: string;
+  title?: string;
+  subtitle?: string;
+} = {}) {
   const [lines, setLines] = useState<PhoneNumberRecord[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -90,14 +98,14 @@ export function ClientTelephonyPanel() {
         <div className={registryToolbar}>
           <div className="flex items-center gap-3 min-w-0">
             <Link
-              href="/dashboard/agentes-voz"
+              href={backHref}
               className="p-1.5 hover:bg-white/[.06] rounded-lg text-gray-400 hover:text-white shrink-0"
             >
               <ChevronLeft className="w-5 h-5" />
             </Link>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Números telefónicos</h1>
-              <p className={`text-xs ${textMuted} mt-0.5`}>Verificados (outbound) y comprados (inbound + outbound)</p>
+              <h1 className="text-xl font-bold tracking-tight">{title}</h1>
+              <p className={`text-xs ${textMuted} mt-0.5`}>{subtitle}</p>
             </div>
           </div>
         </div>

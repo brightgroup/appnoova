@@ -68,3 +68,33 @@ export function getMicrositePublicBaseUrl(): string {
 export function buildMicrositePublicUrl(slug: string): string {
   return `${getMicrositePublicBaseUrl()}/${slug}`;
 }
+
+export function getWidgetAppOrigin(): string {
+  return stripTrailingSlash(
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NOOVA_APP_URL ||
+    "https://app.noova360.com"
+  );
+}
+
+export function buildWidgetPageUrl(slug: string): string {
+  return `${getWidgetAppOrigin()}/widget/${slug}`;
+}
+
+export function buildWidgetEmbedScriptUrl(): string {
+  return `${getWidgetAppOrigin()}/noova-widget.js`;
+}
+
+export function buildWidgetEmbedSnippet(slug: string, accentColor?: string): string {
+  const base = getWidgetAppOrigin();
+  const scriptUrl = buildWidgetEmbedScriptUrl();
+  const colorAttr = accentColor?.trim()
+    ? `\n  data-color="${accentColor.trim()}"`
+    : "";
+  return `<script
+  src="${scriptUrl}"
+  data-slug="${slug}"
+  data-base="${base}"${colorAttr}
+  async
+></script>`;
+}

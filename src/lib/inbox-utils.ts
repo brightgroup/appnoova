@@ -17,9 +17,17 @@ export function formatInboxDisplayTitle(
   if (channel === "web_widget") {
     if (contactLabel.startsWith("anonymous-")) {
       const suffix = contactLabel.replace("anonymous-", "").replace(".", "").slice(-6);
-      return `Visitante micrositio #${suffix || shortId}`;
+      return `Visitante Mi Link #${suffix || shortId}`;
     }
-    return `Visitante micrositio #${shortId}`;
+    return `Visitante Mi Link #${shortId}`;
+  }
+
+  if (channel === "web_embed") {
+    if (contactLabel.startsWith("anonymous-")) {
+      const suffix = contactLabel.replace("anonymous-", "").replace(".", "").slice(-6);
+      return `Visitante widget #${suffix || shortId}`;
+    }
+    return `Visitante widget #${shortId}`;
   }
 
   if (channel === "web_test") {

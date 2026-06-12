@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard, Building2, Loader2 } from "lucide-react";
+import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard, Building2, Loader2, Share2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
@@ -9,38 +9,47 @@ import { supabase } from "@/lib/supabase";
 import {
   sidebarNavActive, sidebarNavIdle, sidebarIconActive, sidebarBadge, sidebarPlanCard
 } from "@/lib/brand-ui";
+import { CANALES_NAV } from "@/lib/canales-nav";
+import { AGENTES_VOZ_NAV } from "@/lib/agentes-voz-nav";
+import { AGENTES_TEXTO_NAV } from "@/lib/agentes-texto-nav";
+import type { LucideIcon } from "lucide-react";
 
 function SidebarSubMenu({
   items,
   pathname
 }: {
-  items: { name: string; href: string }[];
+  items: { name: string; href: string; icon?: LucideIcon }[];
   pathname: string;
 }) {
   return (
-    <div className="ml-8 mt-1 space-y-1.5 pb-2">
+    <div className="ml-4 mt-1 space-y-0.5 pb-2">
       {items.map((item, i) => {
         const active =
           item.href !== "#" &&
           (pathname === item.href || pathname.startsWith(`${item.href}/`));
+        const Icon = item.icon;
         return (
           <Link
             key={i}
             href={item.href}
-            className={`group flex items-center gap-3 px-3 py-2 text-sm font-medium transition-colors ${
+            className={`group flex items-center gap-2.5 px-3 py-2 text-sm font-medium transition-colors rounded-lg ${
               active
-                ? "text-[#a5a5ff]"
-                : "text-white hover:text-gray-100"
+                ? "text-[#a5a5ff] bg-[#5b5bf6]/10"
+                : "text-gray-300 hover:text-white hover:bg-white/[.06]"
             }`}
           >
-            <span
-              aria-hidden
-              className={`shrink-0 rounded-[3px] transition-all duration-200 ${
-                active
-                  ? "h-2 w-2 bg-[#5b5bf6] shadow-[0_0_8px_rgba(91,91,246,0.4)]"
-                  : "h-1.5 w-1.5 bg-white/20 group-hover:bg-white/35"
-              }`}
-            />
+            {Icon ? (
+              <Icon className={`w-4 h-4 shrink-0 ${active ? "text-[#a5a5ff]" : "text-gray-500 group-hover:text-gray-300"}`} />
+            ) : (
+              <span
+                aria-hidden
+                className={`shrink-0 rounded-[3px] transition-all duration-200 ${
+                  active
+                    ? "h-2 w-2 bg-[#5b5bf6] shadow-[0_0_8px_rgba(91,91,246,0.4)]"
+                    : "h-1.5 w-1.5 bg-white/20 group-hover:bg-white/35"
+                }`}
+              />
+            )}
             <span className="truncate">{item.name}</span>
           </Link>
         );
@@ -62,10 +71,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setExpandedMenu("voz");
     } else if (
       pathname.startsWith("/dashboard/agentes-texto") ||
-      pathname.startsWith("/dashboard/micrositio") ||
       pathname.startsWith("/dashboard/inbox")
     ) {
       setExpandedMenu("texto");
+    } else if (
+      pathname.startsWith("/dashboard/canales") ||
+      pathname.startsWith("/dashboard/micrositio")
+    ) {
+      setExpandedMenu("canales");
     }
   }, [pathname]);
 
@@ -172,17 +185,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
             </button>
             {sidebarOpen && expandedMenu === "voz" && (
-              <SidebarSubMenu
-                pathname={pathname}
-                items={[
-                  { name: "Agentes", href: "/dashboard/agentes-voz" },
-                  { name: "Historial", href: "#" },
-                  { name: "Números telefónicos", href: "/dashboard/agentes-voz/numeros" },
-                  { name: "Números de prueba", href: "/dashboard/agentes-voz/numeros-prueba" },
-                  { name: "Troncales SIP", href: "#" },
-                  { name: "Canales", href: "#" }
-                ]}
-              />
+              <SidebarSubMenu pathname={pathname} items={AGENTES_VOZ_NAV} />
             )}
           </div>
 
@@ -208,18 +211,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
             </button>
             {sidebarOpen && expandedMenu === "texto" && (
-              <SidebarSubMenu
-                pathname={pathname}
-                items={[
-                  { name: "Agentes", href: "/dashboard/agentes-texto" },
-                  { name: "Mi link", href: "/dashboard/micrositio" },
-                  { name: "Inbox", href: "/dashboard/inbox" },
-                  { name: "Text Logs", href: "#" },
-                  { name: "Equipos", href: "#" },
-                  { name: "Plantillas", href: "#" },
-                  { name: "Canales", href: "/dashboard/micrositio/configuracion?tab=link" }
-                ]}
-              />
+              <SidebarSubMenu pathname={pathname} items={AGENTES_TEXTO_NAV} />
+            )}
+          </div>
+
+          {/* Canales */}
+          <div>
+            <button
+              onClick={() => toggleMenu("canales")}
+              className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-gray-300 ${
+                sidebarOpen ? "hover:text-white hover:bg-white/[.08]" : "hover:text-white"
+              } ${
+                expandedMenu === "canales" && sidebarOpen ? "text-white bg-white/[.08]" : ""
+              }`}
+              title="Canales"
+            >
+              {sidebarOpen ? (
+                <>
+                  <Share2 className="w-5 h-5 flex-shrink-0 mr-3" />
+                  <span className="flex-1 text-left">Canales</span>
+                  <ChevronRight className={`w-4 h-4 transition-transform ml-2 ${expandedMenu === "canales" ? "rotate-90" : ""}`} />
+                </>
+              ) : (
+                <Share2 className="w-5 h-5 flex-shrink-0" />
+              )}
+            </button>
+            {sidebarOpen && expandedMenu === "canales" && (
+              <SidebarSubMenu pathname={pathname} items={CANALES_NAV} />
             )}
           </div>
 

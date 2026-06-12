@@ -29,7 +29,8 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/admin") ||
     pathname === "/favicon.ico" ||
-    pathname === "/logo-noova.png"
+    pathname === "/logo-noova.png" ||
+    pathname === "/noova-widget.js"
   ) {
     if (pathname.startsWith("/dashboard") || pathname.startsWith("/admin")) {
       const appBase = process.env.NEXT_PUBLIC_APP_URL || "https://app.noova360.com";
@@ -55,5 +56,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|logo-noova.png).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|logo-noova.png|noova-widget.js).*)"],
 };

@@ -3,7 +3,7 @@ export function isMissingTableError(
   error: { code?: string; message?: string } | null | undefined
 ): boolean {
   if (!error) return false;
-  if (error.code === "42P01") return true;
+  if (error.code === "42P01" || error.code === "PGRST205") return true;
   const msg = String(error.message ?? "").toLowerCase();
   return (
     msg.includes("schema cache") ||

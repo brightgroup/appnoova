@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "NEXT_DIST_DIR=.next-dev tsx server.ts",
+    "dev:clean": "rm -rf .next-dev && NEXT_DIST_DIR=.next-dev tsx server.ts",
     "build": "next build",
     "start": "NODE_ENV=production tsx server.ts",
     "lint": "next lint",

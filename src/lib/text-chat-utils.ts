@@ -70,13 +70,15 @@ export function displayChatId(id: string): string {
 export function channelLabel(channel: string): string {
   if (channel === "web_test") return "Prueba web";
   if (channel === "whatsapp") return "WhatsApp";
-  if (channel === "web_widget") return "Micrositio";
+  if (channel === "web_widget") return "Mi Link";
+  if (channel === "web_embed") return "Widget web";
   if (channel === "voice_test") return "Voz prueba";
   return channel;
 }
 
 export function inboxChannelBadge(channel: string): string {
-  if (channel === "web_widget") return "Web";
+  if (channel === "web_widget") return "Mi Link";
+  if (channel === "web_embed") return "Widget";
   if (channel === "web_test") return "API";
   if (channel === "voice_test") return "Voz";
   return "API";

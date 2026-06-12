@@ -32,6 +32,7 @@ import {
 import PricingSection from "@/components/landing/PricingSection";
 import LeadCaptureButton from "@/components/landing/LeadCaptureButton";
 import { LeadCaptureProvider } from "@/components/landing/LeadCaptureProvider";
+import LandingWidgetEmbed from "@/components/landing/LandingWidgetEmbed";
 
 const USE_CASES = [
   {
@@ -479,6 +480,7 @@ export default function LandingPage() {
   return (
     <LeadCaptureProvider>
       <LandingPageContent />
+      <LandingWidgetEmbed />
     </LeadCaptureProvider>
   );
 }

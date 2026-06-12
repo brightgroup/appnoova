@@ -217,7 +217,7 @@ export default function InboxPage() {
   const assignLabel =
     detail?.handoff_mode === "human" && detail?.assigned_to
       ? detail.assigned_to
-      : "Asignar a";
+      : "IA";
 
   const detailTitle =
     detail?.display_title ??

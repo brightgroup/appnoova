@@ -259,7 +259,9 @@ export default function AgenteClientesClient() {
   const skipPersistRef = useRef(true);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [handoffMode, setHandoffMode] = useState<"ai" | "human">("ai");
   const [error, setError] = useState("");
+  const showAiTyping = loading && handoffMode === "ai";
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -395,6 +397,10 @@ export default function AgenteClientesClient() {
   }, []);
 
   useEffect(() => {
+    setHandoffMode("ai");
+  }, [serverConversationId]);
+
+  useEffect(() => {
     if (!serverConversationId || !config.chatEndpoint.includes("/api/public/microsite/")) return;
 
     let cancelled = false;
@@ -406,6 +412,9 @@ export default function AgenteClientesClient() {
         );
         const data = await res.json();
         if (!res.ok || !Array.isArray(data.messages)) return;
+
+        if (data.handoff_mode === "human") setHandoffMode("human");
+        else if (data.handoff_mode === "ai") setHandoffMode("ai");
 
         setMessages(prev => {
           const next = [...prev];
@@ -465,6 +474,9 @@ export default function AgenteClientesClient() {
         setError(data.error || "No se pudo obtener respuesta");
         return;
       }
+      if (data.handoff || data.handoff_mode === "human") {
+        setHandoffMode("human");
+      }
       const assistantMsg = data.reply
         ? { id: crypto.randomUUID(), role: "assistant" as const, content: data.reply }
         : null;
@@ -492,7 +504,7 @@ export default function AgenteClientesClient() {
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, config.chatEndpoint, serverConversationId, chatScope, activeConversationId]);
+  }, [messages, loading, handoffMode, config.chatEndpoint, serverConversationId, chatScope, activeConversationId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -649,7 +661,7 @@ export default function AgenteClientesClient() {
                     </div>
                   </div>
                 ))}
-                {loading && <TypingIndicator />}
+                {showAiTyping && <TypingIndicator />}
               </div>
             </div>
 

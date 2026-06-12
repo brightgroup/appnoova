@@ -3,10 +3,14 @@ import { GoogleGenAI } from "@google/genai";
 import { makeVisitorLabel } from "@/lib/inbox-utils";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { resolveMicrositeAgentForChat } from "@/lib/microsite-server";
+import { resolveWidgetAgentForChat } from "@/lib/widget-server";
+import { isLandingWidgetPreview } from "@/lib/landing-widget";
+import { WEB_EMBED_CHANNEL } from "@/lib/widget-channel";
 import { geminiTextTemperature } from "@/lib/text-agent-form";
 import { persistChatTurn, persistUserMessageOnly } from "@/lib/text-conversation-persist";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
+import { resolvePublicChatChannel } from "@/lib/widget-channel";
 import { getOriApiKey } from "@/lib/google-ai";
 
 interface ChatMessage {
@@ -14,17 +18,20 @@ interface ChatMessage {
   content: string;
 }
 
-const HANDOFF_REPLY =
-  "Un asesor humano te atenderá en breve. Gracias por tu paciencia.";
-
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const resolved = await resolveMicrositeAgentForChat(slug);
+  const channelParam = req.nextUrl.searchParams.get("channel");
+  const preview = req.nextUrl.searchParams.get("preview");
+  const widgetPreview = channelParam === WEB_EMBED_CHANNEL && isLandingWidgetPreview(slug, preview);
+  const resolved =
+    channelParam === WEB_EMBED_CHANNEL
+      ? await resolveWidgetAgentForChat(slug, { requirePublished: !widgetPreview })
+      : await resolveMicrositeAgentForChat(slug);
   if (!resolved) {
-    return NextResponse.json({ error: "Micrositio no disponible" }, { status: 404 });
+    return NextResponse.json({ error: "Canal no disponible" }, { status: 404 });
   }
 
   const conversationId = req.nextUrl.searchParams.get("conversation_id");
@@ -60,13 +67,18 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const resolved = await resolveMicrositeAgentForChat(slug);
+  const body = await req.json();
+  const channel = resolvePublicChatChannel(body.channel);
+  const widgetPreview = channel === WEB_EMBED_CHANNEL && isLandingWidgetPreview(slug, body.preview);
+  const resolved =
+    channel === WEB_EMBED_CHANNEL
+      ? await resolveWidgetAgentForChat(slug, { requirePublished: !widgetPreview })
+      : await resolveMicrositeAgentForChat(slug);
 
   if (!resolved) {
-    return NextResponse.json({ error: "Micrositio no disponible" }, { status: 404 });
+    return NextResponse.json({ error: "Canal no disponible" }, { status: 404 });
   }
 
-  const body = await req.json();
   const messages = (body.messages ?? []) as ChatMessage[];
   const conversationId = body.conversation_id as string | undefined;
   const lastUser = [...messages].reverse().find(m => m.role === "user");
@@ -88,7 +100,6 @@ export async function POST(
       .maybeSingle();
 
     if (existing?.handoff_mode === "human") {
-      const contactLabel = makeVisitorLabel();
       const persisted = await persistUserMessageOnly({
         db,
         userId,
@@ -97,13 +108,18 @@ export async function POST(
         conversationId,
         userMessage: lastUser.content.trim(),
         llmModel: model,
-        channel: "web_widget",
-        contactLabel
+        channel,
+        bumpUnread: true
       });
 
+      if (persisted.error) {
+        return NextResponse.json({ error: persisted.error }, { status: 500 });
+      }
+
+      // Sin reply: un asesor ya atiende; el visitante verá respuestas vía polling (rol human).
       return NextResponse.json({
-        reply: HANDOFF_REPLY,
         handoff: true,
+        handoff_mode: "human",
         conversation_id: persisted.conversationId || conversationId
       });
     }
@@ -148,7 +164,7 @@ export async function POST(
         userMessage: lastUser.content.trim(),
         assistantReply: reply,
         llmModel: model,
-        channel: "web_widget",
+        channel,
         contactLabel
       });
       if (persisted.conversationId) savedConversationId = persisted.conversationId;
