@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MessageCircle, Plus, Clock } from "lucide-react";
 import {
@@ -90,12 +91,9 @@ export default function WhatsAppListPage() {
       onRefresh={load}
       refreshing={loading}
       action={
-        <a
-          href="/?solicitar=acceso"
-          className={`${btnGhost} opacity-90`}
-        >
+        <Link href="/?solicitar=acceso" className={`${btnGhost} opacity-90`}>
           <Plus className="w-4 h-4" /> Solicitar línea
-        </a>
+        </Link>
       }
       footer={
         filtered.length > 0 ? (
