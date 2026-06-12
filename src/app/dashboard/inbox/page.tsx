@@ -58,33 +58,37 @@ export default function InboxPage() {
   const assignRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const loadList = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  const loadList = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    if (!silent) setError("");
     try {
       const headers = await getAuthHeaders();
       const res = await fetch(`/api/inbox?filter=${filter}`, { headers });
       if (res.status === 404) {
-        setError("El Inbox aún no está desplegado en este entorno. Usa localhost o haz deploy a producción.");
+        if (!silent) {
+          setError("El Inbox aún no está desplegado en este entorno. Usa localhost o haz deploy a producción.");
+        }
         setItems([]);
         return;
       }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(
-          data.error ||
-          (res.status === 503
-            ? "Falta la migración 016_inbox_handoff en Supabase."
-            : "Error al cargar inbox")
-        );
+        if (!silent) {
+          setError(
+            data.error ||
+            (res.status === 503
+              ? "Falta la migración 016_inbox_handoff en Supabase."
+              : "Error al cargar inbox")
+          );
+        }
         return;
       }
       setItems(data.items ?? []);
       if (data.current_user_name) setCurrentUserName(data.current_user_name);
     } catch {
-      setError("Error de red al conectar con /api/inbox");
+      if (!silent) setError("Error de red al conectar con /api/inbox");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [filter]);
 
@@ -116,6 +120,11 @@ export default function InboxPage() {
   }, []);
 
   useEffect(() => { loadList(); }, [loadList]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => loadList(true), 5000);
+    return () => window.clearInterval(timer);
+  }, [loadList]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -265,7 +274,7 @@ export default function InboxPage() {
           </div>
           <button
             type="button"
-            onClick={loadList}
+            onClick={() => loadList()}
             className="rounded-xl border border-white/[.08] bg-white/[.08] p-2.5 text-white/50 transition-colors hover:text-white"
             aria-label="Actualizar"
           >
