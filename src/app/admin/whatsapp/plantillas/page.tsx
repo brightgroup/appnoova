@@ -2,65 +2,61 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ChevronLeft, FileText, Loader2, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, Clock, Loader2 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import {
   btnGhost,
-  btnPrimary,
   registryContent,
   registryTable,
   registryTableCell,
   registryTableHead,
   registryTableHeadCell,
   registryTableHeadRow,
-  registryTableRowClickable,
   textMuted
 } from "@/lib/brand-ui";
 import {
   templateStatusColor,
   templateStatusLabel
 } from "@/lib/whatsapp/template-record";
-import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
-import type { WhatsAppTemplateRecord } from "@/types/whatsapp-template";
+import type { WhatsAppTemplateStatus } from "@/types/whatsapp-template";
 
-export default function AdminWhatsAppTemplatesPage() {
-  const router = useRouter();
-  const [templates, setTemplates] = useState<WhatsAppTemplateRecord[]>([]);
-  const [channels, setChannels] = useState<WhatsAppChannelRecord[]>([]);
+interface PendingRow {
+  id: string;
+  template_name: string;
+  status: string;
+  category: string;
+  body_source: string | null;
+  body_preview: string;
+  updated_at: string;
+  rejection_reason: string | null;
+  channel_e164: string | null;
+  user_email: string | null;
+  user_nombre: string | null;
+}
+
+export default function AdminWhatsAppPendingTemplatesPage() {
+  const [templates, setTemplates] = useState<PendingRow[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [filterChannel, setFilterChannel] = useState("");
+  const [filter, setFilter] = useState<"pending_approval" | "all_pending">("pending_approval");
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [tplRes, chRes] = await Promise.all([
-      authFetch(
-        filterChannel
-          ? `/api/admin/whatsapp/templates?whatsapp_channel_id=${filterChannel}`
-          : "/api/admin/whatsapp/templates"
-      ),
-      authFetch("/api/admin/whatsapp/channels")
-    ]);
-    const tplData = await tplRes.json();
-    const chData = await chRes.json();
-    if (tplRes.ok) setTemplates(tplData.templates ?? []);
-    if (chRes.ok) setChannels(chData.channels ?? []);
+    const res = await authFetch(`/api/admin/whatsapp/templates?status=${filter}`);
+    const data = await res.json();
+    if (res.ok) {
+      setTemplates(data.templates ?? []);
+      setPendingCount(data.pending_count ?? 0);
+    }
     setLoading(false);
-  }, [filterChannel]);
+  }, [filter]);
 
   useEffect(() => { load(); }, [load]);
 
-  const deleteTemplate = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm("¿Eliminar esta plantilla de Noova?")) return;
-    const res = await authFetch(`/api/admin/whatsapp/templates?id=${id}`, { method: "DELETE" });
-    if (res.ok) load();
-  };
-
-  const channelLabel = (channelId: string) => {
-    const ch = channels.find(c => c.id === channelId);
-    return ch ? `${ch.e164}${ch.friendly_name ? ` — ${ch.friendly_name}` : ""}` : "—";
-  };
+  useEffect(() => {
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   return (
     <div className="flex-1 flex flex-col bg-[#0d0e14] text-white min-h-0">
@@ -72,37 +68,48 @@ export default function AdminWhatsAppTemplatesPage() {
             </Link>
             <div>
               <h1 className="text-xl font-bold flex items-center gap-2">
-                <FileText className="w-5 h-5 text-[#5b5bf6]" />
-                Plantillas WhatsApp
+                <Clock className="w-5 h-5 text-amber-400" />
+                Aprobaciones pendientes
+                {pendingCount > 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-medium">
+                    {pendingCount}
+                  </span>
+                )}
               </h1>
               <p className={`${textMuted} text-xs mt-0.5`}>
-                Crea, envía y monitorea la aprobación de plantillas
+                Plantillas enviadas por clientes en revisión con Meta
               </p>
             </div>
           </div>
-          <Link href="/admin/whatsapp/plantillas/nueva" className={btnPrimary}>
-            <Plus className="w-4 h-4" />
-            Nueva plantilla
-          </Link>
+          <button type="button" onClick={load} className={btnGhost}>
+            Actualizar
+          </button>
         </div>
       </div>
 
       <div className={registryContent}>
-        <div className="flex items-center gap-3 mb-5">
-          <select
-            value={filterChannel}
-            onChange={e => setFilterChannel(e.target.value)}
-            className="bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm min-w-[220px]"
+        <div className="flex gap-2 mb-5">
+          <button
+            type="button"
+            onClick={() => setFilter("pending_approval")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              filter === "pending_approval"
+                ? "bg-amber-500/15 text-amber-200"
+                : "text-gray-400 hover:text-white hover:bg-white/[.06]"
+            }`}
           >
-            <option value="">Todos los canales</option>
-            {channels.map(ch => (
-              <option key={ch.id} value={ch.id}>
-                {ch.e164}
-              </option>
-            ))}
-          </select>
-          <button type="button" onClick={load} className={btnGhost}>
-            Actualizar
+            En revisión
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter("all_pending")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              filter === "all_pending"
+                ? "bg-amber-500/15 text-amber-200"
+                : "text-gray-400 hover:text-white hover:bg-white/[.06]"
+            }`}
+          >
+            Incluir rechazadas
           </button>
         </div>
 
@@ -111,67 +118,59 @@ export default function AdminWhatsAppTemplatesPage() {
             <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
           </div>
         ) : templates.length === 0 ? (
-          <div className="text-center py-20 space-y-4">
-            <p className="text-sm text-gray-500">No hay plantillas todavía.</p>
-            <Link href="/admin/whatsapp/plantillas/nueva" className={btnPrimary}>
-              <Plus className="w-4 h-4" />
-              Crear primera plantilla
-            </Link>
+          <div className="text-center py-20">
+            <p className="text-sm text-gray-500">
+              {filter === "pending_approval"
+                ? "No hay plantillas en revisión en este momento."
+                : "No hay plantillas pendientes ni rechazadas."}
+            </p>
           </div>
         ) : (
           <table className={`${registryTable} min-w-full`}>
             <thead className={registryTableHead}>
               <tr className={registryTableHeadRow}>
-                <th className={registryTableHeadCell}>Nombre</th>
-                <th className={registryTableHeadCell}>Canal</th>
-                <th className={registryTableHeadCell}>Categoría</th>
+                <th className={registryTableHeadCell}>Plantilla</th>
+                <th className={registryTableHeadCell}>Cliente</th>
+                <th className={registryTableHeadCell}>Línea</th>
                 <th className={registryTableHeadCell}>Estado</th>
-                <th className={registryTableHeadCell}>Actualizado</th>
-                <th className={registryTableHeadCell} />
+                <th className={registryTableHeadCell}>Enviada</th>
               </tr>
             </thead>
             <tbody>
               {templates.map(tpl => (
-                <tr
-                  key={tpl.id}
-                  className={registryTableRowClickable}
-                  onClick={() => router.push(`/admin/whatsapp/plantillas/${tpl.id}`)}
-                >
+                <tr key={tpl.id} className="border-b border-white/[.06]">
                   <td className={`${registryTableCell} text-sm`}>
                     <div className="font-medium text-white">{tpl.template_name}</div>
-                    <div className={`${textMuted} text-xs mt-1 line-clamp-1 max-w-xs`}>
+                    <div className={`${textMuted} text-xs mt-1 line-clamp-2 max-w-sm`}>
                       {tpl.body_source ?? tpl.body_preview}
                     </div>
+                    {tpl.rejection_reason && (
+                      <p className="text-xs text-red-300 mt-1">{tpl.rejection_reason}</p>
+                    )}
                   </td>
-                  <td className={`${registryTableCell} text-xs font-mono text-gray-300`}>
-                    {channelLabel(tpl.whatsapp_channel_id)}
+                  <td className={`${registryTableCell} text-xs text-gray-300`}>
+                    <div>{tpl.user_nombre || "—"}</div>
+                    <div className="text-gray-500">{tpl.user_email}</div>
                   </td>
-                  <td className={`${registryTableCell} text-xs capitalize text-gray-300`}>
-                    {tpl.category}
+                  <td className={`${registryTableCell} font-mono text-xs text-gray-300`}>
+                    {tpl.channel_e164 ?? "—"}
                   </td>
                   <td className={registryTableCell}>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${templateStatusColor(tpl.status)}`}>
-                      {templateStatusLabel(tpl.status)}
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${templateStatusColor(tpl.status as WhatsAppTemplateStatus)}`}
+                    >
+                      {templateStatusLabel(tpl.status as WhatsAppTemplateStatus)}
                     </span>
                   </td>
                   <td className={`${registryTableCell} text-xs text-gray-400`}>
                     {tpl.updated_at
-                      ? new Date(tpl.updated_at).toLocaleDateString("es", {
+                      ? new Date(tpl.updated_at).toLocaleString("es", {
                           day: "2-digit",
                           month: "short",
-                          year: "numeric"
+                          hour: "2-digit",
+                          minute: "2-digit"
                         })
                       : "—"}
-                  </td>
-                  <td className={registryTableCell}>
-                    <button
-                      type="button"
-                      onClick={e => deleteTemplate(tpl.id, e)}
-                      className={btnGhost}
-                      title="Eliminar"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                   </td>
                 </tr>
               ))}

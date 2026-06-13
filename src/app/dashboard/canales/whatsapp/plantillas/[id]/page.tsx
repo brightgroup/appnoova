@@ -4,12 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { useParams } from "next/navigation";
-import { authFetch } from "@/lib/telephony-api";
+import { getAuthHeaders } from "@/lib/text-agents-api";
 import { WhatsAppTemplateEditor } from "@/components/whatsapp/WhatsAppTemplateEditor";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import type { WhatsAppTemplateRecord } from "@/types/whatsapp-template";
 
-export default function EditWhatsAppTemplatePage() {
+export default function EditDashboardWhatsAppTemplatePage() {
   const params = useParams();
   const id = String(params.id ?? "");
   const [template, setTemplate] = useState<WhatsAppTemplateRecord | null>(null);
@@ -19,9 +19,10 @@ export default function EditWhatsAppTemplatePage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    const headers = await getAuthHeaders();
     const [tplRes, chRes] = await Promise.all([
-      authFetch(`/api/admin/whatsapp/templates/${id}`),
-      authFetch("/api/admin/whatsapp/channels")
+      fetch(`/api/whatsapp/templates/${id}`, { headers }),
+      fetch("/api/whatsapp/channels", { headers })
     ]);
     const tplData = await tplRes.json();
     const chData = await chRes.json();
@@ -36,7 +37,6 @@ export default function EditWhatsAppTemplatePage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Auto-refresh mientras está en revisión
   useEffect(() => {
     if (template?.status !== "pending_approval") return;
     const interval = setInterval(load, 30000);
@@ -53,10 +53,10 @@ export default function EditWhatsAppTemplatePage() {
 
   if (error || !template) {
     return (
-      <div className="flex-1 flex flex-col bg-[#0d0e14] text-white items-center justify-center p-6 text-center">
+      <div className="flex-1 flex flex-col bg-noova-main text-white items-center justify-center p-6 text-center">
         <p className="text-red-400 mb-4">{error || "Plantilla no encontrada"}</p>
         <Link
-          href="/admin/whatsapp/plantillas"
+          href="/dashboard/canales/whatsapp/plantillas"
           className="inline-flex items-center gap-2 text-[#a5a5ff] hover:text-white"
         >
           <ChevronLeft className="w-4 h-4" />

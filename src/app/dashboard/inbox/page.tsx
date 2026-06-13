@@ -685,7 +685,7 @@ export default function InboxPage() {
                             detail.whatsapp_session_open === false
                           ? waTemplates.length > 0
                             ? "Asigna la conversación a ti para enviar una plantilla aprobada."
-                            : "Ventana de 24 h cerrada. Registra plantillas en admin o espera a que el cliente escriba."
+                            : "Ventana de 24 h cerrada. Crea plantillas en Canales → WhatsApp o espera a que el cliente escriba."
                           : detail.handoff_mode === "human" && !detail.assigned_to
                             ? "Asigna la conversación a ti para habilitar el chat humano."
                             : "Asigna la conversación a ti (arriba) para tomar el control y responder al visitante."}

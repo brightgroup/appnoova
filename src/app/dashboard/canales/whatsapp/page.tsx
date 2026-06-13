@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MessageCircle, Plus, Clock } from "lucide-react";
+import { MessageCircle, Plus, Clock, FileText } from "lucide-react";
 import {
   btnGhost,
   registryTable,
@@ -91,9 +91,14 @@ export default function WhatsAppListPage() {
       onRefresh={load}
       refreshing={loading}
       action={
-        <Link href="/?solicitar=acceso" className={`${btnGhost} opacity-90`}>
-          <Plus className="w-4 h-4" /> Solicitar línea
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard/canales/whatsapp/plantillas" className={btnGhost}>
+            <FileText className="w-4 h-4" /> Plantillas
+          </Link>
+          <Link href="/?solicitar=acceso" className={`${btnGhost} opacity-90`}>
+            <Plus className="w-4 h-4" /> Solicitar línea
+          </Link>
+        </div>
       }
       footer={
         filtered.length > 0 ? (

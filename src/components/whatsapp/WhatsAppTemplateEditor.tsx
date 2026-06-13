@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Loader2, Send, Save } from "lucide-react";
-import { authFetch } from "@/lib/telephony-api";
+import { getAuthHeaders } from "@/lib/text-agents-api";
 import {
   btnGhost,
   btnPrimary,
@@ -46,13 +46,20 @@ interface WhatsAppTemplateEditorProps {
   templateId?: string;
   initialTemplate?: WhatsAppTemplateRecord;
   channels: WhatsAppChannelRecord[];
+  basePath?: string;
+  apiBase?: string;
 }
+
+const DEFAULT_BASE_PATH = "/dashboard/canales/whatsapp/plantillas";
+const DEFAULT_API_BASE = "/api/whatsapp/templates";
 
 export function WhatsAppTemplateEditor({
   mode,
   templateId,
   initialTemplate,
-  channels
+  channels,
+  basePath = DEFAULT_BASE_PATH,
+  apiBase = DEFAULT_API_BASE
 }: WhatsAppTemplateEditorProps) {
   const router = useRouter();
   const readOnly =
@@ -125,6 +132,14 @@ export function WhatsAppTemplateEditor({
     [channelId, templateName, language, category, bodySource, variableExamples]
   );
 
+  const apiFetch = useCallback(
+    async (path: string, init?: RequestInit) => {
+      const headers = await getAuthHeaders();
+      return fetch(`${apiBase}${path}`, { ...init, headers: { ...headers, ...(init?.headers ?? {}) } });
+    },
+    [apiBase]
+  );
+
   const validate = (): string | null => {
     if (!channelId) return "Selecciona un canal WhatsApp";
     const name = normalizeTemplateName(templateName);
@@ -152,9 +167,8 @@ export function WhatsAppTemplateEditor({
     setError("");
     try {
       if (mode === "create") {
-        const res = await authFetch("/api/admin/whatsapp/templates", {
+        const res = await apiFetch("", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...buildPayload(), action: "draft" })
         });
         const data = await res.json();
@@ -162,11 +176,10 @@ export function WhatsAppTemplateEditor({
           setError(data.error || "No se pudo guardar");
           return;
         }
-        router.push(`/admin/whatsapp/plantillas/${data.template.id}`);
+        router.push(`${basePath}/${data.template.id}`);
       } else if (templateId) {
-        const res = await authFetch(`/api/admin/whatsapp/templates/${templateId}`, {
+        const res = await apiFetch(`/${templateId}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(buildPayload())
         });
         const data = await res.json();
@@ -191,9 +204,8 @@ export function WhatsAppTemplateEditor({
     setError("");
     try {
       if (mode === "create") {
-        const res = await authFetch("/api/admin/whatsapp/templates", {
+        const res = await apiFetch("", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...buildPayload(), action: "submit" })
         });
         const data = await res.json();
@@ -201,11 +213,10 @@ export function WhatsAppTemplateEditor({
           setError(data.error || "No se pudo enviar");
           return;
         }
-        router.push(`/admin/whatsapp/plantillas/${data.template.id}`);
+        router.push(`${basePath}/${data.template.id}`);
       } else if (templateId) {
-        const res = await authFetch(`/api/admin/whatsapp/templates/${templateId}`, {
+        const res = await apiFetch(`/${templateId}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...buildPayload(), action: "submit" })
         });
         const data = await res.json();
@@ -230,7 +241,7 @@ export function WhatsAppTemplateEditor({
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <Link
-              href="/admin/whatsapp/plantillas"
+              href={basePath}
               className="p-1.5 hover:bg-white/[.08] rounded-lg text-gray-400 shrink-0"
             >
               <ChevronLeft className="w-5 h-5" />
@@ -392,7 +403,7 @@ export function WhatsAppTemplateEditor({
 
             {initialTemplate?.twilio_content_sid && (
               <div className="rounded-xl border border-white/[.06] bg-white/[.02] px-4 py-3">
-                <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Referencia del proveedor</p>
+                <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Referencia interna</p>
                 <p className="font-mono text-xs text-gray-400 break-all">{initialTemplate.twilio_content_sid}</p>
               </div>
             )}

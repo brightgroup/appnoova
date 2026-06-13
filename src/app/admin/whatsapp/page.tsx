@@ -98,7 +98,7 @@ export default function AdminWhatsAppPage() {
           </Link>
           <div>
             <h1 className="text-xl font-bold">WhatsApp</h1>
-            <p className="text-xs text-gray-500">Registrar líneas y gestionar plantillas</p>
+            <p className="text-xs text-gray-500">Registrar líneas WhatsApp de clientes</p>
           </div>
         </div>
       </div>
@@ -121,16 +121,16 @@ export default function AdminWhatsAppPage() {
 
         <Link
           href="/admin/whatsapp/plantillas"
-          className="flex items-center justify-between rounded-xl border border-[#5b5bf6]/25 bg-[#5b5bf6]/[.06] p-5 hover:bg-[#5b5bf6]/[.10] transition-colors group"
+          className="flex items-center justify-between rounded-xl border border-amber-500/25 bg-amber-500/[.06] p-5 hover:bg-amber-500/[.10] transition-colors group"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#5b5bf6]/20 flex items-center justify-center">
-              <FileText className="w-5 h-5 text-[#a5a5ff]" />
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+              <FileText className="w-5 h-5 text-amber-300" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-white">Plantillas WhatsApp</p>
+              <p className="text-sm font-semibold text-white">Aprobaciones pendientes</p>
               <p className={`${textMuted} text-xs mt-0.5`}>
-                Crear, enviar a aprobación y monitorear estado
+                Monitorear plantillas en revisión con Meta
               </p>
             </div>
           </div>
