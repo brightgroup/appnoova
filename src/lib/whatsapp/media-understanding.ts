@@ -15,14 +15,14 @@ export interface ProcessedWhatsAppMedia {
   kind: "audio" | "image" | "document" | "video" | "other";
   label: string;
   textForAi: string;
-  displayContent: string;
+  visibleContent: string;
   mediaStoragePath?: string;
   mediaMime?: string;
 }
 
 export interface InboundContentResult {
   userText: string;
-  displayContent: string;
+  userVisible: string;
   primaryMediaType?: "audio" | "image" | "document" | "video";
   mediaLabel?: string;
   mediaStoragePath?: string;
@@ -87,7 +87,7 @@ async function processOneMediaItem(
         kind,
         label,
         textForAi: `[Video]: ${WHATSAPP_VIDEO_AI_NOTICE}`,
-        displayContent: "",
+        visibleContent: "",
         mediaStoragePath: storagePath ?? undefined,
         mediaMime: mime
       };
@@ -105,7 +105,7 @@ async function processOneMediaItem(
         kind,
         label,
         textForAi: `[Nota de voz]: ${text}`,
-        displayContent: text,
+        visibleContent: "",
         mediaStoragePath: storagePath ?? undefined,
         mediaMime: mime
       };
@@ -121,12 +121,11 @@ async function processOneMediaItem(
           : "Describe esta imagen de WhatsApp en español para un agente de atención al cliente (contenido, texto visible, contexto)."
       );
       const text = description || "(No se pudo interpretar la imagen)";
-      const displayLines = [caption.trim(), text].filter(Boolean);
       return {
         kind,
         label,
         textForAi: `[Imagen${caption.trim() ? ` — ${caption.trim()}` : ""}]: ${text}`,
-        displayContent: displayLines.join("\n\n"),
+        visibleContent: caption.trim(),
         mediaStoragePath: storagePath ?? undefined,
         mediaMime: mime
       };
@@ -144,7 +143,7 @@ async function processOneMediaItem(
         kind: "document",
         label,
         textForAi: `[Documento PDF]: ${text}`,
-        displayContent: text,
+        visibleContent: "",
         mediaStoragePath: storagePath ?? undefined,
         mediaMime: mime
       };
@@ -154,7 +153,7 @@ async function processOneMediaItem(
       kind,
       label,
       textForAi: `[${label} recibido — tipo ${mime}]`,
-      displayContent: `${label} recibido`,
+      visibleContent: "",
       mediaStoragePath: storagePath ?? undefined,
       mediaMime: mime
     };
@@ -164,13 +163,13 @@ async function processOneMediaItem(
       kind,
       label,
       textForAi: `[${label}: no procesado — ${msg}]`,
-      displayContent: `${label} (no procesado)`,
+      visibleContent: "",
       mediaMime: item.contentType
     };
   }
 }
 
-/** Convierte texto + adjuntos Twilio en contenido unificado para IA e Inbox. */
+/** Convierte texto + adjuntos Twilio: userText (IA) vs userVisible (Inbox). */
 export async function buildWhatsAppInboundContent(
   apiKey: string,
   body: string,
@@ -178,22 +177,22 @@ export async function buildWhatsAppInboundContent(
   uploadCtx: WhatsAppMediaUploadContext
 ): Promise<InboundContentResult> {
   const caption = body.trim();
-  const parts: string[] = [];
-  const displayParts: string[] = [];
+  const aiParts: string[] = [];
+  const visibleParts: string[] = [];
   let primaryMediaType: InboundContentResult["primaryMediaType"];
   let mediaLabel: string | undefined;
   let mediaStoragePath: string | undefined;
   let mediaMime: string | undefined;
 
   if (caption && media.length === 0) {
-    parts.push(caption);
-    displayParts.push(caption);
+    aiParts.push(caption);
+    visibleParts.push(caption);
   }
 
   for (let i = 0; i < media.length; i++) {
     const processed = await processOneMediaItem(apiKey, media[i], caption, uploadCtx, i);
-    parts.push(processed.textForAi);
-    if (processed.displayContent) displayParts.push(processed.displayContent);
+    aiParts.push(processed.textForAi);
+    if (processed.visibleContent) visibleParts.push(processed.visibleContent);
     if (!primaryMediaType && processed.kind !== "other") {
       primaryMediaType = processed.kind;
       mediaLabel = processed.label;
@@ -202,12 +201,12 @@ export async function buildWhatsAppInboundContent(
     }
   }
 
-  const userText = parts.join("\n\n").trim();
-  const displayContent = displayParts.join("\n\n").trim();
+  const userText = aiParts.join("\n\n").trim();
+  const userVisible = visibleParts.join("\n\n").trim();
 
   return {
     userText,
-    displayContent: displayContent || userText,
+    userVisible,
     primaryMediaType,
     mediaLabel,
     mediaStoragePath,

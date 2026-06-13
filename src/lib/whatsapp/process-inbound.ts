@@ -5,12 +5,12 @@ import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { geminiTextTemperature } from "@/lib/text-agent-form";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import {
-  persistChatTurn,
+  persistAssistantReplyOnly,
   persistUserMessageOnly
 } from "@/lib/text-conversation-persist";
 import {
+  allConversationMessagesForGemini,
   buildWhatsAppContactLabel,
-  conversationMessagesForGemini,
   findWhatsAppConversation
 } from "@/lib/whatsapp/conversation-thread";
 import { mergeWhatsAppMetadata } from "@/lib/whatsapp/conversation-meta";
@@ -109,8 +109,10 @@ export async function processTwilioWhatsAppInbound(
   }
 
   const nowIso = new Date().toISOString();
-  const userDisplay = inboundContent.displayContent;
+  const userDisplay = inboundContent.userVisible;
   const userForAi = inboundContent.userText;
+  const userInternalContent =
+    userForAi.trim() !== userDisplay.trim() ? userForAi : undefined;
   const userMediaType: TextChatMessage["media_type"] =
     inboundContent.primaryMediaType ?? (inbound.media.length ? "document" : "text");
   const userMediaLabel = inboundContent.mediaLabel;
@@ -153,7 +155,8 @@ export async function processTwilioWhatsAppInbound(
     userMediaType: inbound.media.length ? userMediaType : undefined,
     userMediaLabel,
     userMediaStoragePath: inboundContent.mediaStoragePath,
-    userMediaMime: inboundContent.mediaMime
+    userMediaMime: inboundContent.mediaMime,
+    userInternalContent
   };
 
   // —— Baja (STOP / CANCELAR) ——
@@ -221,7 +224,7 @@ export async function processTwilioWhatsAppInbound(
     return { ok: true };
   }
 
-  // —— Modo humano ——
+  // —— Respuesta IA (usuario primero, asistente después) ——
   let companyContextText = "";
   if (agent.company_context_id) {
     const { data: ctx } = await db
@@ -233,8 +236,41 @@ export async function processTwilioWhatsAppInbound(
     companyContextText = String(ctx?.content ?? "");
   }
 
-  const historyMessages = existing
-    ? conversationMessagesForGemini(existing, userForAi)
+  const userPersist = await persistUserMessageOnly({
+    db,
+    userId: channel.user_id,
+    agentId: String(agent.id),
+    agentName: String(agent.name),
+    conversationId: existing?.id ?? null,
+    userMessage: userDisplay,
+    llmModel: model,
+    channel: WHATSAPP_CONVERSATION_CHANNEL,
+    contactLabel: existing ? undefined : contactLabel,
+    bumpUnread: true,
+    handoffMode: "ai",
+    statusLabel: "Chat activo",
+    ...persistOpts
+  });
+
+  if (userPersist.error) return { ok: false, error: userPersist.error };
+
+  await updateWhatsAppConversationMetadata(
+    db,
+    userPersist.conversationId,
+    channel.user_id,
+    existing?.metadata,
+    metaPatch
+  );
+
+  const refreshed = await findWhatsAppConversation(
+    db,
+    channel.user_id,
+    channel.id,
+    inbound.fromE164
+  );
+
+  const geminiContents = refreshed
+    ? allConversationMessagesForGemini(refreshed)
     : [{ role: "user" as const, content: userForAi }];
 
   const systemInstruction = mergeCompanyContext(String(agent.prompt), companyContextText);
@@ -244,7 +280,7 @@ export async function processTwilioWhatsAppInbound(
   try {
     const response = await ai.models.generateContent({
       model,
-      contents: historyMessages.map(m => ({
+      contents: geminiContents.map(m => ({
         role: m.role === "assistant" ? ("model" as const) : ("user" as const),
         parts: [{ text: m.content }]
       })),
@@ -261,29 +297,17 @@ export async function processTwilioWhatsAppInbound(
     return { ok: false, error: msg };
   }
 
-  const persisted = await persistChatTurn({
+  const assistantPersist = await persistAssistantReplyOnly({
     db,
     userId: channel.user_id,
-    agentId: String(agent.id),
-    agentName: String(agent.name),
-    conversationId: existing?.id ?? null,
-    userMessage: userDisplay,
+    conversationId: userPersist.conversationId,
     assistantReply: reply,
-    llmModel: model,
-    channel: WHATSAPP_CONVERSATION_CHANNEL,
-    contactLabel: existing ? undefined : contactLabel,
-    ...persistOpts
+    llmModel: model
   });
 
-  if (persisted.error) return { ok: false, error: persisted.error };
-
-  await updateWhatsAppConversationMetadata(
-    db,
-    persisted.conversationId,
-    channel.user_id,
-    existing?.metadata,
-    metaPatch
-  );
+  if (!assistantPersist.ok) {
+    return { ok: false, error: assistantPersist.error };
+  }
 
   const sendResult = await sendWhatsAppIfAllowed(
     channel,

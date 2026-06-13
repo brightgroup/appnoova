@@ -120,12 +120,14 @@ export function normalizeChatMessages(raw: unknown): TextChatMessage[] {
       if (!content && !hasMedia) return null;
       const mediaType = row.media_type;
       const mediaLabel = row.media_label;
+      const internalContent = row.internal_content;
       const mediaStoragePath = row.media_storage_path;
       const mediaMime = row.media_mime;
       return {
         role,
         content,
         created_at: String(row.created_at ?? new Date().toISOString()),
+        ...(internalContent ? { internal_content: String(internalContent) } : {}),
         ...(mediaType === "audio" ||
         mediaType === "image" ||
         mediaType === "document" ||

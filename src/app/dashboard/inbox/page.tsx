@@ -21,6 +21,7 @@ import {
   formatInboxTime,
   isToday
 } from "@/lib/inbox-utils";
+import { inboxChannelStyle } from "@/lib/inbox-channel-ui";
 import type { InboxFilter, InboxListItem, InboxTextDetail } from "@/types/inbox";
 import type { TextChatMessage } from "@/types/text-agent-conversation";
 
@@ -35,10 +36,15 @@ function AgentAvatar({ name }: { name: string }) {
   );
 }
 
-function ChannelBadge({ label }: { label: string }) {
+function ChannelBadge({ channel }: { channel: string }) {
+  const style = inboxChannelStyle(channel);
+  const Icon = style.icon;
   return (
-    <span className="rounded-md border border-white/10 bg-white/[.08] px-2 py-0.5 text-xs font-medium text-white/60">
-      {label}
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-semibold ${style.badgeClass}`}
+    >
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      {style.label}
     </span>
   );
 }
@@ -114,6 +120,9 @@ export default function InboxPage() {
       const loaded = data.detail ?? null;
       setDetail(loaded?.kind === "text" ? loaded : null);
       if (data.current_user_name) setCurrentUserName(data.current_user_name);
+      setItems(prev =>
+        prev.map(item => (item.id === id ? { ...item, unread_count: 0 } : item))
+      );
     } catch {
       if (!silent) setError("Error de red al cargar conversación");
     } finally {
@@ -124,14 +133,14 @@ export default function InboxPage() {
   useEffect(() => { loadList(); }, [loadList]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => loadList(true), 5000);
+    const timer = window.setInterval(() => loadList(true), 2000);
     return () => window.clearInterval(timer);
   }, [loadList]);
 
   useEffect(() => {
     if (!selectedId) return;
     loadDetail(selectedId);
-    const timer = window.setInterval(() => loadDetail(selectedId, true), 5000);
+    const timer = window.setInterval(() => loadDetail(selectedId, true), 2000);
     return () => window.clearInterval(timer);
   }, [selectedId, loadDetail]);
 
@@ -329,35 +338,48 @@ export default function InboxPage() {
           ) : filteredItems.length === 0 ? null : (
             filteredItems.map(item => {
               const active = selectedId === item.id;
+              const hasUnread = item.unread_count > 0;
               return (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => selectItem(item)}
                   className={`w-full border-b border-white/[.04] px-5 py-3.5 text-left transition-colors ${
-                    active ? "bg-white/[.08]" : "hover:bg-white/[.04]"
-                  }`}
+                    active
+                      ? "bg-white/[.08]"
+                      : hasUnread
+                        ? "bg-[#5b5bf6]/[.12] hover:bg-[#5b5bf6]/[.16]"
+                        : "hover:bg-white/[.04]"
+                  } ${hasUnread ? "border-l-2 border-l-[#5b5bf6]" : "border-l-2 border-l-transparent"}`}
                 >
                   <div className="mb-1.5 flex items-start justify-between gap-2">
-                    <span className="truncate text-sm font-bold text-white">
+                    <span
+                      className={`truncate text-sm text-white ${
+                        hasUnread ? "font-bold" : "font-bold"
+                      }`}
+                    >
                       {item.display_title}
                     </span>
                     <span className="shrink-0 text-xs text-white/40">
                       {formatInboxTime(item.updated_at)}
                     </span>
                   </div>
-                  <p className="mb-2.5 line-clamp-2 text-sm leading-snug text-white/75">
+                  <p
+                    className={`mb-2.5 line-clamp-2 text-sm leading-snug ${
+                      hasUnread ? "font-medium text-white/90" : "text-white/75"
+                    }`}
+                  >
                     {item.preview}
                   </p>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <ChannelBadge label={item.channel_label} />
+                      <ChannelBadge channel={item.channel} />
                       <AgentAvatar name={item.agent_name} />
                       <span className="text-xs text-white/50">{item.agent_name}</span>
                     </div>
-                    {item.unread_count > 0 && (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#5b5bf6] px-1.5 text-[11px] font-bold text-white">
-                        {item.unread_count}
+                    {hasUnread && (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#5b5bf6] px-1.5 text-[11px] font-bold text-white shadow-[0_0_12px_rgba(91,91,246,0.5)]">
+                        {item.unread_count > 9 ? "9+" : item.unread_count}
                       </span>
                     )}
                   </div>
@@ -427,7 +449,7 @@ export default function InboxPage() {
                     )}
                   </div>
                 )}
-                <ChannelBadge label={detail?.channel_label ?? "API"} />
+                <ChannelBadge channel={detail?.channel ?? "web_test"} />
                 <button
                   type="button"
                   onClick={() => {

@@ -77,7 +77,12 @@ function lastTextPreview(messages: unknown): string {
   const last = [...list].reverse().find(m => m.role === "user" || m.role === "assistant" || m.role === "human");
   if (!last) return "Sin mensajes";
   const text = last.content.replace(/\s+/g, " ").trim();
-  return text.length > 72 ? `${text.slice(0, 69)}...` : text;
+  if (text) return text.length > 72 ? `${text.slice(0, 69)}...` : text;
+  if (last.media_type === "image") return "Imagen";
+  if (last.media_type === "audio") return "Nota de voz";
+  if (last.media_type === "video") return "Video";
+  if (last.media_type === "document") return "Documento";
+  return "Archivo";
 }
 
 function lastVoicePreview(transcript: unknown): string {
@@ -147,9 +152,12 @@ export function voiceRowToInboxItem(
 }
 
 export function sortInboxItems(items: InboxListItem[]): InboxListItem[] {
-  return [...items].sort(
-    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-  );
+  return [...items].sort((a, b) => {
+    const aUnread = (a.unread_count ?? 0) > 0 ? 1 : 0;
+    const bUnread = (b.unread_count ?? 0) > 0 ? 1 : 0;
+    if (bUnread !== aUnread) return bUnread - aUnread;
+    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+  });
 }
 
 export function filterInboxItems(

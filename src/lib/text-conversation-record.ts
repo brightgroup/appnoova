@@ -75,6 +75,7 @@ export function mergeChatMessages(
   incoming: {
     role: "user" | "assistant" | "human";
     content: string;
+    internal_content?: string;
     media_type?: TextChatMessage["media_type"];
     media_label?: string;
     media_storage_path?: string;
@@ -93,6 +94,7 @@ export function mergeChatMessages(
       role: msg.role,
       content,
       created_at: nowIso,
+      ...(msg.internal_content ? { internal_content: msg.internal_content } : {}),
       ...(msg.media_type ? { media_type: msg.media_type } : {}),
       ...(msg.media_label ? { media_label: msg.media_label } : {}),
       ...(msg.media_storage_path ? { media_storage_path: msg.media_storage_path } : {}),

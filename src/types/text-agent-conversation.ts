@@ -2,6 +2,8 @@ export interface TextChatMessage {
   role: "user" | "assistant" | "human";
   content: string;
   created_at: string;
+  /** Contexto para IA (transcripción, descripción de imagen); no se muestra en Inbox. */
+  internal_content?: string;
   media_type?: "text" | "audio" | "image" | "document" | "video";
   media_label?: string;
   /** Ruta en bucket whatsapp-media (persistida). */

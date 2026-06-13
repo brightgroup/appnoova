@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { WHATSAPP_CONVERSATION_CHANNEL } from "@/lib/whatsapp-channel";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import { toTextConversationRecord } from "@/lib/text-conversation-record";
-import type { TextAgentConversationRecord } from "@/types/text-agent-conversation";
+import type { TextAgentConversationRecord, TextChatMessage } from "@/types/text-agent-conversation";
 
 function contactMetaKey(channelId: string, contactE164: string): string {
   return `${channelId}:${contactE164}`;
@@ -50,13 +50,32 @@ export function buildWhatsAppContactLabel(profileName: string | null, contactE16
   return contactE164;
 }
 
+export function messageContentForAi(msg: TextChatMessage): string {
+  if (msg.role === "user" && msg.internal_content?.trim()) {
+    return msg.internal_content.trim();
+  }
+  return msg.content;
+}
+
+export function allConversationMessagesForGemini(
+  record: TextAgentConversationRecord
+): { role: "user" | "assistant"; content: string }[] {
+  return normalizeChatMessages(record.messages)
+    .filter(m => m.role === "user" || m.role === "assistant")
+    .map(m => ({
+      role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
+      content: m.role === "assistant" ? m.content : messageContentForAi(m)
+    }))
+    .filter(m => m.content.trim());
+}
+
 export function conversationMessagesForGemini(
   record: TextAgentConversationRecord,
   newUserMessage: string
 ): { role: "user" | "assistant"; content: string }[] {
   const history = normalizeChatMessages(record.messages).map(m => ({
     role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
-    content: m.content
+    content: m.role === "assistant" ? m.content : messageContentForAi(m)
   }));
   return [...history, { role: "user", content: newUserMessage }];
 }
