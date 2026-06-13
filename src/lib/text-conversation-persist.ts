@@ -19,6 +19,10 @@ interface PersistChatTurnInput {
   llmModel: string;
   channel?: string;
   contactLabel?: string;
+  userMediaType?: TextChatMessage["media_type"];
+  userMediaLabel?: string;
+  userMediaStoragePath?: string;
+  userMediaMime?: string;
 }
 
 export async function persistChatTurn(input: PersistChatTurnInput): Promise<{
@@ -46,7 +50,14 @@ export async function persistChatTurn(input: PersistChatTurnInput): Promise<{
   }
 
   const incoming = [
-    { role: "user" as const, content: input.userMessage },
+    {
+      role: "user" as const,
+      content: input.userMessage,
+      ...(input.userMediaType ? { media_type: input.userMediaType } : {}),
+      ...(input.userMediaLabel ? { media_label: input.userMediaLabel } : {}),
+      ...(input.userMediaStoragePath ? { media_storage_path: input.userMediaStoragePath } : {}),
+      ...(input.userMediaMime ? { media_mime: input.userMediaMime } : {})
+    },
     { role: "assistant" as const, content: input.assistantReply }
   ];
 
@@ -141,6 +152,10 @@ interface PersistUserOnlyInput {
   channel?: string;
   contactLabel?: string;
   bumpUnread?: boolean;
+  userMediaType?: TextChatMessage["media_type"];
+  userMediaLabel?: string;
+  userMediaStoragePath?: string;
+  userMediaMime?: string;
 }
 
 /** Guarda solo el mensaje del visitante (modo humano / sin respuesta IA). */
@@ -152,7 +167,16 @@ export async function persistUserMessageOnly(input: PersistUserOnlyInput): Promi
   const nowIso = now.toISOString();
   const channel = input.channel ?? "web_test";
   const contactLabel = input.contactLabel ?? "Prueba web";
-  const incoming = [{ role: "user" as const, content: input.userMessage }];
+  const incoming = [
+    {
+      role: "user" as const,
+      content: input.userMessage,
+      ...(input.userMediaType ? { media_type: input.userMediaType } : {}),
+      ...(input.userMediaLabel ? { media_label: input.userMediaLabel } : {}),
+      ...(input.userMediaStoragePath ? { media_storage_path: input.userMediaStoragePath } : {}),
+      ...(input.userMediaMime ? { media_mime: input.userMediaMime } : {})
+    }
+  ];
 
   let conversationId = input.conversationId ?? null;
   let isNew = false;

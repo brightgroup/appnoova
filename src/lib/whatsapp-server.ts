@@ -1,20 +1,33 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
+import { normalizeWhatsAppE164, toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 
 export async function getWhatsAppChannelByE164(
   db: SupabaseClient,
   businessE164: string
 ): Promise<WhatsAppChannelRecord | null> {
+  const e164 = normalizeWhatsAppE164(businessE164);
   const { data, error } = await db
     .from("whatsapp_channels")
     .select("*")
-    .eq("e164", businessE164)
+    .eq("e164", e164)
     .eq("status", "active")
     .maybeSingle();
 
-  if (error || !data) return null;
-  return toWhatsAppChannelRecord(data);
+  if (error || data) {
+    if (error) return null;
+    return toWhatsAppChannelRecord(data);
+  }
+
+  // Fallback: filas guardadas con espacios u otro formato legacy
+  const { data: rows, error: listErr } = await db
+    .from("whatsapp_channels")
+    .select("*")
+    .eq("status", "active");
+
+  if (listErr || !rows?.length) return null;
+  const match = rows.find(row => normalizeWhatsAppE164(String(row.e164)) === e164);
+  return match ? toWhatsAppChannelRecord(match) : null;
 }
 
 export async function getWhatsAppChannelById(

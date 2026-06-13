@@ -72,16 +72,32 @@ export function toTextConversationListItem(raw: Record<string, unknown>): TextAg
 
 export function mergeChatMessages(
   existing: TextChatMessage[],
-  incoming: { role: "user" | "assistant" | "human"; content: string }[],
+  incoming: {
+    role: "user" | "assistant" | "human";
+    content: string;
+    media_type?: TextChatMessage["media_type"];
+    media_label?: string;
+    media_storage_path?: string;
+    media_mime?: string;
+  }[],
   nowIso: string
 ): TextChatMessage[] {
   const merged = [...existing];
   for (const msg of incoming) {
     const content = msg.content.trim();
-    if (!content) continue;
+    const hasMedia = Boolean(msg.media_storage_path?.trim());
+    if (!content && !hasMedia) continue;
     const last = merged[merged.length - 1];
     if (last && last.role === msg.role && last.content === content) continue;
-    merged.push({ role: msg.role, content, created_at: nowIso });
+    merged.push({
+      role: msg.role,
+      content,
+      created_at: nowIso,
+      ...(msg.media_type ? { media_type: msg.media_type } : {}),
+      ...(msg.media_label ? { media_label: msg.media_label } : {}),
+      ...(msg.media_storage_path ? { media_storage_path: msg.media_storage_path } : {}),
+      ...(msg.media_mime ? { media_mime: msg.media_mime } : {})
+    });
   }
   return merged;
 }

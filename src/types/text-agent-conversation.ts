@@ -2,6 +2,13 @@ export interface TextChatMessage {
   role: "user" | "assistant" | "human";
   content: string;
   created_at: string;
+  media_type?: "text" | "audio" | "image" | "document" | "video";
+  media_label?: string;
+  /** Ruta en bucket whatsapp-media (persistida). */
+  media_storage_path?: string;
+  /** URL firmada temporal (solo en respuestas API al cliente). */
+  media_url?: string;
+  media_mime?: string;
 }
 
 export interface TextAgentConversationRecord {

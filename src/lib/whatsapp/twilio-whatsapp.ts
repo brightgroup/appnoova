@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { twilioWhatsAppWebhookUrl } from "@/lib/telephony/app-url";
+import { twilioWhatsAppStatusWebhookUrl, twilioWhatsAppWebhookUrl } from "@/lib/telephony/app-url";
 
 function twilioCredentials(): { accountSid: string; authToken: string } | null {
   const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
@@ -66,7 +66,8 @@ export async function sendTwilioWhatsAppMessage(
 
   const form: Record<string, string> = {
     To: to,
-    Body: input.body
+    Body: input.body,
+    StatusCallback: twilioWhatsAppStatusWebhookUrl()
   };
 
   if (input.messagingServiceSid?.trim()) {

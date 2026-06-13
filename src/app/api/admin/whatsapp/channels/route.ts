@@ -2,15 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-server";
 import { adminClient } from "@/lib/voice-agents-server";
 import { isMissingTableError } from "@/lib/supabase-table-error";
-import { toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
+import { normalizeWhatsAppE164, toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
 import { twilioWhatsAppWebhookUrl } from "@/lib/telephony/app-url";
 import { isTwilioWhatsAppConfigured } from "@/lib/whatsapp/twilio-whatsapp";
-
-function normalizeE164(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  return trimmed.startsWith("+") ? trimmed : `+${trimmed}`;
-}
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
@@ -43,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const userId = String(body.user_id ?? "").trim();
-  const e164 = normalizeE164(String(body.e164 ?? ""));
+  const e164 = normalizeWhatsAppE164(String(body.e164 ?? ""));
   const textAgentId = body.text_agent_id ? String(body.text_agent_id) : null;
   const friendlyName = body.friendly_name ? String(body.friendly_name).trim() : null;
   const messagingServiceSid = body.twilio_messaging_service_sid

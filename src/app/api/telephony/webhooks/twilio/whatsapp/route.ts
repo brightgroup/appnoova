@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseTwilioWhatsAppAddress } from "@/lib/whatsapp-channel";
+import { parseTwilioWhatsAppMedia } from "@/lib/whatsapp/twilio-media";
 import {
   claimInboundMessageSid,
   getWhatsAppChannelByE164
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
   const toRaw = String(params.To ?? "");
   const body = String(params.Body ?? "");
   const profileName = params.ProfileName ? String(params.ProfileName) : null;
+  const media = parseTwilioWhatsAppMedia(params);
 
   if (!messageSid || !fromRaw || !toRaw) {
     return new NextResponse("", { status: 200 });
@@ -64,7 +66,10 @@ export async function POST(req: NextRequest) {
   const channel = await getWhatsAppChannelByE164(db, businessE164);
 
   if (!channel) {
-    console.warn("[twilio/whatsapp] canal no registrado:", businessE164);
+    console.warn("[twilio/whatsapp] canal no registrado:", businessE164, {
+      from: fromRaw,
+      messageSid
+    });
     return new NextResponse("", { status: 200 });
   }
 
@@ -73,7 +78,8 @@ export async function POST(req: NextRequest) {
     fromE164: parseTwilioWhatsAppAddress(fromRaw),
     toE164: businessE164,
     body,
-    profileName
+    profileName,
+    media
   });
 
   if (!result.ok) {

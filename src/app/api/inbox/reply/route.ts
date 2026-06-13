@@ -5,6 +5,13 @@ import { toTextConversationRecord } from "@/lib/text-conversation-record";
 import { isMissingTableError } from "@/lib/supabase-table-error";
 import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
 import { getAuthUserFromRequest, userDisplayName } from "@/lib/voice-agents-server";
+import { WHATSAPP_CONVERSATION_CHANNEL } from "@/lib/whatsapp-channel";
+import {
+  canSendWhatsAppSessionMessage,
+  readWhatsAppMeta
+} from "@/lib/whatsapp/compliance";
+import { normalizeChatMessages } from "@/lib/text-chat-utils";
+import { signWhatsAppMessageMedia } from "@/lib/whatsapp/media-storage";
 
 export async function POST(req: NextRequest) {
   const user = await getAuthUserFromRequest(req);
@@ -53,6 +60,23 @@ export async function POST(req: NextRequest) {
     ? String(existing.assigned_to)
     : user ? userDisplayName(user) : "Usuario";
 
+  if (String(existing.channel) === WHATSAPP_CONVERSATION_CHANNEL) {
+    const waMeta = readWhatsAppMeta(
+      (existing.metadata ?? {}) as Record<string, unknown>,
+      normalizeChatMessages(existing.messages)
+    );
+    const gate = canSendWhatsAppSessionMessage({
+      lastInboundAt: waMeta.lastInboundAt,
+      optedOut: waMeta.optedOut
+    });
+    if (!gate.allowed) {
+      return NextResponse.json(
+        { error: gate.reason, code: gate.code },
+        { status: 409 }
+      );
+    }
+  }
+
   const result = await persistHumanReply({
     db,
     userId,
@@ -68,8 +92,11 @@ export async function POST(req: NextRequest) {
   const waSend = await sendWhatsAppOutboundForConversation(db, userId, conversationId, content);
   if (!waSend.ok) {
     return NextResponse.json(
-      { error: waSend.error ?? "Mensaje guardado pero no se pudo enviar por WhatsApp" },
-      { status: 502 }
+      {
+        error: waSend.error ?? "Mensaje guardado pero no se pudo enviar por WhatsApp",
+        code: waSend.code
+      },
+      { status: waSend.code === "session_closed" || waSend.code === "opted_out" ? 409 : 502 }
     );
   }
 
@@ -84,5 +111,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  return NextResponse.json({ conversation: toTextConversationRecord(updated) });
+  const record = toTextConversationRecord(updated);
+  const messages =
+    record.channel === WHATSAPP_CONVERSATION_CHANNEL
+      ? await signWhatsAppMessageMedia(db, userId, record.messages)
+      : record.messages;
+
+  return NextResponse.json({ conversation: { ...record, messages } });
 }

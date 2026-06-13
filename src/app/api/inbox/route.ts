@@ -11,6 +11,16 @@ import { toTextConversationRecord } from "@/lib/text-conversation-record";
 import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
 import { getAuthUserFromRequest, userDisplayName } from "@/lib/voice-agents-server";
 import type { InboxDetail, InboxFilter } from "@/types/inbox";
+import { WHATSAPP_CONVERSATION_CHANNEL } from "@/lib/whatsapp-channel";
+import {
+  readWhatsAppMeta,
+  whatsAppComplianceNotice
+} from "@/lib/whatsapp/compliance";
+import {
+  isWhatsAppSessionOpen,
+  whatsAppSessionExpiresAt
+} from "@/lib/whatsapp/session-window";
+import { signWhatsAppMessageMedia } from "@/lib/whatsapp/media-storage";
 
 function parseFilter(raw: string | null): InboxFilter {
   if (raw === "mine" || raw === "unassigned") return raw;
@@ -57,6 +67,11 @@ export async function GET(req: NextRequest) {
 
     const record = toTextConversationRecord(data);
     const textNames = await loadTextAgentNames(db, userId);
+    const isWhatsApp = record.channel === WHATSAPP_CONVERSATION_CHANNEL;
+    const waMeta = readWhatsAppMeta(record.metadata, record.messages);
+    const messagesWithMedia = isWhatsApp
+      ? await signWhatsAppMessageMedia(db, userId, record.messages)
+      : record.messages;
     const detail: InboxDetail = {
       kind: "text",
       id: record.id,
@@ -74,9 +89,17 @@ export async function GET(req: NextRequest) {
       handoff_mode: record.handoff_mode,
       unread_count: record.unread_count,
       status: record.status,
-      messages: record.messages,
+      messages: messagesWithMedia,
       created_at: record.created_at,
-      updated_at: record.updated_at
+      updated_at: record.updated_at,
+      ...(isWhatsApp
+        ? {
+            whatsapp_session_open: isWhatsAppSessionOpen(waMeta.lastInboundAt),
+            whatsapp_session_expires_at: whatsAppSessionExpiresAt(waMeta.lastInboundAt),
+            whatsapp_opted_out: waMeta.optedOut,
+            whatsapp_compliance_notice: whatsAppComplianceNotice(record.metadata, record.messages)
+          }
+        : {})
     };
 
     await db

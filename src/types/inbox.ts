@@ -39,6 +39,11 @@ export interface InboxTextDetail {
   messages: TextChatMessage[];
   created_at: string;
   updated_at: string;
+  /** WhatsApp: ventana Meta 24 h abierta */
+  whatsapp_session_open?: boolean;
+  whatsapp_session_expires_at?: string | null;
+  whatsapp_opted_out?: boolean;
+  whatsapp_compliance_notice?: string | null;
 }
 
 export interface InboxVoiceDetail {

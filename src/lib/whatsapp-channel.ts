@@ -28,13 +28,21 @@ export function toWhatsAppChannelRecord(raw: Record<string, unknown>): WhatsAppC
   };
 }
 
+/** +57 321 9883163 → +573219883163 */
+export function normalizeWhatsAppE164(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const withoutPrefix = trimmed.toLowerCase().startsWith("whatsapp:")
+    ? trimmed.slice("whatsapp:".length).trim()
+    : trimmed;
+  const compact = withoutPrefix.replace(/[\s().-]/g, "");
+  if (!compact) return "";
+  return compact.startsWith("+") ? compact : `+${compact}`;
+}
+
 /** whatsapp:+573001234567 → +573001234567 */
 export function parseTwilioWhatsAppAddress(value: string): string {
-  const trimmed = value.trim();
-  if (trimmed.toLowerCase().startsWith("whatsapp:")) {
-    return trimmed.slice("whatsapp:".length).trim();
-  }
-  return trimmed;
+  return normalizeWhatsAppE164(value);
 }
 
 export function toTwilioWhatsAppAddress(e164: string): string {

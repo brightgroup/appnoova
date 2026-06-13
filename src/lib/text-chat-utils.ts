@@ -116,11 +116,26 @@ export function normalizeChatMessages(raw: unknown): TextChatMessage[] {
         : row.role === "human" ? "human"
         : "user";
       const content = String(row.content ?? "").trim();
-      if (!content) return null;
+      const hasMedia = Boolean(row.media_storage_path);
+      if (!content && !hasMedia) return null;
+      const mediaType = row.media_type;
+      const mediaLabel = row.media_label;
+      const mediaStoragePath = row.media_storage_path;
+      const mediaMime = row.media_mime;
       return {
         role,
         content,
-        created_at: String(row.created_at ?? new Date().toISOString())
+        created_at: String(row.created_at ?? new Date().toISOString()),
+        ...(mediaType === "audio" ||
+        mediaType === "image" ||
+        mediaType === "document" ||
+        mediaType === "video" ||
+        mediaType === "text"
+          ? { media_type: mediaType }
+          : {}),
+        ...(mediaLabel ? { media_label: String(mediaLabel) } : {}),
+        ...(mediaStoragePath ? { media_storage_path: String(mediaStoragePath) } : {}),
+        ...(mediaMime ? { media_mime: String(mediaMime) } : {})
       } satisfies TextChatMessage;
     })
     .filter((m): m is TextChatMessage => m !== null);

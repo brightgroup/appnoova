@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
   ChevronDown,
+  FileText,
   Filter,
+  Film,
   Loader2,
   MessageSquare,
   RefreshCw,
@@ -221,7 +223,10 @@ export default function InboxPage() {
   const canReply =
     detail?.handoff_mode === "human" &&
     Boolean(detail?.assigned_to) &&
-    !offline;
+    !offline &&
+    (detail.kind !== "text" ||
+      detail.channel !== "whatsapp" ||
+      (detail.whatsapp_session_open !== false && !detail.whatsapp_opted_out));
 
   const assignLabel =
     detail?.handoff_mode === "human" && detail?.assigned_to
@@ -443,6 +448,20 @@ export default function InboxPage() {
               </div>
             )}
 
+            {detail?.kind === "text" &&
+              detail.channel === "whatsapp" &&
+              detail.whatsapp_compliance_notice && (
+                <div
+                  className={`mx-6 mt-3 rounded-xl border px-4 py-2.5 text-sm ${
+                    detail.whatsapp_session_open === false || detail.whatsapp_opted_out
+                      ? "border-amber-500/25 bg-amber-500/10 text-amber-200/90"
+                      : "border-emerald-500/20 bg-emerald-500/10 text-emerald-200/90"
+                  }`}
+                >
+                  {detail.whatsapp_compliance_notice}
+                </div>
+              )}
+
             <div className="flex-1 overflow-y-auto px-6 py-6">
               {detailLoading && !detail ? (
                 <div className="flex items-center justify-center py-20 text-white/40">
@@ -485,9 +504,17 @@ export default function InboxPage() {
                   <p className="text-center text-sm text-white/35">
                     {offline
                       ? "Activa Online para responder conversaciones."
-                      : detail.handoff_mode === "human" && !detail.assigned_to
-                        ? "Asigna la conversación a ti para habilitar el chat humano."
-                        : "Asigna la conversación a ti (arriba) para tomar el control y responder al visitante."}
+                      : detail.kind === "text" &&
+                          detail.channel === "whatsapp" &&
+                          detail.whatsapp_opted_out
+                        ? "Contacto dado de baja. Espera a que escriba de nuevo para reabrir la conversación."
+                        : detail.kind === "text" &&
+                            detail.channel === "whatsapp" &&
+                            detail.whatsapp_session_open === false
+                          ? "Ventana de 24 h cerrada. El cliente debe escribir de nuevo para que puedas responder."
+                          : detail.handoff_mode === "human" && !detail.assigned_to
+                            ? "Asigna la conversación a ti para habilitar el chat humano."
+                            : "Asigna la conversación a ti (arriba) para tomar el control y responder al visitante."}
                   </p>
                 )}
               </footer>
@@ -552,7 +579,15 @@ function TextThread({
                   {isHuman ? "Asesor" : "IA"}
                 </span>
               )}
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+              {isUser && msg.media_label && (
+                <span className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-white/40">
+                  {msg.media_label}
+                </span>
+              )}
+              <InboxMessageBody msg={msg} />
+              {msg.content.trim() ? (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+              ) : null}
               <time className="mt-2 block text-[10px] text-white/25">
                 {formatInboxMessageTime(msg.created_at)}
               </time>
@@ -562,4 +597,77 @@ function TextThread({
       })}
     </div>
   );
+}
+
+function InboxMessageBody({ msg }: { msg: TextChatMessage }) {
+  const url = msg.media_url?.trim();
+  const type = msg.media_type;
+
+  if (type === "video" && !url) {
+    return (
+      <div className="mb-2 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.06] px-3 py-2.5 text-sm text-white/70">
+        <Film className="h-4 w-4 shrink-0 text-white/50" />
+        Archivo de video recibido
+      </div>
+    );
+  }
+
+  if (!url) return null;
+
+  if (type === "image") {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="mb-2 block">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={url}
+          alt={msg.media_label ?? "Imagen"}
+          className="max-h-64 w-full rounded-xl object-contain bg-black/20"
+        />
+      </a>
+    );
+  }
+
+  if (type === "audio") {
+    return (
+      <audio
+        controls
+        preload="metadata"
+        src={url}
+        className="mb-2 w-full max-w-full"
+      />
+    );
+  }
+
+  if (type === "video") {
+    return (
+      <div className="mb-2 overflow-hidden rounded-xl border border-white/10 bg-black/30">
+        <video
+          controls
+          preload="metadata"
+          src={url}
+          className="max-h-56 w-full bg-black/40"
+        />
+        <div className="flex items-center gap-2 border-t border-white/10 px-3 py-2 text-xs text-white/60">
+          <Film className="h-4 w-4 shrink-0" />
+          <span>Archivo de video recibido</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (type === "document") {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mb-2 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.06] px-3 py-2 text-sm text-[#67e8f9] hover:bg-white/[.10]"
+      >
+        <FileText className="h-4 w-4 shrink-0" />
+        Abrir documento
+      </a>
+    );
+  }
+
+  return null;
 }
