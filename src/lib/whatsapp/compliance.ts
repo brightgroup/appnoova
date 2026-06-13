@@ -79,7 +79,7 @@ export function canSendWhatsAppSessionMessage(input: WhatsAppSendGateInput): Wha
       allowed: false,
       code: "session_closed",
       reason:
-        "Ventana de 24 h cerrada. Meta solo permite plantillas aprobadas fuera de sesión (próximamente en Noova)."
+        "Ventana de 24 h cerrada. Usa una plantilla aprobada por Meta para recontactar."
     };
   }
   return { allowed: true };

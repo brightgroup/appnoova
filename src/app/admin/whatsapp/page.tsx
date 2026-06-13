@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, Loader2, MessageCircle, Plus, Copy } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, MessageCircle, Plus, Copy, FileText } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { authFetch } from "@/lib/telephony-api";
 import { btnPrimary, btnGhost, registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell, registryTableCell, textMuted } from "@/lib/brand-ui";
@@ -97,8 +97,8 @@ export default function AdminWhatsAppPage() {
             <ChevronLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold">WhatsApp (Fase 0 — Twilio)</h1>
-            <p className="text-xs text-gray-500">Registrar líneas manualmente y copiar webhook</p>
+            <h1 className="text-xl font-bold">WhatsApp</h1>
+            <p className="text-xs text-gray-500">Registrar líneas y gestionar plantillas</p>
           </div>
         </div>
       </div>
@@ -118,6 +118,24 @@ export default function AdminWhatsAppPage() {
             </div>
           </div>
         )}
+
+        <Link
+          href="/admin/whatsapp/plantillas"
+          className="flex items-center justify-between rounded-xl border border-[#5b5bf6]/25 bg-[#5b5bf6]/[.06] p-5 hover:bg-[#5b5bf6]/[.10] transition-colors group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#5b5bf6]/20 flex items-center justify-center">
+              <FileText className="w-5 h-5 text-[#a5a5ff]" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">Plantillas WhatsApp</p>
+              <p className={`${textMuted} text-xs mt-0.5`}>
+                Crear, enviar a aprobación y monitorear estado
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-white transition-colors" />
+        </Link>
 
         <form onSubmit={handleCreate} className="rounded-xl border border-white/[.10] bg-white/[.02] p-5 space-y-4">
           <h2 className="text-sm font-semibold flex items-center gap-2">
@@ -143,7 +161,7 @@ export default function AdminWhatsAppPage() {
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Número E.164 (Twilio WA)</label>
+              <label className="block text-xs text-gray-400 mb-1">Número E.164</label>
               <input
                 value={e164}
                 onChange={e => setE164(e.target.value)}

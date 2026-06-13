@@ -24,6 +24,8 @@ import {
 import { inboxChannelStyle } from "@/lib/inbox-channel-ui";
 import type { InboxFilter, InboxListItem, InboxTextDetail } from "@/types/inbox";
 import type { TextChatMessage } from "@/types/text-agent-conversation";
+import type { WhatsAppTemplateRecord } from "@/types/whatsapp-template";
+import { renderTemplatePreview } from "@/lib/whatsapp/template-record";
 
 type AssignValue = "ai" | "me";
 
@@ -63,6 +65,9 @@ export default function InboxPage() {
   const [currentUserName, setCurrentUserName] = useState("Usuario");
   const [reply, setReply] = useState("");
   const [assignOpen, setAssignOpen] = useState(false);
+  const [waTemplates, setWaTemplates] = useState<WhatsAppTemplateRecord[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [templateVars, setTemplateVars] = useState<string[]>([]);
   const assignRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -144,6 +149,47 @@ export default function InboxPage() {
     return () => window.clearInterval(timer);
   }, [selectedId, loadDetail]);
 
+  const loadWaTemplates = useCallback(async (conversationId: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/whatsapp/templates?conversation_id=${conversationId}`, { headers });
+      const data = await res.json();
+      if (res.ok) {
+        setWaTemplates(data.templates ?? []);
+      } else {
+        setWaTemplates([]);
+      }
+    } catch {
+      setWaTemplates([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (
+      !selectedId ||
+      !detail ||
+      detail.kind !== "text" ||
+      detail.channel !== "whatsapp" ||
+      detail.whatsapp_session_open !== false ||
+      detail.whatsapp_opted_out
+    ) {
+      setWaTemplates([]);
+      setSelectedTemplateId("");
+      setTemplateVars([]);
+      return;
+    }
+    loadWaTemplates(selectedId);
+  }, [selectedId, detail, loadWaTemplates]);
+
+  useEffect(() => {
+    const tpl = waTemplates.find(t => t.id === selectedTemplateId);
+    if (!tpl) {
+      setTemplateVars([]);
+      return;
+    }
+    setTemplateVars(tpl.variable_labels.map(() => ""));
+  }, [selectedTemplateId, waTemplates]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [detail]);
@@ -174,6 +220,8 @@ export default function InboxPage() {
     setSelectedId(item.id);
     setReply("");
     setAssignOpen(false);
+    setSelectedTemplateId("");
+    setTemplateVars([]);
   };
 
   const assignConversation = async (value: AssignValue) => {
@@ -228,6 +276,54 @@ export default function InboxPage() {
     }
     setSending(false);
   };
+
+  const sendTemplate = async () => {
+    if (!selectedId || !selectedTemplateId || sending) return;
+    if (detail?.kind !== "text" || detail.handoff_mode !== "human" || !detail.assigned_to) return;
+
+    setSending(true);
+    setError("");
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/inbox/send-template", {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversation_id: selectedId,
+          template_id: selectedTemplateId,
+          variables: templateVars
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "No se pudo enviar plantilla");
+        return;
+      }
+      setSelectedTemplateId("");
+      setTemplateVars([]);
+      await loadDetail(selectedId);
+      await loadList();
+    } catch {
+      setError("Error de red al enviar plantilla");
+    }
+    setSending(false);
+  };
+
+  const selectedTemplate = waTemplates.find(t => t.id === selectedTemplateId) ?? null;
+  const templatePreview =
+    selectedTemplate && templateVars.every(v => v.trim())
+      ? renderTemplatePreview(selectedTemplate.body_preview, templateVars)
+      : selectedTemplate?.body_preview ?? "";
+
+  const canSendTemplate =
+    detail?.handoff_mode === "human" &&
+    Boolean(detail?.assigned_to) &&
+    !offline &&
+    detail.kind === "text" &&
+    detail.channel === "whatsapp" &&
+    detail.whatsapp_session_open === false &&
+    !detail.whatsapp_opted_out &&
+    waTemplates.length > 0;
 
   const canReply =
     detail?.handoff_mode === "human" &&
@@ -522,6 +618,60 @@ export default function InboxPage() {
                       {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enviar"}
                     </button>
                   </div>
+                ) : canSendTemplate ? (
+                  <div className="mx-auto max-w-3xl space-y-3">
+                    <p className="text-center text-xs text-amber-200/80">
+                      Ventana cerrada — solo plantillas Utility aprobadas por Meta
+                    </p>
+                    <select
+                      value={selectedTemplateId}
+                      onChange={e => setSelectedTemplateId(e.target.value)}
+                      className="w-full rounded-xl border border-white/[.08] bg-white/[.07] px-4 py-3 text-sm text-white focus:border-[#5b5bf6]/40 focus:outline-none"
+                    >
+                      <option value="">Elegir plantilla…</option>
+                      {waTemplates.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.template_name}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedTemplate && selectedTemplate.variable_labels.length > 0 && (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {selectedTemplate.variable_labels.map((label, i) => (
+                          <div key={label}>
+                            <label className="mb-1 block text-xs text-white/45">{label}</label>
+                            <input
+                              value={templateVars[i] ?? ""}
+                              onChange={e => {
+                                const next = [...templateVars];
+                                next[i] = e.target.value;
+                                setTemplateVars(next);
+                              }}
+                              className="w-full rounded-xl border border-white/[.08] bg-white/[.07] px-3 py-2.5 text-sm text-white focus:border-[#5b5bf6]/40 focus:outline-none"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {selectedTemplate && (
+                      <div className="rounded-xl border border-white/[.06] bg-white/[.04] px-4 py-3 text-sm text-white/70">
+                        {templatePreview}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={sendTemplate}
+                      disabled={
+                        !selectedTemplateId ||
+                        sending ||
+                        (selectedTemplate?.variable_labels.length ?? 0) !==
+                          templateVars.filter(v => v.trim()).length
+                      }
+                      className="w-full rounded-2xl bg-amber-600 px-5 py-3 text-sm font-medium text-white disabled:opacity-40"
+                    >
+                      {sending ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Enviar plantilla"}
+                    </button>
+                  </div>
                 ) : (
                   <p className="text-center text-sm text-white/35">
                     {offline
@@ -533,7 +683,9 @@ export default function InboxPage() {
                         : detail.kind === "text" &&
                             detail.channel === "whatsapp" &&
                             detail.whatsapp_session_open === false
-                          ? "Ventana de 24 h cerrada. El cliente debe escribir de nuevo para que puedas responder."
+                          ? waTemplates.length > 0
+                            ? "Asigna la conversación a ti para enviar una plantilla aprobada."
+                            : "Ventana de 24 h cerrada. Registra plantillas en admin o espera a que el cliente escriba."
                           : detail.handoff_mode === "human" && !detail.assigned_to
                             ? "Asigna la conversación a ti para habilitar el chat humano."
                             : "Asigna la conversación a ti (arriba) para tomar el control y responder al visitante."}
