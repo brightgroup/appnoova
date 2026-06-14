@@ -7,6 +7,14 @@ const LINK_HOSTS = new Set([
 
 const MICROSITE_PATH = (process.env.NEXT_PUBLIC_MICROSITE_PATH || "/c").replace(/\/$/, "") || "/c";
 
+function requestHostname(request: NextRequest): string {
+  // server.ts no pasa el host en nextUrl; usar Host / X-Forwarded-Host.
+  const fromHeader =
+    request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+    request.headers.get("host")?.split(":")[0]?.trim();
+  return (fromHeader || request.nextUrl.hostname).toLowerCase();
+}
+
 function isLinkHost(hostname: string): boolean {
   const host = hostname.split(":")[0].toLowerCase();
   if (LINK_HOSTS.has(host)) return true;
@@ -16,8 +24,13 @@ function isLinkHost(hostname: string): boolean {
 }
 
 export function middleware(request: NextRequest) {
-  const hostname = request.nextUrl.hostname;
+  const hostname = requestHostname(request);
   const { pathname } = request.nextUrl;
+
+  if (pathname === "/admin/whatsapp/plantillas" || pathname.startsWith("/admin/whatsapp/plantillas/")) {
+    const appBase = process.env.NEXT_PUBLIC_APP_URL || "https://app.noova360.com";
+    return NextResponse.redirect(new URL("/admin/whatsapp?tab=aprobaciones", appBase));
+  }
 
   if (!isLinkHost(hostname)) {
     return NextResponse.next();

@@ -16,6 +16,7 @@ interface ChannelListPageProps {
   onRefresh?: () => void;
   refreshing?: boolean;
   action?: React.ReactNode;
+  filters?: React.ReactNode;
   footer?: React.ReactNode;
   error?: React.ReactNode;
   children: React.ReactNode;
@@ -32,6 +33,7 @@ export function ChannelListPage({
   onRefresh,
   refreshing,
   action,
+  filters,
   footer,
   error,
   children
@@ -68,6 +70,7 @@ export function ChannelListPage({
             onRefresh={onRefresh}
             refreshing={refreshing}
             action={action}
+            filters={filters}
             error={error}
             footer={footer}
           >

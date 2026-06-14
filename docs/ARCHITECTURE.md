@@ -211,6 +211,7 @@ Ver [ROLLBACK-Y-BACKUPS.md](ROLLBACK-Y-BACKUPS.md) para rollback y backups.
 
 | Quiero… | Dónde mirar |
 |---------|-------------|
+| Ficha de contacto (producto) | [specs/NOOVA360_Spec_Ficha_Contacto.md](specs/NOOVA360_Spec_Ficha_Contacto.md) |
 | Nuevo canal de texto | Nueva tabla + API + panel en `dashboard/canales/` + `channel` en conversaciones |
 | Cambiar UI chat público | `src/app/agenteclientes/`, `src/components/widget/WebChatWidget.tsx` |
 | Nuevo webhook telefonía | `src/app/api/telephony/webhooks/` |

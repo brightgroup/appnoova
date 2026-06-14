@@ -80,7 +80,7 @@ export function WhatsAppPhonePreview({
         </div>
       </div>
       <p className="text-xs text-gray-500 mt-4 text-center max-w-[280px]">
-        Vista previa aproximada. Meta puede ajustar el formato final.
+        Vista previa aproximada del mensaje en WhatsApp.
       </p>
     </div>
   );

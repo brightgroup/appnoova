@@ -82,7 +82,7 @@ export default function WhatsAppListPage() {
   return (
     <ChannelListPage
       title="WhatsApp"
-      description="Líneas WhatsApp Business conectadas vía Twilio. Asigne un agente de texto a cada línea."
+      description="Líneas WhatsApp Business conectadas. Asigne un agente de texto a cada línea."
       loading={loading}
       tableDescription="Haga clic en una línea para asignar agente y ver detalles."
       search={search}
@@ -120,12 +120,12 @@ export default function WhatsAppListPage() {
           <p className="text-sm text-gray-400 mb-2 max-w-md mx-auto">
             {search
               ? "No hay resultados"
-              : "Aún no hay líneas de WhatsApp conectadas. Solicite activación y nuestro equipo registrará su número en Twilio."}
+              : "Aún no hay líneas de WhatsApp conectadas. Solicite activación y nuestro equipo registrará su número."}
           </p>
           {!search && (
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[.04] border border-white/[.08] text-xs text-gray-500">
               <Clock className="w-3.5 h-3.5" />
-              Fase 0 — activación manual
+              Fase 0 — activación asistida
             </div>
           )}
         </div>

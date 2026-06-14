@@ -259,8 +259,8 @@ export function WhatsAppTemplateEditor({
               </div>
               <p className={`${textMuted} text-xs mt-0.5`}>
                 {readOnly
-                  ? "Plantilla enviada — se actualiza automáticamente cuando Meta aprueba"
-                  : "Se enviará automáticamente para aprobación de Meta"}
+                  ? "Plantilla enviada — se actualiza automáticamente cuando se aprueba"
+                  : "Se enviará automáticamente para aprobación"}
               </p>
             </div>
           </div>
@@ -423,7 +423,7 @@ export function WhatsAppTemplateEditor({
             <div>
               <h3 className="text-sm font-semibold text-white">Variables</h3>
               <p className={`${textMuted} text-xs mt-1 leading-relaxed`}>
-                Agrega valores de ejemplo. Meta los usa para revisar y aprobar la plantilla.
+                Agrega valores de ejemplo. Se usan durante la revisión y aprobación.
               </p>
             </div>
 

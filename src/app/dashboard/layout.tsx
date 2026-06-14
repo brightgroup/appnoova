@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard, Building2, Loader2, Share2 } from "lucide-react";
+import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard, Building2, Loader2, Share2, Contact } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
@@ -12,6 +12,7 @@ import {
 import { CANALES_NAV } from "@/lib/canales-nav";
 import { AGENTES_VOZ_NAV } from "@/lib/agentes-voz-nav";
 import { AGENTES_TEXTO_NAV } from "@/lib/agentes-texto-nav";
+import { CRM_NAV } from "@/lib/crm-nav";
 import type { LucideIcon } from "lucide-react";
 
 function SidebarSubMenu({
@@ -79,6 +80,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       pathname.startsWith("/dashboard/micrositio")
     ) {
       setExpandedMenu("canales");
+    } else if (pathname.startsWith("/dashboard/crm")) {
+      setExpandedMenu("crm");
     }
   }, [pathname]);
 
@@ -238,6 +241,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             {sidebarOpen && expandedMenu === "canales" && (
               <SidebarSubMenu pathname={pathname} items={CANALES_NAV} />
+            )}
+          </div>
+
+          {/* CRM */}
+          <div>
+            <button
+              onClick={() => toggleMenu("crm")}
+              className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-gray-300 ${
+                sidebarOpen ? "hover:text-white hover:bg-white/[.08]" : "hover:text-white"
+              } ${
+                expandedMenu === "crm" && sidebarOpen ? "text-white bg-white/[.08]" : ""
+              }`}
+              title="CRM"
+            >
+              {sidebarOpen ? (
+                <>
+                  <Contact className="w-5 h-5 flex-shrink-0 mr-3" />
+                  <span className="flex-1 text-left">CRM</span>
+                  <ChevronRight className={`w-4 h-4 transition-transform ml-2 ${expandedMenu === "crm" ? "rotate-90" : ""}`} />
+                </>
+              ) : (
+                <Contact className="w-5 h-5 flex-shrink-0" />
+              )}
+            </button>
+            {sidebarOpen && expandedMenu === "crm" && (
+              <SidebarSubMenu pathname={pathname} items={CRM_NAV} />
             )}
           </div>
 
