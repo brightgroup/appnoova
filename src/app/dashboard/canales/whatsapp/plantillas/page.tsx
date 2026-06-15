@@ -8,6 +8,8 @@ import { getAuthHeaders } from "@/lib/text-agents-api";
 import {
   btnGhost,
   btnPrimary,
+  registryPage,
+  registryToolbar,
   registryContent,
   registryTable,
   registryTableCell,
@@ -15,6 +17,8 @@ import {
   registryTableHeadCell,
   registryTableHeadRow,
   registryTableRowClickable,
+  registryTableEmpty,
+  registryTableLoading,
   textMuted
 } from "@/lib/brand-ui";
 import {
@@ -24,6 +28,9 @@ import {
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import type { WhatsAppTemplateRecord } from "@/types/whatsapp-template";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
+import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
+import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
+import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 
 export default function DashboardWhatsAppTemplatesPage() {
   const router = useRouter();
@@ -67,9 +74,12 @@ export default function DashboardWhatsAppTemplatesPage() {
     return ch ? `${ch.e164}${ch.friendly_name ? ` — ${ch.friendly_name}` : ""}` : "—";
   };
 
+  const pagination = useRegistryPagination(templates.length, filterChannel);
+  const pageRows = pagination.pageRows(templates);
+
   return (
-    <div className="flex-1 flex flex-col bg-noova-main text-white min-h-0">
-      <div className="border-b border-white/[.08] px-6 py-4 shrink-0">
+    <div className={registryPage}>
+      <div className={registryToolbar}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
@@ -96,34 +106,47 @@ export default function DashboardWhatsAppTemplatesPage() {
       </div>
 
       <div className={registryContent}>
-        <div className="flex items-center gap-3 mb-5">
-          <NoovaSelect
-            value={filterChannel}
-            onChange={setFilterChannel}
-            allowEmpty={true}
-            emptyLabel="Todas las líneas"
-            className="min-w-[220px]"
-            options={channels.map(ch => ({ value: ch.id, label: ch.e164 }))}
-          />
-          <button type="button" onClick={load} className={btnGhost}>
-            Actualizar
-          </button>
-        </div>
-
+        <RegistryTableLayout
+          onRefresh={load}
+          refreshing={loading}
+          filters={
+            <NoovaSelect
+              value={filterChannel}
+              onChange={setFilterChannel}
+              allowEmpty={true}
+              emptyLabel="Todas las líneas"
+              className="min-w-[220px]"
+              options={channels.map(ch => ({ value: ch.id, label: ch.e164 }))}
+            />
+          }
+          footer={templates.length > 0 ? (
+            <RegistryTablePagination
+              total={pagination.total}
+              rangeStart={pagination.rangeStart}
+              rangeEnd={pagination.rangeEnd}
+              pageSafe={pagination.pageSafe}
+              totalPages={pagination.totalPages}
+              pageSize={pagination.pageSize}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+              label="plantillas"
+            />
+          ) : undefined}
+        >
         {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
+          <div className={registryTableLoading}>
+            <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando plantillas…
           </div>
         ) : channels.length === 0 ? (
-          <div className="text-center py-20 space-y-4">
-            <p className="text-sm text-gray-500">Primero necesitas una línea WhatsApp activa.</p>
+          <div className={registryTableEmpty}>
+            <p className="mb-4">Primero necesitas una línea WhatsApp activa.</p>
             <Link href="/dashboard/canales/whatsapp" className={btnPrimary}>
               Ver líneas WhatsApp
             </Link>
           </div>
         ) : templates.length === 0 ? (
-          <div className="text-center py-20 space-y-4">
-            <p className="text-sm text-gray-500">Aún no tienes plantillas para tu negocio.</p>
+          <div className={registryTableEmpty}>
+            <p className="mb-4">Aún no tienes plantillas para tu negocio.</p>
             <Link href="/dashboard/canales/whatsapp/plantillas/nueva" className={btnPrimary}>
               <Plus className="w-4 h-4" />
               Crear primera plantilla
@@ -142,7 +165,7 @@ export default function DashboardWhatsAppTemplatesPage() {
               </tr>
             </thead>
             <tbody>
-              {templates.map(tpl => (
+              {pageRows.map(tpl => (
                 <tr
                   key={tpl.id}
                   className={registryTableRowClickable}
@@ -191,6 +214,7 @@ export default function DashboardWhatsAppTemplatesPage() {
             </tbody>
           </table>
         )}
+        </RegistryTableLayout>
       </div>
     </div>
   );

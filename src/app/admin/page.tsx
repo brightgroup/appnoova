@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Users, BarChart3, Phone, Settings, MessageCircle } from "lucide-react";
+import { Users, BarChart3, Phone, Settings, MessageCircle, Building2, Shield } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function AdminDashboard() {
@@ -17,15 +17,21 @@ export default function AdminDashboard() {
   const menuItems = [
     {
       href: "/admin/users",
-      label: "Gestionar Usuarios",
-      description: "Crear, editar y eliminar usuarios",
+      label: "Usuarios",
+      description: "Activar, desactivar y permisos de plataforma",
       icon: Users
     },
     {
-      href: "/admin/clients",
-      label: "Gestionar Clientes",
-      description: "Crear, editar y eliminar clientes",
-      icon: Users
+      href: "/admin/organizations",
+      label: "Organizaciones",
+      description: "Cuentas tenant y estado de la suscripción",
+      icon: Building2
+    },
+    {
+      href: "/admin/roles",
+      label: "Roles y permisos",
+      description: "Matriz de acceso por módulo",
+      icon: Shield
     },
     {
       href: "/admin/telephony",
@@ -54,7 +60,7 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0d0e14] text-white">
+    <div className="flex-1 flex flex-col text-white">
       {/* Header */}
       <div className="border-b border-white/[.08] px-6 py-6">
         <h1 className="text-2xl font-bold mb-1">Panel Administrador</h1>

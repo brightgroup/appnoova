@@ -1,0 +1,15 @@
+{
+  "name": "noova-app",
+  "description": "Referencia para Coolify — app Next.js en la raíz del monorepo",
+  "build": {
+    "build_pack": "dockerfile",
+    "dockerfile_location": "Dockerfile",
+    "base_directory": "/"
+  },
+  "watch_paths_file": ".github/coolify/noova-app.watchpaths",
+  "network": {
+    "ports": {
+      "expose": "8000"
+    }
+  }
+}

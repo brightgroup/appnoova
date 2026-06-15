@@ -13,6 +13,8 @@ import {
   tabActive, tabIdle
 } from "@/lib/brand-ui";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
+import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
+import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { needsChatAnalysis } from "@/lib/text-chat-analysis";
 import {
@@ -86,6 +88,9 @@ export function ChatRegistryPanel({ agentId, refreshKey = 0 }: ChatRegistryPanel
     }
     return list;
   }, [conversations, filter, search]);
+
+  const pagination = useRegistryPagination(filtered.length, `${filter}-${search}`);
+  const pageRows = pagination.pageRows(filtered);
 
   const runAnalysis = useCallback(async (id: string) => {
     const headers = await getAuthHeaders();
@@ -204,7 +209,17 @@ export function ChatRegistryPanel({ agentId, refreshKey = 0 }: ChatRegistryPanel
             </button>
           }
           footer={!loading && filtered.length > 0 ? (
-            <span>{filtered.length} conversación{filtered.length !== 1 ? "es" : ""}</span>
+            <RegistryTablePagination
+              total={pagination.total}
+              rangeStart={pagination.rangeStart}
+              rangeEnd={pagination.rangeEnd}
+              pageSafe={pagination.pageSafe}
+              totalPages={pagination.totalPages}
+              pageSize={pagination.pageSize}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+              label="conversaciones"
+            />
           ) : undefined}
         >
         {loading ? (
@@ -234,7 +249,7 @@ export function ChatRegistryPanel({ agentId, refreshKey = 0 }: ChatRegistryPanel
               </tr>
             </thead>
             <tbody>
-              {filtered.map(conv => {
+              {pageRows.map(conv => {
                 const quality = chatQualityPercent(conv);
                 const success = isSuccessfulChat(conv);
                 return (

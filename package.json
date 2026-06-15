@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "NODE_ENV=production tsx server.ts",
     "lint": "next lint",
+    "db:migrate": "node scripts/apply-all-migrations.mjs",
     "backup:db": "node scripts/backup-supabase.mjs",
     "email:test": "node scripts/test-resend-email.mjs",
     "email:configure-supabase": "node scripts/configure-supabase-resend-smtp.mjs"

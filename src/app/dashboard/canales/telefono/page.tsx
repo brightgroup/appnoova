@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Phone, Plus } from "lucide-react";
 import { btnPrimary, btnGhost, registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell, registryTableRowClickable, registryTableCellFirst, registryTableCell, registryTableEmpty } from "@/lib/brand-ui";
 import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
+import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
+import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import { countryLabel } from "@/lib/telephony/countries";
 import { numberUsageLabel } from "@/lib/telephony/number-type-labels";
@@ -56,6 +58,9 @@ export default function TelefonoListPage() {
     );
   });
 
+  const pagination = useRegistryPagination(filtered.length, search);
+  const pageRows = pagination.pageRows(filtered);
+
   return (
     <>
       <ChannelListPage
@@ -78,7 +83,17 @@ export default function TelefonoListPage() {
           </>
         }
         footer={filtered.length > 0 ? (
-          <span>Mostrando <span className="text-gray-200">{filtered.length}</span> de {lines.length} líneas</span>
+          <RegistryTablePagination
+            total={pagination.total}
+            rangeStart={pagination.rangeStart}
+            rangeEnd={pagination.rangeEnd}
+            pageSafe={pagination.pageSafe}
+            totalPages={pagination.totalPages}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+            label="líneas"
+          />
         ) : undefined}
       >
         {filtered.length === 0 ? (
@@ -104,7 +119,7 @@ export default function TelefonoListPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(line => (
+              {pageRows.map(line => (
                 <tr
                   key={line.id}
                   className={registryTableRowClickable}

@@ -1,0 +1,78 @@
+# Despliegues selectivos en Coolify (monorepo).
+#
+# Requisitos en Coolify (una vez):
+# 1. App Noova: Build Pack Dockerfile, Dockerfile Location = Dockerfile, Base Directory = /
+#    Watch Paths (copiar desde .github/coolify/noova-app.watchpaths)
+#    Desactivar "Automatic Deployment" si usas solo estos webhooks.
+# 2. Pipecat: Build Pack Dockerfile, Dockerfile Location = services/pipecat-voice/Dockerfile,
+#    Base Directory = services/pipecat-voice
+#    Watch Paths (copiar desde .github/coolify/pipecat-voice.watchpaths)
+# 3. En GitHub → Settings → Secrets → Actions:
+#    COOLIFY_DEPLOY_HOOK_NOOVA  = Deploy Webhook URL de la app Next.js
+#    COOLIFY_DEPLOY_HOOK_PIPECAT = Deploy Webhook URL del servicio Pipecat
+
+name: Coolify Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      noova: ${{ steps.filter.outputs.noova }}
+      pipecat: ${{ steps.filter.outputs.pipecat }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            noova:
+              - 'src/**'
+              - 'public/**'
+              - 'scripts/**'
+              - 'supabase/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'Dockerfile'
+              - 'next.config.ts'
+              - 'server.ts'
+              - 'tailwind.config.ts'
+              - 'postcss.config.mjs'
+              - 'tsconfig.json'
+              - '.github/workflows/coolify-deploy.yml'
+            pipecat:
+              - 'services/pipecat-voice/**'
+
+  deploy-noova:
+    needs: changes
+    if: needs.changes.outputs.noova == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Noova app deploy
+        env:
+          HOOK: ${{ secrets.COOLIFY_DEPLOY_HOOK_NOOVA }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "COOLIFY_DEPLOY_HOOK_NOOVA no configurado — configura el secret o usa Watch Paths en Coolify."
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK"
+
+  deploy-pipecat:
+    needs: changes
+    if: needs.changes.outputs.pipecat == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Pipecat deploy
+        env:
+          HOOK: ${{ secrets.COOLIFY_DEPLOY_HOOK_PIPECAT }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "COOLIFY_DEPLOY_HOOK_PIPECAT no configurado — configura el secret o usa Watch Paths en Coolify."
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK"

@@ -1,0 +1,15 @@
+{
+  "name": "noova-pipecat-voice",
+  "description": "Referencia para Coolify — bot de voz Pipecat",
+  "build": {
+    "build_pack": "dockerfile",
+    "dockerfile_location": "Dockerfile",
+    "base_directory": "services/pipecat-voice"
+  },
+  "watch_paths_file": ".github/coolify/pipecat-voice.watchpaths",
+  "network": {
+    "ports": {
+      "expose": "8765"
+    }
+  }
+}

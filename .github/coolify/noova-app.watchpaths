@@ -1,0 +1,12 @@
+src/**
+public/**
+scripts/**
+supabase/**
+package.json
+package-lock.json
+Dockerfile
+next.config.ts
+server.ts
+tailwind.config.ts
+postcss.config.mjs
+tsconfig.json

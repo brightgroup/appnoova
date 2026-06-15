@@ -1,10 +1,10 @@
-import { supabase } from "@/lib/supabase";
+import { getAuthToken } from "@/lib/voice-agents-api";
 
 export async function authFetch(path: string, init?: RequestInit) {
-  const { data: { session } } = await supabase.auth.getSession();
+  const token = await getAuthToken();
   const headers: HeadersInit = {
     "Content-Type": "application/json",
-    ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
   return fetch(path, { ...init, headers: { ...headers, ...init?.headers } });
 }

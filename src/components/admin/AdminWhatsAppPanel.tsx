@@ -9,12 +9,14 @@ import {
 import { supabase } from "@/lib/supabase";
 import { authFetch } from "@/lib/telephony-api";
 import {
-  btnPrimary, btnGhost, registryPage, registryToolbar, registryContent,
+  btnPrimary, btnGhost, adminRegistryPage, registryToolbar, adminRegistryContent,
   btnFilterGroup, btnFilterActive, btnFilterIdle, registryTable,
   registryTableHead, registryTableHeadRow, registryTableHeadCell,
-  registryTableCell, textMuted
+  registryTableCell, registryTableRow, textMuted
 } from "@/lib/brand-ui";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
+import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
+import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import {
   templateStatusColor,
   templateStatusLabel
@@ -136,8 +138,13 @@ export function AdminWhatsAppPanel() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const channelsPagination = useRegistryPagination(channels.length);
+  const templatesPagination = useRegistryPagination(templates.length, approvalFilter);
+  const pagedChannels = channelsPagination.pageRows(channels);
+  const pagedTemplates = templatesPagination.pageRows(templates);
+
   return (
-    <div className={registryPage}>
+    <div className={adminRegistryPage}>
       <div className={registryToolbar}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -175,7 +182,7 @@ export function AdminWhatsAppPanel() {
         </div>
       </div>
 
-      <div className={registryContent}>
+      <div className={adminRegistryContent}>
         {loading ? (
           <div className="flex justify-center py-20 text-gray-400">
             <Loader2 className="w-6 h-6 animate-spin" />
@@ -200,6 +207,19 @@ export function AdminWhatsAppPanel() {
             <RegistryTableLayout
               onRefresh={load}
               refreshing={loading}
+              footer={channels.length > 0 ? (
+                <RegistryTablePagination
+                  total={channelsPagination.total}
+                  rangeStart={channelsPagination.rangeStart}
+                  rangeEnd={channelsPagination.rangeEnd}
+                  pageSafe={channelsPagination.pageSafe}
+                  totalPages={channelsPagination.totalPages}
+                  pageSize={channelsPagination.pageSize}
+                  onPageChange={channelsPagination.setPage}
+                  onPageSizeChange={channelsPagination.setPageSize}
+                  label="líneas"
+                />
+              ) : undefined}
             >
               {channels.length === 0 ? (
                 <p className="text-sm text-gray-500 py-10 text-center">Sin líneas registradas.</p>
@@ -214,10 +234,10 @@ export function AdminWhatsAppPanel() {
                     </tr>
                   </thead>
                   <tbody>
-                    {channels.map(ch => {
+                    {pagedChannels.map(ch => {
                       const u = users.find(x => x.id === ch.user_id);
                       return (
-                        <tr key={ch.id} className="border-b border-white/[.06]">
+                        <tr key={ch.id} className={registryTableRow}>
                           <td className={`${registryTableCell} font-mono text-sm`}>
                             <div className="flex items-center gap-2">
                               <MessageCircle className="w-4 h-4 text-emerald-400" />
@@ -294,6 +314,19 @@ export function AdminWhatsAppPanel() {
             }
             onRefresh={load}
             refreshing={loading}
+            footer={templates.length > 0 ? (
+              <RegistryTablePagination
+                total={templatesPagination.total}
+                rangeStart={templatesPagination.rangeStart}
+                rangeEnd={templatesPagination.rangeEnd}
+                pageSafe={templatesPagination.pageSafe}
+                totalPages={templatesPagination.totalPages}
+                pageSize={templatesPagination.pageSize}
+                onPageChange={templatesPagination.setPage}
+                onPageSizeChange={templatesPagination.setPageSize}
+                label="plantillas"
+              />
+            ) : undefined}
           >
             {templates.length === 0 ? (
               <div className="py-20 text-center">
@@ -312,8 +345,8 @@ export function AdminWhatsAppPanel() {
                   </tr>
                 </thead>
                 <tbody>
-                  {templates.map(tpl => (
-                    <tr key={tpl.id} className="border-b border-white/[.06]">
+                  {pagedTemplates.map(tpl => (
+                    <tr key={tpl.id} className={registryTableRow}>
                       <td className={`${registryTableCell} text-sm`}>
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4 text-[#5b5bf6] shrink-0" />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Loader2, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Loader2, Pencil } from "lucide-react";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import {
   btnPrimary, registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
@@ -10,11 +10,10 @@ import {
 } from "@/lib/brand-ui";
 import { formatDateTime, formatPhoneDisplay } from "@/lib/telephony/format-phone";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
-import { NoovaSelect } from "@/components/ui/NoovaSelect";
+import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
+import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { TestPhoneNumberModal } from "@/components/telephony/TestPhoneNumberModal";
 import type { TestPhoneNumberRecord } from "@/types/test-phone-number";
-
-const PAGE_SIZES = [10, 25, 50];
 
 export function TestPhoneNumbersPanel() {
   const [numbers, setNumbers] = useState<TestPhoneNumberRecord[]>([]);
@@ -23,8 +22,6 @@ export function TestPhoneNumbersPanel() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TestPhoneNumberRecord | null>(null);
 
@@ -57,11 +54,8 @@ export function TestPhoneNumbersPanel() {
     );
   }, [numbers, search]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageSafe = Math.min(page, totalPages);
-  const pageRows = filtered.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
-
-  useEffect(() => { setPage(1); }, [search, pageSize]);
+  const pagination = useRegistryPagination(filtered.length, search);
+  const pageRows = pagination.pageRows(filtered);
 
   async function handleSave(data: { label: string; e164: string }) {
     setSaving(true);
@@ -115,38 +109,17 @@ export function TestPhoneNumbersPanel() {
           </button>
         }
         footer={filtered.length > 0 ? (
-          <>
-            <span>
-              Mostrando {filtered.length === 0 ? 0 : (pageSafe - 1) * pageSize + 1} a{" "}
-              {Math.min(pageSafe * pageSize, filtered.length)} de {filtered.length} entradas
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                disabled={pageSafe <= 1}
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                className="p-1 rounded hover:bg-white/[.08] disabled:opacity-30"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="w-6 h-6 rounded-full bg-white/[.10] text-white flex items-center justify-center text-[11px]">
-                {pageSafe}
-              </span>
-              <button
-                disabled={pageSafe >= totalPages}
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                className="p-1 rounded hover:bg-white/[.08] disabled:opacity-30"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <NoovaSelect
-                value={String(pageSize)}
-                onChange={v => setPageSize(Number(v))}
-                allowEmpty={false}
-                className="ml-2 w-[72px]"
-                options={PAGE_SIZES.map(s => ({ value: String(s), label: String(s) }))}
-              />
-            </div>
-          </>
+          <RegistryTablePagination
+            total={pagination.total}
+            rangeStart={pagination.rangeStart}
+            rangeEnd={pagination.rangeEnd}
+            pageSafe={pagination.pageSafe}
+            totalPages={pagination.totalPages}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+            label="entradas"
+          />
         ) : undefined}
       >
         {loading ? (

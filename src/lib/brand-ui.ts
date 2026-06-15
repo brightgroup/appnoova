@@ -110,15 +110,22 @@ export const registryListShell =
 export const registryPage =
   "flex-1 flex flex-col min-h-0 bg-noova-main text-white overflow-hidden";
 
+/** Admin — scroll en main, sin contenedor interno estrecho */
+export const adminRegistryPage =
+  "flex-1 flex flex-col bg-noova-main text-white min-h-full";
+
 export const registryToolbar =
   "px-5 py-4 border-b border-white/[.08] shrink-0 bg-noova-main";
 
 export const registryContent =
   "flex-1 overflow-y-auto p-6 min-h-0";
 
+export const adminRegistryContent =
+  "p-6";
+
 /** Contenedor interno del panel — mismo layout que Números de prueba */
 export const registryPanel =
-  "flex flex-col min-h-0";
+  "flex flex-col";
 
 export const registryDescription =
   "text-sm text-gray-200 leading-relaxed mb-5 max-w-3xl";
@@ -127,7 +134,7 @@ export const registrySearchRow =
   "flex flex-wrap items-center gap-3 mb-4";
 
 export const registryTableArea =
-  "min-w-0 overflow-x-auto";
+  "min-w-0 overflow-x-auto overflow-y-visible";
 
 export const registryTableWrap =
   "flex-1 overflow-auto min-h-0";

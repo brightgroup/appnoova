@@ -1,287 +1,303 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-import { Users, Shield, User, RefreshCw, ChevronDown, CheckCircle, Clock, MailCheck, AlertCircle, Phone } from "lucide-react";
 import {
-  registryPage, registryToolbar, registryContent,
+  Users, Shield, RefreshCw, CheckCircle, Clock, MailCheck, AlertCircle,
+  Phone, Plus, Pencil, PauseCircle, Ban, Trash2, MoreHorizontal
+} from "lucide-react";
+import { authFetch } from "@/lib/telephony-api";
+import { AdminUserModal, type AdminUserFormValues } from "@/components/admin/AdminUserModal";
+import { NoovaListMenu, NoovaListMenuItem } from "@/components/ui/NoovaSelect";
+import {
+  adminRegistryPage, registryToolbar, adminRegistryContent,
   registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
   registryTableRow, registryTableCell, registryTableCellFirst, registryTableCellMuted,
-  registryTableLoading, registryTableEmpty, textMuted
+  registryTableLoading, registryTableEmpty, textMuted, btnPrimary
 } from "@/lib/brand-ui";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
-import { NoovaListMenu, NoovaListMenuItem } from "@/components/ui/NoovaSelect";
+import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
+import { useRegistryPagination } from "@/hooks/useRegistryPagination";
+import type { AccountStatus } from "@/types/rbac";
 
-interface UserRecord {
+interface UserRow {
   id: string;
   email: string;
-  nombre: string;
-  rol: string;
-  empresa_id: string | null;
-  created_at: string;
-  updated_at: string;
+  full_name: string | null;
+  nombre?: string | null;
+  status: AccountStatus;
+  is_protected?: boolean;
+  is_super_admin?: boolean;
   email_confirmed?: boolean;
+  created_at: string;
+  memberships?: { organizations?: { name: string } | null; roles?: { name: string } | null }[];
 }
 
-const ROL_BADGE: Record<string, { label: string; color: string }> = {
-  admin:   { label: "Admin",    color: "bg-[#5b5bf6]/20 text-[#5b5bf6] border-[#5b5bf6]/30" },
-  user:    { label: "Usuario",  color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
-  agente:  { label: "Agente",   color: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30" },
+const STATUS_BADGE: Record<string, { label: string; color: string }> = {
+  active:    { label: "Activo",      color: "bg-green-500/20 text-green-400 border-green-500/30" },
+  suspended: { label: "Suspendido",  color: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
+  disabled:  { label: "Desactivado", color: "bg-red-500/20 text-red-400 border-red-500/30" },
+  invited:   { label: "Invitado",    color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
 };
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-ES", {
-    day: "2-digit", month: "short", year: "numeric"
-  });
+  const d = new Date(iso);
+  return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 export default function AdminUsers() {
-  const [users, setUsers]     = useState<UserRecord[]>([]);
+  const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch]   = useState("");
-  const [error, setError]     = useState("");
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const [roleMenuUserId, setRoleMenuUserId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [modal, setModal] = useState<{ mode: "create" | "edit"; user?: UserRow } | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  async function fetchUsers() {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError("");
-    const { data, error: err } = await supabase
-      .from("users")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (err) {
-      setError("No se pudieron cargar los usuarios: " + err.message);
-    } else {
-      setUsers(data || []);
-    }
+    const res = await authFetch("/api/admin/rbac/users");
+    const json = await res.json();
+    if (!res.ok) setError(json.error ?? "Error al cargar");
+    else setUsers(json.users ?? []);
     setLoading(false);
-  }
+  }, []);
 
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   async function confirmUser(userId: string) {
-    setConfirmingId(userId);
-    try {
-      const res = await fetch("/api/admin/confirm-user", {
+    setBusyId(userId);
+    const res = await authFetch("/api/admin/confirm-user", {
+      method: "POST",
+      body: JSON.stringify({ userId }),
+    });
+    const json = await res.json();
+    if (json.success) await fetchUsers();
+    else alert(json.error ?? "Error al verificar");
+    setBusyId(null);
+  }
+
+  async function setStatus(userId: string, status: AccountStatus) {
+    setBusyId(userId);
+    setMenuId(null);
+    const res = await authFetch(`/api/admin/rbac/users/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) await fetchUsers();
+    else alert((await res.json()).error ?? "Error");
+    setBusyId(null);
+  }
+
+  async function deleteUser(user: UserRow) {
+    if (!confirm(`¿Eliminar permanentemente a ${user.email}? Esta acción no se puede deshacer.`)) return;
+    setBusyId(user.id);
+    const res = await authFetch(`/api/admin/rbac/users/${user.id}`, { method: "DELETE" });
+    if (res.ok) await fetchUsers();
+    else alert((await res.json()).error ?? "Error");
+    setBusyId(null);
+  }
+
+  async function handleModalSubmit(values: AdminUserFormValues) {
+    setSaving(true);
+    if (modal?.mode === "create") {
+      const res = await authFetch("/api/admin/rbac/users", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId })
+        body: JSON.stringify(values),
       });
       const json = await res.json();
-      if (json.success) {
-        setUsers(prev => prev.map(u => u.id === userId ? { ...u, email_confirmed: true } : u));
-      } else {
-        alert("Error al confirmar: " + json.error);
-      }
-    } catch (e) {
-      alert("Error de red al confirmar usuario");
+      if (res.ok) {
+        setModal(null);
+        await fetchUsers();
+        if (json.temporary_password) {
+          alert(`Usuario creado.\nContraseña temporal: ${json.temporary_password}\nCompártela de forma segura.`);
+        }
+      } else alert(json.error ?? "Error");
+    } else if (modal?.user) {
+      const res = await authFetch(`/api/admin/rbac/users/${modal.user.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ full_name: values.full_name, status: values.status }),
+      });
+      if (res.ok) {
+        setModal(null);
+        await fetchUsers();
+      } else alert((await res.json()).error ?? "Error");
     }
-    setConfirmingId(null);
+    setSaving(false);
   }
 
-  async function changeRol(userId: string, newRol: string) {
-    setUpdatingId(userId);
-    const { error: err } = await supabase
-      .from("users")
-      .update({ rol: newRol, updated_at: new Date().toISOString() })
-      .eq("id", userId);
-
-    if (!err) {
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, rol: newRol } : u));
-    }
-    setUpdatingId(null);
-  }
-
-  const filtered = users.filter(u =>
+  const filtered = users.filter((u) =>
     u.email.toLowerCase().includes(search.toLowerCase()) ||
-    u.nombre?.toLowerCase().includes(search.toLowerCase())
+    (u.full_name ?? u.nombre ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
-  return (
-    <div className={registryPage}>
+  const pagination = useRegistryPagination(filtered.length, search);
+  const pageRows = pagination.pageRows(filtered);
 
-      <div className={registryToolbar}>
+  return (
+    <div className={adminRegistryPage}>
+      <div className={`${registryToolbar} flex items-center justify-between gap-4`}>
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Users className="w-5 h-5 text-[#5b5bf6]" />
-            <h1 className="text-xl font-bold tracking-tight">Gestión de Usuarios</h1>
+            <h1 className="text-xl font-bold tracking-tight">Usuarios</h1>
           </div>
-          <p className={`text-xs ${textMuted}`}>
-            {users.length} usuario{users.length !== 1 ? "s" : ""} registrado{users.length !== 1 ? "s" : ""}
-          </p>
+          <p className={`text-xs ${textMuted}`}>{users.length} registrados en la plataforma</p>
         </div>
       </div>
 
-      <div className={registryContent}>
+      <div className={adminRegistryContent}>
         <RegistryTableLayout
           search={search}
           onSearchChange={setSearch}
           onRefresh={fetchUsers}
           refreshing={loading}
           error={error || undefined}
-          footer={!loading && users.length > 0 ? (
-            <>
-              <span>{filtered.length} de {users.length} usuarios</span>
-              <span className="flex items-center gap-4">
-                <span>{users.filter(u => u.rol === "admin").length} admin(s)</span>
-                <span>{users.filter(u => u.rol === "user").length} usuario(s)</span>
-                <span>{users.filter(u => u.rol === "agente").length} agente(s)</span>
-              </span>
-            </>
+          action={
+            <button type="button" onClick={() => setModal({ mode: "create" })} className={`${btnPrimary} flex items-center gap-2 shrink-0`}>
+              <Plus className="w-4 h-4" /> Crear usuario
+            </button>
+          }
+          footer={filtered.length > 0 ? (
+            <RegistryTablePagination
+              total={pagination.total}
+              rangeStart={pagination.rangeStart}
+              rangeEnd={pagination.rangeEnd}
+              pageSafe={pagination.pageSafe}
+              totalPages={pagination.totalPages}
+              pageSize={pagination.pageSize}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+              label="usuarios"
+            />
           ) : undefined}
         >
-        {loading ? (
-          <div className={registryTableLoading}>
-            <RefreshCw className="w-5 h-5 animate-spin mr-2" /> Cargando usuarios...
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className={registryTableEmpty}>
-            {search ? "No se encontraron usuarios con ese criterio" : "Aún no hay usuarios registrados"}
-          </div>
-        ) : (
-            <table className={registryTable}>
+          {loading ? (
+            <div className={registryTableLoading}><RefreshCw className="w-5 h-5 animate-spin mr-2" /> Cargando…</div>
+          ) : filtered.length === 0 ? (
+            <div className={registryTableEmpty}>No hay usuarios</div>
+          ) : (
+            <table className={`${registryTable} min-w-[960px]`}>
               <thead className={registryTableHead}>
                 <tr className={registryTableHeadRow}>
                   <th className={registryTableHeadCell}>Usuario</th>
+                  <th className={registryTableHeadCell}>Organización</th>
+                  <th className={registryTableHeadCell}>Estado</th>
+                  <th className={registryTableHeadCell}>Registro</th>
                   <th className={registryTableHeadCell}>Email</th>
-                  <th className={registryTableHeadCell}>Rol</th>
-                  <th className={registryTableHeadCell}>Registrado</th>
-                  <th className={registryTableHeadCell}>Verificación</th>
                   <th className={registryTableHeadCell}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(u => {
-                  const badge = ROL_BADGE[u.rol] ?? { label: u.rol, color: "bg-gray-500/20 text-gray-400 border-gray-500/30" };
+                {pageRows.map((u) => {
+                  const name = u.full_name ?? u.nombre ?? "—";
+                  const badge = STATUS_BADGE[u.status] ?? STATUS_BADGE.active;
+                  const orgLabel = u.memberships?.[0]?.organizations?.name ?? "—";
+                  const protected_ = u.is_protected || u.is_super_admin;
                   return (
                     <tr key={u.id} className={registryTableRow}>
-
-                      {/* Avatar + Nombre */}
                       <td className={registryTableCellFirst}>
                         <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                            u.rol === "admin"
-                              ? "bg-[#5b5bf6]/20 text-[#5b5bf6]"
-                              : "bg-white/[.08] text-gray-400"
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
+                            protected_ ? "bg-[#5b5bf6]/20 text-[#5b5bf6]" : "bg-white/[.08] text-gray-400"
                           }`}>
-                            {u.nombre ? u.nombre[0].toUpperCase() : "?"}
+                            {name[0]?.toUpperCase() ?? "?"}
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-white leading-none mb-0.5">{u.nombre || "—"}</p>
-                            <p className="text-xs text-gray-600 font-mono">{u.id.slice(0, 8)}…</p>
+                            <p className="text-sm font-medium text-white flex items-center gap-1.5">
+                              {name}
+                              {protected_ && <Shield className="w-3 h-3 text-[#5b5bf6]" aria-label="Superadmin" />}
+                            </p>
+                            <p className="text-xs text-gray-600">{u.email}</p>
                           </div>
                         </div>
                       </td>
-
-                      {/* Email */}
-                      <td className={`${registryTableCell} text-sm text-gray-300`}>{u.email}</td>
-
-                      {/* Rol badge */}
+                      <td className={`${registryTableCell} text-sm text-gray-400`}>{orgLabel}</td>
                       <td className={registryTableCell}>
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${badge.color}`}>
-                          {u.rol === "admin" ? <Shield className="w-3 h-3" /> : <User className="w-3 h-3" />}
-                          {badge.label}
-                        </span>
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs border ${badge.color}`}>{badge.label}</span>
                       </td>
-
-                      {/* Fecha */}
                       <td className={registryTableCellMuted}>
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <Clock className="w-3 h-3" />
-                          {formatDate(u.created_at)}
-                        </div>
+                        <span className="inline-flex items-center gap-1 text-xs"><Clock className="w-3 h-3" />{formatDate(u.created_at)}</span>
                       </td>
-
-                      {/* Estado email */}
                       <td className={registryTableCell}>
                         {u.email_confirmed === false ? (
-                          <div className="flex items-center gap-1.5 text-xs text-amber-400">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            Sin verificar
-                          </div>
+                          <span className="text-xs text-amber-400 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> Pendiente</span>
                         ) : (
-                          <div className="flex items-center gap-1.5 text-xs text-green-400">
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            Verificado
-                          </div>
+                          <span className="text-xs text-green-400 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> OK</span>
                         )}
                       </td>
-
-                      {/* Acciones */}
                       <td className={registryTableCell}>
-                        <div className="flex items-center gap-2">
-                          {/* Asignar línea telefónica */}
-                          <Link
-                            href={`/admin/telephony?user_id=${u.id}`}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5b5bf6]/10 border border-[#5b5bf6]/20 text-xs text-[#5b5bf6] hover:bg-[#5b5bf6]/20 transition-all"
-                          >
-                            <Phone className="w-3 h-3" />
-                            Línea
-                          </Link>
-
-                          {/* Confirmar email */}
-                          {u.email_confirmed === false && (
-                            confirmingId === u.id ? (
-                              <RefreshCw className="w-4 h-4 text-cyan-400 animate-spin" />
-                            ) : (
-                              <button
-                                onClick={() => confirmUser(u.id)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-400 hover:bg-cyan-500/20 transition-all"
-                              >
-                                <MailCheck className="w-3 h-3" />
-                                Verificar
+                        {busyId === u.id ? (
+                          <RefreshCw className="w-4 h-4 animate-spin text-[#5b5bf6]" />
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <Link href={`/admin/telephony?user_id=${u.id}`} className="p-1.5 rounded-lg text-[#5b5bf6] hover:bg-[#5b5bf6]/10" title="Línea">
+                              <Phone className="w-4 h-4" />
+                            </Link>
+                            {u.email_confirmed === false && (
+                              <button type="button" onClick={() => confirmUser(u.id)} className="p-1.5 rounded-lg text-cyan-400 hover:bg-cyan-500/10" title="Verificar email">
+                                <MailCheck className="w-4 h-4" />
                               </button>
-                            )
-                          )}
-
-                          {/* Cambiar rol */}
-                          {updatingId === u.id ? (
-                            <RefreshCw className="w-4 h-4 text-[#5b5bf6] animate-spin" />
-                          ) : (
+                            )}
                             <div className="relative">
-                              <button
-                                type="button"
-                                onClick={() => setRoleMenuUserId(prev => (prev === u.id ? null : u.id))}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[.04] border border-white/[.08] text-xs text-gray-400 hover:text-white hover:border-white/[.16] transition-all"
-                              >
-                                Rol
-                                <ChevronDown className="w-3 h-3" />
+                              <button type="button" onClick={() => setMenuId(menuId === u.id ? null : u.id)} className="p-1.5 rounded-lg text-gray-400 hover:bg-white/[.08]">
+                                <MoreHorizontal className="w-4 h-4" />
                               </button>
-                              {roleMenuUserId === u.id && (
-                                <NoovaListMenu className="absolute right-0 top-full mt-1 w-32 z-10">
-                                  {["admin", "user", "agente"].map(rol => (
-                                    <NoovaListMenuItem
-                                      key={rol}
-                                      active={u.rol === rol}
-                                      onClick={() => {
-                                        setRoleMenuUserId(null);
-                                        if (u.rol !== rol) changeRol(u.id, rol);
-                                      }}
-                                    >
-                                      <span className="capitalize flex items-center gap-2">
-                                        {u.rol === rol && <CheckCircle className="w-3 h-3" />}
-                                        {rol}
-                                      </span>
+                              {menuId === u.id && (
+                                <NoovaListMenu className="absolute right-0 top-full mt-1 w-44 z-20">
+                                  <NoovaListMenuItem onClick={() => { setMenuId(null); setModal({ mode: "edit", user: u }); }}>
+                                    <span className="flex items-center gap-2"><Pencil className="w-3.5 h-3.5" /> Editar</span>
+                                  </NoovaListMenuItem>
+                                  {!protected_ && u.status !== "active" && (
+                                    <NoovaListMenuItem onClick={() => setStatus(u.id, "active")}>
+                                      <span className="flex items-center gap-2 text-green-400"><CheckCircle className="w-3.5 h-3.5" /> Activar</span>
                                     </NoovaListMenuItem>
-                                  ))}
+                                  )}
+                                  {!protected_ && u.status === "active" && (
+                                    <NoovaListMenuItem onClick={() => setStatus(u.id, "suspended")}>
+                                      <span className="flex items-center gap-2 text-amber-400"><PauseCircle className="w-3.5 h-3.5" /> Suspender</span>
+                                    </NoovaListMenuItem>
+                                  )}
+                                  {!protected_ && u.status !== "disabled" && (
+                                    <NoovaListMenuItem onClick={() => setStatus(u.id, "disabled")}>
+                                      <span className="flex items-center gap-2 text-red-400"><Ban className="w-3.5 h-3.5" /> Desactivar</span>
+                                    </NoovaListMenuItem>
+                                  )}
+                                  {!protected_ && (
+                                    <NoovaListMenuItem danger onClick={() => { setMenuId(null); deleteUser(u); }}>
+                                      <span className="flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" /> Eliminar</span>
+                                    </NoovaListMenuItem>
+                                  )}
                                 </NoovaListMenu>
                               )}
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-        )}
+          )}
         </RegistryTableLayout>
       </div>
+
+      <AdminUserModal
+        open={!!modal}
+        mode={modal?.mode ?? "create"}
+        initial={modal?.user ? {
+          email: modal.user.email,
+          full_name: modal.user.full_name ?? modal.user.nombre ?? "",
+          status: modal.user.status,
+          is_protected: modal.user.is_protected,
+        } : undefined}
+        saving={saving}
+        onClose={() => setModal(null)}
+        onSubmit={handleModalSubmit}
+      />
     </div>
   );
 }

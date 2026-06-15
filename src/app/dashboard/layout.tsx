@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard, Building2, Loader2, Share2, Contact } from "lucide-react";
+import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard, Building2, Loader2, Share2, Contact, Users } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
@@ -122,14 +122,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push("/login");
   };
 
-  if (!authReady || !checked) {
-    return (
-      <div className="flex h-screen bg-noova-main items-center justify-center text-gray-400">
-        <Loader2 className="w-6 h-6 animate-spin mr-2" />
-        Cargando...
-      </div>
-    );
-  }
+  const showShell = authReady && checked;
 
   const toggleMenu = (menu: string) => {
     setExpandedMenu(expandedMenu === menu ? null : menu);
@@ -137,7 +130,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen bg-noova-main text-white" data-noova-dashboard>
-      {/* Sidebar — tono más claro #2d2d2d */}
+      {showShell && (
       <div
         className={`${sidebarOpen ? "w-64" : "w-20"} bg-noova-surface border-r border-white/[.10] transition-all duration-300 flex flex-col overflow-hidden`}
         data-noova-sidebar
@@ -352,6 +345,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
           </Link>
 
+          {/* Equipo */}
+          <Link
+            href="/dashboard/equipo"
+            className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              pathname === "/dashboard/equipo" || pathname.startsWith("/dashboard/equipo/")
+                ? sidebarNavActive
+                : sidebarNavIdle
+            }`}
+            title="Equipo"
+          >
+            {sidebarOpen ? (
+              <>
+                <Users className={`w-5 h-5 flex-shrink-0 mr-3 ${pathname.startsWith("/dashboard/equipo") ? sidebarIconActive : "text-gray-400"}`} />
+                <span className="flex-1 text-left">Equipo</span>
+              </>
+            ) : (
+              <Users className={`w-5 h-5 flex-shrink-0 ${pathname.startsWith("/dashboard/equipo") ? sidebarIconActive : "text-gray-400"}`} />
+            )}
+          </Link>
+
           {/* Configuración */}
           <Link
             href="/dashboard/configuracion"
@@ -406,9 +419,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </button>
         </div>
       </div>
+      )}
 
-      {/* Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Content — siempre montado para evitar error de hidratación */}
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        {(!authReady || !checked) && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-noova-main text-gray-400">
+            <Loader2 className="w-6 h-6 animate-spin mr-2" />
+            Cargando...
+          </div>
+        )}
         {children}
       </div>
     </div>

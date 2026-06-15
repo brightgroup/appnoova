@@ -58,6 +58,14 @@ body {
   background-color: var(--nv-bg-surface);
 }
 
+/* Admin — fondo unificado del panel (#0d0e14) */
+[data-noova-admin] {
+  --nv-bg-main: #0d0e14;
+  --nv-bg-surface: #13141c;
+  background-color: var(--nv-bg-main);
+  color: #f5f5f5;
+}
+
 /* Modo claro: ajustes para utilidades pensadas en dark */
 html:not(.dark) [data-noova-dashboard] .text-white,
 html:not(.dark) [data-noova-sidebar] .text-white {

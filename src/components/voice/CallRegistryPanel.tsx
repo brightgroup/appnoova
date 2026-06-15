@@ -13,6 +13,8 @@ import {
   tabActive, tabIdle, textMuted, textSecondary
 } from "@/lib/brand-ui";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
+import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
+import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import {
   audioExtensionFromUrl, callQualityPercent, displayCallId, downloadCallJson, downloadCallAudio,
@@ -104,6 +106,9 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
     }
     return list;
   }, [calls, filter, search]);
+
+  const pagination = useRegistryPagination(filteredCalls.length, `${filter}-${search}`);
+  const pageRows = pagination.pageRows(filteredCalls);
 
   const stopAudio = () => {
     audioRef.current?.pause();
@@ -231,7 +236,17 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
             </button>
           }
           footer={!loading && filteredCalls.length > 0 ? (
-            <span>{filteredCalls.length} llamada{filteredCalls.length !== 1 ? "s" : ""}</span>
+            <RegistryTablePagination
+              total={pagination.total}
+              rangeStart={pagination.rangeStart}
+              rangeEnd={pagination.rangeEnd}
+              pageSafe={pagination.pageSafe}
+              totalPages={pagination.totalPages}
+              pageSize={pagination.pageSize}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+              label="llamadas"
+            />
           ) : undefined}
         >
         {loading ? (
@@ -262,7 +277,7 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
               </tr>
             </thead>
             <tbody>
-              {filteredCalls.map(call => {
+              {pageRows.map(call => {
                 const quality = callQualityPercent(call);
                 const isSuccess = call.status_label.toLowerCase().includes("exitosa");
                 return (

@@ -33,6 +33,8 @@ import {
   registryTableEmpty
 } from "@/lib/brand-ui";
 import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
+import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
+import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { formatCrmDateTime } from "@/components/crm/CrmFieldInput";
 import {
   FUENTE_ORIGEN_OPTIONS,
@@ -187,6 +189,9 @@ export default function CrmContactsPage() {
     return list;
   }, [contacts, filter]);
 
+  const pagination = useRegistryPagination(filtered.length, `${search}-${filter}`);
+  const pageRows = pagination.pageRows(filtered);
+
   const filteredIds = useMemo(() => filtered.map(c => c.id), [filtered]);
   const allSelected = filtered.length > 0 && filtered.every(c => selected.has(c.id));
   const someSelected = filtered.some(c => selected.has(c.id));
@@ -337,9 +342,17 @@ export default function CrmContactsPage() {
       }
       footer={
         filtered.length > 0 ? (
-          <span>
-            Mostrando <span className="text-gray-200">{filtered.length}</span> de {contacts.length} contactos
-          </span>
+          <RegistryTablePagination
+            total={pagination.total}
+            rangeStart={pagination.rangeStart}
+            rangeEnd={pagination.rangeEnd}
+            pageSafe={pagination.pageSafe}
+            totalPages={pagination.totalPages}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+            label="contactos"
+          />
         ) : undefined
       }
     >
@@ -367,7 +380,7 @@ export default function CrmContactsPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map(c => (
+            {pageRows.map(c => (
               <tr
                 key={c.id}
                 className={`${registryTableRowClickable} ${selected.has(c.id) ? registryTableRowSelected : ""}`}

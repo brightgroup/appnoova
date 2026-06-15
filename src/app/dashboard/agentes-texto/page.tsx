@@ -15,6 +15,8 @@ import {
   registryTableLoading, registryTableEmpty, registryToolbar, textMuted
 } from "@/lib/brand-ui";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
+import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
+import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { NoovaListMenu, NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 import { supabase } from "@/lib/supabase";
 import {
@@ -132,6 +134,9 @@ export default function AgentesTextoPage() {
   const filteredAgents = agents.filter(a =>
     a.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const pagination = useRegistryPagination(filteredAgents.length, searchTerm);
+  const pageRows = pagination.pageRows(filteredAgents);
 
   const openAgent = (id: string) => {
     router.push(`/dashboard/agentes-texto/configuracion?id=${id}`);
@@ -255,9 +260,17 @@ export default function AgentesTextoPage() {
             </>
           ) : undefined}
           footer={!loadingAgents && filteredAgents.length > 0 ? (
-            <span>
-              Mostrando <span className="text-gray-200">{filteredAgents.length}</span> de {agents.length} agentes
-            </span>
+            <RegistryTablePagination
+              total={pagination.total}
+              rangeStart={pagination.rangeStart}
+              rangeEnd={pagination.rangeEnd}
+              pageSafe={pagination.pageSafe}
+              totalPages={pagination.totalPages}
+              pageSize={pagination.pageSize}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+              label="agentes"
+            />
           ) : undefined}
         >
         {loadingAgents ? (
@@ -286,7 +299,7 @@ export default function AgentesTextoPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredAgents.map((agent) => {
+              {pageRows.map((agent) => {
                 const meta = getTextTemplateMeta(agent.source_template);
                 return (
                   <tr

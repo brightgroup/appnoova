@@ -9,10 +9,12 @@ import {
 import { supabase } from "@/lib/supabase";
 import { authFetch } from "@/lib/telephony-api";
 import {
-  btnPrimary, registryPage, registryToolbar, registryContent, textMuted,
+  btnPrimary, adminRegistryPage, registryToolbar, adminRegistryContent, textMuted,
   btnFilterGroup, btnFilterActive, btnFilterIdle
 } from "@/lib/brand-ui";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
+import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
+import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { PhoneLinesTable, type PhoneLineRow } from "@/components/telephony/PhoneLinesTable";
 import {
   PhoneNumberCategoryTabs,
@@ -196,9 +198,14 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
     };
   });
 
+  const linesPagination = useRegistryPagination(tableRows.length, `${tab}-${search}-${lineCategory}`);
+  const requestsPagination = useRegistryPagination(filteredRequests.length, `${tab}-${search}`);
+  const pagedTableRows = linesPagination.pageRows(tableRows);
+  const pagedRequests = requestsPagination.pageRows(filteredRequests);
+
   return (
     <>
-      <div className={registryPage}>
+      <div className={adminRegistryPage}>
         <div className={registryToolbar}>
           <div className="flex items-center gap-3 min-w-0">
             <Link href="/admin" className="p-1.5 hover:bg-white/[.06] rounded-lg text-gray-400 hover:text-white shrink-0">
@@ -211,7 +218,7 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
           </div>
         </div>
 
-        <div className={registryContent}>
+        <div className={adminRegistryContent}>
           <RegistryTableLayout
             search={search}
             onSearchChange={setSearch}
@@ -308,10 +315,37 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
                 )}
               </div>
             }
+            footer={
+              tab === "lines" && tableRows.length > 0 ? (
+                <RegistryTablePagination
+                  total={linesPagination.total}
+                  rangeStart={linesPagination.rangeStart}
+                  rangeEnd={linesPagination.rangeEnd}
+                  pageSafe={linesPagination.pageSafe}
+                  totalPages={linesPagination.totalPages}
+                  pageSize={linesPagination.pageSize}
+                  onPageChange={linesPagination.setPage}
+                  onPageSizeChange={linesPagination.setPageSize}
+                  label="líneas"
+                />
+              ) : tab === "requests" && filteredRequests.length > 0 ? (
+                <RegistryTablePagination
+                  total={requestsPagination.total}
+                  rangeStart={requestsPagination.rangeStart}
+                  rangeEnd={requestsPagination.rangeEnd}
+                  pageSafe={requestsPagination.pageSafe}
+                  totalPages={requestsPagination.totalPages}
+                  pageSize={requestsPagination.pageSize}
+                  onPageChange={requestsPagination.setPage}
+                  onPageSizeChange={requestsPagination.setPageSize}
+                  label="solicitudes"
+                />
+              ) : undefined
+            }
           >
           {tab === "lines" ? (
             <PhoneLinesTable
-              rows={tableRows}
+              rows={pagedTableRows}
               mode="admin"
               loading={loading}
               emptyMessage={
@@ -324,7 +358,7 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
             />
           ) : (
             <PhoneLineRequestsTable
-              rows={filteredRequests}
+              rows={pagedRequests}
               loading={loading}
               updatingId={updatingRequestId}
               onAttend={handleAttendRequest}

@@ -7,18 +7,20 @@ import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, Settings, Phone, LogOut,
-  ChevronLeft, ChevronRight, Shield, Loader2
+  ChevronLeft, ChevronRight, Shield, Loader2, Building2, KeyRound
 } from "lucide-react";
 import {
   sidebarNavActive, sidebarNavIdle, sidebarIconActive, accentGradientIcon
 } from "@/lib/brand-ui";
 
 const NAV_ITEMS = [
-  { href: "/admin",          label: "Panel",           icon: LayoutDashboard, exact: true },
-  { href: "/admin/users",      label: "Usuarios",           icon: Users },
-  { href: "/admin/telephony",  label: "Líneas telefónicas", icon: Phone, badgeKey: "telephony" as const },
-  { href: "/admin/templates",  label: "Agentes IA",         icon: Settings },
-  { href: "/admin/calls",      label: "Llamadas",           icon: Phone },
+  { href: "/admin",               label: "Panel",            icon: LayoutDashboard, exact: true },
+  { href: "/admin/users",         label: "Usuarios",         icon: Users },
+  { href: "/admin/organizations", label: "Organizaciones",   icon: Building2 },
+  { href: "/admin/roles",         label: "Roles",            icon: KeyRound },
+  { href: "/admin/telephony",     label: "Líneas telefónicas", icon: Phone, badgeKey: "telephony" as const },
+  { href: "/admin/whatsapp",      label: "WhatsApp",         icon: Phone },
+  { href: "/admin/templates",     label: "Agentes IA",       icon: Settings },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -43,62 +45,65 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, []);
 
   useEffect(() => {
+    const ADMIN_CACHE_KEY = "noova_admin_ok";
+    const ADMIN_CACHE_TTL_MS = 5 * 60 * 1000;
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setAuthReady(true);
       if (!session) {
         router.replace("/login");
         return;
       }
-      const { data: profile } = await supabase
-        .from("users")
-        .select("rol")
-        .eq("id", session.user.id)
-        .single();
 
-      if (!profile || profile.rol !== "admin") {
+      try {
+        const raw = sessionStorage.getItem(ADMIN_CACHE_KEY);
+        if (raw) {
+          const { at } = JSON.parse(raw) as { at: number };
+          if (Date.now() - at < ADMIN_CACHE_TTL_MS) {
+            setChecked(true);
+            loadPendingRequests();
+            return;
+          }
+        }
+      } catch {
+        /* ignore cache parse errors */
+      }
+
+      const res = await fetch("/api/admin/me", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (!res.ok) {
         setDenied(true);
         router.replace("/dashboard");
         return;
       }
+
+      try {
+        sessionStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify({ at: Date.now() }));
+      } catch {
+        /* ignore quota errors */
+      }
+
       setChecked(true);
       loadPendingRequests();
     });
   }, [router, loadPendingRequests]);
-
-  useEffect(() => {
-    if (checked) loadPendingRequests();
-  }, [pathname, checked, loadPendingRequests]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
   };
 
-  if (!authReady) {
-    return (
-      <div className="flex h-screen bg-noova-main items-center justify-center text-gray-400">
-        <Loader2 className="w-6 h-6 animate-spin mr-2" />
-        Cargando admin...
-      </div>
-    );
-  }
-
-  if (denied || !checked) {
-    return (
-      <div className="flex h-screen bg-noova-main items-center justify-center text-gray-400">
-        <Loader2 className="w-6 h-6 animate-spin mr-2" />
-        Redirigiendo...
-      </div>
-    );
-  }
+  const showShell = authReady && checked && !denied;
 
   const isActive = (item: typeof NAV_ITEMS[0]) =>
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
 
   return (
-    <div className="flex h-screen bg-[#0d0e14] text-white overflow-hidden">
+    <div className="flex h-screen bg-[#0d0e14] text-white overflow-hidden" data-noova-admin>
 
-      {/* Sidebar */}
+      {showShell && (
       <aside className={`${collapsed ? "w-16" : "w-56"} bg-[#09090f] border-r border-white/[.08] flex flex-col transition-all duration-200`}>
 
         {/* Logo + collapse */}
@@ -169,9 +174,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </button>
         </div>
       </aside>
+      )}
 
-      {/* Content */}
-      <main className="flex-1 overflow-auto">
+      {/* Content — scroll único en main (sin cajas internas estrechas) */}
+      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative">
+        {(!authReady || denied || !checked) && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0d0e14] text-gray-400">
+            <Loader2 className="w-6 h-6 animate-spin mr-2" />
+            {!authReady ? "Cargando admin..." : "Redirigiendo..."}
+          </div>
+        )}
         {children}
       </main>
     </div>

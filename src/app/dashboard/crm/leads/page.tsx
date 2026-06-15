@@ -17,6 +17,8 @@ import {
   formatLeadValue
 } from "@/lib/crm-record";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
+import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
+import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { CrmLeadsKanban } from "@/components/crm/CrmLeadsKanban";
 import type { CrmLead, CrmLeadFilter, CrmLeadsView, CrmPipelineStage } from "@/types/crm";
 
@@ -62,6 +64,9 @@ export default function CrmLeadsPage() {
     }
     return list;
   }, [leads, filter, currentUserName]);
+
+  const pagination = useRegistryPagination(filteredLeads.length, `${filter}-${view}`);
+  const pageRows = pagination.pageRows(filteredLeads);
 
   const kanbanFilters: CrmLeadFilter[] = ["open", "mine"];
 
@@ -130,10 +135,18 @@ export default function CrmLeadsPage() {
               </Link>
             </div>
           }
-          footer={!loading && filteredLeads.length > 0 ? (
-            <span>
-              Mostrando <span className="text-gray-200">{filteredLeads.length}</span> de {leads.length} leads
-            </span>
+          footer={!loading && view === "list" && filteredLeads.length > 0 ? (
+            <RegistryTablePagination
+              total={pagination.total}
+              rangeStart={pagination.rangeStart}
+              rangeEnd={pagination.rangeEnd}
+              pageSafe={pagination.pageSafe}
+              totalPages={pagination.totalPages}
+              pageSize={pagination.pageSize}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+              label="leads"
+            />
           ) : undefined}
         >
           {loading ? (
@@ -171,7 +184,7 @@ export default function CrmLeadsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredLeads.map(lead => (
+                {pageRows.map(lead => (
                   <tr
                     key={lead.id}
                     className={registryTableRowClickable}

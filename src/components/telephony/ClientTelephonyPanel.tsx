@@ -8,6 +8,8 @@ import {
   btnPrimary, btnGhost, registryPage, registryToolbar, registryContent, textMuted
 } from "@/lib/brand-ui";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
+import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
+import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { PhoneLinesTable, type PhoneLineRow } from "@/components/telephony/PhoneLinesTable";
 import {
   PhoneNumberCategoryTabs,
@@ -88,6 +90,9 @@ export function ClientTelephonyPanel({
     ? "No tienes números verificados. Usa «Vincular línea» para solicitar verificación outbound."
     : "No tienes líneas compradas. Usa «Solicitar línea» para pedir una a Noova.";
 
+  const pagination = useRegistryPagination(tableRows.length, `${tab}-${search}`);
+  const pagedRows = pagination.pageRows(tableRows);
+
   return (
     <>
       <div className={registryPage}>
@@ -136,9 +141,22 @@ export function ClientTelephonyPanel({
                 </button>
               </>
             }
+            footer={tableRows.length > 0 ? (
+              <RegistryTablePagination
+                total={pagination.total}
+                rangeStart={pagination.rangeStart}
+                rangeEnd={pagination.rangeEnd}
+                pageSafe={pagination.pageSafe}
+                totalPages={pagination.totalPages}
+                pageSize={pagination.pageSize}
+                onPageChange={pagination.setPage}
+                onPageSizeChange={pagination.setPageSize}
+                label="líneas"
+              />
+            ) : undefined}
           >
             <PhoneLinesTable
-              rows={tableRows}
+              rows={pagedRows}
               mode="client"
               loading={loading}
               emptyMessage={emptyMessage}

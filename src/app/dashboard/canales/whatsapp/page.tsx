@@ -16,6 +16,8 @@ import {
   registryTableEmpty
 } from "@/lib/brand-ui";
 import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
+import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
+import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import type { TextAgentListItem } from "@/types/text-agent";
@@ -79,6 +81,9 @@ export default function WhatsAppListPage() {
     );
   });
 
+  const pagination = useRegistryPagination(filtered.length, search);
+  const pageRows = pagination.pageRows(filtered);
+
   return (
     <ChannelListPage
       title="WhatsApp"
@@ -101,9 +106,17 @@ export default function WhatsAppListPage() {
       }
       footer={
         filtered.length > 0 ? (
-          <span>
-            Mostrando <span className="text-gray-200">{filtered.length}</span> de {channels.length} líneas
-          </span>
+          <RegistryTablePagination
+            total={pagination.total}
+            rangeStart={pagination.rangeStart}
+            rangeEnd={pagination.rangeEnd}
+            pageSafe={pagination.pageSafe}
+            totalPages={pagination.totalPages}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+            label="líneas"
+          />
         ) : undefined
       }
     >
@@ -139,7 +152,7 @@ export default function WhatsAppListPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map(ch => (
+            {pageRows.map(ch => (
               <tr
                 key={ch.id}
                 className={registryTableRowClickable}
