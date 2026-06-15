@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -21,7 +21,9 @@ import {
   formatInboxDisplayTitle,
   formatInboxMessageTime,
   formatInboxTime,
-  isToday
+  inboxMessageStableKey,
+  isToday,
+  mergeInboxTextDetail
 } from "@/lib/inbox-utils";
 import { inboxChannelStyle } from "@/lib/inbox-channel-ui";
 import type { InboxFilter, InboxListItem, InboxTextDetail } from "@/types/inbox";
@@ -76,7 +78,33 @@ function InboxPageInner() {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [templateVars, setTemplateVars] = useState<string[]>([]);
   const assignRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
+  const prevMessageCountRef = useRef(0);
+  const mediaPlaybackCountRef = useRef(0);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  }, []);
+
+  const handleMediaPlaybackStart = useCallback(() => {
+    mediaPlaybackCountRef.current += 1;
+  }, []);
+
+  const handleMediaPlaybackEnd = useCallback(() => {
+    mediaPlaybackCountRef.current = Math.max(0, mediaPlaybackCountRef.current - 1);
+  }, []);
+
+  const isNearBottom = useCallback(() => {
+    const el = messagesScrollRef.current;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+  }, []);
+
+  const handleMessagesScroll = useCallback(() => {
+    stickToBottomRef.current = isNearBottom();
+  }, [isNearBottom]);
 
   useEffect(() => {
     setSelectedId(searchParams.get("id"));
@@ -145,7 +173,12 @@ function InboxPageInner() {
         return;
       }
       const loaded = data.detail ?? null;
-      setDetail(loaded?.kind === "text" ? loaded : null);
+      const next = loaded?.kind === "text" ? loaded : null;
+      setDetail(prev => {
+        if (!next) return null;
+        if (!prev || prev.kind !== "text" || prev.id !== next.id) return next;
+        return mergeInboxTextDetail(prev, next);
+      });
       if (data.current_user_name) setCurrentUserName(data.current_user_name);
       setItems(prev =>
         prev.map(item => (item.id === id ? { ...item, unread_count: 0 } : item))
@@ -167,7 +200,10 @@ function InboxPageInner() {
   useEffect(() => {
     if (!selectedId) return;
     loadDetail(selectedId);
-    const timer = window.setInterval(() => loadDetail(selectedId, true), 2000);
+    const timer = window.setInterval(() => {
+      if (mediaPlaybackCountRef.current > 0) return;
+      void loadDetail(selectedId, true);
+    }, 2000);
     return () => window.clearInterval(timer);
   }, [selectedId, loadDetail]);
 
@@ -213,8 +249,24 @@ function InboxPageInner() {
   }, [selectedTemplateId, waTemplates]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [detail]);
+    stickToBottomRef.current = true;
+    prevMessageCountRef.current = 0;
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!detail || detail.kind !== "text" || detail.id !== selectedId) return;
+
+    const messageCount = detail.messages.length;
+    const hadMoreMessages = messageCount > prevMessageCountRef.current;
+    prevMessageCountRef.current = messageCount;
+
+    if (!hadMoreMessages) return;
+    if (!stickToBottomRef.current && !isNearBottom()) return;
+
+    requestAnimationFrame(() => {
+      scrollToBottom("smooth");
+    });
+  }, [detail, selectedId, isNearBottom, scrollToBottom]);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -302,8 +354,10 @@ function InboxPageInner() {
         return;
       }
       setReply("");
+      stickToBottomRef.current = true;
       await loadDetail(selectedId);
       await loadList();
+      requestAnimationFrame(() => scrollToBottom("smooth"));
     } catch {
       setError("Error de red al enviar");
     }
@@ -647,14 +701,23 @@ function InboxPageInner() {
                 </div>
               )}
 
-            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
+            <div
+              ref={messagesScrollRef}
+              onScroll={handleMessagesScroll}
+              className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6"
+            >
               {detailLoading && !detail ? (
                 <div className="flex items-center justify-center py-20 text-white/40">
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   Cargando mensajes...
                 </div>
               ) : detail ? (
-                <TextThread messages={detail.messages} createdAt={detail.created_at} />
+                <TextThread
+                  messages={detail.messages}
+                  createdAt={detail.created_at}
+                  onMediaPlaybackStart={handleMediaPlaybackStart}
+                  onMediaPlaybackEnd={handleMediaPlaybackEnd}
+                />
               ) : null}
               <div ref={messagesEndRef} />
             </div>
@@ -746,10 +809,14 @@ function InboxPageInner() {
 
 function TextThread({
   messages,
-  createdAt
+  createdAt,
+  onMediaPlaybackStart,
+  onMediaPlaybackEnd
 }: {
   messages: TextChatMessage[];
   createdAt: string;
+  onMediaPlaybackStart?: () => void;
+  onMediaPlaybackEnd?: () => void;
 }) {
   if (messages.length === 0) {
     return <p className="py-10 text-center text-sm text-white/35">Sin mensajes en esta conversación.</p>;
@@ -783,26 +850,34 @@ function TextThread({
           : isHuman
             ? "bg-zinc-700 text-white"
             : "bg-zinc-950 text-white/90";
+        const isAudioOnly = msg.media_type === "audio" && !msg.content.trim();
 
         return (
           <div
-            key={`${msg.created_at}-${i}`}
+            key={inboxMessageStableKey(msg)}
             className={`flex ${gap} ${isUser ? "justify-start" : "justify-end"}`}
           >
             <div
-              className={`group relative max-w-[78%] rounded-2xl px-4 py-3 ${bubbleClass}`}
+              className={`group relative rounded-2xl px-4 py-3 ${bubbleClass} ${
+                isAudioOnly ? "min-w-[min(100%,280px)] max-w-[min(100%,320px)]" : "max-w-[78%]"
+              }`}
             >
               {!isUser && (
                 <span className="mb-1.5 block text-[11px] font-medium text-white/50">
                   {isHuman ? "Asesor" : "IA"}
                 </span>
               )}
-              {isUser && msg.media_label && (
+              {isUser && msg.media_label && msg.media_type !== "audio" && (
                 <span className="mb-1.5 block text-[11px] font-medium text-white/55">
                   {msg.media_label}
                 </span>
               )}
-              <InboxMessageBody msg={msg} variant={isUser ? "user" : isHuman ? "human" : "ai"} />
+              <InboxMessageBody
+                msg={msg}
+                variant={isUser ? "user" : isHuman ? "human" : "ai"}
+                onMediaPlaybackStart={onMediaPlaybackStart}
+                onMediaPlaybackEnd={onMediaPlaybackEnd}
+              />
               {msg.content.trim() ? (
                 <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
               ) : null}
@@ -819,10 +894,14 @@ function TextThread({
 
 function InboxMessageBody({
   msg,
-  variant = "ai"
+  variant = "ai",
+  onMediaPlaybackStart,
+  onMediaPlaybackEnd
 }: {
   msg: TextChatMessage;
   variant?: "user" | "human" | "ai";
+  onMediaPlaybackStart?: () => void;
+  onMediaPlaybackEnd?: () => void;
 }) {
   const url = msg.media_url?.trim();
   const type = msg.media_type;
@@ -859,11 +938,10 @@ function InboxMessageBody({
 
   if (type === "audio") {
     return (
-      <audio
-        controls
-        preload="metadata"
+      <InboxAudioPlayer
         src={url}
-        className="mb-2 w-full max-w-full"
+        onPlaybackStart={onMediaPlaybackStart}
+        onPlaybackEnd={onMediaPlaybackEnd}
       />
     );
   }
@@ -901,6 +979,44 @@ function InboxMessageBody({
 
   return null;
 }
+
+const InboxAudioPlayer = memo(function InboxAudioPlayer({
+  src,
+  onPlaybackStart,
+  onPlaybackEnd
+}: {
+  src: string;
+  onPlaybackStart?: () => void;
+  onPlaybackEnd?: () => void;
+}) {
+  const playingRef = useRef(false);
+
+  const handlePlay = () => {
+    if (playingRef.current) return;
+    playingRef.current = true;
+    onPlaybackStart?.();
+  };
+
+  const handleStop = () => {
+    if (!playingRef.current) return;
+    playingRef.current = false;
+    onPlaybackEnd?.();
+  };
+
+  return (
+    <div className="mb-1 w-full min-w-[220px] overflow-visible">
+      <audio
+        controls
+        preload="metadata"
+        src={src}
+        onPlay={handlePlay}
+        onPause={handleStop}
+        onEnded={handleStop}
+        className="block h-11 w-full min-w-[220px] max-w-full"
+      />
+    </div>
+  );
+});
 
 export default function InboxPage() {
   return (

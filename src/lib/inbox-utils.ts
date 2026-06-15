@@ -1,6 +1,7 @@
 import { channelLabel, inboxChannelBadge, normalizeChatMessages } from "@/lib/text-chat-utils";
 import { WHATSAPP_CONVERSATION_CHANNEL } from "@/lib/whatsapp-channel";
-import type { InboxListItem } from "@/types/inbox";
+import type { InboxListItem, InboxTextDetail } from "@/types/inbox";
+import type { TextChatMessage } from "@/types/text-agent-conversation";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
 
 export function makeVisitorLabel(): string {
@@ -211,4 +212,63 @@ export function inboxMessageLabel(role: string): string {
 
 export function inboxDetailChannelLabel(channel: string): string {
   return channelLabel(channel);
+}
+
+export function inboxMessageStableKey(message: TextChatMessage): string {
+  return [
+    message.created_at,
+    message.role,
+    message.content,
+    message.media_type ?? "",
+    message.media_storage_path ?? ""
+  ].join("\u0001");
+}
+
+/** Evita re-render del hilo cuando el poll solo rota URLs firmadas de media. */
+export function mergeInboxTextDetail(
+  prev: InboxTextDetail,
+  next: InboxTextDetail
+): InboxTextDetail {
+  const prevKeys = prev.messages.map(inboxMessageStableKey);
+  const nextKeys = next.messages.map(inboxMessageStableKey);
+  const keysMatch =
+    prevKeys.length === nextKeys.length &&
+    prevKeys.every((key, index) => key === nextKeys[index]);
+
+  if (!keysMatch) return next;
+
+  const metaMatch =
+    prev.handoff_mode === next.handoff_mode &&
+    prev.assigned_to === next.assigned_to &&
+    prev.whatsapp_session_open === next.whatsapp_session_open &&
+    prev.whatsapp_opted_out === next.whatsapp_opted_out &&
+    prev.whatsapp_compliance_notice === next.whatsapp_compliance_notice &&
+    prev.status === next.status &&
+    prev.display_title === next.display_title &&
+    prev.contact_label === next.contact_label;
+
+  const messages = prev.messages.map((oldMsg, index) => {
+    const newMsg = next.messages[index];
+    if (
+      oldMsg.media_storage_path &&
+      oldMsg.media_storage_path === newMsg.media_storage_path &&
+      oldMsg.media_url
+    ) {
+      return oldMsg;
+    }
+    if (
+      oldMsg.media_url === newMsg.media_url &&
+      oldMsg.content === newMsg.content &&
+      oldMsg.media_type === newMsg.media_type &&
+      oldMsg.media_label === newMsg.media_label
+    ) {
+      return oldMsg;
+    }
+    return newMsg;
+  });
+
+  const messagesUnchanged = messages.every((msg, index) => msg === prev.messages[index]);
+  if (messagesUnchanged && metaMatch) return prev;
+
+  return { ...next, messages };
 }
