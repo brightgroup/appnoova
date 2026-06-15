@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTextAgentUserIdFromRequest, textAgentsAdminClient } from "@/lib/text-agents-server";
-import { buildContactTimeline } from "@/lib/crm-contact-timeline";
+import {
+  buildContactTimeline,
+  mergeTimelineDaySummaries,
+  readTimelineDaySummaries,
+  timelineDaySummariesChanged
+} from "@/lib/crm-contact-timeline";
 import { toCrmContact, toCrmLead } from "@/lib/crm-record";
 import type { TextChatMessage } from "@/types/text-agent-conversation";
 
@@ -40,7 +45,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     contact.inbox_conversation_id
       ? db
           .from("text_agent_conversations")
-          .select("messages")
+          .select("messages, metadata")
           .eq("id", contact.inbox_conversation_id)
           .eq("user_id", userId)
           .maybeSingle()
@@ -58,6 +63,11 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
   const leads = (leadsRes.data ?? []).map(r => toCrmLead(r as Record<string, unknown>));
   const messages = normalizeMessages(convRes.data?.messages);
+  const conversationMetadata =
+    convRes.data?.metadata && typeof convRes.data.metadata === "object" && !Array.isArray(convRes.data.metadata)
+      ? (convRes.data.metadata as Record<string, unknown>)
+      : {};
+  const daySummaries = readTimelineDaySummaries(conversationMetadata);
   const calls = (callsRes.data ?? []) as Array<{
     id: string;
     created_at: string;
@@ -66,7 +76,26 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     status_label: string;
   }>;
 
-  const events = await buildContactTimeline({ contact, leads, messages, calls });
+  const { events, daySummaries: nextDaySummaries } = await buildContactTimeline({
+    contact,
+    leads,
+    messages,
+    daySummaries,
+    calls
+  });
+
+  if (
+    contact.inbox_conversation_id &&
+    timelineDaySummariesChanged(daySummaries, nextDaySummaries)
+  ) {
+    await db
+      .from("text_agent_conversations")
+      .update({
+        metadata: mergeTimelineDaySummaries(conversationMetadata, nextDaySummaries)
+      })
+      .eq("id", contact.inbox_conversation_id)
+      .eq("user_id", userId);
+  }
 
   return NextResponse.json({ events });
 }

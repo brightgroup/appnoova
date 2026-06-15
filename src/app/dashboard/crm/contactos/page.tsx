@@ -264,8 +264,9 @@ export default function CrmContactsPage() {
       onRefresh={() => load()}
       refreshing={loading}
       filters={
-        <div className={btnFilterGroup}>
-          {FILTERS.map(({ id, label }) => (
+        <div className="overflow-x-auto pb-1 -mx-1 px-1">
+          <div className={btnFilterGroup}>
+            {FILTERS.map(({ id, label }) => (
             <button
               key={id}
               type="button"
@@ -274,7 +275,8 @@ export default function CrmContactsPage() {
             >
               {label}
             </button>
-          ))}
+            ))}
+          </div>
         </div>
       }
       action={
@@ -292,7 +294,7 @@ export default function CrmContactsPage() {
           <Link href="/dashboard/crm/configuracion" className={btnGhost}>
             <Settings className="w-4 h-4" />
           </Link>
-          <Link href="/dashboard/crm/contactos/nuevo" className={btnPrimary}>
+          <Link href="/dashboard/crm/contactos/nuevo" className={`${btnPrimary} w-full sm:w-auto justify-center`}>
             <Plus className="w-4 h-4" /> Nuevo contacto
           </Link>
         </div>

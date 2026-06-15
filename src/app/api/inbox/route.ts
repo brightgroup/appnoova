@@ -79,7 +79,8 @@ export async function GET(req: NextRequest) {
       display_title: formatInboxDisplayTitle(
         record.contact_label,
         record.channel,
-        record.id
+        record.id,
+        record.metadata
       ),
       channel: record.channel,
       channel_label: inboxDetailChannelLabel(record.channel),

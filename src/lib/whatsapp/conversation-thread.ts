@@ -46,8 +46,12 @@ export async function findWhatsAppConversationByMessageSid(
 
 export function buildWhatsAppContactLabel(profileName: string | null, contactE164: string): string {
   const name = profileName?.trim();
+  const e164 = contactE164.trim();
+  if (name && e164 && name !== e164 && !/^\+?\d[\d\s()-]{8,}$/.test(name.replace(/\s/g, ""))) {
+    return `${name} · ${e164}`;
+  }
   if (name) return name;
-  return contactE164;
+  return e164;
 }
 
 export function messageContentForAi(msg: TextChatMessage): string {

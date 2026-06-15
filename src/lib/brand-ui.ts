@@ -51,13 +51,13 @@ export const btnGhost =
 
 /* ── Filtros (estilo menú) ── */
 export const btnFilterGroup =
-  "flex rounded-lg border border-white/[.12] overflow-hidden shrink-0 bg-noova-surface";
+  "inline-flex rounded-lg border border-white/[.12] overflow-hidden shrink-0 bg-noova-surface";
 
 export const btnFilterActive =
-  "px-4 py-2 text-xs font-semibold bg-white/[.12] text-white";
+  "px-3 sm:px-4 py-2 text-xs font-semibold bg-white/[.12] text-white whitespace-nowrap shrink-0";
 
 export const btnFilterIdle =
-  "px-4 py-2 text-xs font-medium text-gray-300 hover:text-white hover:bg-white/[.06] transition-colors";
+  "px-3 sm:px-4 py-2 text-xs font-medium text-gray-300 hover:text-white hover:bg-white/[.06] transition-colors whitespace-nowrap shrink-0";
 
 /* ── Tabs ── */
 export const tabActive = "text-white border-[#5b5bf6]";
@@ -124,10 +124,10 @@ export const registryDescription =
   "text-sm text-gray-200 leading-relaxed mb-5 max-w-3xl";
 
 export const registrySearchRow =
-  "flex items-center gap-3 mb-4";
+  "flex flex-wrap items-center gap-3 mb-4";
 
 export const registryTableArea =
-  "min-w-0";
+  "min-w-0 overflow-x-auto";
 
 export const registryTableWrap =
   "flex-1 overflow-auto min-h-0";

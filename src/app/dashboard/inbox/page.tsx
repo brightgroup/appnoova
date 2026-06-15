@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   Bot,
   ChevronDown,
@@ -35,7 +36,7 @@ type AssignValue = "ai" | "me";
 function AgentAvatar({ name }: { name: string }) {
   const initial = name.trim().charAt(0).toUpperCase() || "A";
   return (
-    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[11px] font-semibold text-white/80">
+    <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-white/10 text-[11px] font-semibold leading-none text-white/80">
       {initial}
     </span>
   );
@@ -46,7 +47,7 @@ function ChannelBadge({ channel }: { channel: string }) {
   const Icon = style.icon;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-semibold ${style.badgeClass}`}
+      className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-semibold whitespace-nowrap shrink-0 ${style.badgeClass}`}
     >
       <Icon className="h-3.5 w-3.5 shrink-0" />
       {style.label}
@@ -379,14 +380,20 @@ function InboxPageInner() {
 
   const tabs: { id: InboxFilter; label: string }[] = [
     { id: "all", label: "Todos" },
-    { id: "mine", label: "Mis conversaciones" },
+    { id: "mine", label: "Mías" },
     { id: "unassigned", label: "Sin asignar" }
   ];
 
   return (
     <div className="flex h-full min-h-0 flex-1 overflow-hidden bg-noova-main text-white">
-      {/* Bandeja — tono intermedio entre menú lateral y área de chat */}
-      <aside className="flex w-[360px] shrink-0 flex-col border-r border-white/[.06] bg-noova-main">
+      {/* Bandeja — oculta en tablet/móvil cuando hay conversación abierta */}
+      <aside
+        className={`flex min-w-0 shrink-0 flex-col border-r border-white/[.06] bg-noova-main ${
+          selectedId
+            ? "hidden xl:flex xl:w-[320px] 2xl:w-[360px]"
+            : "flex w-full md:w-[320px] lg:w-[360px]"
+        }`}
+      >
         <div className="flex items-center justify-between border-b border-white/[.05] px-5 py-4">
           <h1 className="text-base font-semibold text-white">Inbox</h1>
           <label className="flex cursor-pointer items-center gap-2.5 text-sm text-white/50">
@@ -438,7 +445,7 @@ function InboxPageInner() {
               key={tab.id}
               type="button"
               onClick={() => setFilter(tab.id)}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+              className={`rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors sm:px-4 sm:py-2 sm:text-sm ${
                 filter === tab.id
                   ? "bg-[#5b5bf6] text-white"
                   : "bg-white/[.10] text-white/60 hover:text-white/90"
@@ -519,8 +526,12 @@ function InboxPageInner() {
         </div>
       </aside>
 
-      {/* Conversación — mucho más oscura, diseño minimalista */}
-      <section className="flex min-w-0 flex-1 flex-col bg-[#030304]">
+      {/* Conversación — pantalla completa en tablet/móvil cuando hay chat abierto */}
+      <section
+        className={`flex min-w-0 flex-1 flex-col bg-[#111113] ${
+          selectedId ? "flex" : "hidden md:flex"
+        }`}
+      >
         {!selectedId ? (
           <div className="flex flex-1 flex-col items-center justify-center text-white/30">
             <MessageSquare className="mb-4 h-12 w-12 opacity-40" />
@@ -531,95 +542,112 @@ function InboxPageInner() {
           </div>
         ) : (
           <>
-            <header className="flex items-center justify-between gap-4 border-b border-white/[.04] px-6 py-4">
-              <div className="min-w-0">
-                <p className="truncate text-base font-bold text-white">
-                  {detailTitle}
-                </p>
-                {detail && (
-                  <p className="mt-0.5 text-sm text-white/40">
-                    {detail.channel_label}
-                    {" · "}
-                    {detail.agent_name}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                {detail?.kind === "text" && (
-                  <div className="relative" ref={assignRef}>
+            <header className="border-b border-white/[.04] px-4 py-3 lg:px-6">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+                <div className="flex min-w-0 items-start gap-3">
+                  {selectedId && (
                     <button
                       type="button"
-                      onClick={() => setAssignOpen(v => !v)}
-                      className="flex items-center gap-2 rounded-xl border border-white/[.10] bg-white/[.08] px-4 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/[.10]"
+                      onClick={() => {
+                        setSelectedId(null);
+                        setDetail(null);
+                        setConversationInUrl(null);
+                      }}
+                      className="mt-0.5 shrink-0 rounded-xl p-2 text-white/50 transition-colors hover:bg-white/[.06] hover:text-white lg:hidden"
+                      aria-label="Volver a la lista"
                     >
-                      {assignLabel}
-                      <ChevronDown className="h-4 w-4 opacity-60" />
+                      <ChevronDown className="h-5 w-5 rotate-90" />
                     </button>
-                    {assignOpen && (
-                      <NoovaListMenu className="absolute right-0 top-full z-20 mt-1.5 min-w-[200px]">
-                        <NoovaListMenuItem
-                          active={detail?.handoff_mode !== "human"}
-                          onClick={() => assignConversation("ai")}
-                        >
-                          <span className="flex items-center gap-2.5">
-                            <Bot className="h-4 w-4 text-[#5b5bf6]" />
-                            Agente (IA)
-                          </span>
-                        </NoovaListMenuItem>
-                        <NoovaListMenuItem
-                          active={
-                            detail?.handoff_mode === "human" &&
-                            detail?.assigned_to === currentUserName
-                          }
-                          onClick={() => assignConversation("me")}
-                        >
-                          <span className="flex items-center gap-2.5">
-                            <User className="h-4 w-4 text-[#67e8f9]" />
-                            {currentUserName} (yo)
-                          </span>
-                        </NoovaListMenuItem>
-                      </NoovaListMenu>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold text-white sm:text-base">{detailTitle}</p>
+                    {detail && (
+                      <p className="mt-0.5 truncate text-xs text-white/40 sm:text-sm">
+                        {detail.channel_label}
+                        {" · "}
+                        {detail.agent_name}
+                      </p>
                     )}
                   </div>
-                )}
-                <ChannelBadge channel={detail?.channel ?? "web_test"} />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedId(null);
-                    setDetail(null);
-                    setConversationInUrl(null);
-                  }}
-                  className="rounded-xl p-2.5 text-white/40 transition-colors hover:bg-white/[.06] hover:text-white"
-                  aria-label="Cerrar"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2 pl-11 lg:pl-0">
+                  {detail?.kind === "text" && (
+                    <div className="relative" ref={assignRef}>
+                      <button
+                        type="button"
+                        onClick={() => setAssignOpen(v => !v)}
+                        className="flex max-w-[140px] items-center gap-1.5 rounded-xl border border-white/[.10] bg-white/[.08] px-3 py-2 text-xs font-medium text-white/80 transition-colors hover:bg-white/[.10] lg:max-w-none lg:py-2.5 lg:text-sm"
+                      >
+                        <span className="truncate">{assignLabel}</span>
+                        <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+                      </button>
+                      {assignOpen && (
+                        <NoovaListMenu className="absolute left-0 top-full z-20 mt-1.5 min-w-[200px] lg:right-0 lg:left-auto">
+                          <NoovaListMenuItem
+                            active={detail?.handoff_mode !== "human"}
+                            onClick={() => assignConversation("ai")}
+                          >
+                            <span className="flex items-center gap-2.5">
+                              <Bot className="h-4 w-4 text-[#5b5bf6]" />
+                              Agente (IA)
+                            </span>
+                          </NoovaListMenuItem>
+                          <NoovaListMenuItem
+                            active={
+                              detail?.handoff_mode === "human" &&
+                              detail?.assigned_to === currentUserName
+                            }
+                            onClick={() => assignConversation("me")}
+                          >
+                            <span className="flex items-center gap-2.5">
+                              <User className="h-4 w-4 text-[#67e8f9]" />
+                              {currentUserName} (yo)
+                            </span>
+                          </NoovaListMenuItem>
+                        </NoovaListMenu>
+                      )}
+                    </div>
+                  )}
+                  <ChannelBadge channel={detail?.channel ?? "web_test"} />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedId(null);
+                      setDetail(null);
+                      setConversationInUrl(null);
+                    }}
+                    className="hidden shrink-0 rounded-xl p-2 text-white/40 transition-colors hover:bg-white/[.06] hover:text-white lg:inline-flex"
+                    aria-label="Cerrar"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
             </header>
 
             {error && (
-              <div className="mx-6 mt-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-400">
+              <div className="mx-4 mt-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-400 lg:mx-6">
                 {error}
               </div>
             )}
 
             {detail?.kind === "text" &&
               detail.channel === "whatsapp" &&
-              detail.whatsapp_compliance_notice && (
+              detail.whatsapp_compliance_notice &&
+              !showTemplateComposer && (
                 <div
-                  className={`mx-6 mt-3 rounded-xl border px-4 py-2.5 text-sm ${
+                  className={`mx-4 mt-2 rounded-lg px-3 py-1.5 text-xs lg:mx-6 ${
                     detail.whatsapp_session_open === false || detail.whatsapp_opted_out
-                      ? "border-amber-500/25 bg-amber-500/10 text-amber-200/90"
-                      : "border-emerald-500/20 bg-emerald-500/10 text-emerald-200/90"
+                      ? "bg-amber-500/10 text-amber-200/80"
+                      : "bg-emerald-500/10 text-emerald-200/80"
                   }`}
                 >
                   {detail.whatsapp_compliance_notice}
                 </div>
               )}
 
-            <div className="flex-1 overflow-y-auto px-6 py-6">
+            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
               {detailLoading && !detail ? (
                 <div className="flex items-center justify-center py-20 text-white/40">
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -632,9 +660,9 @@ function InboxPageInner() {
             </div>
 
             {detail && (
-              <footer className="border-t border-white/[.04] px-6 py-5">
+              <footer className="border-t border-white/[.04] px-4 py-4 sm:px-6 sm:py-5">
                 {canReply ? (
-                  <div className="mx-auto flex max-w-3xl items-end gap-3">
+                  <div className="mx-auto flex max-w-3xl flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
                     <textarea
                       value={reply}
                       onChange={e => setReply(e.target.value)}
@@ -652,9 +680,9 @@ function InboxPageInner() {
                       type="button"
                       onClick={sendReply}
                       disabled={!reply.trim() || sending}
-                      className="rounded-2xl bg-[#5b5bf6] px-5 py-3 text-sm font-medium text-white disabled:opacity-40"
+                      className="w-full shrink-0 rounded-2xl bg-[#5b5bf6] px-5 py-3 text-sm font-medium text-white disabled:opacity-40 sm:w-auto"
                     >
-                      {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enviar"}
+                      {sending ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Enviar"}
                     </button>
                   </div>
                 ) : showTemplateComposer ? (
@@ -675,12 +703,17 @@ function InboxPageInner() {
                       canSend={canSendTemplate}
                     />
                   ) : (
-                    <div className="mx-auto max-w-md rounded-2xl border border-white/[.08] bg-white/[.03] px-5 py-6 text-center">
-                      <FileText className="mx-auto h-8 w-8 text-[#5b5bf6]/60 mb-3" />
-                      <p className="text-sm text-white/60">Ventana de 24 h cerrada</p>
-                      <p className="mt-1 text-xs text-white/35 leading-relaxed">
-                        Crea plantillas aprobadas en Canales → WhatsApp → Plantillas para recontactar.
+                    <div className="mx-auto flex max-w-lg flex-col items-stretch gap-2.5 rounded-xl bg-zinc-900 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-xs text-white/60">
+                        <span className="font-medium text-white/80">Ventana de 24 h cerrada.</span>{" "}
+                        Crea una plantilla para recontactar.
                       </p>
+                      <Link
+                        href="/dashboard/canales/whatsapp/plantillas/nueva"
+                        className="inline-flex shrink-0 items-center justify-center rounded-lg bg-white px-3 py-2 text-xs font-medium text-black transition-colors hover:bg-white/90"
+                      >
+                        Crear plantilla
+                      </Link>
                     </div>
                   )
                 ) : (
@@ -745,35 +778,35 @@ function TextThread({
         const sameSender = prev?.role === msg.role;
         const gap = sameSender ? "mt-1.5" : "mt-5";
 
+        const bubbleClass = isUser
+          ? "bg-zinc-600 text-white"
+          : isHuman
+            ? "bg-zinc-700 text-white"
+            : "bg-zinc-950 text-white/90";
+
         return (
           <div
             key={`${msg.created_at}-${i}`}
             className={`flex ${gap} ${isUser ? "justify-start" : "justify-end"}`}
           >
             <div
-              className={`group relative max-w-[78%] px-4 py-3 ${
-                isUser
-                  ? "rounded-2xl rounded-bl-md border border-[#5b5bf6]/25 bg-[#5b5bf6]/20 text-white"
-                  : isHuman
-                    ? "rounded-2xl rounded-br-md border border-[#67e8f9]/35 bg-[#67e8f9]/[.18] text-white/95"
-                    : "rounded-2xl rounded-br-md border border-white/[.06] bg-white/[.07] text-white/90"
-              }`}
+              className={`group relative max-w-[78%] rounded-2xl px-4 py-3 ${bubbleClass}`}
             >
               {!isUser && (
-                <span className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-white/30">
+                <span className="mb-1.5 block text-[11px] font-medium text-white/50">
                   {isHuman ? "Asesor" : "IA"}
                 </span>
               )}
               {isUser && msg.media_label && (
-                <span className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-white/40">
+                <span className="mb-1.5 block text-[11px] font-medium text-white/55">
                   {msg.media_label}
                 </span>
               )}
-              <InboxMessageBody msg={msg} />
+              <InboxMessageBody msg={msg} variant={isUser ? "user" : isHuman ? "human" : "ai"} />
               {msg.content.trim() ? (
                 <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
               ) : null}
-              <time className="mt-2 block text-[10px] text-white/25">
+              <time className="mt-2 block text-[10px] text-white/35">
                 {formatInboxMessageTime(msg.created_at)}
               </time>
             </div>
@@ -784,14 +817,26 @@ function TextThread({
   );
 }
 
-function InboxMessageBody({ msg }: { msg: TextChatMessage }) {
+function InboxMessageBody({
+  msg,
+  variant = "ai"
+}: {
+  msg: TextChatMessage;
+  variant?: "user" | "human" | "ai";
+}) {
   const url = msg.media_url?.trim();
   const type = msg.media_type;
+  const embedBg =
+    variant === "user"
+      ? "bg-zinc-500 text-white/90"
+      : variant === "human"
+        ? "bg-zinc-600 text-white/90"
+        : "bg-zinc-900 text-white/80";
 
   if (type === "video" && !url) {
     return (
-      <div className="mb-2 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.06] px-3 py-2.5 text-sm text-white/70">
-        <Film className="h-4 w-4 shrink-0 text-white/50" />
+      <div className={`mb-2 flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm ${embedBg}`}>
+        <Film className="h-4 w-4 shrink-0 opacity-70" />
         Archivo de video recibido
       </div>
     );
@@ -806,7 +851,7 @@ function InboxMessageBody({ msg }: { msg: TextChatMessage }) {
         <img
           src={url}
           alt={msg.media_label ?? "Imagen"}
-          className="max-h-64 w-full rounded-xl object-contain bg-black/20"
+          className="max-h-64 w-full rounded-xl object-contain bg-black/25"
         />
       </a>
     );
@@ -825,14 +870,14 @@ function InboxMessageBody({ msg }: { msg: TextChatMessage }) {
 
   if (type === "video") {
     return (
-      <div className="mb-2 overflow-hidden rounded-xl border border-white/10 bg-black/30">
+      <div className={`mb-2 overflow-hidden rounded-xl ${embedBg}`}>
         <video
           controls
           preload="metadata"
           src={url}
-          className="max-h-56 w-full bg-black/40"
+          className="max-h-56 w-full bg-black/30"
         />
-        <div className="flex items-center gap-2 border-t border-white/10 px-3 py-2 text-xs text-white/60">
+        <div className="flex items-center gap-2 px-3 py-2 text-xs opacity-80">
           <Film className="h-4 w-4 shrink-0" />
           <span>Archivo de video recibido</span>
         </div>
@@ -846,7 +891,7 @@ function InboxMessageBody({ msg }: { msg: TextChatMessage }) {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="mb-2 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.06] px-3 py-2 text-sm text-[#67e8f9] hover:bg-white/[.10]"
+        className={`mb-2 flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:opacity-90 ${embedBg}`}
       >
         <FileText className="h-4 w-4 shrink-0" />
         Abrir documento

@@ -1,4 +1,5 @@
 import { channelLabel, inboxChannelBadge, normalizeChatMessages } from "@/lib/text-chat-utils";
+import { WHATSAPP_CONVERSATION_CHANNEL } from "@/lib/whatsapp-channel";
 import type { InboxListItem } from "@/types/inbox";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
 
@@ -6,13 +7,34 @@ export function makeVisitorLabel(): string {
   return `anonymous-${(Date.now() / 1000).toFixed(6)}`;
 }
 
+function looksLikePhone(value: string): boolean {
+  const compact = value.replace(/[\s().-]/g, "");
+  return /^\+?\d{10,15}$/.test(compact);
+}
+
 /** Título legible para la bandeja (evita mostrar anonymous-... crudo). */
 export function formatInboxDisplayTitle(
   contactLabel: string,
   channel: string,
-  conversationId: string
+  conversationId: string,
+  metadata?: Record<string, unknown>
 ): string {
   const shortId = conversationId.replace(/-/g, "").slice(0, 6).toUpperCase();
+
+  if (channel === WHATSAPP_CONVERSATION_CHANNEL) {
+    const e164 = metadata?.whatsapp_contact_e164
+      ? String(metadata.whatsapp_contact_e164).trim()
+      : null;
+    const label = contactLabel.trim();
+
+    if (label.includes(" · ")) return label;
+
+    if (label && e164 && label !== e164 && !looksLikePhone(label)) {
+      return `${label} · ${e164}`;
+    }
+
+    return e164 || label || "WhatsApp";
+  }
 
   if (channel === "web_widget") {
     if (contactLabel.startsWith("anonymous-")) {
@@ -105,7 +127,10 @@ export function textRowToInboxItem(
     display_title: formatInboxDisplayTitle(
       String(row.contact_label ?? "Visitante"),
       channel,
-      String(row.id)
+      String(row.id),
+      typeof row.metadata === "object" && row.metadata !== null
+        ? (row.metadata as Record<string, unknown>)
+        : undefined
     ),
     preview: lastTextPreview(row.messages) || String(row.summary ?? "Sin mensajes"),
     channel,

@@ -3,27 +3,84 @@ import type { CrmContact, CrmLead, CrmTimelineEvent } from "@/types/crm";
 import { analyzeChatConversation } from "@/lib/text-chat-analysis";
 import { buildChatFallbackSummary } from "@/lib/text-chat-utils";
 
+const TIMELINE_DAY_SUMMARIES_KEY = "timeline_day_summaries";
+
+export type TimelineDaySummaryCache = {
+  summary: string;
+  message_count: number;
+  last_message_at: string;
+  analyzed_at: string;
+};
+
+export function readTimelineDaySummaries(
+  metadata: Record<string, unknown> | null | undefined
+): Record<string, TimelineDaySummaryCache> {
+  const raw = metadata?.[TIMELINE_DAY_SUMMARIES_KEY];
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return raw as Record<string, TimelineDaySummaryCache>;
+}
+
+function isTimelineDayCacheValid(
+  cache: TimelineDaySummaryCache | undefined,
+  msgs: TextChatMessage[]
+): boolean {
+  if (!cache?.summary?.trim()) return false;
+  if (cache.message_count !== msgs.length) return false;
+  const lastAt = msgs[msgs.length - 1]?.created_at;
+  return Boolean(lastAt && cache.last_message_at === lastAt);
+}
+
 function formatLapseDay(isoDay: string): string {
   const d = new Date(`${isoDay}T12:00:00`);
   return d.toLocaleDateString("es", { weekday: "short", day: "numeric", month: "short" });
 }
 
-async function summarizeDayMessages(msgs: TextChatMessage[]): Promise<string> {
+async function summarizeDayMessages(
+  day: string,
+  msgs: TextChatMessage[],
+  caches: Record<string, TimelineDaySummaryCache>
+): Promise<{ summary: string; cache?: TimelineDaySummaryCache }> {
+  const cached = caches[day];
+  if (isTimelineDayCacheValid(cached, msgs)) {
+    return { summary: cached!.summary };
+  }
+
+  let summary: string;
   if (msgs.length >= 2) {
     const analysis = await analyzeChatConversation(msgs);
-    return analysis.summary;
+    summary = analysis.summary;
+  } else {
+    const only = msgs[0]?.content?.trim();
+    if (only) summary = only.length > 160 ? `${only.slice(0, 160)}…` : only;
+    else summary = buildChatFallbackSummary(msgs);
   }
-  const only = msgs[0]?.content?.trim();
-  if (only) return only.length > 160 ? `${only.slice(0, 160)}…` : only;
-  return buildChatFallbackSummary(msgs);
+
+  const lastAt = msgs[msgs.length - 1]?.created_at;
+  if (!lastAt) return { summary };
+
+  return {
+    summary,
+    cache: {
+      summary,
+      message_count: msgs.length,
+      last_message_at: lastAt,
+      analyzed_at: new Date().toISOString()
+    }
+  };
 }
 
-async function buildConversationLapses(messages: TextChatMessage[]): Promise<CrmTimelineEvent[]> {
+async function buildConversationLapses(
+  messages: TextChatMessage[],
+  daySummaries: Record<string, TimelineDaySummaryCache>
+): Promise<{
+  events: CrmTimelineEvent[];
+  daySummaries: Record<string, TimelineDaySummaryCache>;
+}> {
   const sorted = [...messages]
     .filter(m => m.created_at)
     .sort((a, b) => new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime());
 
-  if (!sorted.length) return [];
+  if (!sorted.length) return { events: [], daySummaries };
 
   const byDay = new Map<string, TextChatMessage[]>();
   for (const msg of sorted) {
@@ -37,24 +94,53 @@ async function buildConversationLapses(messages: TextChatMessage[]): Promise<Crm
     .sort((a, b) => b[0].localeCompare(a[0]))
     .slice(0, 20);
 
+  const nextCaches = { ...daySummaries };
   const events = await Promise.all(
-    days.map(async ([day, msgs]) => ({
-      id: `lapse-${day}`,
-      kind: "conversation_lapse" as const,
-      at: msgs[msgs.length - 1].created_at!,
-      title: `Conversación WhatsApp · ${formatLapseDay(day)}`,
-      body: await summarizeDayMessages(msgs),
-      channel: "whatsapp"
-    }))
+    days.map(async ([day, msgs]) => {
+      const { summary, cache } = await summarizeDayMessages(day, msgs, nextCaches);
+      if (cache) nextCaches[day] = cache;
+
+      return {
+        id: `lapse-${day}`,
+        kind: "conversation_lapse" as const,
+        at: msgs[msgs.length - 1].created_at!,
+        title: `Conversación WhatsApp · ${formatLapseDay(day)}`,
+        body: summary,
+        channel: "whatsapp"
+      };
+    })
   );
 
-  return events;
+  return { events, daySummaries: nextCaches };
+}
+
+export function mergeTimelineDaySummaries(
+  metadata: Record<string, unknown> | null | undefined,
+  daySummaries: Record<string, TimelineDaySummaryCache>
+): Record<string, unknown> {
+  const base =
+    metadata && typeof metadata === "object" && !Array.isArray(metadata)
+      ? { ...metadata }
+      : {};
+
+  return {
+    ...base,
+    [TIMELINE_DAY_SUMMARIES_KEY]: daySummaries
+  };
+}
+
+export function timelineDaySummariesChanged(
+  before: Record<string, TimelineDaySummaryCache>,
+  after: Record<string, TimelineDaySummaryCache>
+): boolean {
+  return JSON.stringify(before) !== JSON.stringify(after);
 }
 
 export async function buildContactTimeline(input: {
   contact: CrmContact;
   leads: CrmLead[];
   messages: TextChatMessage[];
+  daySummaries?: Record<string, TimelineDaySummaryCache>;
   calls: Array<{
     id: string;
     created_at: string;
@@ -62,8 +148,12 @@ export async function buildContactTimeline(input: {
     summary: string;
     status_label: string;
   }>;
-}): Promise<CrmTimelineEvent[]> {
+}): Promise<{
+  events: CrmTimelineEvent[];
+  daySummaries: Record<string, TimelineDaySummaryCache>;
+}> {
   const events: CrmTimelineEvent[] = [];
+  const initialDaySummaries = input.daySummaries ?? {};
 
   events.push({
     id: `contact-${input.contact.id}`,
@@ -83,7 +173,11 @@ export async function buildContactTimeline(input: {
     });
   }
 
-  events.push(...(await buildConversationLapses(input.messages)));
+  const { events: lapseEvents, daySummaries } = await buildConversationLapses(
+    input.messages,
+    initialDaySummaries
+  );
+  events.push(...lapseEvents);
 
   for (const call of input.calls) {
     events.push({
@@ -96,7 +190,10 @@ export async function buildContactTimeline(input: {
     });
   }
 
-  return events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  return {
+    events: events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()),
+    daySummaries
+  };
 }
 
 export function findDuplicateGroups(

@@ -19,12 +19,12 @@ const KIND_META: Record<
   CrmTimelineEventKind,
   { icon: typeof MessageSquare; accent: string; dot: string }
 > = {
-  conversation_lapse: { icon: MessageSquare, accent: "text-emerald-300", dot: "border-emerald-400/60" },
-  message_in: { icon: MessageSquare, accent: "text-emerald-300", dot: "border-emerald-400/60" },
-  message_out: { icon: MessageSquare, accent: "text-[#a5a5ff]", dot: "border-[#5b5bf6]/60" },
-  call: { icon: Phone, accent: "text-sky-300", dot: "border-sky-400/60" },
-  lead: { icon: Sparkles, accent: "text-amber-300", dot: "border-amber-400/60" },
-  contact_created: { icon: UserPlus, accent: "text-gray-400", dot: "border-gray-500/60" }
+  conversation_lapse: { icon: MessageSquare, accent: "text-emerald-300", dot: "bg-emerald-400" },
+  message_in: { icon: MessageSquare, accent: "text-emerald-300", dot: "bg-emerald-400" },
+  message_out: { icon: MessageSquare, accent: "text-[#a5a5ff]", dot: "bg-[#5b5bf6]" },
+  call: { icon: Phone, accent: "text-sky-300", dot: "bg-sky-400" },
+  lead: { icon: Sparkles, accent: "text-amber-300", dot: "bg-amber-400" },
+  contact_created: { icon: UserPlus, accent: "text-gray-400", dot: "bg-gray-500" }
 };
 
 interface CrmContactTimelineProps {
@@ -108,48 +108,47 @@ export function CrmContactTimeline({ contactId, inboxConversationId, leads = [] 
               </Link>
             )}
           </div>
-          <div className="relative pl-5">
-            <div className="absolute left-[5px] top-3 bottom-3 w-px bg-white/[.08]" />
-            <ul className="space-y-4">
-              {events.map(ev => {
+          <ul className="space-y-0">
+              {events.map((ev, index) => {
                 const meta = KIND_META[ev.kind];
                 const Icon = meta.icon;
+                const isLast = index === events.length - 1;
                 return (
-                  <li key={ev.id} className="relative pl-5">
-                    <span
-                      className={`absolute left-0 top-4 w-[11px] h-[11px] rounded-full border-2 bg-noova-main ${meta.dot}`}
-                    />
-                    <div className="rounded-xl border border-white/[.06] bg-white/[.02] px-4 py-3.5 hover:border-white/[.10] transition-colors">
-                      <div className="flex items-start gap-3">
-                        <span className={`mt-0.5 shrink-0 ${meta.accent}`}>
-                          <Icon className="w-4 h-4" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-sm font-medium text-white leading-snug">{ev.title}</p>
-                            <time className="text-[10px] text-gray-500 shrink-0 whitespace-nowrap pt-0.5">
-                              {formatCrmDateTime(ev.at)}
-                            </time>
-                          </div>
-                          {ev.body && (
-                            <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">{ev.body}</p>
-                          )}
-                          {ev.kind === "conversation_lapse" && inboxConversationId && (
-                            <Link
-                              href={`/dashboard/inbox?id=${inboxConversationId}`}
-                              className="inline-block mt-2 text-[10px] font-medium text-[#a5a5ff] hover:text-white"
-                            >
-                              Abrir en inbox →
-                            </Link>
-                          )}
+                  <li key={ev.id} className="flex gap-4">
+                    <div className="flex w-4 shrink-0 flex-col items-center">
+                      <span className={`mt-1.5 h-3 w-3 shrink-0 rounded-full ${meta.dot}`} />
+                      {!isLast && (
+                        <div className={`my-1 w-0.5 flex-1 min-h-[2.5rem] rounded-full ${meta.dot}`} />
+                      )}
+                    </div>
+                    <div className={`min-w-0 flex-1 ${isLast ? "pb-0" : "pb-6"}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start gap-2">
+                          <span className={`mt-0.5 shrink-0 ${meta.accent}`}>
+                            <Icon className="h-4 w-4" />
+                          </span>
+                          <p className="text-sm font-medium leading-snug text-white">{ev.title}</p>
                         </div>
+                        <time className="shrink-0 whitespace-nowrap pt-0.5 text-[10px] text-gray-500">
+                          {formatCrmDateTime(ev.at)}
+                        </time>
                       </div>
+                      {ev.body && (
+                        <p className="mt-2 text-xs leading-relaxed text-gray-400">{ev.body}</p>
+                      )}
+                      {ev.kind === "conversation_lapse" && inboxConversationId && (
+                        <Link
+                          href={`/dashboard/inbox?id=${inboxConversationId}`}
+                          className="mt-2 inline-block text-[10px] font-medium text-[#a5a5ff] hover:text-white"
+                        >
+                          Abrir en inbox →
+                        </Link>
+                      )}
                     </div>
                   </li>
                 );
               })}
             </ul>
-          </div>
         </section>
       )}
     </div>

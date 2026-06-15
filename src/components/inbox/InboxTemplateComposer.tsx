@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FileText, Loader2, MessageCircle, Send, Sparkles } from "lucide-react";
+import { FileText, Loader2, MessageCircle, Send } from "lucide-react";
 import type { WhatsAppTemplateRecord } from "@/types/whatsapp-template";
 
 interface InboxTemplateComposerProps {
@@ -34,23 +34,13 @@ export function InboxTemplateComposer({
     selected.variable_labels.length === variableValues.filter(v => v.trim()).length;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <div className="rounded-2xl border border-amber-500/20 bg-gradient-to-br from-amber-500/[.08] to-transparent px-4 py-3">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
-            <Sparkles className="h-4 w-4 text-amber-300" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-amber-100">Ventana de 24 h cerrada</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-amber-200/70">
-              Solo puedes enviar plantillas aprobadas. Elige una y completa las variables.
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="mx-auto max-w-2xl space-y-3">
+      <p className="rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200/80">
+        Ventana de 24 h cerrada — elige una plantilla aprobada y completa las variables.
+      </p>
 
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wider text-white/40">Plantillas disponibles</p>
+        <p className="text-[11px] font-medium uppercase tracking-wider text-white/35">Plantillas disponibles</p>
         <div className="grid gap-2 sm:grid-cols-2">
           {templates.map(tpl => {
             const active = tpl.id === selectedTemplateId;
