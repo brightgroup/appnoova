@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { formatLeadValue } from "@/lib/crm-record";
+import { formatProximaAccionFecha } from "@/lib/crm-lead-utils";
 import { filterPipelineStages } from "@/lib/crm-record";
 import type { CrmLead, CrmPipelineStage } from "@/types/crm";
 
@@ -115,20 +116,57 @@ export function CrmLeadsKanban({ leads, stages, onLeadsChange, onSelectLead }: C
                     setOverStageId(null);
                   }}
                   onClick={() => onSelectLead(lead.id)}
-                  className={`group cursor-grab active:cursor-grabbing rounded-lg border border-white/[.08] bg-white/[.03] px-3 py-2.5 transition-colors hover:bg-white/[.05] ${
+                  className={`group cursor-grab active:cursor-grabbing rounded-lg border px-3 py-2.5 transition-colors hover:bg-white/[.05] ${
                     dragId === lead.id ? "opacity-40" : ""
+                  } ${
+                    lead.is_overdue
+                      ? "border-amber-500/35 bg-amber-500/[.06]"
+                      : lead.is_stalled
+                        ? "border-orange-500/25 bg-orange-500/[.04]"
+                        : "border-white/[.08] bg-white/[.03]"
                   }`}
                 >
-                  <p className="text-sm font-medium text-white truncate">{lead.title}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-medium text-white truncate">{lead.title}</p>
+                    {lead.temperatura && (
+                      <span
+                        className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase ${
+                          lead.temperatura === "caliente"
+                            ? "bg-orange-500/20 text-orange-200"
+                            : lead.temperatura === "tibio"
+                              ? "bg-amber-500/15 text-amber-200"
+                              : "bg-sky-500/15 text-sky-300"
+                        }`}
+                      >
+                        {lead.temperatura}
+                      </span>
+                    )}
+                  </div>
                   {lead.contact?.name && (
                     <p className="text-xs text-gray-400 mt-0.5 truncate">{lead.contact.name}</p>
                   )}
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-[#a5a5ff] tabular-nums">
+                  {lead.proxima_accion && (
+                    <p className="mt-2 text-[11px] leading-snug text-gray-300 line-clamp-2">
+                      {lead.proxima_accion}
+                    </p>
+                  )}
+                  <div className="mt-2 flex items-center justify-between gap-2 text-[10px]">
+                    <span
+                      className={`tabular-nums ${
+                        lead.is_overdue ? "text-amber-300 font-medium" : "text-gray-500"
+                      }`}
+                    >
+                      {formatProximaAccionFecha(lead.proxima_accion_fecha)}
+                    </span>
+                    <span className="text-xs font-semibold text-[#a5a5ff] tabular-nums shrink-0">
                       {formatLeadValue(lead.value_amount, lead.currency)}
                     </span>
-                    {lead.source && <span className="text-[10px] text-gray-500 truncate">{lead.source}</span>}
                   </div>
+                  {lead.asesor_responsable && (
+                    <p className="mt-1 text-[10px] text-gray-500 truncate">
+                      {lead.asesor_responsable}
+                    </p>
+                  )}
                 </div>
               ))}
               {stageLeads.length === 0 && (

@@ -262,8 +262,18 @@ export function computeContactNextStep(input: {
 
   if (openLeads.length > 0) {
     const lead = openLeads[0];
+    if (lead.proxima_accion) {
+      const when = lead.proxima_accion_fecha
+        ? ` (${new Date(lead.proxima_accion_fecha).toLocaleDateString("es-CO", { day: "numeric", month: "short" })})`
+        : "";
+      return {
+        message: `${lead.proxima_accion}${when}`,
+        action: "lead",
+        href: `/dashboard/crm/leads/${lead.id}`
+      };
+    }
     return {
-      message: `Lead abierto «${lead.title}» — da seguimiento.`,
+      message: `Lead abierto «${lead.title}» — define la próxima acción.`,
       action: "lead",
       href: `/dashboard/crm/leads/${lead.id}`
     };

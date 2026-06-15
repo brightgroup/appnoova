@@ -33,6 +33,7 @@ export default function CrmLeadsPage() {
   const [view, setView] = useState<CrmLeadsView>("kanban");
   const [filter, setFilter] = useState<CrmLeadFilter>("open");
   const [loading, setLoading] = useState(true);
+  const [currentUserName, setCurrentUserName] = useState("");
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -42,6 +43,7 @@ export default function CrmLeadsPage() {
     if (res.ok) {
       setLeads(data.leads ?? []);
       setStages(data.stages ?? []);
+      if (data.current_user_name) setCurrentUserName(data.current_user_name);
     }
     if (!silent) setLoading(false);
   }, []);
@@ -49,11 +51,23 @@ export default function CrmLeadsPage() {
   useEffect(() => { load(); }, [load]);
 
   const filteredLeads = useMemo(() => {
-    if (filter === "all") return leads;
     if (filter === "won") return leads.filter(l => l.outcome === "won");
     if (filter === "lost") return leads.filter(l => l.outcome === "lost");
-    return leads.filter(l => l.outcome === "open");
-  }, [leads, filter]);
+    if (filter === "all") return leads;
+
+    let list = leads.filter(l => l.outcome === "open");
+    if (filter === "mine") {
+      const me = currentUserName.trim().toLowerCase();
+      list = list.filter(l => l.asesor_responsable?.trim().toLowerCase() === me);
+    } else if (filter === "overdue") {
+      list = list.filter(l => l.is_overdue);
+    } else if (filter === "stalled") {
+      list = list.filter(l => l.is_stalled);
+    }
+    return list;
+  }, [leads, filter, currentUserName]);
+
+  const kanbanFilters: CrmLeadFilter[] = ["open", "mine", "overdue", "stalled"];
 
   const deleteLead = async (id: string) => {
     if (!confirm("¿Eliminar lead?")) return;
@@ -71,7 +85,7 @@ export default function CrmLeadsPage() {
           </Link>
           <div>
             <h1 className="text-xl font-bold tracking-tight">Leads</h1>
-            <p className={`text-xs ${textMuted} mt-0.5`}>Pipeline comercial — kanban y lista</p>
+            <p className={`text-xs ${textMuted} mt-0.5`}>Pipeline accionable — qué hacer y cuándo</p>
           </div>
         </div>
       </div>
@@ -85,6 +99,9 @@ export default function CrmLeadsPage() {
               <div className={btnFilterGroup}>
                 {([
                   ["open", "Abiertos"],
+                  ["mine", "Míos"],
+                  ["overdue", "Vencidos"],
+                  ["stalled", "Estancados"],
                   ["won", "Ganados"],
                   ["lost", "Perdidos"],
                   ["all", "Todos"]
@@ -130,7 +147,7 @@ export default function CrmLeadsPage() {
               <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando leads…
             </div>
           ) : view === "kanban" ? (
-            filter === "open" ? (
+            kanbanFilters.includes(filter) ? (
               <CrmLeadsKanban
                 leads={filteredLeads}
                 stages={stages}
@@ -139,7 +156,7 @@ export default function CrmLeadsPage() {
               />
             ) : (
               <div className={registryTableEmpty}>
-                El kanban solo muestra leads abiertos. Cambia el filtro a «Abiertos».
+                El kanban muestra leads abiertos. Usa filtros Abiertos, Míos, Vencidos o Estancados.
               </div>
             )
           ) : filteredLeads.length === 0 ? (
@@ -154,6 +171,7 @@ export default function CrmLeadsPage() {
                   <th className={registryTableHeadCell}>Contacto</th>
                   <th className={registryTableHeadCell}>Etapa</th>
                   <th className={registryTableHeadCell}>Resultado</th>
+                  <th className={registryTableHeadCell}>Próxima acción</th>
                   <th className={registryTableHeadCell}>Valor</th>
                   <th className={`${registryTableHeadCell} text-center`}>Acciones</th>
                 </tr>
@@ -177,6 +195,9 @@ export default function CrmLeadsPage() {
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${outcomeBadge(lead.outcome)}`}>
                         {CRM_LEAD_OUTCOME_LABELS[lead.outcome]}
                       </span>
+                    </td>
+                    <td className={`${registryTableCell} text-xs text-gray-400 max-w-[200px]`}>
+                      <span className="line-clamp-2">{lead.proxima_accion ?? "—"}</span>
                     </td>
                     <td className={`${registryTableCell} text-sm text-[#a5a5ff] tabular-nums`}>
                       {formatLeadValue(lead.value_amount, lead.currency)}

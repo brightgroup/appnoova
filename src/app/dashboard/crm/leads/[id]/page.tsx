@@ -67,6 +67,18 @@ function LeadEditContent({ leadId }: { leadId: string }) {
         currency: draft.currency,
         source: draft.source,
         notes: draft.notes,
+        proxima_accion: draft.proxima_accion,
+        proxima_accion_fecha: draft.proxima_accion_fecha,
+        proxima_accion_tipo: draft.proxima_accion_tipo,
+        proxima_accion_estado: draft.proxima_accion_estado,
+        motivo_perdida: draft.motivo_perdida,
+        motivo_perdida_detalle: draft.motivo_perdida_detalle,
+        asesor_responsable: draft.asesor_responsable,
+        categoria_interes: draft.categoria_interes,
+        producto_interes: draft.producto_interes,
+        score: draft.score,
+        temperatura: draft.temperatura,
+        inbox_conversation_id: draft.inbox_conversation_id,
         metadata: draft.metadata
       })
     });
@@ -94,7 +106,7 @@ function LeadEditContent({ leadId }: { leadId: string }) {
     <CrmDetailLayout
       backHref="/dashboard/crm/leads"
       title={draft.title || lead?.title || "Lead"}
-      subtitle={stage ? `Etapa: ${stage.name}` : "Pipeline comercial"}
+      subtitle={stage ? `Etapa: ${stage.name}` : "Qué hacer y cuándo"}
       loading={loading}
       saving={saving}
       error={error}

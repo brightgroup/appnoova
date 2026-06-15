@@ -3,6 +3,7 @@ import {
   computeVentanaWaEstado,
   parseSupresiones
 } from "@/lib/crm-contactability";
+import { enrichCrmLead, scoreToTemperatura } from "@/lib/crm-lead-utils";
 import type {
   CrmContact,
   CrmContactActions,
@@ -10,15 +11,19 @@ import type {
   CrmFieldProvenanceEntry,
   CrmLead,
   CrmLeadOutcome,
+  CrmLeadTemperatura,
+  CrmMotivoPerdida,
   CrmPipelineStage,
   CrmPropertyDefinition,
-  CrmPropertyFieldType
+  CrmPropertyFieldType,
+  CrmProximaAccionEstado,
+  CrmProximaAccionTipo
 } from "@/types/crm";
 
 export const DEFAULT_CRM_STAGES: Omit<CrmPipelineStage, "id" | "user_id" | "created_at" | "updated_at">[] = [
-  { name: "Contacto inicial", slug: "contacto_inicial", color: "#5b5bf6", sort_order: 0, is_won: false, is_lost: false },
-  { name: "En seguimiento", slug: "en_seguimiento", color: "#8b5cf6", sort_order: 1, is_won: false, is_lost: false },
-  { name: "En cotización", slug: "en_cotizacion", color: "#f59e0b", sort_order: 2, is_won: false, is_lost: false },
+  { name: "Nuevo", slug: "nuevo", color: "#5b5bf6", sort_order: 0, is_won: false, is_lost: false },
+  { name: "Contactado", slug: "contactado", color: "#8b5cf6", sort_order: 1, is_won: false, is_lost: false },
+  { name: "Cotizado", slug: "cotizado", color: "#f59e0b", sort_order: 2, is_won: false, is_lost: false },
   { name: "Negociación", slug: "negociacion", color: "#3b82f6", sort_order: 3, is_won: false, is_lost: false }
 ];
 
@@ -109,41 +114,7 @@ export const DEFAULT_CONTACT_PROPERTIES: Omit<
 export const DEFAULT_LEAD_PROPERTIES: Omit<
   CrmPropertyDefinition,
   "id" | "user_id" | "created_at" | "updated_at"
->[] = [
-  {
-    entity_type: "lead",
-    field_key: "fecha_cierre",
-    label: "Fecha cierre esperada",
-    field_type: "date",
-    options: [],
-    is_builtin: true,
-    is_required: false,
-    sort_order: 0,
-    group_name: "Pipeline"
-  },
-  {
-    entity_type: "lead",
-    field_key: "probabilidad",
-    label: "Probabilidad",
-    field_type: "select",
-    options: ["10%", "25%", "50%", "75%", "90%"],
-    is_builtin: true,
-    is_required: false,
-    sort_order: 1,
-    group_name: "Pipeline"
-  },
-  {
-    entity_type: "lead",
-    field_key: "producto",
-    label: "Producto de interés",
-    field_type: "text",
-    options: [],
-    is_builtin: true,
-    is_required: false,
-    sort_order: 2,
-    group_name: "Pipeline"
-  }
-];
+>[] = [];
 
 function parseTags(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
@@ -262,10 +233,50 @@ export function toCrmContact(raw: Record<string, unknown>): CrmContact {
   return enrichCrmContact(base);
 }
 
+function parseMotivoPerdida(raw: unknown): CrmMotivoPerdida | null {
+  const allowed = [
+    "precio",
+    "no_respondio",
+    "compro_otro",
+    "no_era_momento",
+    "sin_presupuesto",
+    "datos_incompletos",
+    "otro"
+  ] as const;
+  const v = String(raw ?? "");
+  return allowed.includes(v as CrmMotivoPerdida) ? (v as CrmMotivoPerdida) : null;
+}
+
+function parseProximaAccionTipo(raw: unknown): CrmProximaAccionTipo | null {
+  const allowed = [
+    "whatsapp",
+    "llamada",
+    "email",
+    "cotizacion_ori",
+    "tarea_asesor",
+    "esperar"
+  ] as const;
+  const v = String(raw ?? "");
+  return allowed.includes(v as CrmProximaAccionTipo) ? (v as CrmProximaAccionTipo) : null;
+}
+
+function parseProximaAccionEstado(raw: unknown): CrmProximaAccionEstado {
+  const allowed = ["pendiente", "hecha", "vencida", "cancelada"] as const;
+  const v = String(raw ?? "pendiente");
+  return allowed.includes(v as CrmProximaAccionEstado) ? (v as CrmProximaAccionEstado) : "pendiente";
+}
+
+function parseTemperatura(raw: unknown): CrmLeadTemperatura | null {
+  const allowed = ["frio", "tibio", "caliente"] as const;
+  const v = String(raw ?? "");
+  return allowed.includes(v as CrmLeadTemperatura) ? (v as CrmLeadTemperatura) : null;
+}
+
 export function toCrmLead(raw: Record<string, unknown>): CrmLead {
   const contactRaw = raw.contact as Record<string, unknown> | null | undefined;
   const stageRaw = raw.stage as Record<string, unknown> | null | undefined;
-  return {
+  const score = raw.score != null ? Number(raw.score) : null;
+  const base: CrmLead = {
     id: String(raw.id),
     user_id: String(raw.user_id),
     contact_id: raw.contact_id ? String(raw.contact_id) : null,
@@ -277,12 +288,30 @@ export function toCrmLead(raw: Record<string, unknown>): CrmLead {
     notes: raw.notes ? String(raw.notes) : null,
     sort_order: Number(raw.sort_order ?? 0),
     outcome: raw.outcome === "won" || raw.outcome === "lost" ? raw.outcome : "open",
+    proxima_accion: raw.proxima_accion ? String(raw.proxima_accion) : null,
+    proxima_accion_fecha: raw.proxima_accion_fecha ? String(raw.proxima_accion_fecha) : null,
+    proxima_accion_tipo: parseProximaAccionTipo(raw.proxima_accion_tipo),
+    proxima_accion_estado: parseProximaAccionEstado(raw.proxima_accion_estado),
+    motivo_perdida: parseMotivoPerdida(raw.motivo_perdida),
+    motivo_perdida_detalle: raw.motivo_perdida_detalle ? String(raw.motivo_perdida_detalle) : null,
+    asesor_responsable: raw.asesor_responsable ? String(raw.asesor_responsable) : null,
+    categoria_interes: raw.categoria_interes ? String(raw.categoria_interes) : null,
+    producto_interes: raw.producto_interes ? String(raw.producto_interes) : null,
+    score: score != null && !Number.isNaN(score) ? score : null,
+    temperatura: parseTemperatura(raw.temperatura) ?? scoreToTemperatura(score),
+    stage_entered_at: String(raw.stage_entered_at ?? raw.created_at ?? ""),
+    fecha_ultima_interaccion: raw.fecha_ultima_interaccion
+      ? String(raw.fecha_ultima_interaccion)
+      : null,
+    field_provenance: parseFieldProvenance(raw.field_provenance),
+    inbox_conversation_id: raw.inbox_conversation_id ? String(raw.inbox_conversation_id) : null,
     metadata: parseMetadata(raw.metadata),
     created_at: String(raw.created_at ?? ""),
     updated_at: String(raw.updated_at ?? ""),
     contact: contactRaw ? toCrmContact(contactRaw) : null,
     stage: stageRaw ? toCrmStage(stageRaw) : null
   };
+  return enrichCrmLead(base);
 }
 
 export function slugifyStageName(name: string): string {

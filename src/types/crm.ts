@@ -123,6 +123,27 @@ export interface CrmContact {
 
 export type CrmLeadOutcome = "open" | "won" | "lost";
 
+export type CrmMotivoPerdida =
+  | "precio"
+  | "no_respondio"
+  | "compro_otro"
+  | "no_era_momento"
+  | "sin_presupuesto"
+  | "datos_incompletos"
+  | "otro";
+
+export type CrmProximaAccionTipo =
+  | "whatsapp"
+  | "llamada"
+  | "email"
+  | "cotizacion_ori"
+  | "tarea_asesor"
+  | "esperar";
+
+export type CrmProximaAccionEstado = "pendiente" | "hecha" | "vencida" | "cancelada";
+
+export type CrmLeadTemperatura = "frio" | "tibio" | "caliente";
+
 export interface CrmLead {
   id: string;
   user_id: string;
@@ -135,11 +156,32 @@ export interface CrmLead {
   source: string | null;
   notes: string | null;
   sort_order: number;
+  proxima_accion: string | null;
+  proxima_accion_fecha: string | null;
+  proxima_accion_tipo: CrmProximaAccionTipo | null;
+  proxima_accion_estado: CrmProximaAccionEstado;
+  motivo_perdida: CrmMotivoPerdida | null;
+  motivo_perdida_detalle: string | null;
+  asesor_responsable: string | null;
+  categoria_interes: string | null;
+  producto_interes: string | null;
+  score: number | null;
+  temperatura: CrmLeadTemperatura | null;
+  stage_entered_at: string;
+  fecha_ultima_interaccion: string | null;
+  field_provenance: CrmFieldProvenance;
+  inbox_conversation_id: string | null;
   metadata: Record<string, string | number | boolean | null>;
   created_at: string;
   updated_at: string;
   contact?: CrmContact | null;
   stage?: CrmPipelineStage | null;
+  /** Derivado — días en etapa actual */
+  dias_en_etapa?: number;
+  /** Derivado — sin movimiento prolongado */
+  is_stalled?: boolean;
+  /** Derivado — próxima acción vencida */
+  is_overdue?: boolean;
 }
 
 export type CrmLeadsView = "kanban" | "list";
@@ -153,7 +195,14 @@ export type CrmContactFilter =
   | "prospecto"
   | "cliente";
 
-export type CrmLeadFilter = "all" | "open" | "won" | "lost";
+export type CrmLeadFilter =
+  | "all"
+  | "open"
+  | "won"
+  | "lost"
+  | "mine"
+  | "overdue"
+  | "stalled";
 
 export type CrmTimelineEventKind =
   | "message_in"
