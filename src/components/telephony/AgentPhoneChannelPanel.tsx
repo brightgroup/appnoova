@@ -7,6 +7,7 @@ import { getAuthHeaders } from "@/lib/voice-agents-api";
 import type { PhoneNumberRecord } from "@/types/phone-number";
 import { btnPrimarySm, btnGhost, textMuted, textSecondary } from "@/lib/brand-ui";
 import { ClientLineWizard } from "@/components/telephony/ClientLineWizard";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 
 interface AgentPhoneChannelPanelProps {
   agentId: string;
@@ -149,15 +150,13 @@ export function AgentPhoneChannelPanel({ agentId }: AgentPhoneChannelPanelProps)
               <div className="pt-4 border-t border-white/[.08] space-y-2">
                 <p className={`text-xs ${textMuted}`}>Cambiar a otra línea</p>
                 <div className="flex gap-2">
-                  <select
+                  <NoovaSelect
                     value={selectedLineId}
-                    onChange={e => setSelectedLineId(e.target.value)}
-                    className="flex-1 bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white"
-                  >
-                    {availableLines.map(l => (
-                      <option key={l.id} value={l.id}>{l.e164}</option>
-                    ))}
-                  </select>
+                    onChange={setSelectedLineId}
+                    allowEmpty={false}
+                    className="flex-1"
+                    options={availableLines.map(l => ({ value: l.id, label: l.e164 }))}
+                  />
                   <button
                     onClick={() => assignLine(selectedLineId)}
                     disabled={assigning || !selectedLineId}
@@ -172,15 +171,12 @@ export function AgentPhoneChannelPanel({ agentId }: AgentPhoneChannelPanelProps)
         ) : availableLines.length > 0 ? (
           <div className="rounded-2xl border border-white/[.10] bg-noova-surface p-6 space-y-4">
             <p className={`text-sm ${textSecondary}`}>Selecciona una de tus líneas disponibles:</p>
-            <select
+            <NoovaSelect
               value={selectedLineId}
-              onChange={e => setSelectedLineId(e.target.value)}
-              className="w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white"
-            >
-              {availableLines.map(l => (
-                <option key={l.id} value={l.id}>{l.e164}</option>
-              ))}
-            </select>
+              onChange={setSelectedLineId}
+              allowEmpty={false}
+              options={availableLines.map(l => ({ value: l.id, label: l.e164 }))}
+            />
             <button
               onClick={() => assignLine(selectedLineId)}
               disabled={assigning || !selectedLineId}

@@ -16,6 +16,7 @@ import type { TextAgentFormData, TextAgentRecord } from "@/types/text-agent";
 import type { CompanyContext } from "@/types/company-context";
 import { TextAgentTestPanel } from "@/components/text/TextAgentTestPanel";
 import { ChatRegistryPanel } from "@/components/text/ChatRegistryPanel";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 
 type TabId = "probar" | "config" | "analisis" | "registro" | "canales";
 
@@ -238,21 +239,19 @@ function ConfigContent() {
 
             <div className="space-y-4">
               <Field label="Marca / contexto">
-                <select
+                <NoovaSelect
                   value={form.company_context_id ?? ""}
-                  onChange={e => setForm(f => ({
+                  onChange={v => setForm(f => ({
                     ...f,
-                    company_context_id: e.target.value || null
+                    company_context_id: v || null
                   }))}
-                  className={selectCls}
-                >
-                  <option value="">Sin marca (solo prompt del agente)</option>
-                  {contexts.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}{c.is_default ? " · predeterminada" : ""}
-                    </option>
-                  ))}
-                </select>
+                  allowEmpty={true}
+                  emptyLabel="Sin marca (solo prompt del agente)"
+                  options={contexts.map(c => ({
+                    value: c.id,
+                    label: `${c.name}${c.is_default ? " · predeterminada" : ""}`
+                  }))}
+                />
                 <Link
                   href="/dashboard/contextos"
                   className="inline-block mt-2 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]"
@@ -272,30 +271,27 @@ function ConfigContent() {
               />
 
               <Field label="Modelo de LLM">
-                <select
+                <NoovaSelect
                   value={form.llm_model}
-                  onChange={e => setForm(f => ({ ...f, llm_model: e.target.value }))}
-                  className={selectCls}
-                >
-                  {TEXT_LLM_MODELS.map(m => (
-                    <option key={m.id} value={m.id}>{m.label}</option>
-                  ))}
-                </select>
+                  onChange={v => setForm(f => ({ ...f, llm_model: v }))}
+                  allowEmpty={false}
+                  options={TEXT_LLM_MODELS.map(m => ({ value: m.id, label: m.label }))}
+                />
               </Field>
 
               <Field label="Máximo de tokens de salida">
-                <select
-                  value={form.max_output_tokens}
-                  onChange={e => setForm(f => ({
+                <NoovaSelect
+                  value={String(form.max_output_tokens)}
+                  onChange={v => setForm(f => ({
                     ...f,
-                    max_output_tokens: parseInt(e.target.value, 10)
+                    max_output_tokens: parseInt(v, 10)
                   }))}
-                  className={selectCls}
-                >
-                  {TEXT_OUTPUT_TOKEN_OPTIONS.map(o => (
-                    <option key={o.id} value={o.id}>{o.label}</option>
-                  ))}
-                </select>
+                  allowEmpty={false}
+                  options={TEXT_OUTPUT_TOKEN_OPTIONS.map(o => ({
+                    value: String(o.id),
+                    label: o.label
+                  }))}
+                />
               </Field>
             </div>
 
@@ -424,9 +420,6 @@ function SliderField({
     </Field>
   );
 }
-
-const selectCls =
-  "w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50 appearance-none cursor-pointer";
 
 export default function ConfiguracionTextoPage() {
   return (

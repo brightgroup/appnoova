@@ -23,6 +23,7 @@ import {
 } from "@/lib/whatsapp/template-record";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import type { WhatsAppTemplateRecord } from "@/types/whatsapp-template";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 
 export default function DashboardWhatsAppTemplatesPage() {
   const router = useRouter();
@@ -96,18 +97,14 @@ export default function DashboardWhatsAppTemplatesPage() {
 
       <div className={registryContent}>
         <div className="flex items-center gap-3 mb-5">
-          <select
+          <NoovaSelect
             value={filterChannel}
-            onChange={e => setFilterChannel(e.target.value)}
-            className="bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm min-w-[220px]"
-          >
-            <option value="">Todas las líneas</option>
-            {channels.map(ch => (
-              <option key={ch.id} value={ch.id}>
-                {ch.e164}
-              </option>
-            ))}
-          </select>
+            onChange={setFilterChannel}
+            allowEmpty={true}
+            emptyLabel="Todas las líneas"
+            className="min-w-[220px]"
+            options={channels.map(ch => ({ value: ch.id, label: ch.e164 }))}
+          />
           <button type="button" onClick={load} className={btnGhost}>
             Actualizar
           </button>

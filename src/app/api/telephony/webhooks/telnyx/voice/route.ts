@@ -19,9 +19,11 @@ import {
   getPhoneTestCallSession,
   isPhoneTestCall,
   labelForPhase,
+  labelForManagedOutboundPhase,
   updatePhoneTestCallSession,
   type PhoneTestCallPhase
 } from "@/lib/telephony/test-call-session";
+import { resolveCrmOutboundFromState } from "@/lib/telephony/crm-call-session";
 
 function isOutbound(direction: string): boolean {
   return direction === "outgoing" || direction === "outbound";
@@ -35,6 +37,21 @@ async function resolveTestContext(
   direction: string
 ) {
   const state = decodeTelnyxClientState(payload.client_state);
+  if (state?.type === "crm_outbound") {
+    const crmCtx = await resolveCrmOutboundFromState(state);
+    if (crmCtx) {
+      return {
+        ctx: {
+          phone: crmCtx.phone,
+          agent: crmCtx.agent,
+          connectionId: crmCtx.connectionId,
+          destinationE164: crmCtx.destinationE164,
+          isTestDestination: false
+        },
+        state
+      };
+    }
+  }
   if (state?.type === "test_outbound") {
     const ctx = await resolveOutboundTestFromState(state);
     if (ctx) return { ctx, state };
@@ -157,6 +174,10 @@ export async function POST(req: NextRequest) {
   if (!callId) return NextResponse.json({ ok: true });
 
   const testCall = await isPhoneTestCall(callId);
+  const session = testCall ? await getPhoneTestCallSession(callId) : null;
+  const isCrmCall = Boolean(session?.metadata && (session.metadata as { crm_outbound?: boolean }).crm_outbound);
+  const phaseLabel = (phase: PhoneTestCallPhase) =>
+    labelForManagedOutboundPhase(phase, isCrmCall);
 
   const phaseByEvent: Record<string, PhoneTestCallPhase> = {
     "call.initiated": isOutbound(direction) || testCall ? "ringing" : "dialing",
@@ -170,7 +191,7 @@ export async function POST(req: NextRequest) {
     await updatePhoneTestCallSession(callId, {
       phase: phaseByEvent[eventType],
       last_event: eventType,
-      status_label: labelForPhase(phaseByEvent[eventType])
+      status_label: phaseLabel(phaseByEvent[eventType])
     });
   }
 

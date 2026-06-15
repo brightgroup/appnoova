@@ -17,6 +17,7 @@ import type { CompanyContext } from "@/types/company-context";
 import { AgentTestPanel } from "@/components/voice/AgentTestPanel";
 import { CallRegistryPanel } from "@/components/voice/CallRegistryPanel";
 import { AgentPhoneChannelPanel } from "@/components/telephony/AgentPhoneChannelPanel";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 
 type TabId = "probar" | "config" | "analisis" | "registro" | "metrica" | "canales";
 
@@ -265,21 +266,19 @@ function ConfigContent() {
 
             <div className="space-y-4">
               <Field label="Marca / contexto">
-                <select
+                <NoovaSelect
                   value={form.company_context_id ?? ""}
-                  onChange={e => setForm(f => ({
+                  onChange={v => setForm(f => ({
                     ...f,
-                    company_context_id: e.target.value || null
+                    company_context_id: v || null
                   }))}
-                  className={selectCls}
-                >
-                  <option value="">Sin marca (solo prompt del agente)</option>
-                  {contexts.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}{c.is_default ? " · predeterminada" : ""}
-                    </option>
-                  ))}
-                </select>
+                  allowEmpty={true}
+                  emptyLabel="Sin marca (solo prompt del agente)"
+                  options={contexts.map(c => ({
+                    value: c.id,
+                    label: `${c.name}${c.is_default ? " · predeterminada" : ""}`
+                  }))}
+                />
                 <Link
                   href="/dashboard/contextos"
                   className="inline-block mt-2 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]"
@@ -289,27 +288,21 @@ function ConfigContent() {
               </Field>
 
               <Field label="Voz">
-                <select
+                <NoovaSelect
                   value={form.voice_name}
-                  onChange={e => setForm(f => ({ ...f, voice_name: e.target.value }))}
-                  className={selectCls}
-                >
-                  {GEMINI_VOICES.map(v => (
-                    <option key={v.id} value={v.id}>{v.label}</option>
-                  ))}
-                </select>
+                  onChange={v => setForm(f => ({ ...f, voice_name: v }))}
+                  allowEmpty={false}
+                  options={GEMINI_VOICES.map(v => ({ value: v.id, label: v.label }))}
+                />
               </Field>
 
               <Field label="Modelo de voz">
-                <select
+                <NoovaSelect
                   value={form.model}
-                  onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
-                  className={selectCls}
-                >
-                  {VOICE_MODELS.map(m => (
-                    <option key={m.id} value={m.id}>{m.label}</option>
-                  ))}
-                </select>
+                  onChange={v => setForm(f => ({ ...f, model: v }))}
+                  allowEmpty={false}
+                  options={VOICE_MODELS.map(m => ({ value: m.id, label: m.label }))}
+                />
               </Field>
 
               <SliderField
@@ -341,15 +334,12 @@ function ConfigContent() {
               />
 
               <Field label="Modelo de LLM">
-                <select
+                <NoovaSelect
                   value={form.llm_model}
-                  onChange={e => setForm(f => ({ ...f, llm_model: e.target.value }))}
-                  className={selectCls}
-                >
-                  {LLM_MODELS.map(m => (
-                    <option key={m.id} value={m.id}>{m.label}</option>
-                  ))}
-                </select>
+                  onChange={v => setForm(f => ({ ...f, llm_model: v }))}
+                  allowEmpty={false}
+                  options={LLM_MODELS.map(m => ({ value: m.id, label: m.label }))}
+                />
               </Field>
             </div>
 
@@ -492,9 +482,6 @@ function SliderField({
     </Field>
   );
 }
-
-const selectCls =
-  "w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50 appearance-none cursor-pointer";
 
 export default function ConfiguracionPage() {
   return (

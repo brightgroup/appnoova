@@ -9,7 +9,6 @@ interface ChannelListPageProps {
   title: string;
   description: string;
   loading?: boolean;
-  tableDescription?: string;
   search?: string;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
@@ -17,6 +16,7 @@ interface ChannelListPageProps {
   refreshing?: boolean;
   action?: React.ReactNode;
   filters?: React.ReactNode;
+  alerts?: React.ReactNode;
   footer?: React.ReactNode;
   error?: React.ReactNode;
   children: React.ReactNode;
@@ -26,7 +26,6 @@ export function ChannelListPage({
   title,
   description,
   loading,
-  tableDescription,
   search,
   onSearchChange,
   searchPlaceholder,
@@ -34,6 +33,7 @@ export function ChannelListPage({
   refreshing,
   action,
   filters,
+  alerts,
   footer,
   error,
   children
@@ -63,7 +63,6 @@ export function ChannelListPage({
           </div>
         ) : (
           <RegistryTableLayout
-            description={tableDescription}
             search={search}
             onSearchChange={onSearchChange}
             searchPlaceholder={searchPlaceholder}
@@ -71,6 +70,7 @@ export function ChannelListPage({
             refreshing={refreshing}
             action={action}
             filters={filters}
+            alerts={alerts}
             error={error}
             footer={footer}
           >

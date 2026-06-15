@@ -9,9 +9,7 @@ import { countryLabel } from "@/lib/telephony/countries";
 import { numberUsageLabel } from "@/lib/telephony/number-type-labels";
 import type { PhoneNumberRecord } from "@/types/phone-number";
 import type { VoiceAgentListItem } from "@/types/voice-agent";
-
-const selectCls =
-  "w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50 appearance-none cursor-pointer";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 
 export function LinePhoneConfigPanel({ lineId }: { lineId: string }) {
   const [line, setLine] = useState<PhoneNumberRecord | null>(null);
@@ -159,19 +157,16 @@ export function LinePhoneConfigPanel({ lineId }: { lineId: string }) {
           <label className="block text-[11px] font-medium text-gray-400 mb-1.5 uppercase tracking-wide">
             Agente de voz
           </label>
-          <select
+          <NoovaSelect
             value={selectedAgentId}
-            onChange={e => {
-              setSelectedAgentId(e.target.value);
+            onChange={v => {
+              setSelectedAgentId(v);
               setSaved(false);
             }}
-            className={selectCls}
-          >
-            <option value="">Sin asignar</option>
-            {agents.map(a => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </select>
+            allowEmpty={true}
+            emptyLabel="Sin asignar"
+            options={agents.map(a => ({ value: a.id, label: a.name }))}
+          />
           <Link href="/dashboard/agentes-voz" className="inline-block mt-2 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]">
             Gestionar agentes de voz →
           </Link>

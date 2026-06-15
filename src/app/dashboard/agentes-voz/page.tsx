@@ -12,6 +12,7 @@ import {
   registryTableLoading, registryTableEmpty, registryToolbar, textMuted
 } from "@/lib/brand-ui";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
+import { NoovaListMenu, NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 import { supabase } from "@/lib/supabase";
 import {
   formatContactedLine,
@@ -307,7 +308,6 @@ export default function AgentesVozPage() {
 
       <div className={registryContent}>
         <RegistryTableLayout
-          description="Gestiona tus agentes de voz, revisa métricas de llamadas y accede a la configuración de cada uno."
           search={searchTerm}
           onSearchChange={setSearchTerm}
           searchPlaceholder="Buscar"
@@ -405,26 +405,25 @@ export default function AgentesVozPage() {
                         <MoreVertical className="w-3.5 h-3.5" />
                       </button>
                       {menuAgentId === agent.id && (
-                        <div
-                          className="absolute right-0 top-full mt-1 z-20 min-w-[160px] py-1 rounded-lg bg-[#14151c] border border-white/[.08] shadow-xl"
+                        <NoovaListMenu
+                          className="absolute right-0 top-full mt-1 z-20 min-w-[160px]"
                           onClick={e => e.stopPropagation()}
                         >
-                          <button
-                            onClick={() => openAgent(agent.id)}
-                            className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-white/[.06] hover:text-white"
-                          >
+                          <NoovaListMenuItem onClick={() => openAgent(agent.id)}>
                             Abrir configuración
-                          </button>
-                          <button
+                          </NoovaListMenuItem>
+                          <NoovaListMenuItem
+                            danger
                             onClick={() => {
                               setMenuAgentId(null);
                               setDeleteTarget(agent);
                             }}
-                            className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 flex items-center gap-2"
                           >
-                            <Trash2 className="w-3.5 h-3.5" /> Eliminar agente
-                          </button>
-                        </div>
+                            <span className="flex items-center gap-2">
+                              <Trash2 className="w-3.5 h-3.5" /> Eliminar agente
+                            </span>
+                          </NoovaListMenuItem>
+                        </NoovaListMenu>
                       )}
                     </td>
                   </tr>

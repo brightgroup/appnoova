@@ -5,6 +5,7 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { btnGhost, btnPrimary, accentFocus, registryTableEmpty } from "@/lib/brand-ui";
 import { slugifyPropertyKey } from "@/lib/crm-record";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import type { CrmPropertyDefinition, CrmPropertyEntity, CrmPropertyFieldType } from "@/types/crm";
 
 const FIELD_TYPES: { value: CrmPropertyFieldType; label: string }[] = [
@@ -148,13 +149,12 @@ export function CrmPropertyConfigPanel({ entityType, onUpdated }: CrmPropertyCon
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Tipo</label>
-            <select
+            <NoovaSelect
               value={fieldType}
-              onChange={e => setFieldType(e.target.value as CrmPropertyFieldType)}
-              className={`w-full rounded-xl border border-white/[.10] bg-white/[.04] px-3 py-2 text-sm ${accentFocus}`}
-            >
-              {FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
+              onChange={v => setFieldType(v as CrmPropertyFieldType)}
+              allowEmpty={false}
+              options={FIELD_TYPES.map(t => ({ value: t.value, label: t.label }))}
+            />
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Grupo</label>

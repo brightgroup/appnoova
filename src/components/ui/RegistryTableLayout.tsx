@@ -1,13 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Search, RefreshCw } from "lucide-react";
 import {
-  btnIcon, inputSearch, registryPanel, registryDescription, registrySearchRow,
+  btnIcon, inputSearch, registryPanel, registrySearchRow,
   registryTableArea, registryTableFooter
 } from "@/lib/brand-ui";
 
 interface RegistryTableLayoutProps {
-  description?: string;
   search?: string;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
@@ -23,7 +23,6 @@ interface RegistryTableLayoutProps {
 
 /** Layout de tabla — réplica exacta de Números de prueba */
 export function RegistryTableLayout({
-  description,
   search,
   onSearchChange,
   searchPlaceholder = "Buscar",
@@ -37,10 +36,22 @@ export function RegistryTableLayout({
   children
 }: RegistryTableLayoutProps) {
   const showSearchRow = onSearchChange !== undefined || onRefresh || action;
+  const [inputValue, setInputValue] = useState(search ?? "");
+
+  useEffect(() => {
+    setInputValue(search ?? "");
+  }, [search]);
+
+  useEffect(() => {
+    if (!onSearchChange) return;
+    const timer = window.setTimeout(() => {
+      onSearchChange(inputValue);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [inputValue, onSearchChange]);
 
   return (
     <div className={registryPanel}>
-      {description && <p className={registryDescription}>{description}</p>}
       {alerts}
       {filters && <div className="mb-4">{filters}</div>}
       {showSearchRow && (
@@ -51,8 +62,8 @@ export function RegistryTableLayout({
               <input
                 type="text"
                 placeholder={searchPlaceholder}
-                value={search}
-                onChange={e => onSearchChange(e.target.value)}
+                value={inputValue}
+                onChange={e => setInputValue(e.target.value)}
                 className={inputSearch}
               />
             </div>

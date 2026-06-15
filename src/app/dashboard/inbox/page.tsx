@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Bot,
   ChevronDown,
@@ -27,6 +28,7 @@ import type { TextChatMessage } from "@/types/text-agent-conversation";
 import type { WhatsAppTemplateRecord } from "@/types/whatsapp-template";
 import { renderTemplatePreview } from "@/lib/whatsapp/template-record";
 import { InboxTemplateComposer } from "@/components/inbox/InboxTemplateComposer";
+import { NoovaListMenu, NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 
 type AssignValue = "ai" | "me";
 
@@ -52,9 +54,12 @@ function ChannelBadge({ channel }: { channel: string }) {
   );
 }
 
-export default function InboxPage() {
+function InboxPageInner() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [items, setItems] = useState<InboxListItem[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get("id"));
   const [detail, setDetail] = useState<InboxTextDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -71,6 +76,21 @@ export default function InboxPage() {
   const [templateVars, setTemplateVars] = useState<string[]>([]);
   const assignRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setSelectedId(searchParams.get("id"));
+  }, [searchParams]);
+
+  const setConversationInUrl = useCallback(
+    (id: string | null) => {
+      const qs = new URLSearchParams(searchParams.toString());
+      if (id) qs.set("id", id);
+      else qs.delete("id");
+      const query = qs.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [router, pathname, searchParams]
+  );
 
   const loadList = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -219,10 +239,21 @@ export default function InboxPage() {
 
   const selectItem = (item: InboxListItem) => {
     setSelectedId(item.id);
+    setConversationInUrl(item.id);
     setReply("");
     setAssignOpen(false);
     setSelectedTemplateId("");
     setTemplateVars([]);
+
+    if (item.channel === "whatsapp") {
+      void getAuthHeaders().then(headers =>
+        fetch("/api/crm/contacts/sync-from-conversation", {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ conversation_id: item.id })
+        })
+      );
+    }
   };
 
   const assignConversation = async (value: AssignValue) => {
@@ -526,24 +557,29 @@ export default function InboxPage() {
                       <ChevronDown className="h-4 w-4 opacity-60" />
                     </button>
                     {assignOpen && (
-                      <div className="absolute right-0 top-full z-20 mt-1.5 min-w-[200px] overflow-hidden rounded-xl border border-white/[.10] bg-noova-surface py-1 shadow-2xl">
-                        <button
-                          type="button"
+                      <NoovaListMenu className="absolute right-0 top-full z-20 mt-1.5 min-w-[200px]">
+                        <NoovaListMenuItem
+                          active={detail?.handoff_mode !== "human"}
                           onClick={() => assignConversation("ai")}
-                          className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-white/80 hover:bg-white/[.06]"
                         >
-                          <Bot className="h-4 w-4 text-[#5b5bf6]" />
-                          Agente (IA)
-                        </button>
-                        <button
-                          type="button"
+                          <span className="flex items-center gap-2.5">
+                            <Bot className="h-4 w-4 text-[#5b5bf6]" />
+                            Agente (IA)
+                          </span>
+                        </NoovaListMenuItem>
+                        <NoovaListMenuItem
+                          active={
+                            detail?.handoff_mode === "human" &&
+                            detail?.assigned_to === currentUserName
+                          }
                           onClick={() => assignConversation("me")}
-                          className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-white/80 hover:bg-white/[.06]"
                         >
-                          <User className="h-4 w-4 text-[#67e8f9]" />
-                          {currentUserName} (yo)
-                        </button>
-                      </div>
+                          <span className="flex items-center gap-2.5">
+                            <User className="h-4 w-4 text-[#67e8f9]" />
+                            {currentUserName} (yo)
+                          </span>
+                        </NoovaListMenuItem>
+                      </NoovaListMenu>
                     )}
                   </div>
                 )}
@@ -553,6 +589,7 @@ export default function InboxPage() {
                   onClick={() => {
                     setSelectedId(null);
                     setDetail(null);
+                    setConversationInUrl(null);
                   }}
                   className="rounded-xl p-2.5 text-white/40 transition-colors hover:bg-white/[.06] hover:text-white"
                   aria-label="Cerrar"
@@ -818,4 +855,18 @@ function InboxMessageBody({ msg }: { msg: TextChatMessage }) {
   }
 
   return null;
+}
+
+export default function InboxPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-1 items-center justify-center text-gray-400 text-sm">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando inbox…
+        </div>
+      }
+    >
+      <InboxPageInner />
+    </Suspense>
+  );
 }

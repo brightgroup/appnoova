@@ -88,10 +88,6 @@ export function ClientTelephonyPanel({
     ? "No tienes números verificados. Usa «Vincular línea» para solicitar verificación outbound."
     : "No tienes líneas compradas. Usa «Solicitar línea» para pedir una a Noova.";
 
-  const description = tab === "verified"
-    ? "Números verificados de tu negocio para llamadas salientes (outbound). Las llamadas entrantes no pasan por el agente IA."
-    : "Líneas compradas y asignadas por Noova con capacidad inbound y outbound.";
-
   return (
     <>
       <div className={registryPage}>
@@ -112,7 +108,6 @@ export function ClientTelephonyPanel({
 
         <div className={registryContent}>
           <RegistryTableLayout
-            description={description}
             search={search}
             onSearchChange={setSearch}
             onRefresh={load}

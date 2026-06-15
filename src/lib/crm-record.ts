@@ -1,5 +1,13 @@
+import {
+  computeContactActions,
+  computeVentanaWaEstado,
+  parseSupresiones
+} from "@/lib/crm-contactability";
 import type {
   CrmContact,
+  CrmContactActions,
+  CrmFieldProvenance,
+  CrmFieldProvenanceEntry,
   CrmLead,
   CrmLeadOutcome,
   CrmPipelineStage,
@@ -26,36 +34,54 @@ export const CRM_LEAD_OUTCOME_LABELS: Record<CrmLeadOutcome, string> = {
 };
 
 export const CONTACT_BUILTIN_FIELDS: {
-  key: keyof Pick<CrmContact, "name" | "email" | "phone" | "company" | "job_title" | "source" | "notes">;
+  key: keyof Pick<CrmContact, "name" | "email" | "notes">;
   label: string;
   field_type: CrmPropertyFieldType;
   required?: boolean;
   group_name: string;
 }[] = [
-  { key: "name", label: "Nombre", field_type: "text", required: true, group_name: "Información básica" },
-  { key: "phone", label: "Teléfono", field_type: "phone", group_name: "Información básica" },
-  { key: "email", label: "Email", field_type: "email", group_name: "Información básica" },
-  { key: "company", label: "Empresa", field_type: "text", group_name: "Información básica" },
-  { key: "job_title", label: "Cargo", field_type: "text", group_name: "Información básica" },
-  { key: "source", label: "Origen", field_type: "text", group_name: "Información básica" },
-  { key: "notes", label: "Notas", field_type: "textarea", group_name: "Información básica" }
+  { key: "name", label: "Nombre", field_type: "text", required: true, group_name: "Identidad" },
+  { key: "email", label: "Email", field_type: "email", group_name: "Canales" },
+  { key: "notes", label: "Notas", field_type: "textarea", group_name: "Notas" }
 ];
+
+function parseFieldProvenance(raw: unknown): CrmFieldProvenance {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: CrmFieldProvenance = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!v || typeof v !== "object" || Array.isArray(v)) continue;
+    const e = v as Record<string, unknown>;
+    out[k] = {
+      origen: (["manual", "ia_conversacion", "documento", "importacion", "integracion", "whatsapp"].includes(String(e.origen))
+        ? String(e.origen) : "manual") as CrmFieldProvenanceEntry["origen"],
+      confianza: e.confianza ? String(e.confianza) as CrmFieldProvenanceEntry["confianza"] : null,
+      verificado: Boolean(e.verificado),
+      actualizado_por: e.actualizado_por ? String(e.actualizado_por) : null,
+      actualizado_en: e.actualizado_en ? String(e.actualizado_en) : null
+    };
+  }
+  return out;
+}
+
+function parseStringArray(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(v => String(v).trim()).filter(Boolean);
+}
+
+function parseEnum<T extends string>(raw: unknown, allowed: readonly T[], fallback: T): T {
+  const v = String(raw ?? "") as T;
+  return allowed.includes(v) ? v : fallback;
+}
+
+export function enrichCrmContact(contact: CrmContact): CrmContact {
+  const actions: CrmContactActions = computeContactActions(contact);
+  return { ...contact, actions };
+}
 
 export const DEFAULT_CONTACT_PROPERTIES: Omit<
   CrmPropertyDefinition,
   "id" | "user_id" | "created_at" | "updated_at"
 >[] = [
-  {
-    entity_type: "contact",
-    field_key: "ciudad",
-    label: "Ciudad",
-    field_type: "text",
-    options: [],
-    is_builtin: true,
-    is_required: false,
-    sort_order: 0,
-    group_name: "Automatización"
-  },
   {
     entity_type: "contact",
     field_key: "prioridad",
@@ -64,8 +90,8 @@ export const DEFAULT_CONTACT_PROPERTIES: Omit<
     options: ["Alta", "Media", "Baja"],
     is_builtin: true,
     is_required: false,
-    sort_order: 1,
-    group_name: "Automatización"
+    sort_order: 0,
+    group_name: "Contexto"
   },
   {
     entity_type: "contact",
@@ -75,8 +101,8 @@ export const DEFAULT_CONTACT_PROPERTIES: Omit<
     options: ["Prospecto", "Cliente", "Partner"],
     is_builtin: true,
     is_required: false,
-    sort_order: 2,
-    group_name: "Automatización"
+    sort_order: 1,
+    group_name: "Contexto"
   }
 ];
 
@@ -185,21 +211,55 @@ export function toCrmStage(raw: Record<string, unknown>): CrmPipelineStage {
 }
 
 export function toCrmContact(raw: Record<string, unknown>): CrmContact {
-  return {
+  const ultimoInboundWa = raw.ultimo_inbound_wa ? String(raw.ultimo_inbound_wa) : null;
+  const telefono = raw.telefono ? String(raw.telefono) : raw.phone ? String(raw.phone) : null;
+  const base: CrmContact = {
     id: String(raw.id),
     user_id: String(raw.user_id),
     name: String(raw.name),
+    tipo_contacto: parseEnum(raw.tipo_contacto, ["persona", "empresa"] as const, "persona"),
+    documento_id: raw.documento_id ? String(raw.documento_id) : null,
+    organizacion: raw.organizacion ? String(raw.organizacion) : raw.company ? String(raw.company) : null,
+    whatsapp: raw.whatsapp ? String(raw.whatsapp) : null,
+    telefono,
     email: raw.email ? String(raw.email) : null,
-    phone: raw.phone ? String(raw.phone) : null,
-    company: raw.company ? String(raw.company) : null,
+    canal_preferido: raw.canal_preferido
+      ? parseEnum(raw.canal_preferido, ["whatsapp", "telefono", "email"] as const, "whatsapp")
+      : null,
+    estado_whatsapp: raw.estado_whatsapp
+      ? parseEnum(raw.estado_whatsapp, ["valido", "invalido", "rebotado"] as const, "valido")
+      : null,
+    estado_email: raw.estado_email
+      ? parseEnum(raw.estado_email, ["valido", "invalido", "rebotado"] as const, "valido")
+      : null,
+    ultimo_inbound_wa: ultimoInboundWa,
+    ventana_wa_estado: computeVentanaWaEstado(ultimoInboundWa),
+    supresiones: parseSupresiones(raw.supresiones),
+    autorizacion_datos: Boolean(raw.autorizacion_datos),
+    autorizacion_datos_fecha: raw.autorizacion_datos_fecha ? String(raw.autorizacion_datos_fecha) : null,
+    autorizacion_datos_fuente: raw.autorizacion_datos_fuente ? String(raw.autorizacion_datos_fuente) : null,
+    fuente_origen: raw.fuente_origen ? String(raw.fuente_origen) : raw.source ? String(raw.source) : null,
+    categorias_interes: parseStringArray(raw.categorias_interes),
+    ciudad: raw.ciudad ? String(raw.ciudad) : null,
+    tipo_relacion: parseEnum(
+      raw.tipo_relacion,
+      ["prospecto", "cliente", "referido", "inactivo"] as const,
+      "prospecto"
+    ),
+    asesor_asignado: raw.asesor_asignado ? String(raw.asesor_asignado) : null,
+    inbox_conversation_id: raw.inbox_conversation_id ? String(raw.inbox_conversation_id) : null,
+    field_provenance: parseFieldProvenance(raw.field_provenance),
+    phone: telefono,
+    company: raw.organizacion ? String(raw.organizacion) : raw.company ? String(raw.company) : null,
     job_title: raw.job_title ? String(raw.job_title) : null,
-    source: raw.source ? String(raw.source) : null,
+    source: raw.fuente_origen ? String(raw.fuente_origen) : raw.source ? String(raw.source) : null,
     notes: raw.notes ? String(raw.notes) : null,
     tags: parseTags(raw.tags),
     metadata: parseMetadata(raw.metadata),
     created_at: String(raw.created_at ?? ""),
     updated_at: String(raw.updated_at ?? "")
   };
+  return enrichCrmContact(base);
 }
 
 export function toCrmLead(raw: Record<string, unknown>): CrmLead {

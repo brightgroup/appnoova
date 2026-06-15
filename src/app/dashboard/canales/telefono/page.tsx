@@ -62,7 +62,6 @@ export default function TelefonoListPage() {
         title="Teléfono"
         description="Líneas telefónicas para agentes de voz. Puede gestionar varias líneas y asignarlas a distintos agentes."
         loading={loading}
-        tableDescription="Haga clic en una línea para configurar asignación y detalles."
         search={search}
         onSearchChange={setSearch}
         searchPlaceholder="Buscar número o agente"

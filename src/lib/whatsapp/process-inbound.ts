@@ -14,6 +14,8 @@ import {
   findWhatsAppConversation
 } from "@/lib/whatsapp/conversation-thread";
 import { mergeWhatsAppMetadata } from "@/lib/whatsapp/conversation-meta";
+import { syncCrmContactFromWhatsAppInbound } from "@/lib/crm-contact-sync";
+import { enrichCrmContactFromWhatsAppConversation } from "@/lib/crm-contact-enrich";
 import {
   canSendWhatsAppSessionMessage,
   detectWhatsAppOptOut,
@@ -34,6 +36,42 @@ export interface TwilioWhatsAppInbound {
   body: string;
   profileName: string | null;
   media: TwilioWhatsAppMediaItem[];
+}
+
+async function syncAndEnrichCrmFromInbound(
+  db: SupabaseClient,
+  channel: WhatsAppChannelRecord,
+  conversationId: string,
+  inbound: TwilioWhatsAppInbound,
+  lastInboundAt: string,
+  optedOut: boolean
+): Promise<string | null> {
+  try {
+    const { contactId, error } = await syncCrmContactFromWhatsAppInbound(db, {
+      userId: channel.user_id,
+      fromE164: inbound.fromE164,
+      profileName: inbound.profileName,
+      conversationId,
+      lastInboundAt,
+      optedOut
+    });
+    if (error) console.error("[whatsapp/inbound] crm sync:", error);
+    if (!contactId) return null;
+
+    console.info(`[whatsapp/inbound] crm linked conversation ${conversationId} → contact ${contactId}`);
+
+    void enrichCrmContactFromWhatsAppConversation(
+      db,
+      channel.user_id,
+      contactId,
+      conversationId
+    ).catch(err => console.error("[whatsapp/inbound] crm enrich:", err));
+
+    return contactId;
+  } catch (err) {
+    console.error("[whatsapp/inbound] crm sync:", err);
+    return null;
+  }
 }
 
 async function updateWhatsAppConversationMetadata(
@@ -185,6 +223,8 @@ export async function processTwilioWhatsAppInbound(
       metaPatch
     );
 
+    await syncAndEnrichCrmFromInbound(db, channel, persisted.conversationId, inbound, nowIso, optedOutAfter);
+
     await sendWhatsAppIfAllowed(
       channel,
       inbound.fromE164,
@@ -220,6 +260,8 @@ export async function processTwilioWhatsAppInbound(
       existing.metadata,
       metaPatch
     );
+
+    await syncAndEnrichCrmFromInbound(db, channel, persisted.conversationId, inbound, nowIso, optedOutAfter);
 
     return { ok: true };
   }
@@ -261,6 +303,8 @@ export async function processTwilioWhatsAppInbound(
     existing?.metadata,
     metaPatch
   );
+
+  await syncAndEnrichCrmFromInbound(db, channel, userPersist.conversationId, inbound, nowIso, optedOutAfter);
 
   const refreshed = await findWhatsAppConversation(
     db,

@@ -23,6 +23,7 @@ import type {
 } from "@/types/microsite";
 import type { TextAgentListItem } from "@/types/text-agent";
 import { WidgetEmbedPanel } from "@/components/microsite/WidgetEmbedPanel";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import { MicrositeIconPicker } from "@/components/microsite/MicrositeIconPicker";
 import { ImageDropzone } from "@/components/microsite/ImageDropzone";
 
@@ -320,16 +321,13 @@ function WidgetConfigContent({
             </div>
 
             <Field label="Agente de texto">
-              <select
+              <NoovaSelect
                 value={form.text_agent_id ?? ""}
-                onChange={e => updateForm({ text_agent_id: e.target.value || null })}
-                className={selectCls}
-              >
-                <option value="">Seleccionar agente</option>
-                {agents.map(a => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
+                onChange={v => updateForm({ text_agent_id: v || null })}
+                allowEmpty={true}
+                emptyLabel="Seleccionar agente"
+                options={agents.map(a => ({ value: a.id, label: a.name }))}
+              />
               <Link href="/dashboard/agentes-texto" className="inline-block mt-2 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]">
                 Gestionar agentes →
               </Link>
@@ -602,9 +600,6 @@ function ColorInput({ value, onChange }: { value: string; onChange: (v: string) 
 
 const inputCls =
   "w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50";
-
-const selectCls =
-  "w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50 appearance-none cursor-pointer";
 
 export function WidgetChannelPanel({
   backHref = "/dashboard/canales/widget"

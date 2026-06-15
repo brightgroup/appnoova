@@ -7,9 +7,7 @@ import { btnPrimary, btnGhost, textMuted } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import type { TextAgentListItem } from "@/types/text-agent";
-
-const selectCls =
-  "w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50 appearance-none cursor-pointer";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 
 function statusLabel(status: string): string {
   if (status === "active") return "Activo";
@@ -140,16 +138,13 @@ export function WhatsAppChannelConfigPanel({ channelId }: { channelId: string })
       <div className="rounded-xl border border-white/[.10] bg-white/[.02] p-5 space-y-4">
         <div>
           <label className="block text-xs font-semibold text-gray-300 mb-2">Agente de texto</label>
-          <select
+          <NoovaSelect
             value={selectedAgentId}
-            onChange={e => setSelectedAgentId(e.target.value)}
-            className={selectCls}
-          >
-            <option value="">Sin asignar</option>
-            {agents.map(a => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </select>
+            onChange={setSelectedAgentId}
+            allowEmpty={true}
+            emptyLabel="Sin asignar"
+            options={agents.map(a => ({ value: a.id, label: a.name }))}
+          />
           <p className={`${textMuted} mt-2`}>
             {assignedAgent
               ? `Atiende con: ${assignedAgent.name}`

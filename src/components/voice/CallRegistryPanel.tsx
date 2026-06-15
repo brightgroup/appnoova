@@ -197,7 +197,6 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className={registryContent}>
         <RegistryTableLayout
-          description="Historial de llamadas del agente. Filtra por estado y busca por teléfono o motivo de desconexión."
           search={search}
           onSearchChange={setSearch}
           searchPlaceholder="Buscar"

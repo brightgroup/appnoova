@@ -21,6 +21,7 @@ import {
 } from "@/lib/whatsapp/template-record";
 import type { WhatsAppTemplateStatus } from "@/types/whatsapp-template";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 
 type Tab = "lines" | "approvals";
 
@@ -197,7 +198,6 @@ export function AdminWhatsAppPanel() {
             )}
 
             <RegistryTableLayout
-              description="Líneas WhatsApp registradas en Twilio por cliente."
               onRefresh={load}
               refreshing={loading}
             >
@@ -245,12 +245,16 @@ export function AdminWhatsAppPanel() {
               </h2>
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Cliente</label>
-                <select value={userId} onChange={e => setUserId(e.target.value)} required className="w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm">
-                  <option value="">Seleccionar usuario</option>
-                  {users.map(u => (
-                    <option key={u.id} value={u.id}>{u.nombre || u.email} ({u.email})</option>
-                  ))}
-                </select>
+                <NoovaSelect
+                  value={userId}
+                  onChange={setUserId}
+                  allowEmpty={true}
+                  emptyLabel="Seleccionar usuario"
+                  options={users.map(u => ({
+                    value: u.id,
+                    label: `${u.nombre || u.email} (${u.email})`
+                  }))}
+                />
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
@@ -278,7 +282,6 @@ export function AdminWhatsAppPanel() {
           </div>
         ) : (
           <RegistryTableLayout
-            description="Plantillas enviadas por clientes — revisión Meta vía Twilio Content API."
             filters={
               <div className="flex gap-2">
                 <button type="button" onClick={() => setApprovalFilter("pending_approval")} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${approvalFilter === "pending_approval" ? "bg-amber-500/15 text-amber-200" : "text-gray-400 hover:bg-white/[.06]"}`}>

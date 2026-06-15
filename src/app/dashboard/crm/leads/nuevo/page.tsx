@@ -1,15 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { filterPipelineStages } from "@/lib/crm-record";
 import { CrmDetailLayout } from "@/components/crm/CrmDetailLayout";
 import { CrmLeadForm } from "@/components/crm/CrmLeadForm";
 import type { CrmContact, CrmLead, CrmPipelineStage, CrmPropertyDefinition } from "@/types/crm";
 
-export default function LeadCreatePage() {
+function LeadCreatePageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const prefillContactId = searchParams.get("contact_id");
   const [stages, setStages] = useState<CrmPipelineStage[]>([]);
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [properties, setProperties] = useState<CrmPropertyDefinition[]>([]);
@@ -42,9 +45,13 @@ export default function LeadCreatePage() {
     if (stagesRes.ok) setStages(stagesData.stages ?? []);
     if (contactsRes.ok) setContacts(contactsData.contacts ?? []);
     if (propsRes.ok) setProperties(props.properties ?? []);
-    setDraft(d => ({ ...d, stage_id: d.stage_id || pipeline[0]?.id }));
+    setDraft(d => ({
+      ...d,
+      stage_id: d.stage_id || pipeline[0]?.id,
+      contact_id: prefillContactId || d.contact_id
+    }));
     setLoading(false);
-  }, []);
+  }, [prefillContactId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -103,5 +110,19 @@ export default function LeadCreatePage() {
         }
       />
     </CrmDetailLayout>
+  );
+}
+
+export default function LeadCreatePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-1 items-center justify-center text-gray-400 text-sm">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando…
+        </div>
+      }
+    >
+      <LeadCreatePageInner />
+    </Suspense>
   );
 }

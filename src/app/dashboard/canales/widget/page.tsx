@@ -59,7 +59,6 @@ export default function WidgetListPage() {
       title="Widget web"
       description="Burbuja de chat embebible. Canal independiente de Mi Link: slug, agente, estilo y publicación propios."
       loading={loading}
-      tableDescription="Haga clic en el widget para ver el código de instalación y configuración."
       search={search}
       onSearchChange={setSearch}
       onRefresh={load}

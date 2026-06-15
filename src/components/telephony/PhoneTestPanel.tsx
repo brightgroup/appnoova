@@ -323,7 +323,6 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-8">
       <RegistryTableLayout
-        description={`El agente ${agentName} llamará desde tu línea Telnyx (remitente) al número destinatario que elijas. Los números de prueba están exentos de cargos.`}
         search={lineSearch}
         onSearchChange={setLineSearch}
         searchPlaceholder="Buscar remitente"

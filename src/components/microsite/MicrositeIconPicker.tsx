@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { MICROSITE_ICON_OPTIONS, resolveMicrositeIcon } from "@/lib/microsite-icons";
+import { registryListShell } from "@/lib/brand-ui";
 
 interface MicrositeIconPickerProps {
   value: string;
@@ -39,7 +40,7 @@ export function MicrositeIconPicker({ value, accentColor = "#5b5bf6", onChange }
             aria-label="Cerrar selector de iconos"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute z-50 mt-2 w-full max-h-56 overflow-y-auto rounded-xl border border-white/[.12] bg-noova-surface shadow-2xl p-3">
+          <div className={`absolute z-50 mt-2 w-full max-h-56 overflow-y-auto ${registryListShell} p-3`}>
             <p className="text-[10px] uppercase tracking-wide text-gray-500 mb-2 px-1">Biblioteca de iconos</p>
             <div className="grid grid-cols-5 gap-1.5">
               {MICROSITE_ICON_OPTIONS.map(name => {

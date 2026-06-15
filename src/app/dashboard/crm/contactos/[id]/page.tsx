@@ -1,22 +1,52 @@
 "use client";
 
-import { Suspense, use, useCallback, useEffect, useState } from "react";
+import { Suspense, use, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Activity, Loader2, Sparkles, UserCircle } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
-import { CrmDetailLayout } from "@/components/crm/CrmDetailLayout";
 import { CrmContactForm } from "@/components/crm/CrmContactForm";
-import type { CrmContact, CrmLead, CrmPropertyDefinition } from "@/types/crm";
+import { CrmContactAiTools, useCrmContactCall } from "@/components/crm/CrmContactAiTools";
+import {
+  CrmContactDetailShell,
+  type CrmContactTabId
+} from "@/components/crm/CrmContactDetailShell";
+import { CrmContactHeaderActions } from "@/components/crm/CrmContactHeaderActions";
+import {
+  CrmContactDuplicatesBanner,
+  CrmContactNextStep,
+  CrmContactTimeline
+} from "@/components/crm/CrmContactTimeline";
+import { computeContactNextStep } from "@/lib/crm-contact-timeline";
+import { enrichCrmContact } from "@/lib/crm-record";
+import type { CrmContact, CrmLead, CrmPropertyDefinition, CrmTenantLabels } from "@/types/crm";
+
+const TABS = [
+  { id: "perfil" as const, label: "Perfil", icon: UserCircle },
+  { id: "actividad" as const, label: "Actividad", icon: Activity },
+  { id: "ori" as const, label: "ORI", icon: Sparkles }
+];
+
+function buildSubtitle(contact: Partial<CrmContact>): string {
+  const parts: string[] = [];
+  if (contact.whatsapp) parts.push(contact.whatsapp);
+  else if (contact.telefono) parts.push(contact.telefono);
+  else if (contact.email) parts.push(contact.email);
+  if (contact.organizacion) parts.push(contact.organizacion);
+  else if (contact.ciudad) parts.push(contact.ciudad);
+  return parts.join(" · ") || "Ficha de contacto";
+}
 
 function ContactEditContent({ contactId }: { contactId: string }) {
   const router = useRouter();
   const [contact, setContact] = useState<CrmContact | null>(null);
   const [leads, setLeads] = useState<CrmLead[]>([]);
   const [properties, setProperties] = useState<CrmPropertyDefinition[]>([]);
+  const [labels, setLabels] = useState<CrmTenantLabels | undefined>();
   const [draft, setDraft] = useState<Partial<CrmContact>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState<CrmContactTabId>("perfil");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -35,6 +65,7 @@ function ContactEditContent({ contactId }: { contactId: string }) {
     }
     setContact(detail.contact);
     setLeads(detail.leads ?? []);
+    setLabels(detail.labels);
     setDraft(detail.contact);
     if (propsRes.ok) setProperties(props.properties ?? []);
     setLoading(false);
@@ -52,11 +83,20 @@ function ContactEditContent({ contactId }: { contactId: string }) {
       headers,
       body: JSON.stringify({
         name: draft.name,
+        tipo_contacto: draft.tipo_contacto,
+        documento_id: draft.documento_id,
+        organizacion: draft.organizacion,
+        whatsapp: draft.whatsapp,
+        telefono: draft.telefono,
         email: draft.email,
-        phone: draft.phone,
-        company: draft.company,
-        job_title: draft.job_title,
-        source: draft.source,
+        canal_preferido: draft.canal_preferido,
+        supresiones: draft.supresiones,
+        autorizacion_datos: draft.autorizacion_datos,
+        fuente_origen: draft.fuente_origen,
+        categorias_interes: draft.categorias_interes,
+        ciudad: draft.ciudad,
+        tipo_relacion: draft.tipo_relacion,
+        tags: draft.tags,
         notes: draft.notes,
         metadata: draft.metadata
       })
@@ -79,31 +119,100 @@ function ContactEditContent({ contactId }: { contactId: string }) {
     router.push("/dashboard/crm/contactos");
   };
 
+  const { startCall, busy: callBusy, message: callMessage } = useCrmContactCall(contactId);
+  const [quoteBusy, setQuoteBusy] = useState(false);
+
+  const goToQuote = useCallback(() => {
+    setActiveTab("ori");
+    setTimeout(() => {
+      document.getElementById("crm-quote-section")?.scrollIntoView({ behavior: "smooth" });
+      document.getElementById("crm-generate-quote-btn")?.click();
+    }, 150);
+  }, []);
+
+  const enriched = contact ? enrichCrmContact(contact) : null;
+  const nextStep = enriched
+    ? computeContactNextStep({
+        contact: enriched,
+        openLeads: leads.filter(l => l.outcome === "open")
+      })
+    : null;
+
+  const subtitle = useMemo(() => buildSubtitle(draft), [draft]);
+
   return (
-    <CrmDetailLayout
+    <CrmContactDetailShell
       backHref="/dashboard/crm/contactos"
       title={draft.name || contact?.name || "Contacto"}
-      subtitle={draft.phone || contact?.phone || "Datos del contacto"}
+      subtitle={subtitle}
+      tabs={TABS}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
       loading={loading}
       saving={saving}
       error={error}
       onSave={save}
       onDelete={remove}
+      headerActions={
+        contact ? (
+          <CrmContactHeaderActions
+            contact={enriched ?? contact}
+            contactId={contactId}
+            onCall={startCall}
+            callBusy={callBusy}
+            onQuote={goToQuote}
+            quoteBusy={quoteBusy}
+          />
+        ) : undefined
+      }
     >
       {contact && (
-        <CrmContactForm
-          draft={draft}
-          properties={properties}
-          leads={leads}
-          onChange={patch => setDraft(d => ({ ...d, ...patch }))}
-          onMetaChange={(key, value) =>
-            setDraft(d => ({ ...d, metadata: { ...(d.metadata ?? {}), [key]: value } }))
-          }
-          createdAt={contact.created_at}
-          updatedAt={contact.updated_at}
-        />
+        <>
+          <CrmContactDuplicatesBanner contactId={contactId} onMerged={load} />
+
+          {activeTab === "perfil" && (
+            <CrmContactForm
+              draft={draft}
+              properties={properties}
+              labels={labels}
+              onChange={patch => setDraft(d => ({ ...d, ...patch }))}
+              onMetaChange={(key, value) =>
+                setDraft(d => ({ ...d, metadata: { ...(d.metadata ?? {}), [key]: value } }))
+              }
+              createdAt={contact.created_at}
+              updatedAt={contact.updated_at}
+            />
+          )}
+
+          {activeTab === "actividad" && (
+            <>
+              {nextStep && <CrmContactNextStep message={nextStep.message} href={nextStep.href} />}
+              {callMessage && (
+                <p className="mb-4 text-xs text-[#a5a5ff]">{callMessage}</p>
+              )}
+              <CrmContactTimeline
+                contactId={contactId}
+                inboxConversationId={contact.inbox_conversation_id}
+                leads={leads}
+              />
+            </>
+          )}
+
+          {activeTab === "ori" && (
+            <CrmContactAiTools
+              contactId={contactId}
+              contact={contact}
+              labels={labels}
+              onContactUpdated={c => {
+                setContact(c);
+                setDraft(c);
+              }}
+              onQuoteBusyChange={setQuoteBusy}
+            />
+          )}
+        </>
       )}
-    </CrmDetailLayout>
+    </CrmContactDetailShell>
   );
 }
 

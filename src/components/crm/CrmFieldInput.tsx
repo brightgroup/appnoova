@@ -1,7 +1,9 @@
 import type { CrmPropertyDefinition, CrmPropertyFieldType } from "@/types/crm";
-import { accentFocus } from "@/lib/brand-ui";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
+import { CrmToggleChip } from "@/components/crm/CrmToggleChip";
 
-const inputClass = `w-full rounded-xl border border-white/[.10] bg-white/[.04] px-3 py-2.5 text-sm text-white placeholder:text-white/25 ${accentFocus}`;
+const inputClass =
+  "w-full rounded-xl border border-white/[.12] bg-noova-surface px-4 py-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-[#5b5bf6]/45 focus:ring-1 focus:ring-[#5b5bf6]/20 transition-colors";
 
 interface CrmFieldInputProps {
   definition: Pick<CrmPropertyDefinition, "field_key" | "label" | "field_type" | "options" | "is_required">;
@@ -16,16 +18,13 @@ export function CrmFieldInput({ definition, value, onChange, disabled }: CrmFiel
 
   if (type === "boolean") {
     return (
-      <label className="flex items-center gap-2 text-sm text-gray-300">
-        <input
-          type="checkbox"
-          checked={Boolean(value)}
-          disabled={disabled}
-          onChange={e => onChange(e.target.checked)}
-          className="rounded border-white/20"
-        />
-        {definition.label}
-      </label>
+      <CrmToggleChip
+        checked={Boolean(value)}
+        onChange={v => onChange(v)}
+        label={definition.label}
+        tone="neutral"
+        disabled={disabled}
+      />
     );
   }
 
@@ -48,19 +47,13 @@ export function CrmFieldInput({ definition, value, onChange, disabled }: CrmFiel
   if (type === "select") {
     return (
       <div>
-        <label className="text-xs text-gray-400 mb-1 block">{definition.label}</label>
-        <select
+        <label className="text-xs text-gray-400 mb-1.5 block">{definition.label}</label>
+        <NoovaSelect
           value={strVal}
           disabled={disabled}
-          required={definition.is_required}
-          onChange={e => onChange(e.target.value || null)}
-          className={inputClass}
-        >
-          <option value="">—</option>
-          {definition.options.map(opt => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
+          onChange={v => onChange(v || null)}
+          options={definition.options.map(opt => ({ value: opt, label: opt }))}
+        />
       </div>
     );
   }

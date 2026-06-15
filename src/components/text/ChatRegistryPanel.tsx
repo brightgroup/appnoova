@@ -170,7 +170,6 @@ export function ChatRegistryPanel({ agentId, refreshKey = 0 }: ChatRegistryPanel
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className={registryContent}>
         <RegistryTableLayout
-          description="Historial de chats del agente. Filtra por estado y busca por contacto, canal o resumen."
           search={search}
           onSearchChange={setSearch}
           searchPlaceholder="Buscar"

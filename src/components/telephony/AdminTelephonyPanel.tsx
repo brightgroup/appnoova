@@ -213,7 +213,6 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
 
         <div className={registryContent}>
           <RegistryTableLayout
-            description="Compra y asigna líneas Telnyx a clientes, y atiende sus solicitudes de nuevos números."
             search={search}
             onSearchChange={setSearch}
             searchPlaceholder={tab === "lines" ? "Buscar" : "Buscar solicitud..."}

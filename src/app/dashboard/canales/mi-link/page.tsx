@@ -57,7 +57,6 @@ export default function MiLinkListPage() {
       title="Mi Link"
       description="Un micrositio público de chat con su marca. Solo se permite un link por cuenta."
       loading={loading}
-      tableDescription="Haga clic en su link para abrir la configuración de URL, agente, estilo y publicación."
       search={search}
       onSearchChange={setSearch}
       onRefresh={load}

@@ -22,6 +22,7 @@ import { ImageDropzone } from "@/components/microsite/ImageDropzone";
 import { MicrositeIconPicker } from "@/components/microsite/MicrositeIconPicker";
 import { MicrositePreviewFrame } from "@/components/microsite/MicrositePreviewFrame";
 import { WidgetEmbedPanel } from "@/components/microsite/WidgetEmbedPanel";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 
 export interface MicrositeConfigPanelProps {
   basePath?: string;
@@ -317,16 +318,13 @@ function ConfigContent({
             )}
 
             <Field label="Agente de texto">
-              <select
+              <NoovaSelect
                 value={form.text_agent_id ?? ""}
-                onChange={e => updateForm({ text_agent_id: e.target.value || null })}
-                className={selectCls}
-              >
-                <option value="">Seleccionar agente</option>
-                {agents.map(a => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
+                onChange={v => updateForm({ text_agent_id: v || null })}
+                allowEmpty={true}
+                emptyLabel="Seleccionar agente"
+                options={agents.map(a => ({ value: a.id, label: a.name }))}
+              />
               <p className="text-[10px] text-gray-500 mt-1.5 leading-snug">
                 El agente ya incluye su contexto de marca y personalidad.
               </p>
@@ -691,9 +689,6 @@ function ColorInput({ value, onChange }: { value: string; onChange: (v: string) 
 
 const inputCls =
   "w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50";
-
-const selectCls =
-  "w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50 appearance-none cursor-pointer";
 
 export function MicrositeConfigPanel(props: MicrositeConfigPanelProps = {}) {
   return (

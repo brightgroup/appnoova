@@ -8,6 +8,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import type { CompanyContext } from "@/types/company-context";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 
 interface Message {
   id: string;
@@ -158,15 +159,13 @@ export default function OriCopilotoPage() {
         </div>
         <div className="flex items-center gap-3">
           {contexts.length > 0 && (
-            <select
+            <NoovaSelect
               value={contextId}
-              onChange={e => setContextId(e.target.value)}
-              className="text-xs font-medium bg-[#14151c] border border-white/[.08] rounded-lg px-2.5 py-1.5 text-gray-300 focus:outline-none focus:border-[#5b5bf6]/40"
-            >
-              {contexts.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+              onChange={setContextId}
+              allowEmpty={false}
+              className="w-auto min-w-[140px]"
+              options={contexts.map(c => ({ value: c.id, label: c.name }))}
+            />
           )}
           {hasChat && (
             <button

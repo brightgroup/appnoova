@@ -102,6 +102,10 @@ export const inputSearch =
   "w-full bg-noova-surface border border-white/[.12] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white " +
   "placeholder-gray-400 focus:outline-none focus:border-white/[.22] focus:ring-1 focus:ring-white/[.10] transition-colors";
 
+/** Contenedor del menú desplegable (NoovaSelect) — no usar en tablas */
+export const registryListShell =
+  "rounded-xl border border-white/[.12] bg-noova-surface overflow-hidden shadow-2xl";
+
 /* ── Tablas (registro de llamadas / agentes) — sin recuadros, solo líneas horizontales ── */
 export const registryPage =
   "flex-1 flex flex-col min-h-0 bg-noova-main text-white overflow-hidden";
@@ -145,6 +149,9 @@ export const registryTableRow =
 
 export const registryTableRowClickable =
   "border-b border-white/[.06] hover:bg-white/[.03] cursor-pointer transition-colors group";
+
+export const registryTableRowSelected =
+  "bg-[#5b5bf6]/[.08]";
 
 export const registryTableCellFirst =
   "px-5 py-3.5";

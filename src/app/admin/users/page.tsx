@@ -11,6 +11,7 @@ import {
   registryTableLoading, registryTableEmpty, textMuted
 } from "@/lib/brand-ui";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
+import { NoovaListMenu, NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 
 interface UserRecord {
   id: string;
@@ -42,6 +43,7 @@ export default function AdminUsers() {
   const [error, setError]     = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [roleMenuUserId, setRoleMenuUserId] = useState<string | null>(null);
 
   async function fetchUsers() {
     setLoading(true);
@@ -116,7 +118,6 @@ export default function AdminUsers() {
 
       <div className={registryContent}>
         <RegistryTableLayout
-          description="Administra usuarios, roles y verificación de correo electrónico."
           search={search}
           onSearchChange={setSearch}
           onRefresh={fetchUsers}
@@ -241,28 +242,34 @@ export default function AdminUsers() {
                           {updatingId === u.id ? (
                             <RefreshCw className="w-4 h-4 text-[#5b5bf6] animate-spin" />
                           ) : (
-                            <div className="relative group">
-                              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[.04] border border-white/[.08] text-xs text-gray-400 hover:text-white hover:border-white/[.16] transition-all">
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() => setRoleMenuUserId(prev => (prev === u.id ? null : u.id))}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[.04] border border-white/[.08] text-xs text-gray-400 hover:text-white hover:border-white/[.16] transition-all"
+                              >
                                 Rol
                                 <ChevronDown className="w-3 h-3" />
                               </button>
-                              <div className="absolute right-0 top-full mt-1 w-32 bg-[#0f1020] border border-white/[.12] rounded-xl shadow-2xl z-10 overflow-hidden opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity">
-                                {["admin", "user", "agente"].map(rol => (
-                                  <button
-                                    key={rol}
-                                    onClick={() => changeRol(u.id, rol)}
-                                    disabled={u.rol === rol}
-                                    className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs text-left transition-colors ${
-                                      u.rol === rol
-                                        ? "text-[#5b5bf6] bg-[#5b5bf6]/10 cursor-default"
-                                        : "text-gray-400 hover:text-white hover:bg-white/[.06]"
-                                    }`}
-                                  >
-                                    {u.rol === rol && <CheckCircle className="w-3 h-3" />}
-                                    <span className="capitalize">{rol}</span>
-                                  </button>
-                                ))}
-                              </div>
+                              {roleMenuUserId === u.id && (
+                                <NoovaListMenu className="absolute right-0 top-full mt-1 w-32 z-10">
+                                  {["admin", "user", "agente"].map(rol => (
+                                    <NoovaListMenuItem
+                                      key={rol}
+                                      active={u.rol === rol}
+                                      onClick={() => {
+                                        setRoleMenuUserId(null);
+                                        if (u.rol !== rol) changeRol(u.id, rol);
+                                      }}
+                                    >
+                                      <span className="capitalize flex items-center gap-2">
+                                        {u.rol === rol && <CheckCircle className="w-3 h-3" />}
+                                        {rol}
+                                      </span>
+                                    </NoovaListMenuItem>
+                                  ))}
+                                </NoovaListMenu>
+                              )}
                             </div>
                           )}
                         </div>

@@ -1,0 +1,153 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Check, ChevronDown } from "lucide-react";
+import { accentFocus, registryListShell } from "@/lib/brand-ui";
+
+export interface NoovaSelectOption {
+  value: string;
+  label: string;
+}
+
+interface NoovaSelectProps {
+  value: string;
+  onChange: (value: string) => void;
+  options: NoovaSelectOption[];
+  placeholder?: string;
+  disabled?: boolean;
+  allowEmpty?: boolean;
+  emptyLabel?: string;
+  className?: string;
+}
+
+export function NoovaSelect({
+  value,
+  onChange,
+  options,
+  placeholder = "Seleccionar…",
+  disabled,
+  allowEmpty = true,
+  emptyLabel = "—",
+  className = ""
+}: NoovaSelectProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+
+  const selected = options.find(o => o.value === value);
+  const display = selected?.label ?? (value ? value : placeholder);
+
+  const pick = (next: string) => {
+    onChange(next);
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} className={`relative ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(o => !o)}
+        className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl text-sm text-left transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+          open
+            ? `border border-[#5b5bf6]/45 bg-noova-surface text-white ring-1 ring-[#5b5bf6]/20 ${accentFocus}`
+            : "border border-white/[.12] bg-noova-surface text-white hover:border-white/[.22]"
+        }`}
+      >
+        <span className={selected || value ? "text-white" : "text-gray-500"}>{display}</span>
+        <ChevronDown
+          className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className={`absolute z-50 left-0 right-0 mt-1.5 ${registryListShell} py-1 max-h-60 overflow-y-auto`}>
+          {allowEmpty && (
+            <button
+              type="button"
+              onClick={() => pick("")}
+              className={`w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center justify-between gap-2 ${
+                !value
+                  ? "text-[#a5a5ff] bg-[#5b5bf6]/10"
+                  : "text-gray-300 hover:bg-white/[.05] hover:text-white"
+              }`}
+            >
+              <span>{emptyLabel}</span>
+              {!value && <Check className="w-4 h-4 text-[#5b5bf6] shrink-0" />}
+            </button>
+          )}
+          {options.map(opt => {
+            const active = value === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => pick(opt.value)}
+                className={`w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center justify-between gap-2 ${
+                  active
+                    ? "text-[#a5a5ff] bg-[#5b5bf6]/10"
+                    : "text-gray-200 hover:bg-white/[.05] hover:text-white"
+                }`}
+              >
+                <span className="truncate">{opt.label}</span>
+                {active && <Check className="w-4 h-4 text-[#5b5bf6] shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Lista estática (menús contextuales, opciones fijas) — mismo estilo que el dropdown */
+export function NoovaListMenu({
+  children,
+  className = "",
+  onClick
+}: {
+  children: React.ReactNode;
+  className?: string;
+  onClick?: React.MouseEventHandler<HTMLDivElement>;
+}) {
+  return (
+    <div className={`${registryListShell} py-1 ${className}`} onClick={onClick}>
+      {children}
+    </div>
+  );
+}
+
+export function NoovaListMenuItem({
+  children,
+  onClick,
+  active,
+  danger
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  active?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
+        danger
+          ? "text-red-300 hover:bg-red-500/10"
+          : active
+            ? "text-[#a5a5ff] bg-[#5b5bf6]/10"
+            : "text-gray-200 hover:bg-white/[.05] hover:text-white"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}

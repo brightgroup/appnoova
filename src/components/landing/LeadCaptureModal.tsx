@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, X } from "lucide-react";
 import { COMPANY_SIZE_OPTIONS } from "@/lib/landing-leads";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import type { LeadCaptureIntent } from "@/components/landing/LeadCaptureProvider";
 
 interface LeadCaptureModalProps {
@@ -233,22 +234,17 @@ export default function LeadCaptureModal({ open, intent, onClose }: LeadCaptureM
                 <label htmlFor="lead-size" className="block text-xs font-medium text-gray-400 mb-1.5">
                   Tamaño de la empresa *
                 </label>
-                <select
-                  id="lead-size"
-                  required
+                <NoovaSelect
                   value={companySize}
-                  onChange={e => setCompanySize(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg bg-white/[.05] border border-white/[.1] text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#5b5bf6]/50"
-                >
-                  <option value="" disabled className="bg-[#0c0d14]">
-                    Seleccione…
-                  </option>
-                  {COMPANY_SIZE_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value} className="bg-[#0c0d14]">
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setCompanySize}
+                  allowEmpty={true}
+                  emptyLabel="Seleccione…"
+                  placeholder="Seleccione…"
+                  options={COMPANY_SIZE_OPTIONS.map(opt => ({
+                    value: opt.value,
+                    label: opt.label
+                  }))}
+                />
               </div>
 
               <div>

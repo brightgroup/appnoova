@@ -15,6 +15,7 @@ import {
 import { TELEPHONY_COUNTRIES } from "@/lib/telephony/countries";
 import { telnyxFeatureLabel } from "@/lib/telephony/feature-labels";
 import type { AvailablePhoneNumber } from "@/types/phone-number";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 
 interface UserOption { id: string; email: string; nombre: string }
 interface AgentOption { id: string; name: string }
@@ -242,28 +243,29 @@ export function AdminBuyLineModal({ open, onClose, onSuccess, preselectedUserId 
             <div className="space-y-4">
               <label className={`block text-xs ${textMuted}`}>
                 Cliente
-                <select
+                <NoovaSelect
                   value={userId}
-                  onChange={e => { setUserId(e.target.value); setAgentId(""); }}
-                  className={`mt-1 ${selectCls}`}
-                >
-                  <option value="">Seleccionar...</option>
-                  {users.map(u => (
-                    <option key={u.id} value={u.id}>{u.nombre || u.email}</option>
-                  ))}
-                </select>
+                  onChange={v => { setUserId(v); setAgentId(""); }}
+                  allowEmpty={true}
+                  emptyLabel="Seleccionar..."
+                  className="mt-1"
+                  options={users.map(u => ({
+                    value: u.id,
+                    label: u.nombre || u.email
+                  }))}
+                />
               </label>
               <label className={`block text-xs ${textMuted}`}>
                 Agente de voz (opcional)
-                <select
+                <NoovaSelect
                   value={agentId}
-                  onChange={e => setAgentId(e.target.value)}
+                  onChange={setAgentId}
                   disabled={!userId}
-                  className={`mt-1 ${selectCls} disabled:opacity-50`}
-                >
-                  <option value="">Sin agente</option>
-                  {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
+                  allowEmpty={true}
+                  emptyLabel="Sin agente"
+                  className="mt-1"
+                  options={agents.map(a => ({ value: a.id, label: a.name }))}
+                />
               </label>
             </div>
           )}
@@ -274,21 +276,32 @@ export function AdminBuyLineModal({ open, onClose, onSuccess, preselectedUserId 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 p-4 rounded-xl border border-white/[.10] bg-noova-main">
                 <label className={`block text-[11px] ${textMuted}`}>
                   País
-                  <select value={country} onChange={e => setCountry(e.target.value)} className={`mt-1 ${selectCls}`}>
-                    {TELEPHONY_COUNTRIES.map(c => (
-                      <option key={c.code} value={c.code}>{c.flag} {c.label}</option>
-                    ))}
-                  </select>
+                  <NoovaSelect
+                    value={country}
+                    onChange={setCountry}
+                    allowEmpty={false}
+                    className="mt-1"
+                    options={TELEPHONY_COUNTRIES.map(c => ({
+                      value: c.code,
+                      label: `${c.flag} ${c.label}`
+                    }))}
+                  />
                 </label>
                 <label className={`block text-[11px] ${textMuted}`}>
                   Tipo (Telnyx)
-                  <select value={numberType} onChange={e => setNumberType(e.target.value)} className={`mt-1 ${selectCls}`}>
-                    <option value="local">Local</option>
-                    <option value="toll_free">Toll-free</option>
-                    <option value="mobile">Móvil</option>
-                    <option value="national">Nacional</option>
-                    <option value="all">Todos</option>
-                  </select>
+                  <NoovaSelect
+                    value={numberType}
+                    onChange={setNumberType}
+                    allowEmpty={false}
+                    className="mt-1"
+                    options={[
+                      { value: "local", label: "Local" },
+                      { value: "toll_free", label: "Toll-free" },
+                      { value: "mobile", label: "Móvil" },
+                      { value: "national", label: "Nacional" },
+                      { value: "all", label: "Todos" }
+                    ]}
+                  />
                 </label>
                 <label className={`block text-[11px] ${textMuted}`}>
                   {country === "US" || country === "CA" ? "Área o estado" : "Código de área"}

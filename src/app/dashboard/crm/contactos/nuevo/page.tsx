@@ -9,13 +9,23 @@ import type { CrmContact } from "@/types/crm";
 
 const EMPTY: Partial<CrmContact> = {
   name: "",
+  tipo_contacto: "persona",
+  documento_id: null,
+  organizacion: null,
+  whatsapp: null,
+  telefono: null,
   email: null,
-  phone: null,
-  company: null,
-  job_title: null,
-  source: null,
+  canal_preferido: null,
+  supresiones: [],
+  autorizacion_datos: false,
+  fuente_origen: null,
+  categorias_interes: [],
+  ciudad: null,
+  tipo_relacion: "prospecto",
+  tags: [],
   notes: null,
-  metadata: {}
+  metadata: {},
+  field_provenance: {}
 };
 
 export default function ContactCreatePage() {
@@ -37,12 +47,16 @@ export default function ContactCreatePage() {
       headers,
       body: JSON.stringify({
         name: draft.name,
+        tipo_contacto: draft.tipo_contacto,
+        documento_id: draft.documento_id,
+        organizacion: draft.organizacion,
+        whatsapp: draft.whatsapp,
+        telefono: draft.telefono,
         email: draft.email,
-        phone: draft.phone,
-        company: draft.company,
-        job_title: draft.job_title,
-        source: draft.source,
+        fuente_origen: draft.fuente_origen,
+        ciudad: draft.ciudad,
         notes: draft.notes,
+        autorizacion_datos: draft.autorizacion_datos,
         metadata: draft.metadata
       })
     });
@@ -59,10 +73,11 @@ export default function ContactCreatePage() {
     <CrmDetailLayout
       backHref="/dashboard/crm/contactos"
       title="Nuevo contacto"
-      subtitle="Completa la información básica"
+      subtitle="Al menos un canal válido (WhatsApp, teléfono o email)"
       saving={saving}
       saveLabel="Crear contacto"
       error={error}
+      wide
       onSave={save}
     >
       <CrmContactForm

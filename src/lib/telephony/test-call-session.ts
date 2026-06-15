@@ -72,7 +72,6 @@ export async function getPhoneTestCallSession(callControlId: string) {
   const { data: rows, error } = await db
     .from("voice_agent_calls")
     .select("id, user_id, voice_agent_id, metadata, status, status_label, created_at")
-    .filter("metadata->>phone_test", "eq", "true")
     .filter("metadata->>call_control_id", "eq", callControlId)
     .order("created_at", { ascending: false })
     .limit(1);
@@ -92,7 +91,9 @@ export async function getPhoneTestCallSession(callControlId: string) {
 
 export async function isPhoneTestCall(callControlId: string): Promise<boolean> {
   const session = await getPhoneTestCallSession(callControlId);
-  return Boolean(session);
+  if (!session) return false;
+  const meta = session.metadata as { phone_test?: boolean; crm_outbound?: boolean };
+  return Boolean(meta.phone_test || meta.crm_outbound);
 }
 
 async function findSessionRow(callControlId: string, retries = 3) {
@@ -112,7 +113,13 @@ export async function updatePhoneTestCallSession(
   if (!row) return;
 
   const prev = row.metadata;
-  const metadata: PhoneTestCallMeta = { ...prev, ...patch, phone_test: true, call_control_id: callControlId };
+  const isCrm = Boolean((prev as { crm_outbound?: boolean }).crm_outbound);
+  const metadata = {
+    ...prev,
+    ...patch,
+    call_control_id: callControlId,
+    ...(isCrm ? { crm_outbound: true as const, phone_test: false as const } : { phone_test: true as const })
+  };
 
   if (patch.phase === "answered" && !metadata.answered_at) {
     metadata.answered_at = new Date().toISOString();
@@ -131,7 +138,7 @@ export async function updatePhoneTestCallSession(
     .from("voice_agent_calls")
     .update({
       status,
-      status_label: patch.status_label ?? labelForPhase(metadata.phase),
+      status_label: patch.status_label ?? labelForManagedOutboundPhase(metadata.phase as PhoneTestCallPhase, isCrm),
       ...(patch.summary ? { summary: patch.summary } : {}),
       metadata
     })
@@ -148,6 +155,20 @@ export function labelForPhase(phase: PhoneTestCallPhase): string {
     case "ended": return "Prueba telefónica - Finalizada";
     case "failed": return "Prueba telefónica - Error";
     default: return "Prueba telefónica";
+  }
+}
+
+export function labelForManagedOutboundPhase(phase: PhoneTestCallPhase, isCrm: boolean): string {
+  if (!isCrm) return labelForPhase(phase);
+  switch (phase) {
+    case "dialing": return "Llamada IA — Marcando";
+    case "ringing": return "Llamada IA — Sonando";
+    case "answered": return "Llamada IA — Contestada";
+    case "speaking": return "Llamada IA — Agente hablando";
+    case "connected": return "Llamada IA — En llamada";
+    case "ended": return "Llamada IA — Finalizada";
+    case "failed": return "Llamada IA — Error";
+    default: return "Llamada IA";
   }
 }
 

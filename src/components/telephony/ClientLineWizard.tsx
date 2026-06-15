@@ -8,6 +8,7 @@ import {
 import { authFetch } from "@/lib/telephony-api";
 import { btnPrimary, btnGhost, textMuted } from "@/lib/brand-ui";
 import { TELEPHONY_COUNTRIES } from "@/lib/telephony/countries";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 
 type Flow = "choose" | "purchase" | "verify";
 type PurchaseStep = 1 | 2 | 3;
@@ -140,11 +141,15 @@ export function ClientLineWizard({ open, onClose, onSuccess, voiceAgentId }: Cli
               <div className="mb-3 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400">{error}</div>
             )}
             {purchaseStep === 1 && (
-              <select value={country} onChange={e => setCountry(e.target.value)} className={selectCls}>
-                {TELEPHONY_COUNTRIES.map(c => (
-                  <option key={c.code} value={c.code}>{c.flag} {c.label}</option>
-                ))}
-              </select>
+              <NoovaSelect
+                value={country}
+                onChange={setCountry}
+                allowEmpty={false}
+                options={TELEPHONY_COUNTRIES.map(c => ({
+                  value: c.code,
+                  label: `${c.flag} ${c.label}`
+                }))}
+              />
             )}
             {purchaseStep === 2 && (
               <textarea

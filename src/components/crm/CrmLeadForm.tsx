@@ -7,6 +7,7 @@ import {
   formatLeadValue
 } from "@/lib/crm-record";
 import { CrmFieldInput, formatCrmDateTime } from "@/components/crm/CrmFieldInput";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import type { CrmContact, CrmLead, CrmLeadOutcome, CrmPipelineStage, CrmPropertyDefinition } from "@/types/crm";
 
 function FieldGroup({ title, children }: { title: string; children: React.ReactNode }) {
@@ -55,27 +56,24 @@ export function CrmLeadForm({
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Etapa</label>
-            <select
+            <NoovaSelect
               value={draft.stage_id ?? ""}
-              onChange={e => onChange({ stage_id: e.target.value })}
-              className="w-full rounded-xl border border-white/[.10] bg-white/[.04] px-3 py-2.5 text-sm text-white"
-            >
-              {pipelineStages.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+              onChange={v => onChange({ stage_id: v })}
+              allowEmpty={false}
+              options={pipelineStages.map(s => ({ value: s.id, label: s.name }))}
+            />
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Resultado</label>
-            <select
+            <NoovaSelect
               value={outcome}
-              onChange={e => onChange({ outcome: e.target.value as CrmLeadOutcome })}
-              className="w-full rounded-xl border border-white/[.10] bg-white/[.04] px-3 py-2.5 text-sm text-white"
-            >
-              {(Object.keys(CRM_LEAD_OUTCOME_LABELS) as CrmLeadOutcome[]).map(k => (
-                <option key={k} value={k}>{CRM_LEAD_OUTCOME_LABELS[k]}</option>
-              ))}
-            </select>
+              onChange={v => onChange({ outcome: v as CrmLeadOutcome })}
+              allowEmpty={false}
+              options={(Object.keys(CRM_LEAD_OUTCOME_LABELS) as CrmLeadOutcome[]).map(k => ({
+                value: k,
+                label: CRM_LEAD_OUTCOME_LABELS[k]
+              }))}
+            />
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Valor</label>
@@ -91,15 +89,16 @@ export function CrmLeadForm({
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Moneda</label>
-            <select
+            <NoovaSelect
               value={draft.currency ?? "COP"}
-              onChange={e => onChange({ currency: e.target.value })}
-              className="w-full rounded-xl border border-white/[.10] bg-white/[.04] px-3 py-2.5 text-sm text-white"
-            >
-              <option value="COP">COP</option>
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-            </select>
+              onChange={v => onChange({ currency: v })}
+              allowEmpty={false}
+              options={[
+                { value: "COP", label: "COP" },
+                { value: "USD", label: "USD" },
+                { value: "EUR", label: "EUR" }
+              ]}
+            />
           </div>
         </div>
         <div className="flex items-center gap-2 text-sm pt-1">
@@ -130,18 +129,16 @@ export function CrmLeadForm({
           </div>
           <div className="sm:col-span-2">
             <label className="text-xs text-gray-400 mb-1 block">Contacto</label>
-            <select
+            <NoovaSelect
               value={draft.contact_id ?? ""}
-              onChange={e => onChange({ contact_id: e.target.value || null })}
-              className="w-full rounded-xl border border-white/[.10] bg-white/[.04] px-3 py-2.5 text-sm text-white"
-            >
-              <option value="">Sin contacto</option>
-              {contacts.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.name}{c.phone ? ` · ${c.phone}` : ""}
-                </option>
-              ))}
-            </select>
+              onChange={v => onChange({ contact_id: v || null })}
+              allowEmpty={true}
+              emptyLabel="Sin contacto"
+              options={contacts.map(c => ({
+                value: c.id,
+                label: `${c.name}${c.phone ? ` · ${c.phone}` : ""}`
+              }))}
+            />
           </div>
           <CrmFieldInput
             definition={{ field_key: "source", label: "Origen", field_type: "text", options: [], is_required: false }}

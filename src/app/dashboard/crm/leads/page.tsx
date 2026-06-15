@@ -78,7 +78,6 @@ export default function CrmLeadsPage() {
 
       <div className={registryContent}>
         <RegistryTableLayout
-          description={view === "kanban" ? "Arrastra leads entre etapas. Solo se muestran leads abiertos." : undefined}
           onRefresh={() => load()}
           refreshing={loading}
           filters={

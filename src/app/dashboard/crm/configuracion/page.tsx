@@ -10,9 +10,10 @@ import {
 } from "@/lib/brand-ui";
 import { DEFAULT_CRM_STAGES } from "@/lib/crm-record";
 import { CrmPropertyConfigPanel } from "@/components/crm/CrmPropertyConfigPanel";
+import { CrmTenantLabelsPanel } from "@/components/crm/CrmTenantLabelsPanel";
 import type { CrmPipelineStage } from "@/types/crm";
 
-type Tab = "stages" | "contacts" | "leads";
+type Tab = "stages" | "contacts" | "leads" | "labels";
 type StageDraft = Omit<CrmPipelineStage, "user_id" | "created_at" | "updated_at"> & { id?: string };
 
 export default function CrmConfigPage() {
@@ -118,6 +119,9 @@ export default function CrmConfigPage() {
           <button type="button" onClick={() => setTab("leads")} className={tab === "leads" ? btnFilterActive : btnFilterIdle}>
             Leads
           </button>
+          <button type="button" onClick={() => setTab("labels")} className={tab === "labels" ? btnFilterActive : btnFilterIdle}>
+            Labels
+          </button>
         </div>
       </div>
 
@@ -165,6 +169,7 @@ export default function CrmConfigPage() {
           )}
           {tab === "contacts" && <CrmPropertyConfigPanel entityType="contact" />}
           {tab === "leads" && <CrmPropertyConfigPanel entityType="lead" />}
+          {tab === "labels" && <CrmTenantLabelsPanel />}
         </div>
       </div>
     </div>

@@ -84,7 +84,6 @@ export default function WhatsAppListPage() {
       title="WhatsApp"
       description="Líneas WhatsApp Business conectadas. Asigne un agente de texto a cada línea."
       loading={loading}
-      tableDescription="Haga clic en una línea para asignar agente y ver detalles."
       search={search}
       onSearchChange={setSearch}
       searchPlaceholder="Buscar número o agente"

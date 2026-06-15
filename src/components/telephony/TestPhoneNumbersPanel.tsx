@@ -10,6 +10,7 @@ import {
 } from "@/lib/brand-ui";
 import { formatDateTime, formatPhoneDisplay } from "@/lib/telephony/format-phone";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import { TestPhoneNumberModal } from "@/components/telephony/TestPhoneNumberModal";
 import type { TestPhoneNumberRecord } from "@/types/test-phone-number";
 
@@ -103,7 +104,6 @@ export function TestPhoneNumbersPanel() {
   return (
     <>
       <RegistryTableLayout
-        description="Los números de prueba están exentos de cargos. Puedes agregar un número para recibir llamadas de prueba de tus agentes sin costo adicional."
         search={search}
         onSearchChange={setSearch}
         onRefresh={load}
@@ -138,15 +138,13 @@ export function TestPhoneNumbersPanel() {
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
-              <select
-                value={pageSize}
-                onChange={e => setPageSize(Number(e.target.value))}
-                className="ml-2 bg-noova-surface border border-white/[.12] rounded px-2 py-1 text-white"
-              >
-                {PAGE_SIZES.map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+              <NoovaSelect
+                value={String(pageSize)}
+                onChange={v => setPageSize(Number(v))}
+                allowEmpty={false}
+                className="ml-2 w-[72px]"
+                options={PAGE_SIZES.map(s => ({ value: String(s), label: String(s) }))}
+              />
             </div>
           </>
         ) : undefined}

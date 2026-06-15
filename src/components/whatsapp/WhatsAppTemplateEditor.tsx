@@ -19,6 +19,7 @@ import {
   templateStatusLabel
 } from "@/lib/whatsapp/template-record";
 import { WhatsAppPhonePreview } from "@/components/whatsapp/WhatsAppPhonePreview";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import type {
   WhatsAppTemplateCategory,
@@ -314,19 +315,17 @@ export function WhatsAppTemplateEditor({
             {mode === "create" && (
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1.5">Canal WhatsApp</label>
-                <select
+                <NoovaSelect
                   value={channelId}
-                  onChange={e => setChannelId(e.target.value)}
+                  onChange={setChannelId}
                   disabled={readOnly}
-                  className={inputClass}
-                >
-                  <option value="">Seleccionar línea</option>
-                  {channels.map(ch => (
-                    <option key={ch.id} value={ch.id}>
-                      {ch.e164} {ch.friendly_name ? `— ${ch.friendly_name}` : ""}
-                    </option>
-                  ))}
-                </select>
+                  allowEmpty={true}
+                  emptyLabel="Seleccionar línea"
+                  options={channels.map(ch => ({
+                    value: ch.id,
+                    label: `${ch.e164}${ch.friendly_name ? ` — ${ch.friendly_name}` : ""}`
+                  }))}
+                />
               </div>
             )}
 
@@ -354,29 +353,23 @@ export function WhatsAppTemplateEditor({
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1.5">Idioma</label>
-                <select
+                <NoovaSelect
                   value={language}
-                  onChange={e => setLanguage(e.target.value)}
+                  onChange={setLanguage}
                   disabled={readOnly}
-                  className={inputClass}
-                >
-                  {LANGUAGES.map(l => (
-                    <option key={l.value} value={l.value}>{l.label}</option>
-                  ))}
-                </select>
+                  allowEmpty={false}
+                  options={LANGUAGES.map(l => ({ value: l.value, label: l.label }))}
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1.5">Categoría</label>
-                <select
+                <NoovaSelect
                   value={category}
-                  onChange={e => setCategory(e.target.value as WhatsAppTemplateCategory)}
+                  onChange={v => setCategory(v as WhatsAppTemplateCategory)}
                   disabled={readOnly}
-                  className={inputClass}
-                >
-                  {CATEGORIES.map(c => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
+                  allowEmpty={false}
+                  options={CATEGORIES.map(c => ({ value: c.value, label: c.label }))}
+                />
               </div>
             </div>
 
