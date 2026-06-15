@@ -7,6 +7,8 @@ export interface CrmPipelineStage {
   sort_order: number;
   is_won: boolean;
   is_lost: boolean;
+  /** Instrucciones para que la IA decida cuándo mover un lead a esta etapa */
+  ai_enter_criteria: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -132,22 +134,12 @@ export type CrmMotivoPerdida =
   | "datos_incompletos"
   | "otro";
 
-export type CrmProximaAccionTipo =
-  | "whatsapp"
-  | "llamada"
-  | "email"
-  | "cotizacion_ori"
-  | "tarea_asesor"
-  | "esperar";
-
-export type CrmProximaAccionEstado = "pendiente" | "hecha" | "vencida" | "cancelada";
-
 export type CrmLeadTemperatura = "frio" | "tibio" | "caliente";
 
 export interface CrmLead {
   id: string;
   user_id: string;
-  contact_id: string | null;
+  contact_id: string;
   stage_id: string;
   outcome: CrmLeadOutcome;
   title: string;
@@ -156,10 +148,6 @@ export interface CrmLead {
   source: string | null;
   notes: string | null;
   sort_order: number;
-  proxima_accion: string | null;
-  proxima_accion_fecha: string | null;
-  proxima_accion_tipo: CrmProximaAccionTipo | null;
-  proxima_accion_estado: CrmProximaAccionEstado;
   motivo_perdida: CrmMotivoPerdida | null;
   motivo_perdida_detalle: string | null;
   asesor_responsable: string | null;
@@ -178,10 +166,6 @@ export interface CrmLead {
   stage?: CrmPipelineStage | null;
   /** Derivado — días en etapa actual */
   dias_en_etapa?: number;
-  /** Derivado — sin movimiento prolongado */
-  is_stalled?: boolean;
-  /** Derivado — próxima acción vencida */
-  is_overdue?: boolean;
 }
 
 export type CrmLeadsView = "kanban" | "list";
@@ -200,9 +184,7 @@ export type CrmLeadFilter =
   | "open"
   | "won"
   | "lost"
-  | "mine"
-  | "overdue"
-  | "stalled";
+  | "mine";
 
 export type CrmTimelineEventKind =
   | "message_in"

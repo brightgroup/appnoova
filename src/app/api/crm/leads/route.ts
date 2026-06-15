@@ -3,7 +3,6 @@ import { getTextAgentUserIdFromRequest, textAgentsAdminClient } from "@/lib/text
 import { isMissingTableError } from "@/lib/supabase-table-error";
 import { toCrmLead } from "@/lib/crm-record";
 import { buildLeadRowFromBody } from "@/lib/crm-lead-payload";
-import { DEFAULT_PROXIMA_ACCION } from "@/lib/crm-lead-utils";
 import { getCrmStages } from "@/lib/crm-server";
 import { getAuthUserFromRequest, userDisplayName } from "@/lib/voice-agents-server";
 
@@ -53,18 +52,11 @@ export async function POST(req: NextRequest) {
   const stageId = body.stage_id ? String(body.stage_id) : stages[0]?.id;
   if (!stageId) return NextResponse.json({ error: "Sin etapas configuradas" }, { status: 400 });
 
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(10, 0, 0, 0);
-
   const { row, error: buildError } = buildLeadRowFromBody(
     {
       ...body,
       title,
       stage_id: stageId,
-      proxima_accion: body.proxima_accion ?? DEFAULT_PROXIMA_ACCION,
-      proxima_accion_fecha: body.proxima_accion_fecha ?? tomorrow.toISOString(),
-      proxima_accion_estado: body.proxima_accion_estado ?? "pendiente",
       outcome: body.outcome ?? "open"
     },
     { isCreate: true }

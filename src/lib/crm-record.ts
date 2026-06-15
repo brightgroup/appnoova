@@ -15,16 +15,50 @@ import type {
   CrmMotivoPerdida,
   CrmPipelineStage,
   CrmPropertyDefinition,
-  CrmPropertyFieldType,
-  CrmProximaAccionEstado,
-  CrmProximaAccionTipo
+  CrmPropertyFieldType
 } from "@/types/crm";
 
 export const DEFAULT_CRM_STAGES: Omit<CrmPipelineStage, "id" | "user_id" | "created_at" | "updated_at">[] = [
-  { name: "Nuevo", slug: "nuevo", color: "#5b5bf6", sort_order: 0, is_won: false, is_lost: false },
-  { name: "Contactado", slug: "contactado", color: "#8b5cf6", sort_order: 1, is_won: false, is_lost: false },
-  { name: "Cotizado", slug: "cotizado", color: "#f59e0b", sort_order: 2, is_won: false, is_lost: false },
-  { name: "Negociación", slug: "negociacion", color: "#3b82f6", sort_order: 3, is_won: false, is_lost: false }
+  {
+    name: "Nuevo",
+    slug: "nuevo",
+    color: "#5b5bf6",
+    sort_order: 0,
+    is_won: false,
+    is_lost: false,
+    ai_enter_criteria:
+      "Lead recién creado o primer mensaje del prospecto sin respuesta del asesor o IA."
+  },
+  {
+    name: "Contactado",
+    slug: "contactado",
+    color: "#8b5cf6",
+    sort_order: 1,
+    is_won: false,
+    is_lost: false,
+    ai_enter_criteria:
+      "Hay diálogo activo: el asesor o la IA ya respondió y la conversación continúa."
+  },
+  {
+    name: "Cotizado",
+    slug: "cotizado",
+    color: "#f59e0b",
+    sort_order: 2,
+    is_won: false,
+    is_lost: false,
+    ai_enter_criteria:
+      "El cliente pidió cotización, precio o tarifa; o se envió o discutió una propuesta formal."
+  },
+  {
+    name: "Negociación",
+    slug: "negociacion",
+    color: "#3b82f6",
+    sort_order: 3,
+    is_won: false,
+    is_lost: false,
+    ai_enter_criteria:
+      "Objeciones, comparación con competencia, negociación de condiciones o cierre pendiente."
+  }
 ];
 
 /** Etapas activas del pipeline (excluye legacy ganado/perdido). */
@@ -176,6 +210,7 @@ export function toCrmStage(raw: Record<string, unknown>): CrmPipelineStage {
     sort_order: Number(raw.sort_order ?? 0),
     is_won: Boolean(raw.is_won),
     is_lost: Boolean(raw.is_lost),
+    ai_enter_criteria: raw.ai_enter_criteria ? String(raw.ai_enter_criteria) : null,
     created_at: String(raw.created_at ?? ""),
     updated_at: String(raw.updated_at ?? "")
   };
@@ -247,25 +282,6 @@ function parseMotivoPerdida(raw: unknown): CrmMotivoPerdida | null {
   return allowed.includes(v as CrmMotivoPerdida) ? (v as CrmMotivoPerdida) : null;
 }
 
-function parseProximaAccionTipo(raw: unknown): CrmProximaAccionTipo | null {
-  const allowed = [
-    "whatsapp",
-    "llamada",
-    "email",
-    "cotizacion_ori",
-    "tarea_asesor",
-    "esperar"
-  ] as const;
-  const v = String(raw ?? "");
-  return allowed.includes(v as CrmProximaAccionTipo) ? (v as CrmProximaAccionTipo) : null;
-}
-
-function parseProximaAccionEstado(raw: unknown): CrmProximaAccionEstado {
-  const allowed = ["pendiente", "hecha", "vencida", "cancelada"] as const;
-  const v = String(raw ?? "pendiente");
-  return allowed.includes(v as CrmProximaAccionEstado) ? (v as CrmProximaAccionEstado) : "pendiente";
-}
-
 function parseTemperatura(raw: unknown): CrmLeadTemperatura | null {
   const allowed = ["frio", "tibio", "caliente"] as const;
   const v = String(raw ?? "");
@@ -279,7 +295,7 @@ export function toCrmLead(raw: Record<string, unknown>): CrmLead {
   const base: CrmLead = {
     id: String(raw.id),
     user_id: String(raw.user_id),
-    contact_id: raw.contact_id ? String(raw.contact_id) : null,
+    contact_id: String(raw.contact_id),
     stage_id: String(raw.stage_id),
     title: String(raw.title),
     value_amount: raw.value_amount != null ? Number(raw.value_amount) : null,
@@ -288,10 +304,6 @@ export function toCrmLead(raw: Record<string, unknown>): CrmLead {
     notes: raw.notes ? String(raw.notes) : null,
     sort_order: Number(raw.sort_order ?? 0),
     outcome: raw.outcome === "won" || raw.outcome === "lost" ? raw.outcome : "open",
-    proxima_accion: raw.proxima_accion ? String(raw.proxima_accion) : null,
-    proxima_accion_fecha: raw.proxima_accion_fecha ? String(raw.proxima_accion_fecha) : null,
-    proxima_accion_tipo: parseProximaAccionTipo(raw.proxima_accion_tipo),
-    proxima_accion_estado: parseProximaAccionEstado(raw.proxima_accion_estado),
     motivo_perdida: parseMotivoPerdida(raw.motivo_perdida),
     motivo_perdida_detalle: raw.motivo_perdida_detalle ? String(raw.motivo_perdida_detalle) : null,
     asesor_responsable: raw.asesor_responsable ? String(raw.asesor_responsable) : null,

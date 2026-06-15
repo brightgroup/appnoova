@@ -1,16 +1,15 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import Link from "next/link";
 import {
   Check,
-  Copy,
   FileUp,
   Loader2
 } from "lucide-react";
 import { getAuthHeaders, getAuthToken } from "@/lib/text-agents-api";
 import { btnGhost, btnPrimary } from "@/lib/brand-ui";
-import type { CrmAiFieldSuggestion, CrmQuoteRecord } from "@/lib/crm-ai-extract";
+import { CrmOriQuotePanel } from "@/components/crm/CrmOriQuotePanel";
+import type { CrmAiFieldSuggestion } from "@/lib/crm-ai-extract";
 import type { CrmContact, CrmTenantLabels } from "@/types/crm";
 
 function FieldGroup({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
@@ -117,10 +116,38 @@ export function CrmContactAiTools({
   const [docSelected, setDocSelected] = useState<Set<string>>(new Set());
   const [docError, setDocError] = useState("");
 
-  const [quoteLoading, setQuoteLoading] = useState(false);
-  const [quote, setQuote] = useState<CrmQuoteRecord | null>(null);
-  const [quoteError, setQuoteError] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [leadAnalyzeLoading, setLeadAnalyzeLoading] = useState(false);
+  const [leadAnalyzeError, setLeadAnalyzeError] = useState("");
+  const [leadAnalyzeMsg, setLeadAnalyzeMsg] = useState("");
+
+  const runLeadAnalyze = useCallback(async () => {
+    setLeadAnalyzeLoading(true);
+    setLeadAnalyzeError("");
+    setLeadAnalyzeMsg("");
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/crm/contacts/${contactId}/lead-analyze`, {
+        method: "POST",
+        headers
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLeadAnalyzeError(data.error || "Error al analizar pipeline");
+        return;
+      }
+      if (data.created) {
+        setLeadAnalyzeMsg("Se creó un lead y se actualizó según la conversación.");
+      } else if (data.updated?.length) {
+        setLeadAnalyzeMsg(`Lead actualizado: ${data.updated.join(", ")}`);
+      } else {
+        setLeadAnalyzeMsg("Sin cambios — aún no hay señales suficientes en la conversación.");
+      }
+    } catch {
+      setLeadAnalyzeError("Error de red");
+    } finally {
+      setLeadAnalyzeLoading(false);
+    }
+  }, [contactId]);
 
   const runCapture = useCallback(async () => {
     setCaptureLoading(true);
@@ -201,38 +228,6 @@ export function CrmContactAiTools({
       setDocLoading(false);
     }
   };
-
-  const generateQuote = async () => {
-    setQuoteLoading(true);
-    onQuoteBusyChange?.(true);
-    setQuoteError("");
-    try {
-      const headers = await getAuthHeaders();
-      const res = await fetch(`/api/crm/contacts/${contactId}/quote`, { method: "POST", headers });
-      const data = await res.json();
-      if (!res.ok) {
-        setQuoteError(data.error || "Error al generar cotización");
-        return;
-      }
-      setQuote(data.quote ?? null);
-    } catch {
-      setQuoteError("Error de red");
-    } finally {
-      setQuoteLoading(false);
-      onQuoteBusyChange?.(false);
-    }
-  };
-
-  const copyText = async (text: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const waSendHref =
-    contact.inbox_conversation_id && quote?.whatsapp_message
-      ? `/dashboard/inbox?id=${contact.inbox_conversation_id}`
-      : undefined;
 
   return (
     <>
@@ -326,58 +321,33 @@ export function CrmContactAiTools({
         )}
       </FieldGroup>
 
-      <div id="crm-quote-section">
-        <FieldGroup
-          title="Cotización ORI"
-          action={
-            <button
-              id="crm-generate-quote-btn"
-              type="button"
-              onClick={generateQuote}
-              disabled={quoteLoading}
-              className={btnPrimary}
-            >
-              {quoteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Generar cotización"}
+      <FieldGroup
+        title="Pipeline IA desde conversación"
+        action={
+          contact.inbox_conversation_id ? (
+            <button type="button" onClick={runLeadAnalyze} disabled={leadAnalyzeLoading} className={btnGhost}>
+              {leadAnalyzeLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Analizar pipeline"}
             </button>
-          }
-        >
-          {quoteError && <p className="text-xs text-red-400 mb-2">{quoteError}</p>}
-          {quote ? (
-            <div className="space-y-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-semibold text-white">{quote.title}</h3>
-                  <p className="text-xs text-gray-500">{new Date(quote.created_at).toLocaleString("es")}</p>
-                </div>
-                <button type="button" onClick={() => copyText(quote.body)} className={btnGhost} title="Copiar">
-                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </div>
-              <pre className="text-xs text-gray-300 whitespace-pre-wrap font-sans leading-relaxed max-h-48 overflow-y-auto">
-                {quote.body}
-              </pre>
-              {quote.whatsapp_message && (
-                <div className="pt-3 border-t border-white/[.08]">
-                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Mensaje WhatsApp</p>
-                  <p className="text-xs text-gray-300 whitespace-pre-wrap">{quote.whatsapp_message}</p>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    <button type="button" onClick={() => copyText(quote.whatsapp_message)} className={btnGhost}>
-                      <Copy className="w-3.5 h-3.5" /> Copiar WA
-                    </button>
-                    {waSendHref && (
-                      <Link href={waSendHref} className={btnPrimary}>
-                        Abrir inbox para enviar
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
           ) : (
-            <p className="text-sm text-gray-500">
-              Genera una cotización personalizada con ORI según los datos del contacto.
-            </p>
-          )}
+            <span className="text-xs text-gray-500">Sin conversación vinculada</span>
+          )
+        }
+      >
+        {leadAnalyzeError && <p className="text-xs text-red-400 mb-2">{leadAnalyzeError}</p>}
+        {leadAnalyzeMsg && <p className="text-xs text-gray-400">{leadAnalyzeMsg}</p>}
+        <p className="text-sm text-gray-500">
+          ORI lee la conversación de WhatsApp y mueve el lead según los criterios configurados en cada etapa.
+        </p>
+      </FieldGroup>
+
+      <div id="crm-quote-section">
+        <FieldGroup title="Cotización ORI">
+          <CrmOriQuotePanel
+            quoteEndpoint={`/api/crm/contacts/${contactId}/quote`}
+            inboxConversationId={contact.inbox_conversation_id}
+            description="Genera una cotización personalizada con ORI según los datos del contacto."
+            onQuoteBusyChange={onQuoteBusyChange}
+          />
         </FieldGroup>
       </div>
     </>

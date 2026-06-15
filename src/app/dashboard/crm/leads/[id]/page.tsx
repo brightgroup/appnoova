@@ -67,10 +67,6 @@ function LeadEditContent({ leadId }: { leadId: string }) {
         currency: draft.currency,
         source: draft.source,
         notes: draft.notes,
-        proxima_accion: draft.proxima_accion,
-        proxima_accion_fecha: draft.proxima_accion_fecha,
-        proxima_accion_tipo: draft.proxima_accion_tipo,
-        proxima_accion_estado: draft.proxima_accion_estado,
         motivo_perdida: draft.motivo_perdida,
         motivo_perdida_detalle: draft.motivo_perdida_detalle,
         asesor_responsable: draft.asesor_responsable,
@@ -106,7 +102,7 @@ function LeadEditContent({ leadId }: { leadId: string }) {
     <CrmDetailLayout
       backHref="/dashboard/crm/leads"
       title={draft.title || lead?.title || "Lead"}
-      subtitle={stage ? `Etapa: ${stage.name}` : "Qué hacer y cuándo"}
+      subtitle={stage ? `Etapa: ${stage.name}` : "Oportunidad en pipeline"}
       loading={loading}
       saving={saving}
       error={error}
@@ -119,10 +115,15 @@ function LeadEditContent({ leadId }: { leadId: string }) {
           stages={stages}
           contacts={contacts}
           properties={properties}
+          leadId={lead.id}
           onChange={patch => setDraft(d => ({ ...d, ...patch }))}
           onMetaChange={(key, value) =>
             setDraft(d => ({ ...d, metadata: { ...(d.metadata ?? {}), [key]: value } }))
           }
+          onLeadSynced={synced => {
+            setLead(synced);
+            setDraft(synced);
+          }}
           createdAt={lead.created_at}
           updatedAt={lead.updated_at}
         />

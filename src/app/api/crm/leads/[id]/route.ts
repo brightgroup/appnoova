@@ -56,18 +56,6 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
         : existing.contact_id
           ? String(existing.contact_id)
           : null,
-    proxima_accion:
-      row.proxima_accion !== undefined
-        ? (row.proxima_accion as string | null)
-        : existing.proxima_accion
-          ? String(existing.proxima_accion)
-          : null,
-    proxima_accion_fecha:
-      row.proxima_accion_fecha !== undefined
-        ? (row.proxima_accion_fecha as string | null)
-        : existing.proxima_accion_fecha
-          ? String(existing.proxima_accion_fecha)
-          : null,
     motivo_perdida:
       row.motivo_perdida !== undefined
         ? (row.motivo_perdida as CrmMotivoPerdida | null)

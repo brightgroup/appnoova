@@ -21,11 +21,9 @@ function LeadCreatePageInner() {
     title: "",
     outcome: "open",
     currency: "COP",
-    contact_id: null,
     value_amount: null,
     source: null,
     notes: null,
-    proxima_accion_estado: "pendiente",
     metadata: {}
   });
   const [loading, setLoading] = useState(true);
@@ -67,8 +65,6 @@ function LeadCreatePageInner() {
     const validationError = validateLeadPayload({
       outcome: (draft.outcome ?? "open") as CrmLead["outcome"],
       contact_id: draft.contact_id ?? null,
-      proxima_accion: draft.proxima_accion ?? null,
-      proxima_accion_fecha: draft.proxima_accion_fecha ?? null,
       isCreate: true
     });
     if (!draft.title?.trim()) {
@@ -104,7 +100,7 @@ function LeadCreatePageInner() {
     <CrmDetailLayout
       backHref="/dashboard/crm/leads"
       title="Nuevo lead"
-      subtitle="Define qué hacer con esta oportunidad y cuándo"
+      subtitle="Vincula un contacto y deja que ORI asista en la cotización"
       loading={loading}
       saving={saving}
       saveLabel="Crear lead"

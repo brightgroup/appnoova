@@ -2,9 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
-import { formatLeadValue } from "@/lib/crm-record";
-import { formatProximaAccionFecha } from "@/lib/crm-lead-utils";
-import { filterPipelineStages } from "@/lib/crm-record";
+import { formatLeadValue, filterPipelineStages } from "@/lib/crm-record";
 import type { CrmLead, CrmPipelineStage } from "@/types/crm";
 
 interface CrmLeadsKanbanProps {
@@ -116,14 +114,8 @@ export function CrmLeadsKanban({ leads, stages, onLeadsChange, onSelectLead }: C
                     setOverStageId(null);
                   }}
                   onClick={() => onSelectLead(lead.id)}
-                  className={`group cursor-grab active:cursor-grabbing rounded-lg border px-3 py-2.5 transition-colors hover:bg-white/[.05] ${
+                  className={`group cursor-grab active:cursor-grabbing rounded-lg border border-white/[.08] bg-white/[.03] px-3 py-2.5 transition-colors hover:bg-white/[.05] ${
                     dragId === lead.id ? "opacity-40" : ""
-                  } ${
-                    lead.is_overdue
-                      ? "border-amber-500/35 bg-amber-500/[.06]"
-                      : lead.is_stalled
-                        ? "border-orange-500/25 bg-orange-500/[.04]"
-                        : "border-white/[.08] bg-white/[.03]"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -145,18 +137,16 @@ export function CrmLeadsKanban({ leads, stages, onLeadsChange, onSelectLead }: C
                   {lead.contact?.name && (
                     <p className="text-xs text-gray-400 mt-0.5 truncate">{lead.contact.name}</p>
                   )}
-                  {lead.proxima_accion && (
-                    <p className="mt-2 text-[11px] leading-snug text-gray-300 line-clamp-2">
-                      {lead.proxima_accion}
+                  {(lead.categoria_interes || lead.producto_interes) && (
+                    <p className="mt-2 text-[11px] leading-snug text-gray-400 line-clamp-2">
+                      {[lead.categoria_interes, lead.producto_interes].filter(Boolean).join(" · ")}
                     </p>
                   )}
                   <div className="mt-2 flex items-center justify-between gap-2 text-[10px]">
-                    <span
-                      className={`tabular-nums ${
-                        lead.is_overdue ? "text-amber-300 font-medium" : "text-gray-500"
-                      }`}
-                    >
-                      {formatProximaAccionFecha(lead.proxima_accion_fecha)}
+                    <span className="text-gray-500 tabular-nums">
+                      {lead.dias_en_etapa != null && lead.dias_en_etapa > 0
+                        ? `${lead.dias_en_etapa}d en etapa`
+                        : "—"}
                     </span>
                     <span className="text-xs font-semibold text-[#a5a5ff] tabular-nums shrink-0">
                       {formatLeadValue(lead.value_amount, lead.currency)}

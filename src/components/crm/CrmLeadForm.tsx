@@ -8,12 +8,15 @@ import {
 } from "@/lib/crm-record";
 import {
   CRM_MOTIVO_PERDIDA_LABELS,
-  CRM_PROXIMA_ACCION_TIPO_LABELS,
-  CRM_TEMPERATURA_LABELS,
-  DEFAULT_PROXIMA_ACCION,
-  formatProximaAccionFecha
+  CRM_TEMPERATURA_LABELS
 } from "@/lib/crm-lead-utils";
 import { FUENTE_ORIGEN_OPTIONS } from "@/lib/crm-contactability";
+import { CrmOriQuotePanel } from "@/components/crm/CrmOriQuotePanel";
+import { CrmFieldProvenanceBadge } from "@/components/crm/CrmFieldProvenanceBadge";
+import { getAuthHeaders } from "@/lib/text-agents-api";
+import { btnGhost } from "@/lib/brand-ui";
+import { Loader2 } from "lucide-react";
+import { useState } from "react";
 import { CrmFieldInput, formatCrmDateTime } from "@/components/crm/CrmFieldInput";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import type {
@@ -23,8 +26,7 @@ import type {
   CrmLeadTemperatura,
   CrmMotivoPerdida,
   CrmPipelineStage,
-  CrmPropertyDefinition,
-  CrmProximaAccionTipo
+  CrmPropertyDefinition
 } from "@/types/crm";
 
 function FieldGroup({ title, children }: { title: string; children: React.ReactNode }) {
@@ -54,8 +56,10 @@ interface CrmLeadFormProps {
   stages: CrmPipelineStage[];
   contacts: CrmContact[];
   properties: CrmPropertyDefinition[];
+  leadId?: string;
   onChange: (patch: Partial<CrmLead>) => void;
   onMetaChange: (key: string, value: string | number | boolean | null) => void;
+  onLeadSynced?: (lead: CrmLead) => void;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -65,105 +69,101 @@ export function CrmLeadForm({
   stages,
   contacts,
   properties,
+  leadId,
   onChange,
   onMetaChange,
+  onLeadSynced,
   createdAt,
   updatedAt
 }: CrmLeadFormProps) {
   const pipelineStages = filterPipelineStages(stages);
   const outcome = (draft.outcome ?? "open") as CrmLeadOutcome;
   const stage = pipelineStages.find(s => s.id === draft.stage_id);
-  const isOpen = outcome === "open";
   const contact = contacts.find(c => c.id === draft.contact_id);
   const inboxId = draft.inbox_conversation_id ?? contact?.inbox_conversation_id;
+  const quoteEndpoint = leadId
+    ? `/api/crm/leads/${leadId}/quote`
+    : draft.contact_id
+      ? `/api/crm/contacts/${draft.contact_id}/quote`
+      : null;
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
+  const prov = draft.field_provenance ?? {};
 
-  const markAccionHecha = () => {
-    onChange({ proxima_accion_estado: "hecha" });
+  const syncFromConversation = async () => {
+    if (!draft.contact_id) return;
+    setSyncing(true);
+    setSyncMsg("");
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/crm/contacts/${draft.contact_id}/lead-analyze`, {
+        method: "POST",
+        headers
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSyncMsg(data.error || "No se pudo analizar");
+        return;
+      }
+      if (data.lead) {
+        onLeadSynced?.(data.lead);
+        setSyncMsg(
+          data.created
+            ? "Lead creado y analizado por IA"
+            : data.updated?.length
+              ? `Actualizado: ${data.updated.join(", ")}`
+              : "Sin cambios en esta conversación"
+        );
+      } else {
+        setSyncMsg("Sin oportunidad detectada aún");
+      }
+    } catch {
+      setSyncMsg("Error de red");
+    } finally {
+      setSyncing(false);
+    }
   };
 
   return (
     <>
-      {isOpen && (
-        <FieldGroup title="Acción ahora">
-          <div className="rounded-xl border border-[#5b5bf6]/20 bg-[#5b5bf6]/[.06] p-4 space-y-3">
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div className="sm:col-span-2">
-                <label className="text-xs text-gray-400 mb-1 block">Próxima acción</label>
-                <input
-                  value={draft.proxima_accion ?? ""}
-                  onChange={e => onChange({ proxima_accion: e.target.value })}
-                  placeholder={DEFAULT_PROXIMA_ACCION}
-                  className="w-full rounded-xl border border-white/[.10] bg-white/[.04] px-3 py-2.5 text-sm text-white"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 mb-1 block">Cuándo</label>
-                <input
-                  type="datetime-local"
-                  value={
-                    draft.proxima_accion_fecha
-                      ? new Date(draft.proxima_accion_fecha).toISOString().slice(0, 16)
-                      : ""
-                  }
-                  onChange={e =>
-                    onChange({
-                      proxima_accion_fecha: e.target.value
-                        ? new Date(e.target.value).toISOString()
-                        : null
-                    })
-                  }
-                  className="w-full rounded-xl border border-white/[.10] bg-white/[.04] px-3 py-2.5 text-sm text-white"
-                />
-                {draft.proxima_accion_fecha && (
-                  <p className="mt-1 text-[10px] text-gray-500">
-                    {formatProximaAccionFecha(draft.proxima_accion_fecha)}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 mb-1 block">Tipo</label>
-                <NoovaSelect
-                  value={draft.proxima_accion_tipo ?? ""}
-                  onChange={v => onChange({ proxima_accion_tipo: (v || null) as CrmProximaAccionTipo | null })}
-                  allowEmpty
-                  emptyLabel="Sin tipo"
-                  options={(
-                    Object.keys(CRM_PROXIMA_ACCION_TIPO_LABELS) as CrmProximaAccionTipo[]
-                  ).map(k => ({ value: k, label: CRM_PROXIMA_ACCION_TIPO_LABELS[k] }))}
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              {inboxId && (
+      {draft.contact_id && quoteEndpoint && (
+        <FieldGroup title="ORI — Asistente de cotización">
+          <CrmOriQuotePanel
+            quoteEndpoint={quoteEndpoint}
+            inboxConversationId={inboxId}
+            description="ORI redacta la cotización con el contexto del contacto y esta oportunidad."
+          />
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {inboxId && (
+              <>
+                <button
+                  type="button"
+                  onClick={syncFromConversation}
+                  disabled={syncing}
+                  className={btnGhost}
+                >
+                  {syncing ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    "Sincronizar pipeline con IA"
+                  )}
+                </button>
                 <Link
                   href={`/dashboard/inbox?id=${inboxId}`}
                   className="rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-xs text-[#a5a5ff] hover:bg-white/[.08]"
                 >
                   Abrir inbox →
                 </Link>
-              )}
-              {draft.contact_id && (
-                <Link
-                  href={`/dashboard/crm/contactos/${draft.contact_id}`}
-                  className="rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-xs text-[#a5a5ff] hover:bg-white/[.08]"
-                >
-                  Cotizar ORI →
-                </Link>
-              )}
-              {draft.proxima_accion_estado !== "hecha" && (
-                <button
-                  type="button"
-                  onClick={markAccionHecha}
-                  className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-200 hover:bg-emerald-500/15"
-                >
-                  Marcar hecha
-                </button>
-              )}
-              {draft.proxima_accion_estado === "hecha" && (
-                <span className="text-xs text-emerald-300">Acción completada</span>
-              )}
-            </div>
+              </>
+            )}
+            <Link
+              href={`/dashboard/crm/contactos/${draft.contact_id}`}
+              className="rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-xs text-[#a5a5ff] hover:bg-white/[.08]"
+            >
+              Ver contacto →
+            </Link>
           </div>
+          {syncMsg && <p className="text-xs text-gray-400">{syncMsg}</p>}
         </FieldGroup>
       )}
 
@@ -176,6 +176,7 @@ export function CrmLeadForm({
               onChange={e => onChange({ title: e.target.value })}
               className="w-full rounded-xl border border-white/[.10] bg-white/[.04] px-3 py-2.5 text-sm text-white"
             />
+            <CrmFieldProvenanceBadge provenance={prov.title} />
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Categoría de interés</label>
@@ -185,6 +186,7 @@ export function CrmLeadForm({
               placeholder="Ej. Autos, Salud…"
               className="w-full rounded-xl border border-white/[.10] bg-white/[.04] px-3 py-2.5 text-sm text-white"
             />
+            <CrmFieldProvenanceBadge provenance={prov.categoria_interes} />
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Producto de interés</label>
@@ -193,6 +195,7 @@ export function CrmLeadForm({
               onChange={e => onChange({ producto_interes: e.target.value || null })}
               className="w-full rounded-xl border border-white/[.10] bg-white/[.04] px-3 py-2.5 text-sm text-white"
             />
+            <CrmFieldProvenanceBadge provenance={prov.producto_interes} />
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Valor estimado</label>
@@ -280,6 +283,7 @@ export function CrmLeadForm({
               allowEmpty={false}
               options={pipelineStages.map(s => ({ value: s.id, label: s.name }))}
             />
+            <CrmFieldProvenanceBadge provenance={prov.stage_id} />
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Resultado</label>
@@ -318,11 +322,6 @@ export function CrmLeadForm({
             </>
           )}
         </div>
-        {draft.is_stalled && isOpen && (
-          <p className="text-xs text-amber-300/90 rounded-lg bg-amber-500/10 px-3 py-2">
-            Lead estancado — lleva más de 5 días en esta etapa sin avance.
-          </p>
-        )}
       </FieldGroup>
 
       <FieldGroup title="Contacto">
@@ -331,7 +330,7 @@ export function CrmLeadForm({
             <label className="text-xs text-gray-400 mb-1 block">Contacto asociado *</label>
             <NoovaSelect
               value={draft.contact_id ?? ""}
-              onChange={v => onChange({ contact_id: v || null })}
+              onChange={v => onChange({ contact_id: v || undefined })}
               allowEmpty
               emptyLabel="Seleccionar contacto…"
               options={contacts.map(c => ({
@@ -341,14 +340,6 @@ export function CrmLeadForm({
             />
           </div>
         </div>
-        {draft.contact_id && (
-          <Link
-            href={`/dashboard/crm/contactos/${draft.contact_id}`}
-            className="text-xs text-[#a5a5ff] hover:underline inline-block"
-          >
-            Ver ficha del contacto →
-          </Link>
-        )}
       </FieldGroup>
 
       <FieldGroup title="Asignación">

@@ -1,25 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTextAgentUserIdFromRequest, textAgentsAdminClient } from "@/lib/text-agents-server";
 import { generateOriQuote, type CrmQuoteRecord } from "@/lib/crm-ai-extract";
-import { getDefaultCompanyContextContent } from "@/lib/company-context";
 import { getTenantLabels } from "@/lib/crm-labels";
-import { toCrmContact } from "@/lib/crm-record";
+import { getDefaultCompanyContextContent } from "@/lib/company-context";
+import { toCrmContact, toCrmLead } from "@/lib/crm-record";
 
 type Ctx = { params: Promise<{ id: string }> };
-
-export async function GET(_req: NextRequest, ctx: Ctx) {
-  const userId = await getTextAgentUserIdFromRequest(_req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-
-  const { id } = await ctx.params;
-  const db = textAgentsAdminClient();
-  const { data } = await db.from("crm_contacts").select("metadata").eq("id", id).eq("user_id", userId).maybeSingle();
-  if (!data) return NextResponse.json({ error: "Contacto no encontrado" }, { status: 404 });
-
-  const meta = (data.metadata as Record<string, unknown>) ?? {};
-  const quotes = (meta.crm_quotes as CrmQuoteRecord[]) ?? [];
-  return NextResponse.json({ quotes });
-}
 
 export async function POST(_req: NextRequest, ctx: Ctx) {
   const userId = await getTextAgentUserIdFromRequest(_req);
@@ -29,20 +15,36 @@ export async function POST(_req: NextRequest, ctx: Ctx) {
   const db = textAgentsAdminClient();
 
   const [{ data: row }, labels, companyContext] = await Promise.all([
-    db.from("crm_contacts").select("*").eq("id", id).eq("user_id", userId).maybeSingle(),
+    db
+      .from("crm_leads")
+      .select("*, contact:crm_contacts(*), stage:crm_pipeline_stages(*)")
+      .eq("id", id)
+      .eq("user_id", userId)
+      .maybeSingle(),
     getTenantLabels(db, userId),
     getDefaultCompanyContextContent(db, userId)
   ]);
 
-  if (!row) return NextResponse.json({ error: "Contacto no encontrado" }, { status: 404 });
+  if (!row) return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
 
-  const contact = toCrmContact(row);
+  const lead = toCrmLead(row as Record<string, unknown>);
+  const contactRaw = row.contact as Record<string, unknown> | null;
+  if (!contactRaw) {
+    return NextResponse.json({ error: "El lead requiere un contacto vinculado" }, { status: 400 });
+  }
+
+  const contact = toCrmContact(contactRaw);
 
   try {
     const quote = await generateOriQuote(contact, {
-      labels: {
-        categoria: labels.categoria_interes,
-        producto: labels.producto_servicio
+      labels: { categoria: labels.categoria_interes, producto: labels.producto_servicio },
+      lead: {
+        title: lead.title,
+        categoria_interes: lead.categoria_interes,
+        producto_interes: lead.producto_interes,
+        value_amount: lead.value_amount,
+        currency: lead.currency,
+        stage_name: lead.stage?.name ?? null
       },
       companyContext
     });
@@ -52,7 +54,7 @@ export async function POST(_req: NextRequest, ctx: Ctx) {
     const crm_quotes = [quote, ...prev].slice(0, 10);
 
     await db
-      .from("crm_contacts")
+      .from("crm_leads")
       .update({
         metadata: { ...meta, crm_quotes, last_quote_id: quote.id },
         updated_at: new Date().toISOString()

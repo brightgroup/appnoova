@@ -1,10 +1,5 @@
 import { validateLeadPayload } from "@/lib/crm-lead-utils";
-import type {
-  CrmLeadOutcome,
-  CrmMotivoPerdida,
-  CrmProximaAccionEstado,
-  CrmProximaAccionTipo
-} from "@/types/crm";
+import type { CrmLeadOutcome, CrmMotivoPerdida } from "@/types/crm";
 
 const MOTIVOS: CrmMotivoPerdida[] = [
   "precio",
@@ -14,22 +9,6 @@ const MOTIVOS: CrmMotivoPerdida[] = [
   "sin_presupuesto",
   "datos_incompletos",
   "otro"
-];
-
-const ACCION_TIPOS: CrmProximaAccionTipo[] = [
-  "whatsapp",
-  "llamada",
-  "email",
-  "cotizacion_ori",
-  "tarea_asesor",
-  "esperar"
-];
-
-const ACCION_ESTADOS: CrmProximaAccionEstado[] = [
-  "pendiente",
-  "hecha",
-  "vencida",
-  "cancelada"
 ];
 
 function parseEnum<T extends string>(raw: unknown, allowed: readonly T[]): T | null {
@@ -46,7 +25,7 @@ export function buildLeadRowFromBody(
   if (body.stage_id !== undefined) row.stage_id = String(body.stage_id);
   if (body.title !== undefined) row.title = String(body.title).trim();
   if (body.contact_id !== undefined) {
-    row.contact_id = body.contact_id ? String(body.contact_id) : null;
+    row.contact_id = String(body.contact_id);
   }
   if (body.value_amount !== undefined) {
     row.value_amount = body.value_amount != null ? Number(body.value_amount) : null;
@@ -58,23 +37,6 @@ export function buildLeadRowFromBody(
   if (body.outcome !== undefined) {
     const o = String(body.outcome);
     if (o === "won" || o === "lost" || o === "open") row.outcome = o;
-  }
-  if (body.proxima_accion !== undefined) {
-    row.proxima_accion = body.proxima_accion ? String(body.proxima_accion).trim() : null;
-  }
-  if (body.proxima_accion_fecha !== undefined) {
-    row.proxima_accion_fecha = body.proxima_accion_fecha
-      ? String(body.proxima_accion_fecha)
-      : null;
-  }
-  if (body.proxima_accion_tipo !== undefined) {
-    row.proxima_accion_tipo = body.proxima_accion_tipo
-      ? parseEnum(body.proxima_accion_tipo, ACCION_TIPOS)
-      : null;
-  }
-  if (body.proxima_accion_estado !== undefined) {
-    const estado = parseEnum(body.proxima_accion_estado, ACCION_ESTADOS);
-    if (estado) row.proxima_accion_estado = estado;
   }
   if (body.motivo_perdida !== undefined) {
     row.motivo_perdida = body.motivo_perdida ? parseEnum(body.motivo_perdida, MOTIVOS) : null;
@@ -97,6 +59,9 @@ export function buildLeadRowFromBody(
   }
   if (body.score !== undefined) {
     row.score = body.score != null ? Number(body.score) : null;
+  }
+  if (body.temperatura !== undefined) {
+    row.temperatura = body.temperatura ? String(body.temperatura) : null;
   }
   if (body.inbox_conversation_id !== undefined) {
     row.inbox_conversation_id = body.inbox_conversation_id
@@ -126,18 +91,6 @@ export function buildLeadRowFromBody(
         : body.contact_id
           ? String(body.contact_id)
           : null,
-    proxima_accion:
-      row.proxima_accion !== undefined
-        ? (row.proxima_accion as string | null)
-        : body.proxima_accion
-          ? String(body.proxima_accion)
-          : null,
-    proxima_accion_fecha:
-      row.proxima_accion_fecha !== undefined
-        ? (row.proxima_accion_fecha as string | null)
-        : body.proxima_accion_fecha
-          ? String(body.proxima_accion_fecha)
-          : null,
     motivo_perdida:
       row.motivo_perdida !== undefined
         ? (row.motivo_perdida as CrmMotivoPerdida | null)
@@ -147,21 +100,17 @@ export function buildLeadRowFromBody(
     isCreate: opts.isCreate
   });
 
-  if (validationError && opts.isCreate) {
+  if (validationError) {
     return { row, error: validationError };
   }
 
   return { row, error: null };
 }
 
-export function validateLeadPatch(
-  merged: {
-    outcome: CrmLeadOutcome;
-    contact_id: string | null;
-    proxima_accion: string | null;
-    proxima_accion_fecha: string | null;
-    motivo_perdida: CrmMotivoPerdida | null;
-  }
-): string | null {
+export function validateLeadPatch(merged: {
+  outcome: CrmLeadOutcome;
+  contact_id: string | null;
+  motivo_perdida: CrmMotivoPerdida | null;
+}): string | null {
   return validateLeadPayload(merged);
 }

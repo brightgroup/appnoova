@@ -1,6 +1,7 @@
 import type { TextChatMessage } from "@/types/text-agent-conversation";
 import type { CrmContact, CrmFieldProvenanceEntry } from "@/types/crm";
 import { runOriJsonPrompt } from "@/lib/crm-gemini";
+import { mergeCompanyContext } from "@/lib/merge-company-context";
 
 const EXTRACTABLE_FIELDS = [
   "name",
@@ -160,12 +161,40 @@ export interface CrmQuoteRecord {
   whatsapp_message: string;
 }
 
-export async function generateContactQuote(contact: CrmContact, labels?: { producto?: string; categoria?: string }): Promise<CrmQuoteRecord> {
+export async function generateOriQuote(
+  contact: CrmContact,
+  ctx?: {
+    labels?: { producto?: string; categoria?: string };
+    companyContext?: string;
+    lead?: {
+      title: string;
+      categoria_interes?: string | null;
+      producto_interes?: string | null;
+      value_amount?: number | null;
+      currency?: string;
+      stage_name?: string | null;
+    };
+  }
+): Promise<CrmQuoteRecord> {
   const { runOriTextPrompt } = await import("@/lib/crm-gemini");
 
-  const system = `Eres Ori, copiloto de seguros en Colombia. Genera cotizaciones claras, profesionales y en español colombiano.
+  const baseSystem = `Eres Ori, copiloto de seguros en Colombia. Genera cotizaciones claras, profesionales y en español colombiano.
 Incluye: saludo personalizado, producto/ramo sugerido, supuestos, rango o valor referencial (si no hay datos exactos, indícalo), próximo paso y cierre cordial.
-No inventes primas exactas sin datos — usa rangos orientativos o pide el dato faltante.`;
+No inventes primas exactas sin datos — usa rangos orientativos o pide el dato faltante.
+Si hay contexto de oportunidad/lead, prioriza categoría y producto de la oportunidad sobre datos genéricos del contacto.
+Si hay conocimiento de la empresa (tarifarios, productos), úsalo como fuente prioritaria para montos y condiciones.`;
+
+  const system = mergeCompanyContext(baseSystem, ctx?.companyContext ?? "");
+
+  const leadBlock = ctx?.lead
+    ? `
+Oportunidad (lead):
+Título: ${ctx.lead.title}
+Etapa: ${ctx.lead.stage_name ?? "—"}
+Categoría oportunidad: ${ctx.lead.categoria_interes ?? "—"}
+Producto oportunidad: ${ctx.lead.producto_interes ?? "—"}
+Valor estimado: ${ctx.lead.value_amount != null ? `${ctx.lead.value_amount} ${ctx.lead.currency ?? "COP"}` : "—"}`
+    : "";
 
   const prompt = `Genera una cotización para este contacto:
 
@@ -174,9 +203,9 @@ Tipo: ${contact.tipo_contacto}
 Organización: ${contact.organizacion ?? "—"}
 Ciudad: ${contact.ciudad ?? "—"}
 WhatsApp: ${contact.whatsapp ?? "—"}
-${labels?.categoria ? `Categoría (${labels.categoria}): ${(contact.categorias_interes ?? []).join(", ") || "—"}` : ""}
+${ctx?.labels?.categoria ? `Categoría (${ctx.labels.categoria}): ${(contact.categorias_interes ?? []).join(", ") || "—"}` : ""}
 Relación: ${contact.tipo_relacion}
-Notas: ${contact.notes ?? "—"}
+Notas: ${contact.notes ?? "—"}${leadBlock}
 
 Responde en dos bloques separados por "---WHATSAPP---":
 1) Cotización completa (para PDF o email)
@@ -185,7 +214,9 @@ Responde en dos bloques separados por "---WHATSAPP---":
   const raw = await runOriTextPrompt(system, prompt);
   const [body, whatsapp_message = ""] = raw.split("---WHATSAPP---").map(s => s.trim());
 
-  const title = `Cotización — ${contact.name}`;
+  const title = ctx?.lead
+    ? `Cotización — ${ctx.lead.title}`
+    : `Cotización — ${contact.name}`;
   const summary = body.split("\n").find(l => l.trim().length > 20)?.slice(0, 120) ?? "Cotización generada por ORI";
 
   return {
@@ -196,4 +227,12 @@ Responde en dos bloques separados por "---WHATSAPP---":
     body,
     whatsapp_message: whatsapp_message || body.slice(0, 900)
   };
+}
+
+/** @deprecated Usa generateOriQuote */
+export async function generateContactQuote(
+  contact: CrmContact,
+  labels?: { producto?: string; categoria?: string }
+): Promise<CrmQuoteRecord> {
+  return generateOriQuote(contact, { labels });
 }

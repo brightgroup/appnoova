@@ -9,6 +9,7 @@ import {
   registryPage, registryToolbar, registryContent, registryPanel, textMuted
 } from "@/lib/brand-ui";
 import { DEFAULT_CRM_STAGES } from "@/lib/crm-record";
+import { DEFAULT_STAGE_AI_CRITERIA } from "@/lib/crm-lead-ai-shared";
 import { CrmPropertyConfigPanel } from "@/components/crm/CrmPropertyConfigPanel";
 import { CrmTenantLabelsPanel } from "@/components/crm/CrmTenantLabelsPanel";
 import type { CrmPipelineStage } from "@/types/crm";
@@ -51,7 +52,8 @@ export default function CrmConfigPage() {
         color: "#5b5bf6",
         sort_order: prev.length,
         is_won: false,
-        is_lost: false
+        is_lost: false,
+        ai_enter_criteria: null
       }
     ]);
   };
@@ -72,7 +74,8 @@ export default function CrmConfigPage() {
           name: s.name,
           slug: s.slug,
           color: s.color,
-          sort_order: i
+          sort_order: i,
+          ai_enter_criteria: s.ai_enter_criteria ?? null
         }))
       })
     });
@@ -135,33 +138,53 @@ export default function CrmConfigPage() {
             ) : (
               <div className="space-y-2">
                 <p className="text-sm text-gray-500 mb-4">
-                  Las etapas representan el avance en el pipeline. Ganado y perdido se marcan como resultado en cada lead, no como etapa.
+                  Las etapas representan el avance en el pipeline. Define cuándo la IA debe mover un lead a cada etapa según la conversación.
                 </p>
                 {stages.map((stage, i) => (
-                  <div key={stage.id ?? i} className="flex items-center gap-3 border-b border-white/[.06] py-3">
-                    <GripVertical className="w-4 h-4 text-gray-600 shrink-0" />
-                    <input
-                      type="color"
-                      value={stage.color}
-                      onChange={e => updateStage(i, { color: e.target.value })}
-                      className="w-8 h-8 rounded-lg border-0 bg-transparent cursor-pointer shrink-0"
-                    />
-                    <input
-                      value={stage.name}
-                      onChange={e => updateStage(i, {
-                        name: e.target.value,
-                        slug: e.target.value.toLowerCase().replace(/\s+/g, "_")
-                      })}
-                      className="flex-1 rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-2 text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeStage(i)}
-                      disabled={stages.length <= 2}
-                      className={btnGhost}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  <div key={stage.id ?? i} className="border-b border-white/[.06] py-4 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <GripVertical className="w-4 h-4 text-gray-600 shrink-0" />
+                      <input
+                        type="color"
+                        value={stage.color}
+                        onChange={e => updateStage(i, { color: e.target.value })}
+                        className="w-8 h-8 rounded-lg border-0 bg-transparent cursor-pointer shrink-0"
+                      />
+                      <input
+                        value={stage.name}
+                        onChange={e => updateStage(i, {
+                          name: e.target.value,
+                          slug: e.target.value.toLowerCase().replace(/\s+/g, "_")
+                        })}
+                        className="flex-1 rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-2 text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeStage(i)}
+                        disabled={stages.length <= 2}
+                        className={btnGhost}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="pl-11">
+                      <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">
+                        Criterio IA — mover aquí cuando…
+                      </label>
+                      <textarea
+                        value={
+                          stage.ai_enter_criteria ??
+                          DEFAULT_STAGE_AI_CRITERIA[stage.slug] ??
+                          ""
+                        }
+                        onChange={e =>
+                          updateStage(i, { ai_enter_criteria: e.target.value || null })
+                        }
+                        rows={2}
+                        placeholder="Ej. El cliente pidió cotización o precio…"
+                        className="w-full rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-2 text-xs text-gray-300 resize-y"
+                      />
+                    </div>
                   </div>
                 ))}
               </div>

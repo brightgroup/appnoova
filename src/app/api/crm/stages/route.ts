@@ -36,6 +36,7 @@ export async function PUT(req: NextRequest) {
     sort_order: Number(s.sort_order ?? i),
     is_won: false,
     is_lost: false,
+    ai_enter_criteria: s.ai_enter_criteria ? String(s.ai_enter_criteria).trim() : null,
     updated_at: new Date().toISOString()
   })).filter(r => r.name);
 

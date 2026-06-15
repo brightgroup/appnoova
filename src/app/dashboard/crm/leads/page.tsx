@@ -59,15 +59,11 @@ export default function CrmLeadsPage() {
     if (filter === "mine") {
       const me = currentUserName.trim().toLowerCase();
       list = list.filter(l => l.asesor_responsable?.trim().toLowerCase() === me);
-    } else if (filter === "overdue") {
-      list = list.filter(l => l.is_overdue);
-    } else if (filter === "stalled") {
-      list = list.filter(l => l.is_stalled);
     }
     return list;
   }, [leads, filter, currentUserName]);
 
-  const kanbanFilters: CrmLeadFilter[] = ["open", "mine", "overdue", "stalled"];
+  const kanbanFilters: CrmLeadFilter[] = ["open", "mine"];
 
   const deleteLead = async (id: string) => {
     if (!confirm("¿Eliminar lead?")) return;
@@ -85,7 +81,7 @@ export default function CrmLeadsPage() {
           </Link>
           <div>
             <h1 className="text-xl font-bold tracking-tight">Leads</h1>
-            <p className={`text-xs ${textMuted} mt-0.5`}>Pipeline accionable — qué hacer y cuándo</p>
+            <p className={`text-xs ${textMuted} mt-0.5`}>Pipeline de oportunidades asistido por ORI</p>
           </div>
         </div>
       </div>
@@ -100,8 +96,6 @@ export default function CrmLeadsPage() {
                 {([
                   ["open", "Abiertos"],
                   ["mine", "Míos"],
-                  ["overdue", "Vencidos"],
-                  ["stalled", "Estancados"],
                   ["won", "Ganados"],
                   ["lost", "Perdidos"],
                   ["all", "Todos"]
@@ -156,7 +150,7 @@ export default function CrmLeadsPage() {
               />
             ) : (
               <div className={registryTableEmpty}>
-                El kanban muestra leads abiertos. Usa filtros Abiertos, Míos, Vencidos o Estancados.
+                El kanban muestra leads abiertos. Usa filtros Abiertos o Míos.
               </div>
             )
           ) : filteredLeads.length === 0 ? (
@@ -171,7 +165,7 @@ export default function CrmLeadsPage() {
                   <th className={registryTableHeadCell}>Contacto</th>
                   <th className={registryTableHeadCell}>Etapa</th>
                   <th className={registryTableHeadCell}>Resultado</th>
-                  <th className={registryTableHeadCell}>Próxima acción</th>
+                  <th className={registryTableHeadCell}>Categoría</th>
                   <th className={registryTableHeadCell}>Valor</th>
                   <th className={`${registryTableHeadCell} text-center`}>Acciones</th>
                 </tr>
@@ -197,7 +191,7 @@ export default function CrmLeadsPage() {
                       </span>
                     </td>
                     <td className={`${registryTableCell} text-xs text-gray-400 max-w-[200px]`}>
-                      <span className="line-clamp-2">{lead.proxima_accion ?? "—"}</span>
+                      <span className="line-clamp-2">{lead.categoria_interes ?? "—"}</span>
                     </td>
                     <td className={`${registryTableCell} text-sm text-[#a5a5ff] tabular-nums`}>
                       {formatLeadValue(lead.value_amount, lead.currency)}

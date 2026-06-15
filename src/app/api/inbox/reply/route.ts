@@ -12,6 +12,8 @@ import {
 } from "@/lib/whatsapp/compliance";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import { signWhatsAppMessageMedia } from "@/lib/whatsapp/media-storage";
+import { enrichCrmLeadForConversationId } from "@/lib/crm-lead-enrich";
+import { enrichCrmContactFromWhatsAppConversation } from "@/lib/crm-contact-enrich";
 
 export async function POST(req: NextRequest) {
   const user = await getAuthUserFromRequest(req);
@@ -97,6 +99,25 @@ export async function POST(req: NextRequest) {
         code: waSend.code
       },
       { status: waSend.code === "session_closed" || waSend.code === "opted_out" ? 409 : 502 }
+    );
+  }
+
+  const { data: linkedContact } = await db
+    .from("crm_contacts")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("inbox_conversation_id", conversationId)
+    .maybeSingle();
+
+  if (linkedContact?.id) {
+    void enrichCrmContactFromWhatsAppConversation(
+      db,
+      userId,
+      String(linkedContact.id),
+      conversationId
+    ).catch(err => console.error("[inbox/reply] contact enrich:", err));
+    void enrichCrmLeadForConversationId(db, userId, conversationId).catch(err =>
+      console.error("[inbox/reply] lead enrich:", err)
     );
   }
 
