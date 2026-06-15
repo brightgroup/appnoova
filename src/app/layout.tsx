@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -23,8 +25,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
-      <body className={poppins.className}>{children}</body>
+    <html lang="es" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
+      <body className={poppins.className}>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   );
 }

@@ -353,21 +353,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </Link>
 
           {/* Configuración */}
-          <button 
-            className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all ${
-              sidebarOpen ? "hover:text-white hover:bg-white/[.08]" : "hover:text-white"
+          <Link
+            href="/dashboard/configuracion"
+            className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              pathname === "/dashboard/configuracion" || pathname.startsWith("/dashboard/configuracion/")
+                ? sidebarNavActive
+                : sidebarNavIdle
             }`}
             title="Configuración"
           >
             {sidebarOpen ? (
               <>
-                <Settings className="w-5 h-5 flex-shrink-0 mr-3" />
+                <Settings className={`w-5 h-5 flex-shrink-0 mr-3 ${pathname.startsWith("/dashboard/configuracion") ? sidebarIconActive : "text-gray-400"}`} />
                 <span className="flex-1 text-left">Configuración</span>
               </>
             ) : (
-              <Settings className="w-5 h-5 flex-shrink-0" />
+              <Settings className={`w-5 h-5 flex-shrink-0 ${pathname.startsWith("/dashboard/configuracion") ? sidebarIconActive : "text-gray-400"}`} />
             )}
-          </button>
+          </Link>
         </nav>
 
         {/* Footer - Plan & Logout */}
