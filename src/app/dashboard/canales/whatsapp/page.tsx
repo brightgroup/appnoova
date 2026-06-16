@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { MessageCircle, Plus, Clock, FileText } from "lucide-react";
 import {
   btnGhost,
+  btnPrimary,
   registryTable,
   registryTableHead,
   registryTableHeadRow,
@@ -19,44 +20,59 @@ import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { getAuthHeaders } from "@/lib/text-agents-api";
+import { RequestWhatsAppLineModal } from "@/components/whatsapp/RequestWhatsAppLineModal";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import type { TextAgentListItem } from "@/types/text-agent";
 
+interface WhatsAppRequest {
+  id: string;
+  status: string;
+  friendly_name: string | null;
+  phone_e164: string | null;
+}
+
 function statusBadge(status: string) {
-  if (status === "active") return "bg-emerald-500/15 text-emerald-300";
-  if (status === "suspended") return "bg-red-500/15 text-red-300";
+  if (status === "active" || status === "completed") return "bg-emerald-500/15 text-emerald-300";
+  if (status === "suspended" || status === "rejected") return "bg-red-500/15 text-red-300";
   return "bg-amber-500/15 text-amber-300";
 }
 
 function statusText(status: string) {
-  if (status === "active") return "Activo";
+  if (status === "active" || status === "completed") return "Activo";
   if (status === "suspended") return "Suspendido";
+  if (status === "rejected") return "Rechazado";
   return "Pendiente";
 }
 
 export default function WhatsAppListPage() {
   const router = useRouter();
   const [channels, setChannels] = useState<WhatsAppChannelRecord[]>([]);
+  const [requests, setRequests] = useState<WhatsAppRequest[]>([]);
   const [agents, setAgents] = useState<TextAgentListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [dbReady, setDbReady] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const headers = await getAuthHeaders();
-      const [chRes, agentsRes] = await Promise.all([
+      const [chRes, agentsRes, reqRes] = await Promise.all([
         fetch("/api/whatsapp/channels", { headers }),
-        fetch("/api/text/agents", { headers })
+        fetch("/api/text/agents", { headers }),
+        fetch("/api/whatsapp/requests", { headers })
       ]);
       const chData = await chRes.json();
       const agentsData = await agentsRes.json();
+      const reqData = await reqRes.json();
+
       if (chRes.ok) {
         setChannels(chData.channels ?? []);
         setDbReady(chData.dbReady !== false);
       }
       if (agentsRes.ok) setAgents(agentsData.agents ?? []);
+      if (reqRes.ok) setRequests(reqData.requests ?? []);
     } finally {
       setLoading(false);
     }
@@ -99,9 +115,9 @@ export default function WhatsAppListPage() {
           <Link href="/dashboard/canales/whatsapp/plantillas" className={btnGhost}>
             <FileText className="w-4 h-4" /> Plantillas
           </Link>
-          <Link href="/?solicitar=acceso" className={`${btnGhost} opacity-90`}>
+          <button onClick={() => setModalOpen(true)} className={`${btnPrimary} py-2`}>
             <Plus className="w-4 h-4" /> Solicitar línea
-          </Link>
+          </button>
         </div>
       }
       footer={
@@ -120,9 +136,34 @@ export default function WhatsAppListPage() {
         ) : undefined
       }
     >
+      <RequestWhatsAppLineModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSuccess={load}
+      />
+
       {!dbReady && (
         <div className="mx-6 mt-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
           Falta la migración de WhatsApp en Supabase (021_whatsapp_channels.sql).
+        </div>
+      )}
+
+      {requests.some(r => r.status === "pending" || r.status === "approved") && (
+        <div className="mx-6 mt-6 mb-2">
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Solicitudes en curso</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {requests.filter(r => r.status === "pending" || r.status === "approved").map(req => (
+              <div key={req.id} className="bg-white/[.02] border border-white/[.08] rounded-xl p-4 flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{req.friendly_name || "WhatsApp"}</p>
+                  <p className="text-xs text-gray-500 truncate">{req.phone_e164 || "Número por asignar"}</p>
+                </div>
+                <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusBadge(req.status)}`}>
+                  {statusText(req.status)}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -137,12 +178,14 @@ export default function WhatsAppListPage() {
           {!search && (
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[.04] border border-white/[.08] text-xs text-gray-500">
               <Clock className="w-3.5 h-3.5" />
-              Fase 0 — activación asistida
+              Activación asistida por Noova
             </div>
           )}
         </div>
       ) : (
-        <table className={`${registryTable} min-w-[720px]`}>
+        <div className="mt-4 px-6">
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Líneas activas</h3>
+          <table className={`${registryTable} min-w-[720px]`}>
           <thead className={registryTableHead}>
             <tr className={registryTableHeadRow}>
               <th className={registryTableHeadCell}>Línea</th>
@@ -181,7 +224,8 @@ export default function WhatsAppListPage() {
             ))}
           </tbody>
         </table>
-      )}
-    </ChannelListPage>
-  );
+      </div>
+    )}
+  </ChannelListPage>
+);
 }

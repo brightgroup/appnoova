@@ -115,7 +115,9 @@ async function sendWhatsAppIfAllowed(
       toE164,
       fromE164: channel.e164,
       messagingServiceSid: channel.twilio_messaging_service_sid,
-      body
+      body,
+      accountSid: channel.twilio_subaccount_sid,
+      authToken: channel.twilio_subaccount_auth_token
     });
     return { ok: true };
   } catch (err) {
@@ -436,7 +438,9 @@ export async function sendWhatsAppOutboundForConversation(
       messagingServiceSid: channelRow.twilio_messaging_service_sid
         ? String(channelRow.twilio_messaging_service_sid)
         : null,
-      body
+      body,
+      accountSid: channelRow.twilio_subaccount_sid,
+      authToken: channelRow.twilio_subaccount_auth_token
     });
     return { ok: true };
   } catch (err) {

@@ -50,6 +50,9 @@ export interface SendWhatsAppMessageInput {
   fromE164?: string;
   messagingServiceSid?: string | null;
   body: string;
+  /** Opcional: credenciales de subcuenta */
+  accountSid?: string | null;
+  authToken?: string | null;
 }
 
 export interface SendWhatsAppTemplateInput {
@@ -58,22 +61,29 @@ export interface SendWhatsAppTemplateInput {
   messagingServiceSid?: string | null;
   contentSid: string;
   contentVariables?: Record<string, string>;
+  /** Opcional: credenciales de subcuenta */
+  accountSid?: string | null;
+  authToken?: string | null;
 }
 
-async function postTwilioMessage(form: Record<string, string>): Promise<{ sid: string }> {
-  const creds = twilioCredentials();
-  if (!creds) {
+async function postTwilioMessage(form: Record<string, string>, accountSid?: string | null, authToken?: string | null): Promise<{ sid: string }> {
+  const master = twilioCredentials();
+  if (!master) {
     throw new Error("Twilio no configurado (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN)");
   }
+
+  // Usar credenciales de subcuenta si se proporcionan, si no las master
+  const activeSid = accountSid || master.accountSid;
+  const activeToken = authToken || master.authToken;
 
   form.StatusCallback = twilioWhatsAppStatusWebhookUrl();
 
   const res = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${creds.accountSid}/Messages.json`,
+    `https://api.twilio.com/2010-04-01/Accounts/${activeSid}/Messages.json`,
     {
       method: "POST",
       headers: {
-        Authorization: authHeader(creds.accountSid, creds.authToken),
+        Authorization: authHeader(activeSid, activeToken),
         "Content-Type": "application/x-www-form-urlencoded"
       },
       body: new URLSearchParams(form).toString()
@@ -115,7 +125,7 @@ export async function sendTwilioWhatsAppMessage(
     Body: input.body
   };
   applyFromFields(form, input);
-  return postTwilioMessage(form);
+  return postTwilioMessage(form, input.accountSid, input.authToken);
 }
 
 /** Plantilla aprobada por Meta (ContentSid HX…). Fuera de ventana 24 h. */
@@ -130,5 +140,5 @@ export async function sendTwilioWhatsAppTemplate(
   if (input.contentVariables && Object.keys(input.contentVariables).length > 0) {
     form.ContentVariables = JSON.stringify(input.contentVariables);
   }
-  return postTwilioMessage(form);
+  return postTwilioMessage(form, input.accountSid, input.authToken);
 }

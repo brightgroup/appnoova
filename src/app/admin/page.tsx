@@ -18,6 +18,7 @@ interface AdminStats {
   phone_lines_total: number;
   whatsapp_channels_total: number;
   pending_whatsapp_templates: number;
+  pending_whatsapp_requests: number;
   voice_agents_total: number;
   text_agents_total: number;
   calls_today: number;
@@ -39,7 +40,9 @@ export default function AdminDashboard() {
   useEffect(() => { loadStats(); }, [loadStats]);
 
   const pendingTotal =
-    (stats?.pending_telephony_requests ?? 0) + (stats?.pending_whatsapp_templates ?? 0);
+    (stats?.pending_telephony_requests ?? 0) + 
+    (stats?.pending_whatsapp_templates ?? 0) +
+    (stats?.pending_whatsapp_requests ?? 0);
 
   const statCards = stats
     ? [
@@ -88,8 +91,8 @@ export default function AdminDashboard() {
         {
           label: "WhatsApp",
           value: String(stats.whatsapp_channels_total),
-          hint: stats.pending_whatsapp_templates > 0
-            ? `${stats.pending_whatsapp_templates} plantilla${stats.pending_whatsapp_templates !== 1 ? "s" : ""} en revisión`
+          hint: (stats.pending_whatsapp_templates + stats.pending_whatsapp_requests) > 0
+            ? `${stats.pending_whatsapp_templates + stats.pending_whatsapp_requests} pendiente${(stats.pending_whatsapp_templates + stats.pending_whatsapp_requests) !== 1 ? "s" : ""}`
             : "Líneas registradas",
           icon: MessageCircle,
           color: "cyan" as const,
@@ -130,10 +133,10 @@ export default function AdminDashboard() {
     {
       href: "/admin/whatsapp",
       label: "WhatsApp (Twilio)",
-      description: "Líneas, webhooks y aprobaciones Meta",
+      description: "Líneas, webhooks y solicitudes",
       icon: MessageCircle,
-      badge: stats?.pending_whatsapp_templates,
-      alert: (stats?.pending_whatsapp_templates ?? 0) > 0,
+      badge: (stats?.pending_whatsapp_templates ?? 0) + (stats?.pending_whatsapp_requests ?? 0),
+      alert: ((stats?.pending_whatsapp_templates ?? 0) + (stats?.pending_whatsapp_requests ?? 0)) > 0,
     },
     {
       href: "/admin/templates",
@@ -178,6 +181,9 @@ export default function AdminDashboard() {
               {pendingTotal} pendiente{pendingTotal !== 1 ? "s" : ""} requiere{pendingTotal === 1 ? "" : "n"} atención
               {(stats?.pending_telephony_requests ?? 0) > 0 && (
                 <> · <Link href="/admin/telephony?tab=solicitudes" className="text-[#a5a5ff] hover:underline">{stats?.pending_telephony_requests} solicitud{stats?.pending_telephony_requests !== 1 ? "es" : ""} de línea</Link></>
+              )}
+              {(stats?.pending_whatsapp_requests ?? 0) > 0 && (
+                <> · <Link href="/admin/whatsapp?tab=requests" className="text-[#a5a5ff] hover:underline">{stats?.pending_whatsapp_requests} activación{stats?.pending_whatsapp_requests !== 1 ? "es" : ""} WA</Link></>
               )}
               {(stats?.pending_whatsapp_templates ?? 0) > 0 && (
                 <> · <Link href="/admin/whatsapp?tab=aprobaciones" className="text-[#a5a5ff] hover:underline">{stats?.pending_whatsapp_templates} plantilla{stats?.pending_whatsapp_templates !== 1 ? "s" : ""} WA</Link></>

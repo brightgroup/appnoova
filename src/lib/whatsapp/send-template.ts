@@ -95,7 +95,9 @@ export async function sendWhatsAppTemplateForConversation(input: {
       fromE164: channel.e164,
       messagingServiceSid: channel.twilio_messaging_service_sid,
       contentSid: template.twilio_content_sid,
-      contentVariables
+      contentVariables,
+      accountSid: channelRow.twilio_subaccount_sid,
+      authToken: channelRow.twilio_subaccount_auth_token
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error al enviar plantilla";

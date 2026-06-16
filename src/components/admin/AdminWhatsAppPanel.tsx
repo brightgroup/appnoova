@@ -25,7 +25,20 @@ import type { WhatsAppTemplateStatus } from "@/types/whatsapp-template";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
 
-type Tab = "lines" | "approvals";
+type Tab = "lines" | "approvals" | "requests";
+
+interface WhatsAppRequestRow {
+  id: string;
+  user_id: string;
+  text_agent_id: string | null;
+  phone_e164: string | null;
+  friendly_name: string | null;
+  notes: string | null;
+  status: string;
+  created_at: string;
+  profiles: { email: string; full_name: string | null } | null;
+  text_agents: { name: string } | null;
+}
 
 interface PendingRow {
   id: string;
@@ -48,10 +61,12 @@ export function AdminWhatsAppPanel() {
   const [channels, setChannels] = useState<WhatsAppChannelRecord[]>([]);
   const [users, setUsers] = useState<{ id: string; email: string; nombre: string }[]>([]);
   const [templates, setTemplates] = useState<PendingRow[]>([]);
+  const [requests, setRequests] = useState<WhatsAppRequestRow[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [webhookUrl, setWebhookUrl] = useState("");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<string | boolean>(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [approvalFilter, setApprovalFilter] = useState<"pending_approval" | "all_pending">("pending_approval");
@@ -65,21 +80,31 @@ export function AdminWhatsAppPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const [chRes, usersRes, tplRes] = await Promise.all([
+    const [chRes, usersRes, tplRes, reqRes] = await Promise.all([
       authFetch("/api/admin/whatsapp/channels"),
       supabase.from("users").select("id, email, nombre").order("email"),
-      authFetch(`/api/admin/whatsapp/templates?status=${approvalFilter}`)
+      authFetch(`/api/admin/whatsapp/templates?status=${approvalFilter}`),
+      authFetch("/api/admin/whatsapp/requests")
     ]);
     const chData = await chRes.json();
     const tplData = await tplRes.json();
+    const reqData = await reqRes.json();
+
     if (chRes.ok) {
       setChannels(chData.channels ?? []);
       setWebhookUrl(String(chData.webhook_url ?? ""));
     } else setError(chData.error || "Error al cargar");
+
     if (tplRes.ok) {
       setTemplates(tplData.templates ?? []);
       setPendingCount(tplData.pending_count ?? 0);
     }
+
+    if (reqRes.ok) {
+      setRequests(reqData.requests ?? []);
+      setPendingRequestsCount((reqData.requests ?? []).filter((r: any) => r.status === "pending").length);
+    }
+
     if (usersRes.data) setUsers(usersRes.data);
     setLoading(false);
   }, [approvalFilter]);
@@ -87,10 +112,43 @@ export function AdminWhatsAppPanel() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    if (tab !== "approvals") return;
+    if (tab === "lines") return;
     const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
   }, [tab, load]);
+
+  const handleProvision = async (requestId: string) => {
+    if (!confirm("¿Deseas crear una subcuenta en Twilio y el canal para esta solicitud?")) return;
+    
+    setSaving(requestId as any); // hack para mostrar cargando en el botón
+    try {
+      const res = await authFetch(`/api/admin/whatsapp/requests/${requestId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "provision" })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al aprovisionar");
+      await load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Error desconocido");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdateStatus = async (requestId: string, status: string) => {
+    try {
+      const res = await authFetch(`/api/admin/whatsapp/requests/${requestId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) await load();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -179,6 +237,14 @@ export function AdminWhatsAppPanel() {
               </span>
             )}
           </button>
+          <button type="button" onClick={() => setTab("requests")} className={tab === "requests" ? btnFilterActive : btnFilterIdle}>
+            Solicitudes
+            {pendingRequestsCount > 0 && (
+              <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#5b5bf6] px-1 text-[10px] font-bold text-white">
+                {pendingRequestsCount}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -191,7 +257,7 @@ export function AdminWhatsAppPanel() {
           <div className="space-y-8 max-w-4xl">
             {webhookUrl && (
               <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[.06] p-4 space-y-2">
-                <p className="text-sm font-medium text-emerald-300">Webhook Twilio Console</p>
+                <p className="text-sm font-medium text-emerald-300">Webhook Twilio Console (Master)</p>
                 <p className={`${textMuted} text-xs`}>
                   Messaging → WhatsApp Senders → HTTP POST al recibir mensaje
                 </p>
@@ -229,6 +295,7 @@ export function AdminWhatsAppPanel() {
                     <tr className={registryTableHeadRow}>
                       <th className={registryTableHeadCell}>Número</th>
                       <th className={registryTableHeadCell}>Cliente</th>
+                      <th className={registryTableHeadCell}>Subcuenta</th>
                       <th className={registryTableHeadCell}>Estado</th>
                       <th className={registryTableHeadCell} />
                     </tr>
@@ -245,6 +312,9 @@ export function AdminWhatsAppPanel() {
                             </div>
                           </td>
                           <td className={`${registryTableCell} text-sm`}>{u?.email ?? ch.user_id.slice(0, 8)}</td>
+                          <td className={`${registryTableCell} font-mono text-[10px] text-gray-500`}>
+                            {ch.twilio_subaccount_sid || "Master"}
+                          </td>
                           <td className={registryTableCell}>{ch.status}</td>
                           <td className={registryTableCell}>
                             <button type="button" onClick={() => toggleActive(ch.id, ch.status)} className={btnGhost}>
@@ -261,7 +331,7 @@ export function AdminWhatsAppPanel() {
 
             <form id="wa-register-form" onSubmit={handleCreate} className="rounded-xl border border-white/[.10] bg-white/[.02] p-5 space-y-4">
               <h2 className="text-sm font-semibold flex items-center gap-2">
-                <Plus className="w-4 h-4 text-emerald-400" /> Registrar línea WhatsApp (Twilio)
+                <Plus className="w-4 h-4 text-emerald-400" /> Registrar línea WhatsApp (Manual)
               </h2>
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Cliente</label>
@@ -295,12 +365,12 @@ export function AdminWhatsAppPanel() {
                 Activar inmediatamente
               </label>
               {error && <p className="text-sm text-red-400">{error}</p>}
-              <button type="submit" disabled={saving} className={btnPrimary}>
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Registrar línea"}
+              <button type="submit" disabled={!!saving} className={btnPrimary}>
+                {saving === true ? <Loader2 className="w-4 h-4 animate-spin" /> : "Registrar línea"}
               </button>
             </form>
           </div>
-        ) : (
+        ) : tab === "approvals" ? (
           <RegistryTableLayout
             filters={
               <div className="flex gap-2">
@@ -367,6 +437,79 @@ export function AdminWhatsAppPanel() {
                       </td>
                       <td className={`${registryTableCell} text-xs text-gray-400`}>
                         {tpl.updated_at ? new Date(tpl.updated_at).toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </RegistryTableLayout>
+        ) : (
+          <RegistryTableLayout onRefresh={load} refreshing={loading}>
+            {requests.length === 0 ? (
+              <p className="text-sm text-gray-500 py-10 text-center">No hay solicitudes pendientes.</p>
+            ) : (
+              <table className={`${registryTable} min-w-full`}>
+                <thead className={registryTableHead}>
+                  <tr className={registryTableHeadRow}>
+                    <th className={registryTableHeadCell}>Solicitud</th>
+                    <th className={registryTableHeadCell}>Cliente</th>
+                    <th className={registryTableHeadCell}>Agente</th>
+                    <th className={registryTableHeadCell}>Estado</th>
+                    <th className={registryTableHeadCell} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map(req => (
+                    <tr key={req.id} className={registryTableRow}>
+                      <td className={registryTableCell}>
+                        <div className="text-sm font-medium text-white">{req.friendly_name || "WhatsApp"}</div>
+                        <div className="text-xs font-mono text-gray-500">{req.phone_e164 || "Sin número"}</div>
+                        {req.notes && <div className="text-[11px] text-amber-200/60 mt-1 max-w-xs truncate">{req.notes}</div>}
+                      </td>
+                      <td className={registryTableCell}>
+                        <div className="text-xs text-white">{req.profiles?.full_name || "—"}</div>
+                        <div className="text-[11px] text-gray-500">{req.profiles?.email}</div>
+                      </td>
+                      <td className={registryTableCell}>
+                        <div className="text-xs text-gray-300">{req.text_agents?.name || "Sin agente"}</div>
+                      </td>
+                      <td className={registryTableCell}>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                          req.status === "completed" ? "bg-emerald-500/20 text-emerald-400" :
+                          req.status === "rejected" ? "bg-red-500/20 text-red-400" :
+                          "bg-amber-500/20 text-amber-400"
+                        }`}>
+                          {req.status}
+                        </span>
+                      </td>
+                      <td className={registryTableCell}>
+                        <div className="flex gap-2">
+                          {req.status === "pending" && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={!!saving}
+                                onClick={() => handleProvision(req.id)}
+                                className={`${btnPrimary} py-1.5 px-3 text-xs`}
+                              >
+                                {saving === (req.id as any) ? <Loader2 className="w-3 h-3 animate-spin" /> : "Aprovisionar"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateStatus(req.id, "rejected")}
+                                className={`${btnGhost} py-1.5 px-3 text-xs text-red-400 hover:text-red-300`}
+                              >
+                                Rechazar
+                              </button>
+                            </>
+                          )}
+                          {req.status === "completed" && (
+                            <span className="text-xs text-emerald-400 font-medium flex items-center gap-1">
+                              Completado
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
