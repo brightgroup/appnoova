@@ -5,6 +5,11 @@ import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { geminiTextTemperature } from "@/lib/text-agent-form";
 import { persistChatTurn } from "@/lib/text-conversation-persist";
 import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
+import {
+  checkBillingForUser,
+  readGeminiUsage,
+  recordUsageSafe
+} from "@/lib/billing/meter";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -55,6 +60,20 @@ export async function POST(req: NextRequest) {
   }
   if (!agent) {
     return NextResponse.json({ error: "Agente no encontrado" }, { status: 404 });
+  }
+
+  const billing = await checkBillingForUser(db, userId);
+  if (!billing.allowed) {
+    return NextResponse.json(
+      {
+        error:
+          billing.reason === "no_credits"
+            ? "Te quedaste sin créditos este mes. Recarga o espera tu próxima fecha de facturación."
+            : "Tu cuenta está suspendida. Regulariza el pago para continuar.",
+        code: billing.reason
+      },
+      { status: 402 }
+    );
   }
 
   let companyContextText = "";
@@ -112,6 +131,21 @@ export async function POST(req: NextRequest) {
       }
     } catch (persistErr) {
       console.error("[text/chat] persist:", persistErr);
+    }
+
+    if (billing.organizationId) {
+      await recordUsageSafe({
+        db,
+        organizationId: billing.organizationId,
+        userId,
+        eventType: "text_test",
+        channel: "web_test",
+        provider: "google",
+        model,
+        gemini: readGeminiUsage(response),
+        referenceType: "text_agent_conversation",
+        referenceId: savedConversationId ?? undefined
+      });
     }
 
     return NextResponse.json({

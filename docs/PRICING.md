@@ -360,7 +360,8 @@ Costo promedio ponderado: **~$0,59 COP por crédito consumido**.
 
 - [ ] Migrar WhatsApp de Twilio → 360dialog Partner (~10–15 clientes activos pagando)
 - [ ] Revisar precio WhatsApp con IA ($60 → $65–70) post-lanzamiento
-- [ ] Implementar wallet/créditos en base de datos
+- [x] Implementar wallet/créditos en base de datos (migración 041 — créditos mensuales no acumulables, medición en tiempo real, suspensión automática)
+- [ ] Conectar pasarela de pago (hoy el pago se marca manual desde /admin/billing)
 - [ ] Definir cobro en COP vs USD en pasarela de pago
 
 ---
@@ -370,3 +371,4 @@ Costo promedio ponderado: **~$0,59 COP por crédito consumido**.
 | Fecha | Cambio |
 |-------|--------|
 | Jun 2026 | Documento inicial. WA Fase 0 Twilio. WhatsApp IA a $60 (lanzamiento). Planes $0 / $82 / $345 / $815 USD. |
+| Jun 2026 | Sistema de consumo/facturación (migración 041): planes en BD, billetera de créditos mensual no acumulable, ledger `usage_events` con costo real vs cobro, facturas + suspensión automática, panel cliente (/dashboard/facturacion) y panel proveedor (/admin/billing). IDs de plan: explorador/esencial/crecimiento/escala. |

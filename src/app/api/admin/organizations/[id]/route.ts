@@ -5,7 +5,7 @@ import { uniqueOrgSlug } from "@/lib/admin-utils";
 import type { AccountStatus } from "@/types/rbac";
 
 const VALID_STATUS = new Set<AccountStatus>(["active", "invited", "suspended", "disabled"]);
-const PLANS = new Set(["trial", "starter", "pro", "enterprise"]);
+const PLANS = new Set(["explorador", "esencial", "crecimiento", "escala"]);
 
 /** PATCH — editar organización (nombre, slug, plan, estado) */
 export async function PATCH(
@@ -72,6 +72,18 @@ export async function PATCH(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Si cambió el plan, re-crear suscripción + billetera (reinicia créditos del periodo)
+  if (typeof updates.plan === "string") {
+    const { error: billingErr } = await db.rpc("billing_bootstrap_subscription", {
+      p_org: id,
+      p_plan: updates.plan,
+    });
+    if (billingErr) {
+      console.error("[admin/organizations] bootstrap billing (patch):", billingErr.message);
+    }
+  }
+
   return NextResponse.json({ organization: data });
 }
 

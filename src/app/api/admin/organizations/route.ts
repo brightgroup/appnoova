@@ -3,7 +3,7 @@ import { requireSuperAdmin, isProtectedUser } from "@/lib/admin-server";
 import { adminClient } from "@/lib/voice-agents-server";
 import { uniqueOrgSlug } from "@/lib/admin-utils";
 
-const PLANS = new Set(["trial", "starter", "pro", "enterprise"]);
+const PLANS = new Set(["explorador", "esencial", "crecimiento", "escala"]);
 
 /** GET — organizaciones con owner y conteo de miembros */
 export async function GET(req: NextRequest) {
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   const name = (body.name as string | undefined)?.trim();
   const ownerEmail = (body.owner_email as string | undefined)?.trim().toLowerCase();
   const ownerUserId = body.owner_user_id as string | undefined;
-  const plan = (body.plan as string | undefined)?.trim() || "trial";
+  const plan = (body.plan as string | undefined)?.trim() || "explorador";
 
   if (!name) {
     return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
@@ -119,6 +119,15 @@ export async function POST(req: NextRequest) {
     user_id: ownerId,
     organization_id: org.id,
   });
+
+  // Crear suscripción + billetera de créditos + primera factura
+  const { error: billingErr } = await db.rpc("billing_bootstrap_subscription", {
+    p_org: org.id,
+    p_plan: plan,
+  });
+  if (billingErr) {
+    console.error("[admin/organizations] bootstrap billing:", billingErr.message);
+  }
 
   return NextResponse.json({ organization: org }, { status: 201 });
 }

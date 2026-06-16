@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { authFetch } from "@/lib/telephony-api";
 import {
   sidebarNavActive, sidebarNavIdle, sidebarIconActive, sidebarBadge, sidebarPlanCard
 } from "@/lib/brand-ui";
@@ -14,6 +15,12 @@ import { AGENTES_VOZ_NAV } from "@/lib/agentes-voz-nav";
 import { AGENTES_TEXTO_NAV } from "@/lib/agentes-texto-nav";
 import { CRM_NAV } from "@/lib/crm-nav";
 import type { LucideIcon } from "lucide-react";
+
+function formatCreditsShort(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  return new Intl.NumberFormat("es-CO").format(Math.round(n));
+}
 
 function SidebarSubMenu({
   items,
@@ -64,8 +71,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
   const [authReady, setAuthReady] = useState(false);
+  const [billing, setBilling] = useState<{ planName: string; remaining: number; total: number; usedPct: number } | null>(null);
   const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    if (!checked) return;
+    let cancelled = false;
+    authFetch("/api/billing/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (cancelled || !json) return;
+        const w = json.wallet;
+        const planName = json.subscription?.plans?.name ?? json.subscription?.plan_id ?? "Plan";
+        if (w) {
+          setBilling({
+            planName,
+            remaining: Number(w.remaining_credits ?? 0),
+            total: Number(w.total_credits ?? 0),
+            usedPct: Number(w.used_pct ?? 0)
+          });
+        }
+      })
+      .catch(() => { /* silencioso */ });
+    return () => { cancelled = true; };
+  }, [checked, pathname]);
 
   useEffect(() => {
     if (pathname.startsWith("/dashboard/agentes-voz")) {
@@ -365,6 +395,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
           </Link>
 
+          {/* Facturación */}
+          <Link
+            href="/dashboard/facturacion"
+            className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              pathname === "/dashboard/facturacion" || pathname.startsWith("/dashboard/facturacion/")
+                ? sidebarNavActive
+                : sidebarNavIdle
+            }`}
+            title="Facturación"
+          >
+            {sidebarOpen ? (
+              <>
+                <CreditCard className={`w-5 h-5 flex-shrink-0 mr-3 ${pathname.startsWith("/dashboard/facturacion") ? sidebarIconActive : "text-gray-400"}`} />
+                <span className="flex-1 text-left">Facturación</span>
+              </>
+            ) : (
+              <CreditCard className={`w-5 h-5 flex-shrink-0 ${pathname.startsWith("/dashboard/facturacion") ? sidebarIconActive : "text-gray-400"}`} />
+            )}
+          </Link>
+
           {/* Configuración */}
           <Link
             href="/dashboard/configuracion"
@@ -390,14 +440,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className={`${sidebarOpen ? "p-3 space-y-3" : "p-3 space-y-3"} border-t border-white/[.08]`}>
           {/* Plan Card */}
           {sidebarOpen && (
-            <div className={sidebarPlanCard}>
+            <Link href="/dashboard/facturacion" className={`${sidebarPlanCard} block hover:bg-white/[.07] transition-colors`}>
               <div className="flex items-center gap-2 mb-2">
                 <CreditCard className={`w-4 h-4 flex-shrink-0 ${sidebarIconActive}`} />
-                <span className="text-xs font-medium text-gray-200">Pro Plan</span>
+                <span className="text-xs font-medium text-gray-200">{billing?.planName ?? "Plan"}</span>
               </div>
-              <p className="text-[11px] text-gray-500">Créditos usados</p>
-              <p className="text-sm font-semibold text-[#5b5bf6] tabular-nums">0 / 100.4K</p>
-            </div>
+              <p className="text-[11px] text-gray-500">Créditos disponibles</p>
+              <p className="text-sm font-semibold text-[#5b5bf6] tabular-nums">
+                {billing
+                  ? `${formatCreditsShort(billing.remaining)} / ${formatCreditsShort(billing.total)}`
+                  : "—"}
+              </p>
+              <div className="mt-2 h-1.5 rounded-full bg-white/[.08] overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${(billing?.usedPct ?? 0) >= 90 ? "bg-red-500" : (billing?.usedPct ?? 0) >= 70 ? "bg-amber-500" : "bg-[#5b5bf6]"}`}
+                  style={{ width: `${billing?.usedPct ?? 0}%` }}
+                />
+              </div>
+            </Link>
           )}
 
           {/* Logout */}

@@ -4,6 +4,11 @@ import { getOriApiKey, getOriModel } from "@/lib/google-ai";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { ORI_SYSTEM_PROMPT } from "@/lib/ori-prompt";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
+import {
+  checkBillingForUser,
+  readGeminiUsage,
+  recordUsageSafe
+} from "@/lib/billing/meter";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -34,6 +39,21 @@ export async function POST(req: NextRequest) {
 
   if (!lastUser?.content?.trim()) {
     return NextResponse.json({ error: "Mensaje vacío" }, { status: 400 });
+  }
+
+  const billingDb = adminClient();
+  const billing = await checkBillingForUser(billingDb, userId);
+  if (!billing.allowed) {
+    return NextResponse.json(
+      {
+        error:
+          billing.reason === "no_credits"
+            ? "Te quedaste sin créditos este mes. Recarga o espera tu próxima fecha de facturación."
+            : "Tu cuenta está suspendida. Regulariza el pago para reactivar ORI.",
+        code: billing.reason
+      },
+      { status: 402 }
+    );
   }
 
   let companyContextText = "";
@@ -80,6 +100,19 @@ export async function POST(req: NextRequest) {
     const reply = response.text?.trim();
     if (!reply) {
       return NextResponse.json({ error: "Ori no generó respuesta" }, { status: 502 });
+    }
+
+    if (billing.organizationId) {
+      await recordUsageSafe({
+        db: billingDb,
+        organizationId: billing.organizationId,
+        userId,
+        eventType: "ori",
+        channel: "ori",
+        provider: "google",
+        model,
+        gemini: readGeminiUsage(response)
+      });
     }
 
     return NextResponse.json({ reply, model });

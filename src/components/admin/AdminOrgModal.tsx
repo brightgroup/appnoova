@@ -24,10 +24,10 @@ interface AdminOrgModalProps {
 }
 
 const PLAN_OPTIONS = [
-  { value: "trial", label: "Trial" },
-  { value: "starter", label: "Starter" },
-  { value: "pro", label: "Pro" },
-  { value: "enterprise", label: "Enterprise" },
+  { value: "explorador", label: "Explorador · Prueba 14 días (15.000 cr)" },
+  { value: "esencial", label: "Esencial · $82/mes (350.000 cr)" },
+  { value: "crecimiento", label: "Crecimiento · $345/mes (1.500.000 cr)" },
+  { value: "escala", label: "Escala · $815/mes (3.800.000 cr)" },
 ];
 
 const STATUS_OPTIONS = [
@@ -46,7 +46,7 @@ export function AdminOrgModal({
 }: AdminOrgModalProps) {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  const [plan, setPlan] = useState("trial");
+  const [plan, setPlan] = useState("explorador");
   const [status, setStatus] = useState<AccountStatus>("active");
   const [ownerEmail, setOwnerEmail] = useState("");
 
@@ -54,7 +54,7 @@ export function AdminOrgModal({
     if (open) {
       setName(initial?.name ?? "");
       setSlug(initial?.slug ?? "");
-      setPlan(initial?.plan ?? "trial");
+      setPlan(initial?.plan ?? "explorador");
       setStatus((initial?.status as AccountStatus) ?? "active");
       setOwnerEmail(initial?.owner_email ?? "");
     }

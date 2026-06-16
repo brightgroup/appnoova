@@ -12,6 +12,14 @@ import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
 import { resolvePublicChatChannel } from "@/lib/widget-channel";
 import { getOriApiKey } from "@/lib/google-ai";
+import {
+  checkBillingForUser,
+  readGeminiUsage,
+  recordUsageSafe
+} from "@/lib/billing/meter";
+
+const PUBLIC_BILLING_FALLBACK =
+  "¡Gracias por tu mensaje! En este momento no puedo responder automáticamente, pero un asesor te contactará muy pronto.";
 
 interface ChatMessage {
   role: "user" | "assistant" | "human";
@@ -130,6 +138,30 @@ export async function POST(
     return NextResponse.json({ error: "Servicio no disponible temporalmente." }, { status: 503 });
   }
 
+  // —— Facturación: si la org no tiene saldo, no gastamos IA ——
+  const billing = await checkBillingForUser(db, userId);
+  if (!billing.allowed) {
+    const contactLabel = conversationId ? undefined : makeVisitorLabel();
+    const persisted = await persistChatTurn({
+      db,
+      userId,
+      agentId: String(agent.id),
+      agentName: String(agent.name),
+      conversationId,
+      userMessage: lastUser.content.trim(),
+      assistantReply: PUBLIC_BILLING_FALLBACK,
+      llmModel: model,
+      channel,
+      contactLabel
+    });
+    return NextResponse.json({
+      reply: PUBLIC_BILLING_FALLBACK,
+      conversation_id: persisted.conversationId || conversationId || null
+    });
+  }
+
+  const billingEventType = channel === WEB_EMBED_CHANNEL ? "widget" : "milink";
+
   const systemInstruction = mergeCompanyContext(String(agent.prompt), companyContextText);
   const temperature = geminiTextTemperature(Number(agent.temperature) || 0.7);
   const maxOutputTokens = Number(agent.max_output_tokens) || 2048;
@@ -170,6 +202,21 @@ export async function POST(
       if (persisted.conversationId) savedConversationId = persisted.conversationId;
     } catch (err) {
       console.error("[public/microsite/chat] persist:", err);
+    }
+
+    if (billing.organizationId) {
+      await recordUsageSafe({
+        db,
+        organizationId: billing.organizationId,
+        userId,
+        eventType: billingEventType,
+        channel,
+        provider: "google",
+        model,
+        gemini: readGeminiUsage(response),
+        referenceType: "text_agent_conversation",
+        referenceId: savedConversationId ?? undefined
+      });
     }
 
     return NextResponse.json({

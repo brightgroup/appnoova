@@ -3,6 +3,7 @@ import { buildCallRecordFields, splitCallRecordFields, updateAgentCallsCount } f
 import { getPhoneTestCallSession, updatePhoneTestCallSession, labelForPhase } from "@/lib/telephony/test-call-session";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import { uploadCallRecording } from "@/lib/voice-call-storage";
+import { recordUsageSafe, resolveOrgIdForUser } from "@/lib/billing/meter";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
 
 export async function finalizePhoneTestCall(input: {
@@ -103,6 +104,27 @@ export async function finalizePhoneTestCall(input: {
   }
 
   await updateAgentCallsCount(db, session.voice_agent_id, callsCountNext);
+
+  if (durationSec > 0) {
+    const billedMinutes = Math.max(1, Math.ceil(durationSec / 60));
+    const orgId = await resolveOrgIdForUser(db, session.user_id);
+    if (orgId) {
+      await recordUsageSafe({
+        db,
+        organizationId: orgId,
+        userId: session.user_id,
+        eventType: "voice",
+        channel: "voice",
+        quantity: billedMinutes,
+        provider: "telnyx",
+        voiceMinutes: durationSec / 60,
+        referenceType: "voice_agent_call",
+        referenceId: session.id,
+        idempotencyKey: `voice_${session.id}`,
+        metadata: { duration_sec: durationSec, call_control_id: input.callControlId }
+      });
+    }
+  }
 
   await updatePhoneTestCallSession(input.callControlId, {
     phase: "ended",

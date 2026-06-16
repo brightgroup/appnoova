@@ -25,6 +25,12 @@ import {
 } from "@/lib/whatsapp/compliance";
 import { buildWhatsAppInboundContent } from "@/lib/whatsapp/media-understanding";
 import { sendTwilioWhatsAppMessage } from "@/lib/whatsapp/twilio-whatsapp";
+import {
+  checkBillingForOrg,
+  readGeminiUsage,
+  recordUsageSafe,
+  resolveOrgIdForUser
+} from "@/lib/billing/meter";
 import type { TwilioWhatsAppMediaItem } from "@/lib/whatsapp/twilio-media";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import { WHATSAPP_CONVERSATION_CHANNEL } from "@/lib/whatsapp-channel";
@@ -37,6 +43,14 @@ export interface TwilioWhatsAppInbound {
   body: string;
   profileName: string | null;
   media: TwilioWhatsAppMediaItem[];
+}
+
+async function resolveChannelOrgId(
+  db: SupabaseClient,
+  channel: WhatsAppChannelRecord
+): Promise<string | null> {
+  if (channel.organization_id) return channel.organization_id;
+  return resolveOrgIdForUser(db, channel.user_id);
 }
 
 async function syncAndEnrichCrmFromInbound(
@@ -176,6 +190,7 @@ export async function processTwilioWhatsAppInbound(
   }
 
   const model = String(agent.llm_model || "gemini-2.5-flash");
+  const orgId = await resolveChannelOrgId(db, channel);
   const contactLabel = buildWhatsAppContactLabel(inbound.profileName, inbound.fromE164);
   const existing = await findWhatsAppConversation(
     db,
@@ -242,6 +257,21 @@ export async function processTwilioWhatsAppInbound(
       false
     );
 
+    if (orgId) {
+      await recordUsageSafe({
+        db,
+        organizationId: orgId,
+        userId: channel.user_id,
+        eventType: "whatsapp_manual",
+        channel: WHATSAPP_CONVERSATION_CHANNEL,
+        provider: "twilio",
+        twilioMessages: 2, // entrante + confirmación de baja
+        referenceType: "text_agent_conversation",
+        referenceId: persisted.conversationId,
+        idempotencyKey: `wa_optout_${inbound.messageSid}`
+      });
+    }
+
     return { ok: true };
   }
 
@@ -272,10 +302,58 @@ export async function processTwilioWhatsAppInbound(
 
     await syncAndEnrichCrmFromInbound(db, channel, persisted.conversationId, inbound, nowIso, optedOutAfter);
 
+    if (orgId) {
+      await recordUsageSafe({
+        db,
+        organizationId: orgId,
+        userId: channel.user_id,
+        eventType: "whatsapp_manual",
+        channel: WHATSAPP_CONVERSATION_CHANNEL,
+        provider: "twilio",
+        twilioMessages: 1,
+        referenceType: "text_agent_conversation",
+        referenceId: persisted.conversationId,
+        idempotencyKey: `wa_in_${inbound.messageSid}`
+      });
+    }
+
     return { ok: true };
   }
 
   // —— Respuesta IA (usuario primero, asistente después) ——
+  if (orgId) {
+    const billing = await checkBillingForOrg(db, orgId);
+    if (!billing.allowed) {
+      // Sin saldo / suspendida: registramos el entrante pero no gastamos IA ni enviamos.
+      const blockedPersist = await persistUserMessageOnly({
+        db,
+        userId: channel.user_id,
+        agentId: String(agent.id),
+        agentName: String(agent.name),
+        conversationId: existing?.id ?? null,
+        userMessage: userDisplay,
+        llmModel: model,
+        channel: WHATSAPP_CONVERSATION_CHANNEL,
+        contactLabel: existing ? undefined : contactLabel,
+        bumpUnread: true,
+        handoffMode: "human",
+        statusLabel: "Sin créditos",
+        ...persistOpts
+      });
+      if (!blockedPersist.error) {
+        await updateWhatsAppConversationMetadata(
+          db,
+          blockedPersist.conversationId,
+          channel.user_id,
+          existing?.metadata,
+          metaPatch
+        );
+        await syncAndEnrichCrmFromInbound(db, channel, blockedPersist.conversationId, inbound, nowIso, optedOutAfter);
+      }
+      return { ok: true };
+    }
+  }
+
   let companyContextText = "";
   if (agent.company_context_id) {
     const { data: ctx } = await db
@@ -330,6 +408,7 @@ export async function processTwilioWhatsAppInbound(
   const ai = new GoogleGenAI({ apiKey });
 
   let reply: string;
+  let geminiUsage: ReturnType<typeof readGeminiUsage> | null = null;
   try {
     const response = await ai.models.generateContent({
       model,
@@ -344,6 +423,7 @@ export async function processTwilioWhatsAppInbound(
       }
     });
     reply = response.text?.trim() ?? "";
+    geminiUsage = readGeminiUsage(response);
     if (!reply) return { ok: false, error: "IA sin respuesta" };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error IA";
@@ -377,6 +457,23 @@ export async function processTwilioWhatsAppInbound(
   if (!sendResult.ok) {
     console.error("[whatsapp/inbound] send:", sendResult.error);
     return { ok: false, error: sendResult.error };
+  }
+
+  if (orgId) {
+    await recordUsageSafe({
+      db,
+      organizationId: orgId,
+      userId: channel.user_id,
+      eventType: "whatsapp_ai",
+      channel: WHATSAPP_CONVERSATION_CHANNEL,
+      provider: "google",
+      model,
+      gemini: geminiUsage,
+      twilioMessages: 2, // entrante + saliente
+      referenceType: "text_agent_conversation",
+      referenceId: userPersist.conversationId,
+      idempotencyKey: `wa_ai_${inbound.messageSid}`
+    });
   }
 
   return { ok: true };
@@ -431,6 +528,24 @@ export async function sendWhatsAppOutboundForConversation(
     return { ok: false, error: "Canal WhatsApp no encontrado" };
   }
 
+  const outboundOrgId = channelRow.organization_id
+    ? String(channelRow.organization_id)
+    : await resolveOrgIdForUser(db, userId);
+
+  if (outboundOrgId) {
+    const billing = await checkBillingForOrg(db, outboundOrgId);
+    if (!billing.allowed) {
+      return {
+        ok: false,
+        code: billing.reason,
+        error:
+          billing.reason === "no_credits"
+            ? "Sin créditos este mes. Recarga para enviar WhatsApp."
+            : "Cuenta suspendida. Regulariza el pago para enviar WhatsApp."
+      };
+    }
+  }
+
   try {
     await sendTwilioWhatsAppMessage({
       toE164: contactE164,
@@ -442,6 +557,21 @@ export async function sendWhatsAppOutboundForConversation(
       accountSid: channelRow.twilio_subaccount_sid,
       authToken: channelRow.twilio_subaccount_auth_token
     });
+
+    if (outboundOrgId) {
+      await recordUsageSafe({
+        db,
+        organizationId: outboundOrgId,
+        userId,
+        eventType: "whatsapp_manual",
+        channel: WHATSAPP_CONVERSATION_CHANNEL,
+        provider: "twilio",
+        twilioMessages: 1,
+        referenceType: "text_agent_conversation",
+        referenceId: conversationId
+      });
+    }
+
     return { ok: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error al enviar WhatsApp";
