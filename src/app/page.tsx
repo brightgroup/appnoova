@@ -452,6 +452,11 @@ function LandingPageContent() {
                     Contacto
                   </LeadCaptureButton>
                 </li>
+                <li>
+                  <Link href="/privacy" className="hover:text-white transition-colors">
+                    Política de privacidad
+                  </Link>
+                </li>
               </ul>
             </div>
             <div>

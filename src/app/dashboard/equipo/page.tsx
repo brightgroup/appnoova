@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Users, RefreshCw, UserPlus, Shield, ChevronDown, CheckCircle,
-  PauseCircle, Trash2, Mail, AlertCircle, Loader2
+  PauseCircle, Trash2, Mail, AlertCircle, Loader2, ChevronLeft
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { InviteMemberModal } from "@/components/equipo/InviteMemberModal";
@@ -211,22 +211,23 @@ export default function EquipoPage() {
   return (
     <div className={registryPage}>
       <div className={registryToolbar}>
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Users className="w-5 h-5 text-[#5b5bf6]" />
-            <h1 className="text-xl font-bold tracking-tight text-[var(--nv-text,white)]">Equipo</h1>
+        <div className="flex items-center gap-3 min-w-0">
+          <Link
+            href="/dashboard"
+            className="p-1.5 hover:bg-white/[.06] rounded-lg transition-colors text-gray-400 hover:text-white shrink-0"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">Equipo</h1>
+            <p className={`text-xs ${textMuted} mt-0.5`}>
+              {orgName ? `${orgName} · ` : ""}
+              {members.length} miembro{members.length !== 1 ? "s" : ""}
+              {invites.length > 0 &&
+                ` · ${invites.length} invitación${invites.length !== 1 ? "es" : ""} pendiente${invites.length !== 1 ? "s" : ""}`}
+            </p>
           </div>
-          <p className={`text-xs ${textMuted}`}>
-            {orgName ? `${orgName} · ` : ""}{members.length} miembro{members.length !== 1 ? "s" : ""}
-            {invites.length > 0 && ` · ${invites.length} invitación${invites.length !== 1 ? "es" : ""} pendiente${invites.length !== 1 ? "s" : ""}`}
-          </p>
         </div>
-        {canManage && (
-          <button type="button" onClick={() => setModalOpen(true)} className={`${btnPrimary} flex items-center gap-2`}>
-            <UserPlus className="w-4 h-4" />
-            Agregar miembro
-          </button>
-        )}
       </div>
 
       <div className={registryContent}>
@@ -261,6 +262,14 @@ export default function EquipoPage() {
           onRefresh={load}
           refreshing={loading}
           error={error || undefined}
+          action={
+            canManage ? (
+              <button type="button" onClick={() => setModalOpen(true)} className={`${btnPrimary} flex items-center gap-2`}>
+                <UserPlus className="w-4 h-4" />
+                Agregar miembro
+              </button>
+            ) : undefined
+          }
           footer={filtered.length > 0 ? (
             <RegistryTablePagination
               total={pagination.total}
