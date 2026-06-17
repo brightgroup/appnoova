@@ -71,7 +71,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
   const [authReady, setAuthReady] = useState(false);
-  const [billing, setBilling] = useState<{ planName: string; remaining: number; total: number; usedPct: number } | null>(null);
+  const [billing, setBilling] = useState<{ planName: string; remaining: number; total: number; usedPct: number; status: string } | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -88,8 +88,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           setBilling({
             planName,
             remaining: Number(w.remaining_credits ?? 0),
-            total: Number(w.total_credits ?? 0),
-            usedPct: Number(w.used_pct ?? 0)
+            total:     Number(w.total_credits ?? 0),
+            usedPct:   Number(w.used_pct ?? 0),
+            status:    json.subscription?.status ?? "active",
           });
         }
       })
@@ -439,26 +440,56 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Footer - Plan & Logout */}
         <div className={`${sidebarOpen ? "p-3 space-y-3" : "p-3 space-y-3"} border-t border-white/[.08]`}>
           {/* Plan Card */}
-          {sidebarOpen && (
-            <Link href="/dashboard/facturacion" className={`${sidebarPlanCard} block hover:bg-white/[.07] transition-colors`}>
-              <div className="flex items-center gap-2 mb-2">
-                <CreditCard className={`w-4 h-4 flex-shrink-0 ${sidebarIconActive}`} />
-                <span className="text-xs font-medium text-gray-200">{billing?.planName ?? "Plan"}</span>
-              </div>
-              <p className="text-[11px] text-gray-500">Créditos disponibles</p>
-              <p className="text-sm font-semibold text-[#5b5bf6] tabular-nums">
-                {billing
-                  ? `${formatCreditsShort(billing.remaining)} / ${formatCreditsShort(billing.total)}`
-                  : "—"}
-              </p>
-              <div className="mt-2 h-1.5 rounded-full bg-white/[.08] overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${(billing?.usedPct ?? 0) >= 90 ? "bg-red-500" : (billing?.usedPct ?? 0) >= 70 ? "bg-amber-500" : "bg-[#5b5bf6]"}`}
-                  style={{ width: `${billing?.usedPct ?? 0}%` }}
-                />
-              </div>
-            </Link>
-          )}
+          {sidebarOpen && (() => {
+            const pct   = billing?.usedPct ?? 0;
+            const st    = billing?.status ?? "active";
+            const badge =
+              st === "active"    ? "bg-green-500/20 text-green-400"  :
+              st === "trialing"  ? "bg-blue-500/20 text-blue-400"    :
+              st === "past_due"  ? "bg-amber-500/20 text-amber-400"  :
+              "bg-gray-500/20 text-gray-400";
+            const badgeLabel =
+              st === "active"    ? "Activo"     :
+              st === "trialing"  ? "En prueba"  :
+              st === "past_due"  ? "Vencida"    :
+              st === "suspended" ? "Suspendida" : "Inactivo";
+            return (
+              <Link
+                href="/dashboard/facturacion"
+                className="block rounded-xl border border-black/[.25] bg-black/[.18] hover:bg-black/[.25] transition-all duration-150 p-3.5"
+              >
+                {/* Fila 1: etiqueta + badge */}
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-widest">Plan actual</p>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${badge}`}>
+                    {badgeLabel}
+                  </span>
+                </div>
+
+                {/* Fila 2: nombre del plan */}
+                <p className="text-lg font-bold text-white leading-snug mb-2 capitalize">
+                  {billing?.planName ?? "—"}
+                </p>
+
+                {/* Fila 3: créditos + barra */}
+                <div>
+                  <div className="flex items-baseline justify-between mb-1.5">
+                    <span className="text-xs text-gray-400 tabular-nums">
+                      {billing ? formatCreditsShort(billing.remaining) : "—"}
+                      <span className="text-gray-600"> / {billing ? formatCreditsShort(billing.total) : "—"} créditos</span>
+                    </span>
+                    <span className="text-xs font-semibold text-gray-400">{pct}%</span>
+                  </div>
+                  <div className="h-[3px] rounded-full bg-white/[.08] overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-[#5b5bf6]"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              </Link>
+            );
+          })()}
 
           {/* Logout */}
           <button
