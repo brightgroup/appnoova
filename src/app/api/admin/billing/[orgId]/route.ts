@@ -62,3 +62,37 @@ export async function GET(
     recent_events: recentRes.data ?? []
   });
 }
+
+/** PATCH — cambiar plan, precio/créditos custom (descuentos), estado, notas */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ orgId: string }> }
+) {
+  const auth = await requireSuperAdmin(req);
+  if (auth instanceof NextResponse) return auth;
+
+  const { orgId } = await params;
+  const db = adminClient();
+
+  const body = (await req.json()) as {
+    plan_id?: string | null;
+    price_usd?: number | null;
+    monthly_credits?: number | null;
+    status?: string | null;
+    notes?: string | null;
+    custom_label?: string | null;
+  };
+
+  const { error } = await db.rpc("billing_admin_update_subscription", {
+    p_org:             orgId,
+    p_plan_id:         body.plan_id         ?? null,
+    p_price_usd:       body.price_usd       ?? null,
+    p_monthly_credits: body.monthly_credits ?? null,
+    p_status:          body.status          ?? null,
+    p_notes:           body.notes           ?? null,
+    p_custom_label:    body.custom_label    ?? null,
+  });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
