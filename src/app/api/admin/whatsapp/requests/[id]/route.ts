@@ -4,11 +4,11 @@ import { adminClient } from "@/lib/voice-agents-server";
 import { createTwilioSubaccount } from "@/lib/telephony/twilio-subaccounts";
 
 /** PATCH — actualizar estado o aprovisionar solicitud de WhatsApp. */
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
 
-  const { id } = params;
+  const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const { status, notes, action } = body;
 
