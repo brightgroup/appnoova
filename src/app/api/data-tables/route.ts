@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/voice-agents-server";
 import { getOrgContextFromRequest } from "@/lib/org-server";
 import { parseExcelBuffer } from "@/lib/data-tables/parse-excel";
+import { validateDataTableImport } from "@/lib/data-tables/validate-import";
 import type { DataTableRecord } from "@/types/data-table";
 
 function toRecord(raw: Record<string, unknown>): DataTableRecord {
@@ -57,6 +58,11 @@ export async function POST(req: NextRequest) {
         { error: err instanceof Error ? err.message : "No se pudo leer el Excel" },
         { status: 400 }
       );
+    }
+
+    const importCheck = validateDataTableImport(parsed.rows.length, parsed.columns);
+    if (!importCheck.ok) {
+      return NextResponse.json({ error: importCheck.error }, { status: 400 });
     }
 
     const db = adminClient();

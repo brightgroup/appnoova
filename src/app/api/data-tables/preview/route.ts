@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOrgContextFromRequest } from "@/lib/org-server";
 import { parseExcelBuffer } from "@/lib/data-tables/parse-excel";
+import { validateDataTableImport } from "@/lib/data-tables/validate-import";
 
 /** POST — vista previa de importación Excel (sin guardar) */
 export async function POST(req: NextRequest) {
@@ -15,12 +16,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const parsed = parseExcelBuffer(await file.arrayBuffer(), file.name);
+    const validation = validateDataTableImport(parsed.rows.length, parsed.columns);
     return NextResponse.json({
       suggested_name: parsed.suggestedName,
       sheet_name: parsed.sheetName,
       columns: parsed.columns,
       row_count: parsed.rows.length,
       sample_rows: parsed.rows.slice(0, 8),
+      validation,
     });
   } catch (err) {
     return NextResponse.json(

@@ -12,6 +12,17 @@ export interface ImportPreview {
   columns: DataTableColumn[];
   row_count: number;
   sample_rows: Record<string, string | number | boolean | null>[];
+  validation?: {
+    ok: boolean;
+    error?: string;
+    warnings: string[];
+    column_mapping: {
+      product: string | null;
+      category: string | null;
+      sku: string | null;
+    };
+    search_mode: "full_catalog" | "smart_search";
+  };
 }
 
 function formatPreviewCell(value: unknown, col: DataTableColumn): string {
@@ -140,7 +151,10 @@ export function DataTableImportDialog({
               >
                 <Upload className="w-8 h-8 mx-auto mb-3 text-[#5b5bf6]" />
                 <p className="text-sm text-white font-medium">Arrastra tu Excel aquí</p>
-                <p className="text-xs text-gray-500 mt-1">o haz clic para seleccionar · .xlsx, .xls, .csv</p>
+                <p className="text-xs text-gray-500 mt-1">o haz clic para seleccionar · .xlsx, .xls, .csv · máx. 1.000 registros</p>
+                <p className="text-[10px] text-gray-600 mt-2 leading-relaxed">
+                  Columnas recomendadas: Producto, Categoría, SKU/Código, Precio. Puedes agregar más columnas sin problema.
+                </p>
               </div>
               <input
                 ref={fileRef}
@@ -201,6 +215,52 @@ export function DataTableImportDialog({
                   <p className="text-xl font-bold text-white mt-1">{preview.columns.length}</p>
                 </div>
               </div>
+
+              {preview.validation && (
+                <div className="rounded-lg border border-white/[.08] bg-white/[.02] p-3 space-y-2">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wide">Columnas clave detectadas</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <span className="text-gray-500">Producto </span>
+                      <span className={preview.validation.column_mapping.product ? "text-emerald-400" : "text-red-400"}>
+                        {preview.validation.column_mapping.product ?? "No detectada"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Categoría </span>
+                      <span className={preview.validation.column_mapping.category ? "text-emerald-400" : "text-amber-400"}>
+                        {preview.validation.column_mapping.category ?? "Opcional"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">SKU </span>
+                      <span className={preview.validation.column_mapping.sku ? "text-emerald-400" : "text-amber-400"}>
+                        {preview.validation.column_mapping.sku ?? "Opcional"}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-gray-500">
+                    {preview.validation.search_mode === "full_catalog"
+                      ? "Modo catálogo completo: la IA verá todos los productos en cada mensaje."
+                      : "Modo búsqueda inteligente: la IA recibe solo los productos relevantes a cada pregunta."}
+                  </p>
+                </div>
+              )}
+
+              {preview.validation && !preview.validation.ok && (
+                <div className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                  {preview.validation.error}
+                </div>
+              )}
+
+              {preview.validation?.warnings.map(w => (
+                <div
+                  key={w}
+                  className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-200/90"
+                >
+                  {w}
+                </div>
+              ))}
 
               <div>
                 <p className="text-xs text-gray-400 mb-2">Vista previa (primeras filas)</p>
@@ -268,7 +328,11 @@ export function DataTableImportDialog({
             <button
               type="button"
               onClick={confirmImport}
-              disabled={importing || (!tableId && !tableName.trim())}
+              disabled={
+                importing ||
+                (!tableId && !tableName.trim()) ||
+                preview.validation?.ok === false
+              }
               className={`${btnPrimary} gap-2`}
             >
               {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}

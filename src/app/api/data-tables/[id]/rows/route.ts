@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/voice-agents-server";
 import { getOrgContextFromRequest } from "@/lib/org-server";
 import { normalizeRowData } from "@/lib/data-tables/columns";
+import { rowLimitError } from "@/lib/data-tables/validate-import";
 import type { DataTableColumn, DataTableRowRecord } from "@/types/data-table";
 
 function toRow(raw: Record<string, unknown>): DataTableRowRecord {
@@ -45,6 +46,9 @@ export async function POST(
     .from("data_table_rows")
     .select("id", { count: "exact", head: true })
     .eq("data_table_id", id);
+
+  const limitErr = rowLimitError(count ?? 0);
+  if (limitErr) return NextResponse.json({ error: limitErr }, { status: 400 });
 
   const { data, error } = await db
     .from("data_table_rows")

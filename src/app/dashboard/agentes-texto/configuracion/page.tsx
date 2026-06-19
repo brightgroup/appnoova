@@ -294,7 +294,8 @@ function ConfigContent() {
                   Gestionar tablas de datos →
                 </Link>
                 <p className="text-[10px] text-gray-500 mt-1.5 leading-relaxed">
-                  El agente usará esta tabla como fuente autorizada de precios y productos.
+                  Fuente autorizada de precios y productos. Hasta 150 filas: catálogo completo por mensaje.
+                  De 151 a 1.000: búsqueda por nombre, SKU o categoría antes de responder.
                 </p>
               </Field>
 

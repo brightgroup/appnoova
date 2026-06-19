@@ -56,7 +56,7 @@ REGLAS OBLIGATORIAS — cumple siempre:
 
 ${rules}
 
-(La tabla asignada no tiene filas que coincidan con esta consulta. No inventes datos.)`;
+(La consulta no encontró filas coincidentes en el catálogo asignado. No inventes datos: indica que no aparece en el catálogo o pide más detalle — nombre, SKU o categoría.)`;
   }
 
   return `${base}
