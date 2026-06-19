@@ -22,10 +22,11 @@ export { twilioWhatsAppWebhookUrl };
 export function validateTwilioWebhookSignature(
   signature: string | null,
   url: string,
-  params: Record<string, string>
+  params: Record<string, string>,
+  authToken?: string | null
 ): boolean {
-  const creds = twilioCredentials();
-  if (!creds || !signature) return false;
+  const token = authToken?.trim() || twilioCredentials()?.authToken;
+  if (!token || !signature) return false;
 
   const sortedKeys = Object.keys(params).sort();
   let payload = url;
@@ -34,7 +35,7 @@ export function validateTwilioWebhookSignature(
   }
 
   const expected = crypto
-    .createHmac("sha1", creds.authToken)
+    .createHmac("sha1", token)
     .update(Buffer.from(payload, "utf-8"))
     .digest("base64");
 

@@ -6,9 +6,7 @@ import {
   getWhatsAppChannelByE164
 } from "@/lib/whatsapp-server";
 import { processTwilioWhatsAppInbound } from "@/lib/whatsapp/process-inbound";
-import {
-  validateTwilioWebhookSignature
-} from "@/lib/whatsapp/twilio-whatsapp";
+import { validateTwilioWebhookRequest } from "@/lib/whatsapp/twilio-webhook-auth";
 import { twilioWhatsAppWebhookUrl } from "@/lib/telephony/app-url";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
 
@@ -26,18 +24,22 @@ export async function POST(req: NextRequest) {
   const params = parseTwilioForm(rawBody);
 
   const signature = req.headers.get("x-twilio-signature");
-  const skipValidation = process.env.TWILIO_WHATSAPP_SKIP_SIGNATURE === "1";
+  const db = textAgentsAdminClient();
 
-  if (!skipValidation) {
-    const valid = validateTwilioWebhookSignature(
-      signature,
-      twilioWhatsAppWebhookUrl(),
-      params
-    );
-    if (!valid) {
-      console.warn("[twilio/whatsapp] firma inválida");
-      return new NextResponse("Forbidden", { status: 403 });
-    }
+  const valid = await validateTwilioWebhookRequest(
+    db,
+    signature,
+    twilioWhatsAppWebhookUrl(),
+    params
+  );
+  if (!valid) {
+    console.warn("[twilio/whatsapp] firma inválida", {
+      accountSid: params.AccountSid,
+      to: params.To,
+      from: params.From,
+      webhookUrl: twilioWhatsAppWebhookUrl()
+    });
+    return new NextResponse("Forbidden", { status: 403 });
   }
 
   const messageSid = String(params.MessageSid ?? "");
@@ -50,8 +52,6 @@ export async function POST(req: NextRequest) {
   if (!messageSid || !fromRaw || !toRaw) {
     return new NextResponse("", { status: 200 });
   }
-
-  const db = textAgentsAdminClient();
 
   try {
     const claimed = await claimInboundMessageSid(db, messageSid);
