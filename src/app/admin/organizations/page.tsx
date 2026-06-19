@@ -96,13 +96,22 @@ export default function AdminOrganizationsPage() {
           name: values.name,
           slug: values.slug || undefined,
           plan: values.plan,
+          owner_mode: values.owner_mode,
           owner_email: values.owner_email,
+          owner_full_name: values.owner_full_name || undefined,
+          owner_password: values.owner_password || undefined,
         }),
       });
+      const json = await res.json();
       if (res.ok) {
         setModal(null);
         await fetchOrgs();
-      } else alert((await res.json()).error ?? "Error");
+        if (json.temporary_password) {
+          alert(
+            `Organización creada.\nPropietario: ${values.owner_email}\nContraseña temporal: ${json.temporary_password}\nCompártela de forma segura.`
+          );
+        }
+      } else alert(json.error ?? "Error");
     } else if (modal?.org) {
       const res = await authFetch(`/api/admin/organizations/${modal.org.id}`, {
         method: "PATCH",

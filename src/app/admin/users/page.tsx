@@ -7,7 +7,7 @@ import {
   Phone, Plus, Pencil, PauseCircle, Ban, Trash2, MoreHorizontal
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
-import { AdminUserModal, type AdminUserFormValues } from "@/components/admin/AdminUserModal";
+import { AdminUserModal, type AdminUserFormValues, type AdminOrgOption } from "@/components/admin/AdminUserModal";
 import { NoovaAnchoredMenu } from "@/components/ui/NoovaAnchoredMenu";
 import { NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 import {
@@ -55,6 +55,21 @@ export default function AdminUsers() {
   const [menuId, setMenuId] = useState<string | null>(null);
   const [modal, setModal] = useState<{ mode: "create" | "edit"; user?: UserRow } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [organizations, setOrganizations] = useState<AdminOrgOption[]>([]);
+
+  const fetchOrganizations = useCallback(async () => {
+    const res = await authFetch("/api/admin/organizations");
+    const json = await res.json();
+    if (res.ok) {
+      setOrganizations(
+        (json.organizations ?? []).map((o: { id: string; name: string; slug: string }) => ({
+          id: o.id,
+          name: o.name,
+          slug: o.slug,
+        }))
+      );
+    }
+  }, []);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -66,7 +81,7 @@ export default function AdminUsers() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => { void fetchUsers(); void fetchOrganizations(); }, [fetchUsers, fetchOrganizations]);
 
   async function confirmUser(userId: string) {
     setBusyId(userId);
@@ -158,7 +173,7 @@ export default function AdminUsers() {
           error={error || undefined}
           action={
             <button type="button" onClick={() => setModal({ mode: "create" })} className={`${btnPrimary} flex items-center gap-2 shrink-0`}>
-              <Plus className="w-4 h-4" /> Crear usuario
+              <Plus className="w-4 h-4" /> Agregar usuario
             </button>
           }
           footer={filtered.length > 0 ? (
@@ -291,6 +306,7 @@ export default function AdminUsers() {
       <AdminUserModal
         open={!!modal}
         mode={modal?.mode ?? "create"}
+        organizations={organizations}
         initial={modal?.user ? {
           email: modal.user.email,
           full_name: modal.user.full_name ?? modal.user.nombre ?? "",
