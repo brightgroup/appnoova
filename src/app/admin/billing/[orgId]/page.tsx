@@ -447,9 +447,9 @@ export default function AdminBillingDetailPage() {
 
                 {/* Etiqueta */}
                 <div>
-                  <label className={labelCls}>Etiqueta interna</label>
+                  <label className={labelCls}>Etiqueta promocional (visible para el cliente)</label>
                   <input
-                    type="text" placeholder='ej. "Crecimiento -40% hasta sep 2026"'
+                    type="text" placeholder='ej. "Lanzamiento −40% hasta sep 2026"'
                     value={subForm.custom_label}
                     onChange={e => setSubForm(f => ({ ...f, custom_label: e.target.value }))}
                     className={inputCls}

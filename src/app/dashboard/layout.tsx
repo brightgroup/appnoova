@@ -71,7 +71,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
   const [authReady, setAuthReady] = useState(false);
-  const [billing, setBilling] = useState<{ planName: string; remaining: number; total: number; usedPct: number; status: string } | null>(null);
+  const [billing, setBilling] = useState<{
+    planName: string;
+    remaining: number;
+    total: number;
+    usedPct: number;
+    status: string;
+    promoLabel?: string | null;
+    promoPriceUsd?: number | null;
+    promoPriceCatalogUsd?: number | null;
+  } | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -91,6 +100,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             total:     Number(w.total_credits ?? 0),
             usedPct:   Number(w.used_pct ?? 0),
             status:    json.subscription?.status ?? "active",
+            promoLabel: json.plan_promo?.label ?? json.plan_promo?.headline ?? null,
+            promoPriceUsd: json.plan_promo?.price_usd ?? null,
+            promoPriceCatalogUsd: json.plan_promo?.price_usd_catalog ?? null,
           });
         }
       })
@@ -481,9 +493,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
 
                 {/* Fila 2: nombre del plan */}
-                <p className="text-lg font-bold text-white leading-snug mb-2 capitalize">
+                <p className="text-lg font-bold text-white leading-snug mb-1 capitalize">
                   {billing?.planName ?? "—"}
                 </p>
+                {billing?.promoLabel && (
+                  <p className="text-[10px] text-[#a5a5ff] font-medium mb-1 truncate" title={billing.promoLabel}>
+                    {billing.promoLabel}
+                  </p>
+                )}
+                {billing?.promoPriceUsd != null &&
+                  billing.promoPriceCatalogUsd != null &&
+                  billing.promoPriceUsd < billing.promoPriceCatalogUsd && (
+                  <p className="text-[10px] text-green-400 mb-2">
+                    <span className="line-through text-gray-500 mr-1">${billing.promoPriceCatalogUsd}</span>
+                    ${billing.promoPriceUsd}/mes
+                  </p>
+                )}
 
                 {/* Fila 3: créditos + barra */}
                 <div>

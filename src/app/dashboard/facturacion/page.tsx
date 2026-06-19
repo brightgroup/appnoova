@@ -17,6 +17,14 @@ import {
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { VOICE_CREDITS_PER_MINUTE } from "@/lib/billing/pricing";
+import type { PlanPromoDisplay } from "@/lib/billing/plan-promo";
+import {
+  BILLING_CHART_CATEGORIES,
+  chartAxisTicks,
+  dayTotal,
+  niceChartScaleMax,
+  type BillingChartDay,
+} from "@/lib/billing/chart-categories";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -42,18 +50,18 @@ interface Plan {
   trial_days: number; whatsapp_included: boolean; max_text_agents: number | null;
   max_users: number | null; support_level: string;
 }
-interface DailyPoint {
-  dayStr: string; dateKey: string;
-  web: number; whatsapp: number; voz: number; flujos: number; otros: number;
-}
+type DailyPoint = BillingChartDay;
 interface UsageDetail { id: string; name: string; type: string; credits: number; }
 interface Stats {
   avg_daily: number; peak_daily: number; peak_day_label: string;
-  total_web: number; total_whatsapp: number; total_voz: number; total_flujos: number; total_otros: number;
+  category_totals: Record<string, number>;
 }
 interface BillingData {
   organization: { id: string; name: string };
-  subscription: Subscription | null; wallet: Wallet | null;
+  subscription: Subscription | null;
+  plan_monthly_credits?: number;
+  plan_promo?: PlanPromoDisplay | null;
+  wallet: Wallet | null;
   invoices: Invoice[]; plans: Plan[];
   daily_chart: DailyPoint[]; usage_details: UsageDetail[]; stats: Stats;
 }
@@ -68,13 +76,13 @@ const TABS = [
   { id: "auto",     label: "Recarga automática" },
 ];
 
-const CHART_KEYS = [
-  { key: "web",      label: "ORI / Mi Link",  color: "#5b5bf6" },
-  { key: "whatsapp", label: "WhatsApp",        color: "#22c55e" },
-  { key: "voz",      label: "Agentes de Voz", color: "#c084fc" },
-  { key: "flujos",   label: "Flujos / ORI",   color: "#06b6d4" },
-  { key: "otros",    label: "Otros",           color: "#6b7280" },
+const CHART_RANGE_OPTIONS = [
+  { id: "7",  label: "7 días" },
+  { id: "30", label: "30 días" },
+  { id: "90", label: "90 días" },
 ] as const;
+
+type ChartRangeId = (typeof CHART_RANGE_OPTIONS)[number]["id"];
 
 const INVOICE_FILTERS = [
   { id: "todos",   label: "Todos" },
@@ -83,11 +91,14 @@ const INVOICE_FILTERS = [
   { id: "overdue", label: "Vencidas" },
 ];
 const USAGE_FILTERS = [
-  { id: "todos",          label: "Todos" },
-  { id: "Agente de Voz", label: "Agentes de Voz" },
-  { id: "WhatsApp",       label: "WhatsApp" },
-  { id: "ORI / Mi Link",  label: "ORI / Mi Link" },
-  { id: "Flujos",         label: "Flujos" },
+  { id: "todos",           label: "Todos" },
+  { id: "ORI",             label: "ORI" },
+  { id: "Mi Link",         label: "Mi Link" },
+  { id: "WhatsApp",        label: "WhatsApp" },
+  { id: "Agentes de Voz",  label: "Agentes de Voz" },
+  { id: "Documentos",      label: "Documentos" },
+  { id: "Formularios",     label: "Formularios" },
+  { id: "Cotizaciones",    label: "Cotizaciones" },
 ];
 
 const INVOICE_STATUS: Record<string, { label: string; cls: string }> = {
@@ -153,10 +164,8 @@ export default function FacturacionPage() {
   const [autoOn, setAutoOn] = useState(false);
   const [rechargeQ, setRechargeQ] = useState("50000");
 
-  // Tooltip + filtro de fechas gráfico
-  const [hoverBar,   setHoverBar]   = useState<DailyPoint | null>(null);
-  const [chartFrom,  setChartFrom]  = useState("");
-  const [chartTo,    setChartTo]    = useState("");
+  const [hoverBar, setHoverBar] = useState<DailyPoint | null>(null);
+  const [chartRange, setChartRange] = useState<ChartRangeId>("30");
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -173,9 +182,14 @@ export default function FacturacionPage() {
   const wallet   = data?.wallet;
   const sub      = data?.subscription;
   const plans    = data?.plans ?? [];
-  const stats    = data?.stats;
   const chart    = data?.daily_chart ?? [];
   const planName = sub?.plans?.name ?? sub?.plan_id ?? "—";
+  const catalogPlan = plans.find((p) => p.id === sub?.plan_id);
+  const catalogPriceUsd = catalogPlan?.price_usd ?? sub?.plans?.price_usd ?? 0;
+  const planPromo = data?.plan_promo ?? null;
+  const effectivePriceUsd = planPromo?.price_usd ?? Number(sub?.price_usd ?? catalogPriceUsd);
+  const planMonthlyCredits =
+    data?.plan_monthly_credits ?? catalogPlan?.monthly_credits ?? sub?.monthly_credits ?? 0;
   const status   = sub?.status ?? "active";
   const sBadge   = SUB_STATUS[status] ?? SUB_STATUS.active;
   const remaining   = wallet?.remaining_credits ?? 0;
@@ -209,19 +223,52 @@ export default function FacturacionPage() {
 
   const totalUsageCredits = filteredUsage.reduce((s, u) => s + u.credits, 0);
 
-  // Filtrado de fechas del gráfico (client-side)
   const chartFiltered = useMemo(() => {
-    if (!chartFrom && !chartTo) return chart;
-    return chart.filter(p => {
-      const d = p.dateKey;
-      if (chartFrom && d < chartFrom) return false;
-      if (chartTo   && d > chartTo)   return false;
-      return true;
-    });
-  }, [chart, chartFrom, chartTo]);
+    const days = Number(chartRange);
+    return chart.slice(-days);
+  }, [chart, chartRange]);
 
-  // Máximo barra gráfico
-  const maxBar = Math.max(...chartFiltered.map(p => p.web + p.whatsapp + p.voz + p.flujos + p.otros), 500);
+  const chartRangeLabel = useMemo(() => {
+    if (chartFiltered.length === 0) return "—";
+    const first = chartFiltered[0];
+    const last = chartFiltered[chartFiltered.length - 1];
+    return `${first.dayLabel} — ${last.dayLabel}`;
+  }, [chartFiltered]);
+
+  const chartScaleMax = useMemo(() => {
+    const maxDay = Math.max(...chartFiltered.map(dayTotal), 0);
+    const dailyBudget = planMonthlyCredits > 0 ? planMonthlyCredits / 30 : 0;
+    return niceChartScaleMax(Math.max(maxDay, dailyBudget * 0.25, 1_000));
+  }, [chartFiltered, planMonthlyCredits]);
+
+  const chartTicks = useMemo(() => chartAxisTicks(chartScaleMax, 4), [chartScaleMax]);
+
+  const activeChartCategories = useMemo(
+    () => BILLING_CHART_CATEGORIES.filter((c) =>
+      chartFiltered.some((d) => d[c.key] > 0)
+    ),
+    [chartFiltered]
+  );
+
+  const rangeStats = useMemo(() => {
+    let peak = 0;
+    let peakLabel = "—";
+    let sum = 0;
+    chartFiltered.forEach((d) => {
+      const t = dayTotal(d);
+      sum += t;
+      if (t > peak) {
+        peak = t;
+        peakLabel = d.dayStr;
+      }
+    });
+    return {
+      avg: chartFiltered.length > 0 ? Math.round(sum / chartFiltered.length) : 0,
+      peak,
+      peakLabel,
+      total: sum,
+    };
+  }, [chartFiltered]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -284,6 +331,29 @@ export default function FacturacionPage() {
             {tab === "overview" && (
               <div className="space-y-5 max-w-5xl">
 
+                {planPromo && (
+                  <div className="rounded-xl border border-[#5b5bf6]/30 bg-gradient-to-r from-[#5b5bf6]/15 to-[#7070f8]/5 p-4 flex items-start gap-3">
+                    <Zap className="w-5 h-5 text-[#a5a5ff] shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-[#a5a5ff]">Beneficio activo en tu plan</p>
+                      <p className="text-sm text-gray-300 mt-1">{planPromo.headline}</p>
+                      <div className="flex flex-wrap gap-2 mt-2.5">
+                        {planPromo.price_discount_pct != null && planPromo.price_discount_pct > 0 && (
+                          <span className="text-xs font-medium bg-green-500/15 text-green-300 px-2.5 py-1 rounded-full">
+                            −{planPromo.price_discount_pct}% · US$ {fmtN(planPromo.price_usd)}/mes
+                            <span className="line-through text-green-300/45 ml-1.5">${fmtN(planPromo.price_usd_catalog)}</span>
+                          </span>
+                        )}
+                        {planPromo.credits_bonus_pct != null && planPromo.credits_bonus_pct > 0 && (
+                          <span className="text-xs font-medium bg-[#5b5bf6]/15 text-[#a5a5ff] px-2.5 py-1 rounded-full">
+                            +{planPromo.credits_bonus_pct}% créditos · {fmtN(planPromo.monthly_credits)}/mes
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Grid de métricas — estilo dashboard Noova */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
@@ -312,18 +382,35 @@ export default function FacturacionPage() {
                   <div className="bg-white/[.02] border border-white/[.08] rounded-xl p-5 hover:bg-white/[.04] transition-colors">
                     <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">Plan actual</p>
                     <p className="text-2xl font-bold capitalize">{planName}</p>
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${sBadge.cls}`}>{sBadge.label}</span>
-                      {sub?.custom_label && (
-                        <span className="text-[10px] text-[#a5a5ff] bg-[#5b5bf6]/10 px-1.5 py-0.5 rounded-md truncate max-w-[80px]" title={sub.custom_label}>
-                          {sub.custom_label}
+                      {planPromo?.label && (
+                        <span className="text-[10px] text-[#a5a5ff] bg-[#5b5bf6]/10 px-2 py-0.5 rounded-md font-medium">
+                          {planPromo.label}
                         </span>
                       )}
                     </div>
-                    {sub?.price_usd != null && (
-                      <p className="text-sm text-gray-400 mt-2">
-                        {sub.price_usd > 0 ? `$${sub.price_usd} USD/mes` : "Plan gratuito"}
-                      </p>
+                    {sub && (
+                      <div className="mt-2">
+                        {sub.plan_id === "explorador" ? (
+                          <p className="text-sm text-gray-400">
+                            {sub.status === "trialing" ? "Prueba gratuita · 14 días" : "Plan gratuito"}
+                          </p>
+                        ) : planPromo?.price_discount_pct ? (
+                          <>
+                            <p className="text-xs text-gray-500 line-through">${fmtN(planPromo.price_usd_catalog)} USD/mes</p>
+                            <p className="text-sm font-semibold text-green-300">${fmtN(effectivePriceUsd)} USD/mes</p>
+                          </>
+                        ) : effectivePriceUsd > 0 ? (
+                          <p className="text-sm text-gray-400">${fmtN(effectivePriceUsd)} USD/mes</p>
+                        ) : null}
+                        {planPromo?.credits_bonus_pct != null && planPromo.credits_bonus_pct > 0 && (
+                          <p className="text-[11px] text-[#a5a5ff]/80 mt-1">
+                            {fmtN(planPromo.monthly_credits)} cr/mes
+                            <span className="text-gray-500 line-through ml-1">{fmtN(planPromo.monthly_credits_catalog)}</span>
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -344,145 +431,158 @@ export default function FacturacionPage() {
                   </div>
                 </div>
 
-                {/* Gráfico de consumo diario — barras horizontales */}
-                <div className="bg-white/[.02] border border-white/[.08] rounded-xl p-5">
+                {/* Gráfico de consumo diario */}
+                <div className="bg-white/[.02] border border-white/[.08] rounded-2xl p-6">
 
-                  {/* Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-5">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-[#5b5bf6] shrink-0" />
+                  <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-[#5b5bf6]/15 border border-[#5b5bf6]/25">
+                        <TrendingUp className="w-5 h-5 text-[#a5a5ff]" />
+                      </div>
                       <div>
-                        <h2 className="text-sm font-bold">Consumo del periodo</h2>
-                        <p className="text-xs text-gray-500">{fmtDate(wallet?.period_start ?? null)} — {fmtDate(wallet?.period_end ?? null)}</p>
+                        <h2 className="text-base font-bold">Consumo del periodo</h2>
+                        <p className="text-sm text-gray-500 mt-0.5">{chartRangeLabel}</p>
                       </div>
                     </div>
 
-                    {/* Control de fechas */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <input
-                        type="date"
-                        value={chartFrom}
-                        onChange={e => setChartFrom(e.target.value)}
-                        className="h-7 rounded-lg border border-white/[.10] bg-white/[.04] px-2 text-[11px] text-gray-300 focus:outline-none focus:border-[#5b5bf6]/50 [color-scheme:dark]"
-                      />
-                      <span className="text-xs text-gray-600">—</span>
-                      <input
-                        type="date"
-                        value={chartTo}
-                        onChange={e => setChartTo(e.target.value)}
-                        className="h-7 rounded-lg border border-white/[.10] bg-white/[.04] px-2 text-[11px] text-gray-300 focus:outline-none focus:border-[#5b5bf6]/50 [color-scheme:dark]"
-                      />
-                      {(chartFrom || chartTo) && (
+                    <div className={btnFilterGroup}>
+                      {CHART_RANGE_OPTIONS.map((opt) => (
                         <button
-                          onClick={() => { setChartFrom(""); setChartTo(""); }}
-                          className="h-7 px-2 text-[10px] text-gray-500 hover:text-white rounded-lg hover:bg-white/[.06] transition-colors"
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setChartRange(opt.id)}
+                          className={chartRange === opt.id ? btnFilterActive : btnFilterIdle}
                         >
-                          ×
+                          {opt.label}
                         </button>
-                      )}
+                      ))}
                     </div>
                   </div>
 
-                  {/* Leyenda */}
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-gray-400 mb-4">
-                    {CHART_KEYS.map(c => (
-                      <span key={c.key} className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: c.color }} />
-                        {c.label}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Barras horizontales — fecha en eje vertical */}
-                  {chartFiltered.length === 0 ? (
-                    <p className="text-sm text-gray-500 text-center py-8">Sin datos para el rango seleccionado.</p>
-                  ) : (
-                    <div
-                      className="space-y-1 max-h-72 overflow-y-auto pr-1"
-                      onMouseLeave={() => setHoverBar(null)}
-                    >
-                      {chartFiltered.map(p => {
-                        const dayTotal = p.web + p.whatsapp + p.voz + p.flujos + p.otros;
-                        const pct      = maxBar > 0 ? (dayTotal / maxBar) * 100 : 0;
-                        const isHover  = hoverBar?.dateKey === p.dateKey;
-                        return (
-                          <div
-                            key={p.dateKey}
-                            className={`flex items-center gap-2.5 group cursor-pointer rounded-lg px-1 py-0.5 transition-colors ${isHover ? "bg-white/[.04]" : "hover:bg-white/[.02]"}`}
-                            onMouseEnter={() => setHoverBar(p)}
-                          >
-                            {/* Etiqueta de día */}
-                            <span className="w-10 text-[9px] text-gray-500 tabular-nums text-right shrink-0">{p.dayStr}</span>
-
-                            {/* Barra compuesta */}
-                            <div className="flex-1 h-4 rounded overflow-hidden bg-white/[.04] relative">
-                              {dayTotal > 0 && (
-                                <div
-                                  className="absolute left-0 top-0 h-full flex rounded overflow-hidden transition-all"
-                                  style={{ width: `${Math.max(pct, 0.5)}%` }}
-                                >
-                                  {CHART_KEYS.map(c => {
-                                    const v = p[c.key as keyof DailyPoint] as number;
-                                    return v > 0 ? (
-                                      <div
-                                        key={c.key}
-                                        title={`${c.label}: ${fmtN(v)}`}
-                                        style={{ width: `${(v / dayTotal) * 100}%`, backgroundColor: c.color }}
-                                      />
-                                    ) : null;
-                                  })}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Valor total del día */}
-                            <span className="w-16 text-[9px] text-right tabular-nums shrink-0 text-gray-500 group-hover:text-gray-300 transition-colors">
-                              {dayTotal > 0 ? fmtN(dayTotal) : "—"}
-                            </span>
-                          </div>
-                        );
-                      })}
+                  {activeChartCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-gray-400 mb-5">
+                      {activeChartCategories.map((c) => (
+                        <span key={c.key} className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: c.color }} />
+                          {c.label}
+                        </span>
+                      ))}
                     </div>
                   )}
 
-                  {/* Tooltip flotante al hacer hover */}
-                  {hoverBar && (() => {
-                    const dayTotal = CHART_KEYS.reduce((s, c) => s + (hoverBar[c.key as keyof DailyPoint] as number), 0);
-                    return (
-                      <div className="mt-3 border-t border-white/[.06] pt-3 flex flex-wrap gap-x-5 gap-y-1 text-[10px]">
-                        <span className="text-gray-400 font-semibold w-full">{hoverBar.dayStr} · {fmtN(dayTotal)} cr totales</span>
-                        {CHART_KEYS.map(c => {
-                          const v = hoverBar[c.key as keyof DailyPoint] as number;
-                          return v > 0 ? (
-                            <span key={c.key} className="flex items-center gap-1.5 text-gray-400">
-                              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
-                              {c.label}: <span className="text-white font-semibold">{fmtN(v)}</span>
-                            </span>
-                          ) : null;
+                  {chartFiltered.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-12">Sin datos para el rango seleccionado.</p>
+                  ) : (
+                    <div onMouseLeave={() => setHoverBar(null)}>
+                      <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                        {[...chartFiltered].reverse().map((p) => {
+                          const totalDay = dayTotal(p);
+                          const pct = chartScaleMax > 0 ? (totalDay / chartScaleMax) * 100 : 0;
+                          const isHover = hoverBar?.dateKey === p.dateKey;
+                          const visibleCats = BILLING_CHART_CATEGORIES.filter((c) => p[c.key] > 0);
+
+                          return (
+                            <div
+                              key={p.dateKey}
+                              className={`grid grid-cols-[88px_1fr_72px] items-center gap-4 rounded-xl px-2 py-2 transition-colors cursor-pointer ${
+                                isHover ? "bg-white/[.05]" : "hover:bg-white/[.03]"
+                              }`}
+                              onMouseEnter={() => setHoverBar(p)}
+                            >
+                              <div className="text-right shrink-0">
+                                <p className="text-sm font-semibold text-white tabular-nums">{p.dayStr}</p>
+                                <p className="text-[11px] text-gray-500 capitalize truncate">{p.dayLabel.split(",")[0]}</p>
+                              </div>
+
+                              <div className="relative h-7 rounded-lg overflow-hidden bg-white/[.04]">
+                                {totalDay > 0 && (
+                                  <div
+                                    className="absolute left-0 top-0 h-full flex rounded-lg overflow-hidden transition-all duration-300"
+                                    style={{ width: `${Math.max(pct, totalDay > 0 ? 2 : 0)}%` }}
+                                  >
+                                    {visibleCats.map((c) => (
+                                      <div
+                                        key={c.key}
+                                        title={`${c.label}: ${fmtN(p[c.key])}`}
+                                        style={{
+                                          width: `${(p[c.key] / totalDay) * 100}%`,
+                                          backgroundColor: c.color,
+                                        }}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              <span className="text-sm font-bold tabular-nums text-right shrink-0 text-gray-300">
+                                {totalDay > 0 ? fmtN(totalDay) : "—"}
+                              </span>
+                            </div>
+                          );
                         })}
+                      </div>
+
+                      {/* Eje X con valores de créditos */}
+                      <div className="grid grid-cols-[88px_1fr_72px] gap-4 mt-4 pt-4 border-t border-white/[.06]">
+                        <div />
+                        <div className="relative h-6">
+                          {chartTicks.map((tick) => (
+                            <div
+                              key={tick}
+                              className="absolute top-0 flex flex-col items-center -translate-x-1/2"
+                              style={{ left: `${chartScaleMax > 0 ? (tick / chartScaleMax) * 100 : 0}%` }}
+                            >
+                              <span className="w-px h-2 bg-white/20" />
+                              <span className="text-[11px] text-gray-500 tabular-nums mt-1">{fmtN(tick)}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-gray-600 text-right uppercase tracking-wide">créditos</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {hoverBar && (() => {
+                    const totalDay = dayTotal(hoverBar);
+                    const visible = BILLING_CHART_CATEGORIES.filter((c) => hoverBar[c.key] > 0);
+                    return (
+                      <div className="mt-5 border-t border-white/[.06] pt-4 flex flex-wrap gap-x-6 gap-y-2">
+                        <span className="text-sm text-gray-300 font-semibold w-full">
+                          {hoverBar.dayLabel} · {fmtN(totalDay)} cr totales
+                        </span>
+                        {visible.map((c) => (
+                          <span key={c.key} className="flex items-center gap-2 text-sm text-gray-400">
+                            <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: c.color }} />
+                            {c.label}: <span className="text-white font-semibold tabular-nums">{fmtN(hoverBar[c.key])}</span>
+                          </span>
+                        ))}
                       </div>
                     );
                   })()}
                 </div>
 
-                {/* Cards estadísticas — estilo dashboard */}
-                {stats && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                    {[
-                      { label: "Promedio diario", value: fmtN(stats.avg_daily), sub: "créditos/día", color: "text-white" },
-                      { label: "Día pico",        value: fmtN(stats.peak_daily), sub: stats.peak_day_label, color: "text-white" },
-                      { label: "ORI / Mi Link",   value: fmtN(stats.total_web),      sub: "créditos", color: "text-[#a5a5ff]" },
-                      { label: "WhatsApp",         value: fmtN(stats.total_whatsapp), sub: "créditos", color: "text-green-400" },
-                      { label: "Agentes de Voz",  value: fmtN(stats.total_voz),      sub: "créditos", color: "text-purple-400" },
-                    ].map(s => (
-                      <div key={s.label} className="bg-white/[.02] border border-white/[.08] rounded-xl p-4 hover:bg-white/[.04] transition-colors">
-                        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1.5">{s.label}</p>
-                        <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
-                        <p className="text-[10px] text-gray-500 mt-0.5">{s.sub}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {/* Cards estadísticas del rango */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                  {[
+                    { label: "Promedio diario", value: fmtN(rangeStats.avg), sub: `últimos ${chartRange} días`, color: "text-white" },
+                    { label: "Día pico", value: fmtN(rangeStats.peak), sub: rangeStats.peakLabel, color: "text-white" },
+                    { label: "Total periodo", value: fmtN(rangeStats.total), sub: "créditos", color: "text-[#a5a5ff]" },
+                    ...BILLING_CHART_CATEGORIES.filter((c) => rangeStats.total > 0 && chartFiltered.some((d) => d[c.key] > 0))
+                      .slice(0, 2)
+                      .map((c) => ({
+                        label: c.label,
+                        value: fmtN(chartFiltered.reduce((s, d) => s + d[c.key], 0)),
+                        sub: "créditos",
+                        color: c.key === "whatsapp" ? "text-green-400" : c.key === "voz" ? "text-purple-400" : "text-[#a5a5ff]",
+                      })),
+                  ].slice(0, 5).map((s) => (
+                    <div key={s.label} className="bg-white/[.02] border border-white/[.08] rounded-xl p-5 hover:bg-white/[.04] transition-colors">
+                      <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">{s.label}</p>
+                      <p className={`text-2xl font-bold tabular-nums ${s.color}`}>{s.value}</p>
+                      <p className="text-xs text-gray-500 mt-1">{s.sub}</p>
+                    </div>
+                  ))}
+                </div>
 
                 {/* Banner prueba */}
                 {sub?.status === "trialing" && sub.trial_ends_at && (
@@ -619,6 +719,9 @@ export default function FacturacionPage() {
                     const isActive  = p.id === sub?.plan_id;
                     const copy      = PLAN_COPY[p.id] ?? { tagline: "", features: [], ideal: "" };
                     const callsEst  = p.monthly_credits > 0 ? Math.floor(p.monthly_credits / VOICE_CREDITS_PER_MINUTE) : 0;
+                    const displayPrice = isActive && planPromo ? planPromo.price_usd : p.price_usd;
+                    const displayCredits = isActive ? planMonthlyCredits : p.monthly_credits;
+                    const callsEstActive = displayCredits > 0 ? Math.floor(displayCredits / VOICE_CREDITS_PER_MINUTE) : callsEst;
 
                     return (
                       <div
@@ -640,6 +743,11 @@ export default function FacturacionPage() {
                             <Star className="w-2 h-2" /> Plan actual
                           </span>
                         )}
+                        {isActive && planPromo?.label && (
+                          <span className="absolute -top-2.5 right-4 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#5b5bf6] text-white max-w-[140px] truncate" title={planPromo.label}>
+                            {planPromo.label}
+                          </span>
+                        )}
 
                         <div className="p-5 flex-1 space-y-4">
                           {/* Nombre + precio */}
@@ -647,10 +755,21 @@ export default function FacturacionPage() {
                             <h3 className="text-sm font-bold text-white">{p.name}</h3>
                             <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">{copy.tagline}</p>
                           </div>
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-xs text-gray-400">US$</span>
-                            <span className="text-3xl font-extrabold text-white">{fmtN(p.price_usd)}</span>
-                            <span className="text-xs text-gray-500">/mes</span>
+                          <div className="flex items-baseline gap-1 flex-wrap">
+                            {isActive && planPromo?.price_discount_pct ? (
+                              <>
+                                <span className="text-sm text-gray-500 line-through mr-1">${fmtN(p.price_usd)}</span>
+                                <span className="text-xs text-gray-400">US$</span>
+                                <span className="text-3xl font-extrabold text-green-300">{fmtN(displayPrice)}</span>
+                                <span className="text-xs text-gray-500">/mes</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-xs text-gray-400">US$</span>
+                                <span className="text-3xl font-extrabold text-white">{fmtN(displayPrice)}</span>
+                                <span className="text-xs text-gray-500">/mes</span>
+                              </>
+                            )}
                           </div>
 
                           {/* Barra de créditos si es el plan activo */}
@@ -659,7 +778,7 @@ export default function FacturacionPage() {
                               <div>
                                 <div className="flex justify-between text-[10px] text-gray-400 mb-1.5">
                                   <span>Créditos usados</span>
-                                  <span>{fmtN(wallet?.used_credits ?? 0)} / {fmtN(total)}</span>
+                                  <span>{fmtN(wallet?.used_credits ?? 0)} / {fmtN(planMonthlyCredits)}</span>
                                 </div>
                                 <div className="h-1.5 rounded-full bg-white/[.08] overflow-hidden">
                                   <div className="h-full bg-[#5b5bf6] rounded-full" style={{ width: `${usedPct}%` }} />
@@ -670,7 +789,15 @@ export default function FacturacionPage() {
 
                           {/* Créditos del plan */}
                           <p className="text-xs font-semibold text-[#a5a5ff]">
-                            {fmtN(p.monthly_credits)} créditos/mes
+                            {isActive && planPromo?.credits_bonus_pct ? (
+                              <>
+                                {fmtN(displayCredits)} créditos/mes
+                                <span className="text-gray-500 line-through font-normal ml-1">{fmtN(p.monthly_credits)}</span>
+                                <span className="text-green-300 font-normal ml-1">+{planPromo.credits_bonus_pct}%</span>
+                              </>
+                            ) : (
+                              <>{fmtN(displayCredits)} créditos/mes</>
+                            )}
                             {p.max_users != null && (
                               <span className="text-gray-400 font-normal ml-1">· hasta {p.max_users} usuarios</span>
                             )}
@@ -695,13 +822,13 @@ export default function FacturacionPage() {
                         </div>
 
                         {/* Pie de tarjeta */}
-                        {callsEst > 0 && (
+                        {callsEstActive > 0 && (
                           <div className="px-5 pb-5">
                             <div className="rounded-lg border border-white/[.06] bg-white/[.03] p-3 text-center">
                               <p className="text-[9px] text-gray-500 font-semibold uppercase tracking-wide flex items-center justify-center gap-1 mb-1">
                                 <Phone className="w-2.5 h-2.5" /> Aprox. en llamadas de voz
                               </p>
-                              <p className="text-sm font-bold text-white">{fmtN(callsEst)} min/mes</p>
+                              <p className="text-sm font-bold text-white">{fmtN(callsEstActive)} min/mes</p>
                               <p className="text-[9px] text-gray-600">a {VOICE_CREDITS_PER_MINUTE} créditos / minuto</p>
                             </div>
                           </div>
@@ -782,11 +909,14 @@ export default function FacturacionPage() {
                       <tbody>
                         {uPage.map(u => {
                           const typeCls =
-                                u.type === "Agente de Voz" ? "bg-purple-500/15 text-purple-300" :
-                            u.type === "WhatsApp"      ? "bg-green-500/15 text-green-300" :
-                            u.type === "ORI / Mi Link" ? "bg-[#5b5bf6]/15 text-[#a5a5ff]" :
-                            u.type === "Flujos"        ? "bg-cyan-500/15 text-cyan-300" :
-                                                         "bg-white/[.06] text-gray-400";
+                                u.type === "Agentes de Voz" ? "bg-purple-500/15 text-purple-300" :
+                            u.type === "WhatsApp"           ? "bg-green-500/15 text-green-300" :
+                            u.type === "ORI"                ? "bg-[#5b5bf6]/15 text-[#a5a5ff]" :
+                            u.type === "Mi Link"            ? "bg-indigo-500/15 text-indigo-300" :
+                            u.type === "Documentos"         ? "bg-amber-500/15 text-amber-300" :
+                            u.type === "Formularios"        ? "bg-cyan-500/15 text-cyan-300" :
+                            u.type === "Cotizaciones"       ? "bg-pink-500/15 text-pink-300" :
+                                                              "bg-white/[.06] text-gray-400";
                           return (
                             <tr key={u.id} className={registryTableRow}>
                               <td className={registryTableCellFirst}>

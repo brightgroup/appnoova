@@ -25,7 +25,7 @@ export function ThemeSettingPanel() {
       <div>
         <h2 className="text-sm font-semibold text-[var(--nv-text)]">Apariencia</h2>
         <p className="text-xs text-[var(--nv-text-muted)] mt-1">
-          Elige cómo se ve la plataforma. Automático sigue la configuración de tu dispositivo
+          Elige cómo se ve la plataforma. Por defecto Noova usa tema oscuro; elige Claro si lo prefieres
           {preference === "system" ? ` (ahora: ${resolved === "dark" ? "oscuro" : "claro"})` : ""}.
         </p>
       </div>
