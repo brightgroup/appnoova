@@ -16,6 +16,7 @@ import {
 } from "@/lib/brand-ui";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
+import { VOICE_CREDITS_PER_MINUTE } from "@/lib/billing/pricing";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -38,7 +39,8 @@ interface Invoice {
 }
 interface Plan {
   id: string; name: string; price_usd: number; monthly_credits: number;
-  trial_days: number; whatsapp_included: boolean; max_text_agents: number | null; support_level: string;
+  trial_days: number; whatsapp_included: boolean; max_text_agents: number | null;
+  max_users: number | null; support_level: string;
 }
 interface DailyPoint {
   dayStr: string; dateKey: string;
@@ -109,19 +111,19 @@ const PLAN_COPY: Record<string, { tagline: string; features: string[]; ideal: st
     ideal: "Para explorar antes de comprometerte",
   },
   esencial: {
-    tagline: "Todo lo esencial para automatizar",
-    features: ["ORI, Mi Link e inbox", "Agentes ilimitados", "WhatsApp incluido", "Soporte por email"],
-    ideal: "Corredor independiente · 1–3 asesores",
+    tagline: "Equipo pequeño, volumen moderado",
+    features: ["350.000 créditos/mes", "Hasta 5 usuarios", "CRM e inbox con ia", "WhatsApp incluido", "Soporte por email"],
+    ideal: "Corredor independiente · 1–5 personas",
   },
   crecimiento: {
-    tagline: "Más créditos, más agentes, soporte prioritario",
-    features: ["Todo lo de Esencial", "Agentes ilimitados", "WhatsApp incluido", "Soporte prioritario"],
-    ideal: "Agencia en crecimiento · 4–10 asesores",
+    tagline: "Más equipo y más volumen mensual",
+    features: ["1.500.000 créditos/mes", "Hasta 15 usuarios", "Misma plataforma completa", "Soporte prioritario"],
+    ideal: "Agencia en crecimiento · 6–15 personas",
   },
   escala: {
-    tagline: "Máxima potencia para equipos corporativos",
-    features: ["Todo lo de Crecimiento", "Agentes ilimitados", "Soporte dedicado", "Gerente de cuenta"],
-    ideal: "Equipos corporativos · volumen alto",
+    tagline: "Alto volumen y equipo grande",
+    features: ["3.800.000 créditos/mes", "Usuarios ilimitados", "Misma plataforma completa", "Soporte dedicado"],
+    ideal: "Operación grande · más de 15 personas o alto consumo",
   },
 };
 
@@ -616,7 +618,7 @@ export default function FacturacionPage() {
                   {plans.map(p => {
                     const isActive  = p.id === sub?.plan_id;
                     const copy      = PLAN_COPY[p.id] ?? { tagline: "", features: [], ideal: "" };
-                    const callsEst  = p.monthly_credits > 0 ? Math.floor(p.monthly_credits / 350) : 0;
+                    const callsEst  = p.monthly_credits > 0 ? Math.floor(p.monthly_credits / VOICE_CREDITS_PER_MINUTE) : 0;
 
                     return (
                       <div
@@ -669,6 +671,12 @@ export default function FacturacionPage() {
                           {/* Créditos del plan */}
                           <p className="text-xs font-semibold text-[#a5a5ff]">
                             {fmtN(p.monthly_credits)} créditos/mes
+                            {p.max_users != null && (
+                              <span className="text-gray-400 font-normal ml-1">· hasta {p.max_users} usuarios</span>
+                            )}
+                            {p.max_users == null && p.price_usd > 0 && (
+                              <span className="text-gray-400 font-normal ml-1">· usuarios ilimitados</span>
+                            )}
                             {p.trial_days > 0 && <span className="text-gray-500 font-normal ml-1">· {p.trial_days} días gratis</span>}
                           </p>
 
@@ -694,7 +702,7 @@ export default function FacturacionPage() {
                                 <Phone className="w-2.5 h-2.5" /> Aprox. en llamadas de voz
                               </p>
                               <p className="text-sm font-bold text-white">{fmtN(callsEst)} min/mes</p>
-                              <p className="text-[9px] text-gray-600">a 350 créditos / minuto</p>
+                              <p className="text-[9px] text-gray-600">a {VOICE_CREDITS_PER_MINUTE} créditos / minuto</p>
                             </div>
                           </div>
                         )}

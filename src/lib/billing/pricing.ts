@@ -31,7 +31,7 @@ export const CREDIT_COST: Record<UsageEventType, number> = {
   text_test: 10,
   whatsapp_ai: 60,
   whatsapp_manual: 30,
-  voice: 350, // por minuto
+  voice: 900, // por minuto (precio al público)
   doc_scan: 90,
   form_fill: 50,
   quote: 70

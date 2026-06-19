@@ -68,6 +68,7 @@ export default function EquipoPage() {
   const [orgName, setOrgName] = useState("");
   const [canManage, setCanManage] = useState(false);
   const [canAdmin, setCanAdmin] = useState(false);
+  const [seatLimit, setSeatLimit] = useState<{ used: number; max: number | null } | null>(null);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -110,6 +111,9 @@ export default function EquipoPage() {
     } else {
       setMembers(membersJson.members ?? []);
       setInvites(membersJson.invites ?? []);
+      if (membersJson.seats) {
+        setSeatLimit({ used: membersJson.seats.used ?? 0, max: membersJson.seats.max ?? null });
+      }
     }
     if (rolesRes.ok) setRoles(rolesJson.roles ?? []);
 
@@ -226,6 +230,10 @@ export default function EquipoPage() {
               {members.length} miembro{members.length !== 1 ? "s" : ""}
               {invites.length > 0 &&
                 ` · ${invites.length} invitación${invites.length !== 1 ? "es" : ""} pendiente${invites.length !== 1 ? "s" : ""}`}
+              {seatLimit?.max != null &&
+                ` · ${seatLimit.used}/${seatLimit.max} usuarios del plan`}
+              {seatLimit?.max == null && seatLimit != null &&
+                ` · usuarios ilimitados`}
             </p>
           </div>
         </div>

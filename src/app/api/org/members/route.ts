@@ -43,7 +43,31 @@ export async function GET(req: NextRequest) {
     : { data: [] };
   const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
 
+  const { data: subRow } = await db
+    .from("organization_subscriptions")
+    .select("plan_id, plans(name, max_users)")
+    .eq("organization_id", ctx.organizationId)
+    .maybeSingle();
+
+  const planRaw = subRow?.plans as { name: string; max_users: number | null } | { name: string; max_users: number | null }[] | null;
+  const plan = Array.isArray(planRaw) ? planRaw[0] : planRaw;
+  const maxUsers = plan?.max_users ?? null;
+
+  const activeOrInvited = (members ?? []).filter((m) => m.status === "active" || m.status === "invited").length;
+  const pendingInvites = (invites ?? []).length;
+  const seatsUsed = activeOrInvited + pendingInvites;
+
   return NextResponse.json({
+    plan: {
+      id: subRow?.plan_id ?? null,
+      name: plan?.name ?? null,
+      max_users: maxUsers,
+    },
+    seats: {
+      used: seatsUsed,
+      max: maxUsers,
+      remaining: maxUsers != null ? Math.max(0, maxUsers - seatsUsed) : null,
+    },
     members: (members ?? []).map((m) => {
       const profile = profileMap.get(m.user_id);
       const roleRaw = m.roles as { id: string; slug: string; name: string } | { id: string; slug: string; name: string }[] | null;
@@ -97,6 +121,38 @@ export async function POST(req: NextRequest) {
   }
 
   const db = adminClient();
+
+  const { data: subRow } = await db
+    .from("organization_subscriptions")
+    .select("plan_id, plans(max_users)")
+    .eq("organization_id", ctx.organizationId)
+    .maybeSingle();
+
+  const planRaw = subRow?.plans as { max_users: number | null } | { max_users: number | null }[] | null;
+  const maxUsers = Array.isArray(planRaw) ? planRaw[0]?.max_users : planRaw?.max_users;
+  if (maxUsers != null) {
+    const [{ count: memberCount }, { count: inviteCount }] = await Promise.all([
+      db
+        .from("organization_members")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", ctx.organizationId)
+        .in("status", ["active", "invited"]),
+      db
+        .from("organization_invites")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", ctx.organizationId)
+        .is("accepted_at", null)
+        .gt("expires_at", new Date().toISOString()),
+    ]);
+    const totalSeats = (memberCount ?? 0) + (inviteCount ?? 0);
+    if (totalSeats >= maxUsers) {
+      return NextResponse.json(
+        { error: `Su plan permite máximo ${maxUsers} usuarios. Actualice el plan para agregar más.` },
+        { status: 403 }
+      );
+    }
+  }
+
   const role = await getOrgRoleById(db, ctx.organizationId, roleId);
   if (!role || role.slug === "owner") {
     return NextResponse.json({ error: "Rol inválido" }, { status: 400 });

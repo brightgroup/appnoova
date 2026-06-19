@@ -29,10 +29,10 @@ interface AdminOrgModalProps {
 }
 
 const PLAN_OPTIONS = [
-  { value: "explorador", label: "Explorador · Prueba 14 días (15.000 cr)" },
-  { value: "esencial", label: "Esencial · $82/mes (350.000 cr)" },
-  { value: "crecimiento", label: "Crecimiento · $345/mes (1.500.000 cr)" },
-  { value: "escala", label: "Escala · $815/mes (3.800.000 cr)" },
+  { value: "explorador", label: "Explorador · Prueba 14 días · 1 usuario · 15.000 cr" },
+  { value: "esencial", label: "Esencial · $82/mes · 5 usuarios · 350.000 cr" },
+  { value: "crecimiento", label: "Crecimiento · $345/mes · 15 usuarios · 1.500.000 cr" },
+  { value: "escala", label: "Escala · $815/mes · usuarios ilimitados · 3.800.000 cr" },
 ];
 
 const STATUS_OPTIONS = [

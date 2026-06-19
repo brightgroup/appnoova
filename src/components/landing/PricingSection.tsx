@@ -9,7 +9,7 @@ type TextEstimate = "mix" | "whatsapp";
 
 const AVG_TEXT_MSG_CREDITS = 30;
 const WA_IA_CREDITS = 60;
-const VOICE_MIN_CREDITS = 350;
+const VOICE_MIN_CREDITS = 900;
 
 const FREE_PLAN = {
   id: "explorador",
@@ -37,11 +37,12 @@ const PAID_PLANS_INSURANCE = [
     priceLabel: "$82",
     priceSuffix: "USD / mes",
     credits: 350_000,
-    voiceCap: 1_000,
+    voiceCap: 388,
     features: [
       "350.000 créditos / mes",
-      "Agente entrenado, Mi Link, inbox y agentes",
-      "Escaneo, formularios y cotizaciones",
+      "Hasta 5 usuarios",
+      "CRM, contactos y leads con ia",
+      "Agentes de texto, Mi Link e inbox",
       "WhatsApp con ia (según consumo)",
       "Soporte por chat y correo"
     ],
@@ -56,11 +57,12 @@ const PAID_PLANS_INSURANCE = [
     priceLabel: "$345",
     priceSuffix: "USD / mes",
     credits: 1_500_000,
-    voiceCap: 4_285,
+    voiceCap: 1_666,
     features: [
       "1.500.000 créditos / mes",
-      "Agentes de texto ilimitados",
-      "Inbox omnicanal",
+      "Hasta 15 usuarios",
+      "Misma plataforma: CRM, inbox y agentes ia",
+      "WhatsApp con ia (según consumo)",
       "Soporte prioritario",
       "Onboarding WhatsApp sin costo adicional"
     ],
@@ -75,13 +77,14 @@ const PAID_PLANS_INSURANCE = [
     priceLabel: "$815",
     priceSuffix: "USD / mes",
     credits: 3_800_000,
-    voiceCap: 10_850,
+    voiceCap: 4_222,
     features: [
       "3.800.000 créditos / mes",
-      "Todo lo del plan Crecimiento",
+      "Usuarios ilimitados",
+      "Misma plataforma: CRM, inbox y agentes ia",
+      "WhatsApp con ia (según consumo)",
       "Soporte dedicado",
-      "Onboarding WhatsApp sin costo adicional",
-      "Equipos grandes y multi-sucursal"
+      "Onboarding WhatsApp sin costo adicional"
     ],
     cta: "Empezar con Escala",
     source: "plan_escala",
@@ -95,8 +98,9 @@ const PAID_PLANS_GENERIC = [
     subtitle: "Equipos pequeños",
     features: [
       "350.000 créditos / mes",
+      "Hasta 5 usuarios",
+      "CRM, contactos y leads con ia",
       "Agentes de texto, Mi Link e inbox",
-      "Widget web y captación de leads",
       "WhatsApp con ia (según consumo)",
       "Soporte por chat y correo"
     ]
@@ -106,8 +110,9 @@ const PAID_PLANS_GENERIC = [
     subtitle: "Pymes en expansión",
     features: [
       "1.500.000 créditos / mes",
-      "Agentes de texto ilimitados",
-      "Inbox omnicanal y CRM integrado",
+      "Hasta 15 usuarios",
+      "Misma plataforma: CRM, inbox y agentes ia",
+      "WhatsApp con ia (según consumo)",
       "Soporte prioritario",
       "Onboarding WhatsApp sin costo adicional"
     ]
@@ -117,10 +122,11 @@ const PAID_PLANS_GENERIC = [
     subtitle: "Operación de alto volumen",
     features: [
       "3.800.000 créditos / mes",
-      "Todo lo del plan Crecimiento",
+      "Usuarios ilimitados",
+      "Misma plataforma: CRM, inbox y agentes ia",
+      "WhatsApp con ia (según consumo)",
       "Soporte dedicado",
-      "Multi-equipo y multi-sucursal",
-      "Implementación asistida"
+      "Onboarding WhatsApp sin costo adicional"
     ]
   }
 ] as const;
@@ -130,7 +136,7 @@ const EXTRA_USAGE_INSURANCE = [
   { label: "Llenado de formatos", price: "$50" },
   { label: "Escaneo de documento (póliza PDF)", price: "$90" },
   { label: "Generación de cotización", price: "$70" },
-  { label: "Agente de voz (por minuto)", price: "$350" }
+  { label: "Agente de voz (por minuto)", price: "$900" }
 ];
 
 const EXTRA_USAGE_GENERIC = [
@@ -138,7 +144,7 @@ const EXTRA_USAGE_GENERIC = [
   { label: "Llenado de formularios", price: "$50" },
   { label: "Procesamiento de documentos", price: "$90" },
   { label: "Cotización asistida por ia", price: "$70" },
-  { label: "Agente de voz (por minuto)", price: "$350" }
+  { label: "Agente de voz (por minuto)", price: "$900" }
 ];
 
 const ENTERPRISE_PLAN = {

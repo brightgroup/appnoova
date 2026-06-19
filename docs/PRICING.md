@@ -120,7 +120,7 @@ Documento de referencia para costos, márgenes y precios al cliente.
 | Documento | ~$25 prom. | ×3 | $75–95 |
 | Formulario | ~$21 | ×2.5 | $50–55 |
 | Cotización | ~$35 prom. | ×2 | $70–75 |
-| Minuto voz | ~$210 | ×1.7 | $350–360 |
+| Minuto voz | ~$210 | ×4.3 | $900 |
 
 **Regla:** margen mínimo global **40%** en promedio. No bajar WhatsApp con IA de **$60** en fase de lanzamiento; revisar cuando migremos a 360dialog.
 
@@ -165,7 +165,7 @@ El cliente no ve proveedores, categorías Meta ni tipos de mensaje Twilio.
 | **ORI llena un formulario** | 50 | **$50** | ~$21 | ~58% |
 | **ORI escanea un documento** | 90 | **$90** | ~$25 | ~72% |
 | **ORI genera una cotización** | 70 | **$70** | ~$35 | ~50% |
-| **Agente de voz** (por minuto) | 350 | **$350** | ~$210 | ~40% |
+| **Agente de voz** (por minuto) | 900 | **$900** | ~$210 | ~77% |
 
 **Referencia competencia:** Dapta ~$73 COP por respuesta IA en WhatsApp. **Noova: $60** (lanzamiento).
 
@@ -206,7 +206,7 @@ Pago en COP al TRM del día o equivalente acordado.
 | **Precio** | **$82 USD/mes** (~$344.000 COP) |
 | **Créditos incluidos** | **350.000 / mes** |
 | **Ideal para** | Corredor independiente o agencia pequeña (1–3 asesores) |
-| **Incluye** | ORI, Mi Link, inbox, agentes de texto, soporte por email |
+| **Incluye** | ORI, Mi Link, inbox, CRM con ia, agentes de texto, **hasta 5 usuarios**, soporte por email |
 
 **Equivale aprox. a:**
 - ~**11.600** mensajes de texto con IA (promedio ~$30), o
@@ -224,8 +224,8 @@ Pago en COP al TRM del día o equivalente acordado.
 |---|---|
 | **Precio** | **$345 USD/mes** (~$1.449.000 COP) |
 | **Créditos incluidos** | **1.500.000 / mes** |
-| **Ideal para** | Agencia en crecimiento (4–10 asesores) |
-| **Incluye** | Todo Inicio + agentes ilimitados + soporte prioritario |
+| **Ideal para** | Agencia en crecimiento (6–15 asesores) |
+| **Incluye** | Misma plataforma que Esencial + **1.500.000 créditos** + **hasta 15 usuarios** + soporte prioritario |
 
 **Equivale aprox. a:**
 - ~**50.000** mensajes de texto con IA (promedio ~$30), o
@@ -243,8 +243,8 @@ Pago en COP al TRM del día o equivalente acordado.
 |---|---|
 | **Precio** | **$815 USD/mes** (~$3.423.000 COP) |
 | **Créditos incluidos** | **3.800.000 / mes** |
-| **Ideal para** | Agencias con alto volumen WA, documentos y equipo grande |
-| **Incluye** | Todo Profesional + onboarding dedicado |
+| **Ideal para** | Agencias con equipo grande o alto volumen de consumo |
+| **Incluye** | Misma plataforma + **3.800.000 créditos** + **usuarios ilimitados** + soporte dedicado |
 
 **Equivale aprox. a:**
 - ~**126.600** mensajes de texto con IA (promedio ~$30), o
@@ -268,11 +268,17 @@ Pago en COP al TRM del día o equivalente acordado.
 | Inbox | ✅ | ✅ | ✅ | ✅ |
 | WhatsApp + IA | — | ✅ | ✅ | ✅ |
 | Agentes de texto | 1 | Ilimitados | Ilimitados | Ilimitados |
+| Usuarios en equipo | 1 | **5 máx.** | **15 máx.** | **Ilimitados** |
+| CRM contactos/leads con ia | — | ✅ | ✅ | ✅ |
 | Escaneo / formularios / cotizaciones | ✅ | ✅ | ✅ | ✅ |
 | Agente de voz | Próximamente | Próximamente | Próximamente | Próximamente |
 | Soporte | Email | Email | Prioritario | Dedicado |
 
 **WhatsApp:** conexión incluida sin cargo adicional en fase de lanzamiento (onboarding manual).
+
+**Corporativo:** empresas que superen Escala en volumen o requisitos especiales → plan a medida (fuera de esta tabla).
+
+**Lógica de upgrade:** mismo producto en los tres planes de pago; sube de plan cuando crece el **equipo** (usuarios) o el **consumo mensual** (créditos).
 
 ---
 
