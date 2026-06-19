@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin, isProtectedUser } from "@/lib/admin-server";
+import { deleteUserCompletely } from "@/lib/admin-provisioning";
 import { adminClient } from "@/lib/voice-agents-server";
 import type { AccountStatus } from "@/types/rbac";
 
@@ -92,16 +93,20 @@ export async function DELETE(
     .eq("owner_user_id", userId);
 
   for (const org of ownedOrgs ?? []) {
-    if (await isProtectedUser(org.owner_user_id)) continue;
-    await db.from("organizations").delete().eq("id", org.id);
+    if (await isProtectedUser(org.owner_user_id)) {
+      return NextResponse.json(
+        { error: "No se puede eliminar un usuario con organización protegida del superadministrador" },
+        { status: 403 }
+      );
+    }
   }
 
-  await db.from("organization_members").delete().eq("user_id", userId);
-  await db.from("platform_role_assignments").delete().eq("user_id", userId);
-  await db.from("user_active_organization").delete().eq("user_id", userId);
-
-  const { error } = await db.auth.admin.deleteUser(userId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  try {
+    await deleteUserCompletely(db, userId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Error al eliminar usuario";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin, isProtectedUser } from "@/lib/admin-server";
+import { deleteOrganizationCompletely } from "@/lib/admin-provisioning";
 import { adminClient } from "@/lib/voice-agents-server";
 import { uniqueOrgSlug } from "@/lib/admin-utils";
 import type { AccountStatus } from "@/types/rbac";
@@ -108,9 +109,12 @@ export async function DELETE(
     );
   }
 
-  await db.from("user_active_organization").delete().eq("organization_id", id);
-  const { error } = await db.from("organizations").delete().eq("id", id);
+  try {
+    await deleteOrganizationCompletely(db, id);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Error al eliminar organización";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

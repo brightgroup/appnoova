@@ -169,3 +169,36 @@ export async function addOrganizationMember(
     await db.from("users").update({ organization_id: input.organizationId }).eq("id", input.userId);
   }
 }
+
+/** Elimina una organización y desbloquea FKs (members→roles RESTRICT, users.organization_id). */
+export async function deleteOrganizationCompletely(db: Db, orgId: string): Promise<void> {
+  await db.from("organization_members").delete().eq("organization_id", orgId);
+  await db.from("organization_invites").delete().eq("organization_id", orgId);
+  await db.from("user_active_organization").delete().eq("organization_id", orgId);
+  await db.from("users").update({ organization_id: null }).eq("organization_id", orgId);
+
+  const { error } = await db.from("organizations").delete().eq("id", orgId);
+  if (error) throw new Error(error.message);
+}
+
+/** Elimina un usuario de auth tras limpiar orgs propias y referencias bloqueantes. */
+export async function deleteUserCompletely(db: Db, userId: string): Promise<void> {
+  const { data: ownedOrgs } = await db
+    .from("organizations")
+    .select("id")
+    .eq("owner_user_id", userId);
+
+  for (const org of ownedOrgs ?? []) {
+    await deleteOrganizationCompletely(db, org.id);
+  }
+
+  await db.from("organization_invites").delete().eq("invited_by", userId);
+  await db.from("platform_role_assignments").update({ assigned_by: null }).eq("assigned_by", userId);
+  await db.from("phone_numbers").update({ assigned_by: null }).eq("assigned_by", userId);
+  await db.from("organization_members").delete().eq("user_id", userId);
+  await db.from("platform_role_assignments").delete().eq("user_id", userId);
+  await db.from("user_active_organization").delete().eq("user_id", userId);
+
+  const { error } = await db.auth.admin.deleteUser(userId);
+  if (error) throw new Error(error.message);
+}
