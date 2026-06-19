@@ -4,17 +4,20 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
-  ChevronLeft, Save, Upload, Plus, Trash2, Loader2, Bot, Database, MoreHorizontal, Pencil
+  ChevronLeft, Save, Upload, Plus, Trash2, Loader2, Bot, Database, MoreHorizontal,
+  Download, FileSpreadsheet
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
+import { parseCellValue } from "@/lib/data-tables/columns";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { DataTableImportDialog } from "@/components/data-tables/DataTableImportDialog";
+import { exportDataTableCsv, exportDataTableXlsx } from "@/lib/data-tables/export";
 import { NoovaAnchoredMenu } from "@/components/ui/NoovaAnchoredMenu";
 import { NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import {
-  registryPage, registryToolbar, btnPrimary, btnGhost, textMuted,
+  registryPage, registryToolbar, registryContent, btnPrimary, btnGhost, textMuted,
   registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
   registryTableRow, registryTableCell, registryTableCellFirst, registryTableEmpty,
 } from "@/lib/brand-ui";
@@ -32,6 +35,9 @@ function formatCell(value: unknown, col: DataTableColumn): string {
   return String(value);
 }
 
+const DATA_COL_WIDTH_PX = 140;
+const ACTIONS_COL_WIDTH_PX = 40;
+
 export default function TablaDetailPage() {
   const { id } = useParams<{ id: string }>();
 
@@ -44,6 +50,9 @@ export default function TablaDetailPage() {
   const [error, setError] = useState("");
   const [editRow, setEditRow] = useState<DataTableRowRecord | null>(null);
   const [editDraft, setEditDraft] = useState<Record<string, string>>({});
+  const [editingCell, setEditingCell] = useState<{ rowId: string; colKey: string } | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [savingCell, setSavingCell] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
@@ -79,16 +88,8 @@ export default function TablaDetailPage() {
   const pagination = useRegistryPagination(filteredRows.length, search, { defaultPageSize: 100 });
   const pageRows = pagination.pageRows(filteredRows);
 
-  const openEdit = (row: DataTableRowRecord) => {
-    setEditRow(row);
-    const draft: Record<string, string> = {};
-    for (const c of columns) {
-      draft[c.key] = row.data[c.key] != null ? String(row.data[c.key]) : "";
-    }
-    setEditDraft(draft);
-  };
-
   const openNew = () => {
+    setEditingCell(null);
     setEditRow({
       id: "", data_table_id: id, organization_id: "", data: {},
       sort_order: rows.length, is_active: true, created_at: "", updated_at: "",
@@ -98,18 +99,52 @@ export default function TablaDetailPage() {
     setEditDraft(draft);
   };
 
+  const startCellEdit = (row: DataTableRowRecord, col: DataTableColumn) => {
+    setEditingCell({ rowId: row.id, colKey: col.key });
+    setEditValue(row.data[col.key] != null ? String(row.data[col.key]) : "");
+  };
+
+  const cancelCellEdit = () => {
+    setEditingCell(null);
+    setEditValue("");
+  };
+
+  const saveCell = async (row: DataTableRowRecord, col: DataTableColumn) => {
+    const cellKey = `${row.id}:${col.key}`;
+    const parsed = parseCellValue(editValue, col);
+    const current = row.data[col.key];
+    const unchanged =
+      parsed === current ||
+      (parsed == null && (current == null || current === ""));
+
+    if (unchanged) {
+      cancelCellEdit();
+      return;
+    }
+
+    setSavingCell(cellKey);
+    const data = { ...row.data, [col.key]: parsed };
+    const res = await authFetch(`/api/data-tables/${id}/rows`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ row_id: row.id, data }),
+    });
+    const json = await res.json();
+    setSavingCell(null);
+    if (!res.ok) {
+      setError(json.error ?? "Error al guardar celda");
+      return;
+    }
+    setRows(prev => prev.map(r => (r.id === row.id ? { ...r, data } : r)));
+    cancelCellEdit();
+  };
+
   const saveRow = async () => {
     if (!table) return;
     setSaving(true);
     const data: Record<string, string | number | null> = {};
     for (const c of columns) {
-      const raw = editDraft[c.key] ?? "";
-      if (c.type === "number") {
-        const n = Number(String(raw).replace(/[^\d.-]/g, ""));
-        data[c.key] = raw.trim() === "" ? null : (Number.isFinite(n) ? n : null);
-      } else {
-        data[c.key] = raw.trim() || null;
-      }
+      data[c.key] = parseCellValue(editDraft[c.key] ?? "", c) as string | number | null;
     }
 
     const isNew = !editRow?.id;
@@ -160,7 +195,7 @@ export default function TablaDetailPage() {
   return (
     <div className={registryPage}>
       <div className={registryToolbar}>
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <Link href="/dashboard/tablas" className="p-1.5 hover:bg-white/[.06] rounded-lg text-gray-400 shrink-0">
             <ChevronLeft className="w-5 h-5" />
           </Link>
@@ -168,9 +203,6 @@ export default function TablaDetailPage() {
             <div className="flex items-center gap-2 flex-wrap">
               <Database className="w-4 h-4 text-[#5b5bf6] shrink-0" />
               <h1 className="text-xl font-bold tracking-tight truncate">{table.name}</h1>
-              <span className="text-xs text-gray-500">
-                {table.row_count.toLocaleString("es-CO")} filas · {columns.length} columnas
-              </span>
             </div>
             {linkedAgents.length > 0 && (
               <p className={`text-xs ${textMuted} mt-0.5 flex items-center gap-1`}>
@@ -182,19 +214,8 @@ export default function TablaDetailPage() {
         </div>
       </div>
 
-      <div className="px-5 pb-5">
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {columns.map(c => (
-            <span
-              key={c.key}
-              className="text-[10px] px-2 py-1 rounded-full border border-white/[.08] bg-white/[.03] text-gray-400"
-            >
-              {c.label}
-              {c.filterable && <span className="text-[#a5a5ff] ml-1">filtro</span>}
-            </span>
-          ))}
-        </div>
-
+      <div className={`${registryContent} flex flex-col min-h-0 overflow-hidden`}>
+        <div className="flex-1 flex flex-col min-h-0">
         <RegistryTableLayout
           search={search}
           onSearchChange={setSearch}
@@ -203,7 +224,29 @@ export default function TablaDetailPage() {
           refreshing={loading}
           error={error || undefined}
           action={
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {rows.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => exportDataTableCsv(table.name, columns, filteredRows)}
+                    className={btnGhost}
+                    title="Descargar CSV"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span className="hidden sm:inline">CSV</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exportDataTableXlsx(table.name, columns, filteredRows)}
+                    className={btnGhost}
+                    title="Descargar Excel"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span className="hidden sm:inline">Excel</span>
+                  </button>
+                </>
+              )}
               <button type="button" onClick={() => setImportOpen(true)} className={btnGhost}>
                 <Upload className="w-4 h-4" />
                 <span className="hidden sm:inline">Reimportar</span>
@@ -236,28 +279,82 @@ export default function TablaDetailPage() {
                 : "Esta tabla no tiene filas. Agrega una manualmente o reimporta un Excel."}
             </div>
           ) : (
-            <table className={`${registryTable} min-w-max`}>
+            <table
+              className={`${registryTable} table-fixed`}
+              style={{ width: displayCols.length * DATA_COL_WIDTH_PX + ACTIONS_COL_WIDTH_PX }}
+            >
+              <colgroup>
+                {displayCols.map(c => (
+                  <col key={c.key} style={{ width: DATA_COL_WIDTH_PX }} />
+                ))}
+                <col style={{ width: ACTIONS_COL_WIDTH_PX }} />
+              </colgroup>
               <thead className={registryTableHead}>
                 <tr className={registryTableHeadRow}>
                   {displayCols.map(c => (
-                    <th key={c.key} className={registryTableHeadCell}>{c.label}</th>
+                    <th
+                      key={c.key}
+                      title={c.label}
+                      className={`${registryTableHeadCell} !px-2 !py-1.5 max-w-0 overflow-hidden`}
+                    >
+                      <span className="block truncate">{c.label}</span>
+                    </th>
                   ))}
-                  <th className={`${registryTableHeadCell} w-12`} />
+                  <th className={`${registryTableHeadCell} !px-1 !py-1.5 w-10`} />
                 </tr>
               </thead>
               <tbody>
                 {pageRows.map(row => (
                   <tr key={row.id} className={registryTableRow}>
-                    {displayCols.map(c => (
-                      <td
-                        key={c.key}
-                        className={`${registryTableCell} text-sm text-gray-200 whitespace-nowrap max-w-[240px] truncate`}
-                        title={formatCell(row.data[c.key], c)}
-                      >
-                        {formatCell(row.data[c.key], c)}
-                      </td>
-                    ))}
-                    <td className={registryTableCell} onClick={e => e.stopPropagation()}>
+                    {displayCols.map(c => {
+                      const isEditing = editingCell?.rowId === row.id && editingCell.colKey === c.key;
+                      const cellKey = `${row.id}:${c.key}`;
+                      const isSaving = savingCell === cellKey;
+                      const display = formatCell(row.data[c.key], c);
+
+                      return (
+                        <td
+                          key={c.key}
+                          className={`${registryTableCellFirst} !px-0 !py-0 text-xs text-gray-200 max-w-0 overflow-hidden`}
+                          title={!isEditing ? display : undefined}
+                          onClick={() => {
+                            if (!isEditing) startCellEdit(row, c);
+                          }}
+                        >
+                          {isEditing ? (
+                            <input
+                              autoFocus
+                              type="text"
+                              value={editValue}
+                              disabled={isSaving}
+                              onChange={e => setEditValue(e.target.value)}
+                              onBlur={() => void saveCell(row, c)}
+                              onKeyDown={e => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  void saveCell(row, c);
+                                }
+                                if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  cancelCellEdit();
+                                }
+                              }}
+                              onClick={e => e.stopPropagation()}
+                              className="w-full min-w-0 max-w-full box-border bg-[#1a1b24] border border-[#5b5bf6]/50 px-2 py-1 text-xs text-white outline-none focus:border-[#5b5bf6]"
+                            />
+                          ) : (
+                            <span className="block px-2 py-1 truncate cursor-text hover:bg-white/[.04]">
+                              {isSaving ? (
+                                <Loader2 className="w-3 h-3 animate-spin text-[#5b5bf6] inline" />
+                              ) : (
+                                display
+                              )}
+                            </span>
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className={`${registryTableCell} !px-0 !py-0`}>
                       <NoovaAnchoredMenu
                         open={openMenuId === row.id}
                         onClose={() => setOpenMenuId(null)}
@@ -269,17 +366,12 @@ export default function TablaDetailPage() {
                               e.stopPropagation();
                               setOpenMenuId(prev => (prev === row.id ? null : row.id));
                             }}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/[.06]"
+                            className="p-1 rounded-lg text-gray-500 hover:text-white hover:bg-white/[.06]"
                           >
-                            <MoreHorizontal className="w-4 h-4" />
+                            <MoreHorizontal className="w-3.5 h-3.5" />
                           </button>
                         }
                       >
-                        <NoovaListMenuItem onClick={() => { setOpenMenuId(null); openEdit(row); }}>
-                          <span className="flex items-center gap-2">
-                            <Pencil className="w-3.5 h-3.5" /> Editar
-                          </span>
-                        </NoovaListMenuItem>
                         <NoovaListMenuItem danger onClick={() => void deleteRow(row.id)}>
                           <span className="flex items-center gap-2">
                             <Trash2 className="w-3.5 h-3.5" /> Eliminar
@@ -293,9 +385,10 @@ export default function TablaDetailPage() {
             </table>
           )}
         </RegistryTableLayout>
+        </div>
 
-        <p className={`text-xs ${textMuted} mt-4`}>
-          Asigna esta tabla en la configuración de tu agente de texto. El agente usará estos datos como fuente autorizada de precios y productos.
+        <p className={`text-xs ${textMuted} mt-4 shrink-0`}>
+          Clic en cualquier celda para editarla (como Excel). Enter guarda, Escape cancela. El agente solo usa los datos de esta tabla.
         </p>
       </div>
 

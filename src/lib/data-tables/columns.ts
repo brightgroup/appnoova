@@ -16,15 +16,36 @@ export function slugifyColumnKey(label: string): string {
     .slice(0, 48) || "columna";
 }
 
-function inferType(values: unknown[]): DataColumnType {
+function hasLetters(value: string): boolean {
+  return /[a-zA-ZáéíóúñÁÉÍÓÚÑüÜ]/.test(value);
+}
+
+/** Valor numérico puro (sin letras). Rechaza "Tortas" y "16 porciones". */
+export function isPureNumericValue(v: unknown): boolean {
+  if (typeof v === "number") return Number.isFinite(v);
+  const s = String(v).trim();
+  if (!s || hasLetters(s)) return false;
+  const digits = s.replace(/[^\d.,-]/g, "");
+  if (!digits) return false;
+  const n = Number(digits.replace(/,/g, "."));
+  return Number.isFinite(n);
+}
+
+function columnLabelLooksNumeric(label: string): boolean {
+  const normalized = label
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  return NUMBER_HINTS.some(h => normalized.includes(h));
+}
+
+function inferType(label: string, values: unknown[]): DataColumnType {
+  if (columnLabelLooksNumeric(label)) return "number";
+
   const nonEmpty = values.filter(v => v !== null && v !== undefined && String(v).trim() !== "");
   if (nonEmpty.length === 0) return "text";
-  const allNumeric = nonEmpty.every(v => {
-    if (typeof v === "number") return Number.isFinite(v);
-    const n = Number(String(v).replace(/[^\d.-]/g, ""));
-    return String(v).trim() !== "" && Number.isFinite(n);
-  });
-  return allNumeric ? "number" : "text";
+  if (nonEmpty.every(isPureNumericValue)) return "number";
+  return "text";
 }
 
 function uniqueKey(base: string, used: Set<string>): string {
@@ -50,7 +71,7 @@ export function buildColumnsFromHeaders(
       const baseKey = slugifyColumnKey(label);
       const key = uniqueKey(baseKey, used);
       const values = sampleRows.map(r => r[label]);
-      const type = inferType(values);
+      const type = inferType(label, values);
       const normalized = label.toLowerCase();
       const filterable = FILTERABLE_HINTS.some(h => normalized.includes(h));
       const required = filterable || normalized.includes("producto") || normalized.includes("nombre");
@@ -66,6 +87,22 @@ export function buildColumnsFromHeaders(
     });
 }
 
+export function parseCellValue(
+  raw: unknown,
+  col: Pick<DataTableColumn, "type">
+): string | number | boolean | null {
+  if (raw === null || raw === undefined || String(raw).trim() === "") return null;
+  if (col.type === "number") {
+    if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
+    const s = String(raw).trim();
+    if (hasLetters(s)) return null;
+    const n = Number(s.replace(/[^\d.,-]/g, "").replace(/,/g, "."));
+    return Number.isFinite(n) ? n : null;
+  }
+  if (col.type === "boolean") return Boolean(raw);
+  return String(raw).trim();
+}
+
 export function normalizeRowData(
   raw: Record<string, unknown>,
   columns: DataTableColumn[]
@@ -73,18 +110,7 @@ export function normalizeRowData(
   const out: Record<string, string | number | boolean | null> = {};
   for (const col of columns) {
     const val = raw[col.label] ?? raw[col.key] ?? null;
-    if (val === null || val === undefined || String(val).trim() === "") {
-      out[col.key] = null;
-      continue;
-    }
-    if (col.type === "number") {
-      const n = typeof val === "number" ? val : Number(String(val).replace(/[^\d.-]/g, ""));
-      out[col.key] = Number.isFinite(n) ? n : null;
-    } else if (col.type === "boolean") {
-      out[col.key] = Boolean(val);
-    } else {
-      out[col.key] = String(val).trim();
-    }
+    out[col.key] = parseCellValue(val, col);
   }
   return out;
 }

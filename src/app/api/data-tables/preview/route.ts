@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       sheet_name: parsed.sheetName,
       columns: parsed.columns,
       row_count: parsed.rows.length,
-      preview_rows: parsed.rows.slice(0, 5),
+      sample_rows: parsed.rows.slice(0, 8),
     });
   } catch (err) {
     return NextResponse.json(

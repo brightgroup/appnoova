@@ -11,7 +11,19 @@ export interface ImportPreview {
   sheet_name: string;
   columns: DataTableColumn[];
   row_count: number;
-  preview_rows: Record<string, string | number | boolean | null>[];
+  sample_rows: Record<string, string | number | boolean | null>[];
+}
+
+function formatPreviewCell(value: unknown, col: DataTableColumn): string {
+  if (value == null || value === "") return "—";
+  if (col.type === "number" && typeof value === "number") {
+    const l = col.label.toLowerCase();
+    if (l.includes("precio") || l.includes("costo")) {
+      return "$" + new Intl.NumberFormat("es-CO").format(Math.round(value));
+    }
+    return new Intl.NumberFormat("es-CO").format(value);
+  }
+  return String(value);
 }
 
 interface DataTableImportDialogProps {
@@ -102,17 +114,17 @@ export function DataTableImportDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={handleClose}>
       <div
-        className="w-full max-w-lg rounded-xl border border-white/[.12] bg-[#12131a] shadow-2xl"
+        className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-xl border border-white/[.12] bg-[#12131a] shadow-2xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[.08]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[.08] shrink-0">
           <h2 className="text-sm font-semibold text-white">{title}</h2>
           <button onClick={handleClose} className="p-1 rounded-lg text-gray-500 hover:text-white hover:bg-white/[.06]">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 overflow-y-auto overflow-x-hidden min-h-0 flex-1 min-w-0">
           {!preview && !loadingPreview && (
             <>
               <div
@@ -191,6 +203,34 @@ export function DataTableImportDialog({
               </div>
 
               <div>
+                <p className="text-xs text-gray-400 mb-2">Vista previa (primeras filas)</p>
+                <div className="overflow-x-auto rounded-lg border border-white/[.08] max-h-48 overflow-y-auto">
+                  <table className="w-full text-xs min-w-max">
+                    <thead className="sticky top-0 bg-[#12131a]">
+                      <tr className="border-b border-white/[.08]">
+                        {preview.columns.map(c => (
+                          <th key={c.key} className="px-2 py-1.5 text-left text-gray-500 font-medium whitespace-nowrap">
+                            {c.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(preview.sample_rows ?? []).map((row, i) => (
+                        <tr key={i} className="border-b border-white/[.04] last:border-0">
+                          {preview.columns.map(c => (
+                            <td key={c.key} className="px-2 py-1.5 text-gray-300 whitespace-nowrap max-w-[200px] truncate">
+                              {formatPreviewCell(row[c.key], c)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
                 <p className="text-xs text-gray-400 mb-2">Columnas detectadas</p>
                 <div className="flex flex-wrap gap-1.5">
                   {preview.columns.map(c => (
@@ -204,36 +244,6 @@ export function DataTableImportDialog({
                   ))}
                 </div>
               </div>
-
-              {preview.preview_rows.length > 0 && (
-                <div>
-                  <p className="text-xs text-gray-400 mb-2">Vista previa (primeras filas)</p>
-                  <div className="overflow-x-auto rounded-lg border border-white/[.08] max-h-32">
-                    <table className="w-full text-[10px]">
-                      <thead>
-                        <tr className="border-b border-white/[.06] bg-white/[.03]">
-                          {preview.columns.filter(c => c.display).slice(0, 4).map(c => (
-                            <th key={c.key} className="px-2 py-1.5 text-left text-gray-500 font-medium whitespace-nowrap">
-                              {c.label}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {preview.preview_rows.slice(0, 3).map((row, i) => (
-                          <tr key={i} className="border-b border-white/[.04] last:border-0">
-                            {preview.columns.filter(c => c.display).slice(0, 4).map(c => (
-                              <td key={c.key} className="px-2 py-1.5 text-gray-300 whitespace-nowrap">
-                                {row[c.key] != null ? String(row[c.key]) : "—"}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
 
               {tableId && (
                 <p className="text-xs text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
@@ -250,7 +260,7 @@ export function DataTableImportDialog({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/[.08]">
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/[.08] shrink-0">
           <button type="button" onClick={handleClose} className={btnGhost}>
             Cancelar
           </button>

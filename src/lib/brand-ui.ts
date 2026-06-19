@@ -137,7 +137,7 @@ export const registryTableArea =
   "min-w-0 overflow-x-auto overflow-y-visible";
 
 export const registryTableWrap =
-  "flex-1 overflow-auto min-h-0";
+  "flex-1 min-h-0 min-w-0 overflow-x-auto overflow-y-auto";
 
 export const registryTable =
   "w-full border-collapse text-xs";

@@ -98,7 +98,11 @@ export async function POST(req: NextRequest) {
       billing.organizationId
     );
   }
-  const promptWithCatalog = mergeDataTableContext(String(agent.prompt), dataTableContext || null);
+  const promptWithCatalog = mergeDataTableContext(
+    String(agent.prompt),
+    dataTableContext || null,
+    { tableLinked: Boolean(agent.data_table_id) }
+  );
   const systemInstruction = mergeCompanyContext(promptWithCatalog, companyContextText);
   const model = String(agent.llm_model || "gemini-2.5-flash");
   const temperature = geminiTextTemperature(Number(agent.temperature) || 0.7);

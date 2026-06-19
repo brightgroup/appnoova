@@ -30,17 +30,40 @@ export function formatRowsAsCatalog(
   return `| ${header} |\n| ${sep} |\n${lines.map(l => `| ${l} |`).join("\n")}`;
 }
 
-export function mergeDataTableContext(agentPrompt: string, catalogText: string | null): string {
+export function mergeDataTableContext(
+  agentPrompt: string,
+  catalogText: string | null,
+  options?: { tableLinked?: boolean }
+): string {
   const base = agentPrompt.trim();
-  if (!catalogText?.trim()) return base;
+  const tableLinked = options?.tableLinked ?? Boolean(catalogText?.trim());
+
+  if (!tableLinked) return base;
+
+  const rules = `## CATÁLOGO / TABLA DE DATOS (ÚNICA FUENTE DE VERDAD)
+
+REGLAS OBLIGATORIAS — cumple siempre:
+1. Solo puedes mencionar productos, precios, cantidades, categorías y atributos que aparezcan **literalmente** en la tabla de abajo.
+2. Si el cliente pregunta por algo que **no está** en la tabla, dilo con claridad: no tienes ese dato en el catálogo. No inventes alternativas ni precios.
+3. **NUNCA** inventes productos, precios, promociones, stock ni disponibilidad.
+4. No hagas cálculos de totales ni descuentos salvo sumas simples con números explícitos de la tabla.
+5. Si la tabla está vacía o no aplica a la pregunta, indica que no hay información en el catálogo y ofrece contactar a un asesor humano.`;
+
+  if (!catalogText?.trim()) {
+    return `${base}
+
+---
+
+${rules}
+
+(La tabla asignada no tiene filas que coincidan con esta consulta. No inventes datos.)`;
+  }
 
   return `${base}
 
 ---
 
-## CATÁLOGO DE PRODUCTOS (FUENTE AUTORIZADA)
-Usa EXCLUSIVAMENTE estos datos para precios, productos, cantidades, categorías y stock.
-Nunca inventes ni calcules precios. Si algo no está aquí, dilo con honestidad.
+${rules}
 
 ${catalogText.trim()}`;
 }

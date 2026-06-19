@@ -415,7 +415,11 @@ export async function processTwilioWhatsAppInbound(
       orgId
     );
   }
-  const promptWithCatalog = mergeDataTableContext(String(agent.prompt), dataTableContext || null);
+  const promptWithCatalog = mergeDataTableContext(
+    String(agent.prompt),
+    dataTableContext || null,
+    { tableLinked: Boolean(agent.data_table_id) }
+  );
   const systemInstruction = mergeCompanyContext(promptWithCatalog, companyContextText);
   const ai = new GoogleGenAI({ apiKey });
 

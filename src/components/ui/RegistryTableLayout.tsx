@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Search, RefreshCw } from "lucide-react";
 import {
   btnIcon, inputSearch, registryPanel, registrySearchRow,
-  registryTableArea, registryTableFooter
+  registryTableWrap, registryTableFooter
 } from "@/lib/brand-ui";
 
 interface RegistryTableLayoutProps {
@@ -51,7 +51,7 @@ export function RegistryTableLayout({
   }, [inputValue, onSearchChange]);
 
   return (
-    <div className={registryPanel}>
+    <div className={`${registryPanel} flex flex-col flex-1 min-h-0`}>
       {alerts}
       {filters && <div className="mb-4">{filters}</div>}
       {showSearchRow && (
@@ -81,7 +81,7 @@ export function RegistryTableLayout({
           {error}
         </div>
       )}
-      <div className={registryTableArea}>{children}</div>
+      <div className={registryTableWrap}>{children}</div>
       {footer && <div className={registryTableFooter}>{footer}</div>}
     </div>
   );
