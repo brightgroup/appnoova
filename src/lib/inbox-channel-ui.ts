@@ -1,4 +1,11 @@
 import { Code2, Link2, MessageCircle, MessageSquare, Phone, type LucideIcon } from "lucide-react";
+import {
+  tagNeonAmber,
+  tagNeonEmerald,
+  tagNeonOrange,
+  tagNeonSky,
+  tagNeonViolet,
+} from "@/lib/brand-ui";
 
 export interface InboxChannelStyle {
   icon: LucideIcon;
@@ -10,28 +17,28 @@ const STYLES: Record<string, InboxChannelStyle> = {
   whatsapp: {
     icon: MessageCircle,
     label: "WhatsApp",
-    badgeClass: "border-emerald-500/35 bg-emerald-500/20 text-emerald-300"
+    badgeClass: tagNeonEmerald,
   },
   web_widget: {
     icon: Link2,
     label: "Mi Link",
-    badgeClass: "border-violet-500/35 bg-violet-500/20 text-violet-300"
+    badgeClass: tagNeonViolet,
   },
   web_embed: {
     icon: Code2,
     label: "Widget",
-    badgeClass: "border-sky-500/35 bg-sky-500/20 text-sky-300"
+    badgeClass: tagNeonSky,
   },
   web_test: {
     icon: MessageSquare,
     label: "API",
-    badgeClass: "border-amber-500/35 bg-amber-500/20 text-amber-300"
+    badgeClass: tagNeonAmber,
   },
   voice_test: {
     icon: Phone,
     label: "Voz",
-    badgeClass: "border-orange-500/35 bg-orange-500/20 text-orange-300"
-  }
+    badgeClass: tagNeonOrange,
+  },
 };
 
 export function inboxChannelStyle(channel: string): InboxChannelStyle {

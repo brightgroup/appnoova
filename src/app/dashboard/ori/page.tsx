@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import type { CompanyContext } from "@/types/company-context";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
+import { copilotBadge } from "@/lib/brand-ui";
 
 interface Message {
   id: string;
@@ -152,7 +153,7 @@ export default function OriCopilotoPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[15px] font-semibold tracking-tight text-white">Ori</span>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#5b5bf6]/15 text-[#a5a5ff] border border-[#5b5bf6]/25">
+            <span className={copilotBadge}>
               Copiloto
             </span>
           </div>
@@ -237,7 +238,7 @@ export default function OriCopilotoPage() {
             )}
 
             {/* Input amplio */}
-            <div className="rounded-[1.35rem] border border-white/[.09] bg-[#14151c] focus-within:border-[#5b5bf6]/30 focus-within:shadow-[0_0_0_1px_rgba(91,91,246,0.15)] transition-all">
+            <div className="rounded-[1.35rem] border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] focus-within:border-[#5b5bf6]/30 focus-within:shadow-[0_0_0_1px_rgba(91,91,246,0.15)] transition-all">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -246,7 +247,7 @@ export default function OriCopilotoPage() {
                 placeholder="¿En qué puedo ayudarte?"
                 disabled={loading}
                 rows={hasChat ? 1 : 2}
-                className="w-full bg-transparent px-6 pt-4 pb-2 text-base text-gray-100 placeholder-gray-500 resize-none focus:outline-none disabled:opacity-50 min-h-[56px] leading-relaxed"
+                className="w-full bg-transparent px-6 pt-4 pb-2 text-base text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] resize-none focus:outline-none disabled:opacity-50 min-h-[56px] leading-relaxed"
               />
               <div className="flex items-center justify-between px-4 pb-4 pt-1">
                 <button
@@ -299,7 +300,7 @@ export default function OriCopilotoPage() {
                       type="button"
                       onClick={() => sendMessage(action.prompt)}
                       disabled={loading}
-                      className="group flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#14151c] border border-white/[.07] hover:border-[#5b5bf6]/25 hover:bg-[#5b5bf6]/[.06] text-[13px] font-medium text-gray-400 hover:text-gray-200 transition-all disabled:opacity-40 sm:w-auto w-full justify-center sm:justify-start"
+                      className="group flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] hover:border-[#5b5bf6]/25 hover:bg-[var(--nv-accent-muted)] text-[13px] font-medium text-[var(--nv-text-muted)] hover:text-[var(--nv-text)] transition-all disabled:opacity-40 sm:w-auto w-full justify-center sm:justify-start"
                     >
                       <Icon className="w-3.5 h-3.5 text-gray-500 group-hover:text-[#5b5bf6] transition-colors" strokeWidth={1.75} />
                       {action.label}

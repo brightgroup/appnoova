@@ -2,6 +2,8 @@
 
 import { Bell, MessageCircle, Zap, Phone } from "lucide-react";
 
+import { inputSearch } from "@/lib/brand-ui";
+
 export default function Dashboard() {
   return (
     <div className="flex-1 flex flex-col bg-noova-main text-white overflow-hidden">
@@ -12,7 +14,7 @@ export default function Dashboard() {
             <input
               type="text"
               placeholder="Buscar leads, agentes..."
-              className="w-full max-w-md bg-white/[.05] border border-white/[.08] rounded-lg px-4 py-2 text-sm placeholder-gray-500 focus:outline-none focus:border-[#5b5bf6]/50 focus:ring-1 focus:ring-[#5b5bf6]/20"
+              className={`${inputSearch} max-w-md pl-4`}
             />
           </div>
 

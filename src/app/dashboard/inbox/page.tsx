@@ -32,6 +32,11 @@ import type { WhatsAppTemplateRecord } from "@/types/whatsapp-template";
 import { renderTemplatePreview } from "@/lib/whatsapp/template-record";
 import { InboxTemplateComposer } from "@/components/inbox/InboxTemplateComposer";
 import { NoovaListMenu, NoovaListMenuItem } from "@/components/ui/NoovaSelect";
+import {
+  inputSearch,
+  tagNeonAmber,
+  tagNeonEmerald,
+} from "@/lib/brand-ui";
 
 type AssignValue = "ai" | "me";
 
@@ -473,7 +478,7 @@ function InboxPageInner() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Buscar conversaciones..."
-              className="w-full rounded-xl border border-white/[.08] bg-white/[.08] py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/30 focus:border-[#5b5bf6]/40 focus:outline-none"
+              className={`${inputSearch} rounded-xl`}
             />
           </div>
           <button
@@ -582,7 +587,7 @@ function InboxPageInner() {
 
       {/* Conversación — pantalla completa en tablet/móvil cuando hay chat abierto */}
       <section
-        className={`flex min-w-0 flex-1 flex-col bg-[#111113] ${
+        className={`flex min-w-0 flex-1 flex-col bg-[var(--nv-bg-chat)] ${
           selectedId ? "flex" : "hidden md:flex"
         }`}
       >
@@ -693,8 +698,8 @@ function InboxPageInner() {
                 <div
                   className={`mx-4 mt-2 rounded-lg px-3 py-1.5 text-xs lg:mx-6 ${
                     detail.whatsapp_session_open === false || detail.whatsapp_opted_out
-                      ? "bg-amber-500/10 text-amber-200/80"
-                      : "bg-emerald-500/10 text-emerald-200/80"
+                      ? tagNeonAmber
+                      : tagNeonEmerald
                   }`}
                 >
                   {detail.whatsapp_compliance_notice}
@@ -737,7 +742,7 @@ function InboxPageInner() {
                       }}
                       rows={2}
                       placeholder="Escribe como asesor humano..."
-                      className="flex-1 resize-none rounded-2xl border border-white/[.08] bg-white/[.07] px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-[#5b5bf6]/40 focus:outline-none"
+                      className="flex-1 resize-none rounded-2xl border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] px-4 py-3 text-sm text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] focus:border-[#5b5bf6]/40 focus:outline-none"
                     />
                     <button
                       type="button"
@@ -766,7 +771,7 @@ function InboxPageInner() {
                       canSend={canSendTemplate}
                     />
                   ) : (
-                    <div className="mx-auto flex max-w-lg flex-col items-stretch gap-2.5 rounded-xl bg-zinc-900 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="mx-auto flex max-w-lg flex-col items-stretch gap-2.5 rounded-xl border border-[var(--nv-border)] bg-[var(--nv-bg-control)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-xs text-white/60">
                         <span className="font-medium text-white/80">Ventana de 24 h cerrada.</span>{" "}
                         Crea una plantilla para recontactar.
@@ -846,10 +851,10 @@ function TextThread({
         const gap = sameSender ? "mt-1.5" : "mt-5";
 
         const bubbleClass = isUser
-          ? "bg-zinc-600 text-white"
+          ? "inbox-bubble-user"
           : isHuman
-            ? "bg-zinc-700 text-white"
-            : "bg-zinc-950 text-white/90";
+            ? "inbox-bubble-human"
+            : "inbox-bubble-ai";
         const isAudioOnly = msg.media_type === "audio" && !msg.content.trim();
 
         return (
@@ -858,12 +863,14 @@ function TextThread({
             className={`flex ${gap} ${isUser ? "justify-start" : "justify-end"}`}
           >
             <div
-              className={`group relative rounded-2xl px-4 py-3 ${bubbleClass} ${
+              className={`group relative rounded-2xl ${bubbleClass} ${
+                isUser ? "px-3.5 py-2" : "px-4 py-3"
+              } ${
                 isAudioOnly ? "min-w-[min(100%,280px)] max-w-[min(100%,320px)]" : "max-w-[78%]"
               }`}
             >
               {!isUser && (
-                <span className="mb-1.5 block text-[11px] font-medium text-white/50">
+                <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--nv-text-faint)]">
                   {isHuman ? "Asesor" : "IA"}
                 </span>
               )}
@@ -907,10 +914,10 @@ function InboxMessageBody({
   const type = msg.media_type;
   const embedBg =
     variant === "user"
-      ? "bg-zinc-500 text-white/90"
+      ? "inbox-bubble-user"
       : variant === "human"
-        ? "bg-zinc-600 text-white/90"
-        : "bg-zinc-900 text-white/80";
+        ? "inbox-bubble-human"
+        : "inbox-bubble-ai";
 
   if (type === "video" && !url) {
     return (

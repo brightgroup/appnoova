@@ -39,14 +39,16 @@ export function ThemeSettingPanel() {
               onClick={() => setPreference(id)}
               className={`rounded-xl border p-4 text-left transition-all ${
                 active
-                  ? "border-[#5b5bf6]/40 bg-[#5b5bf6]/10 ring-1 ring-[#5b5bf6]/25"
+                  ? "border-[#5b5bf6]/40 bg-[var(--nv-accent-muted)] ring-1 ring-[#5b5bf6]/20 shadow-[0_0_20px_-4px_var(--nv-accent-glow)]"
                   : "border-[var(--nv-border-strong)] bg-[var(--nv-hover)] hover:border-[var(--nv-border-strong)] hover:bg-[var(--nv-hover-strong)]"
               }`}
             >
               <div className="flex items-center gap-2 mb-2">
                 <span
                   className={`inline-flex h-9 w-9 items-center justify-center rounded-lg ${
-                    active ? "bg-[#5b5bf6]/20 text-[#a5a5ff]" : "bg-[var(--nv-hover-strong)] text-[var(--nv-text-muted)]"
+                    active
+                      ? "bg-[var(--nv-accent-muted-strong)] text-[var(--nv-accent-text-soft)]"
+                      : "bg-[var(--nv-hover-strong)] text-[var(--nv-text-muted)]"
                   }`}
                 >
                   <Icon className="h-4 w-4" />

@@ -1,3 +1,5 @@
+import { tagNeonAmber, tagNeonBlue, tagNeonEmerald } from "@/lib/brand-ui";
+
 const AGENT_COLOR_GRADIENTS: Record<string, [string, string]> = {
   "from-[#1d4ed8] to-[#38bdf8]": ["#1d4ed8", "#38bdf8"],
   "from-[#0369a1] to-[#00eaff]": ["#0369a1", "#00eaff"],
@@ -60,10 +62,10 @@ export function formatContactedLine(contacted: number, contacts: number): string
 export function qualityBadgeClass(label: string): string {
   switch (label) {
     case "Estable":
-      return "bg-emerald-500/20 text-emerald-400";
+      return tagNeonEmerald;
     case "Mejorando":
-      return "bg-blue-500/20 text-blue-400";
+      return tagNeonBlue;
     default:
-      return "bg-amber-500/20 text-amber-400";
+      return tagNeonAmber;
   }
 }

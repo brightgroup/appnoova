@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard, Building2, Loader2, Share2, Contact, Users, Database } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { NoovaLogo } from "@/components/brand/NoovaLogo";
 import { authFetch } from "@/lib/telephony-api";
 import {
   sidebarNavActive, sidebarNavIdle, sidebarIconActive, sidebarBadge, sidebarPlanCard
@@ -169,14 +169,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Logo */}
         <div className={`p-4 border-b border-white/[.08] flex items-center ${sidebarOpen ? "justify-between" : "justify-center"}`}>
           {sidebarOpen && (
-            <Link href="/dashboard" className="relative h-10 w-44 flex-shrink-0">
-              <Image
-                src="/logo-noova.png"
-                alt="Noova 360"
-                fill
-                className="object-contain object-left"
-                priority
-              />
+            <Link href="/dashboard" className="flex-shrink-0">
+              <NoovaLogo width={176} height={40} priority />
             </Link>
           )}
           <button
@@ -476,7 +470,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             return (
               <Link
                 href="/dashboard/facturacion"
-                className="block rounded-xl border border-black/[.25] bg-black/[.18] hover:bg-black/[.25] transition-all duration-150 p-3.5"
+                className={`block ${sidebarPlanCard}`}
               >
                 {/* Fila 1: etiqueta + badge */}
                 <div className="flex items-center justify-between mb-1.5">
@@ -500,7 +494,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </span>
                     <span className="text-xs font-semibold text-gray-400">{pct}%</span>
                   </div>
-                  <div className="h-[3px] rounded-full bg-white/[.08] overflow-hidden">
+                  <div className="h-[3px] rounded-full bg-[var(--nv-border)] overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-[#5b5bf6]"}`}
                       style={{ width: `${pct}%` }}

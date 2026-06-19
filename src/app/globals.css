@@ -2,25 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Noova360 — tokens de tema ── */
 :root {
-  --nv-bg-main: #f4f4f5;
+  --nv-bg-main: #eef0f4;
   --nv-bg-surface: #ffffff;
-  --nv-text: #18181b;
-  --nv-text-muted: #52525b;
-  --nv-text-faint: #71717a;
-  --nv-border: rgba(0, 0, 0, 0.08);
-  --nv-border-strong: rgba(0, 0, 0, 0.12);
-  --nv-hover: rgba(0, 0, 0, 0.03);
-  --nv-hover-strong: rgba(0, 0, 0, 0.06);
-  --nv-input-bg: #ffffff;
-  --nv-input-border: rgba(0, 0, 0, 0.12);
-  --nv-overlay: rgba(0, 0, 0, 0.04);
-  --nv-overlay-strong: rgba(0, 0, 0, 0.08);
+  --nv-bg-elevated: #f8f9fb;
+  --nv-bg-control: #e4e9f2;
+  --nv-bg-control-hover: #d8dfea;
+  --nv-bg-chat: #f3f5f9;
+  --nv-bg-table: #ffffff;
+  --nv-bg-table-head: #f8f9fc;
+  --nv-bg-table-hover: #f1f4f9;
+  --nv-text: #111318;
+  --nv-text-muted: #5a6170;
+  --nv-text-faint: #8b919c;
+  --nv-border: rgba(17, 19, 24, 0.07);
+  --nv-border-strong: rgba(17, 19, 24, 0.11);
+  --nv-hover: rgba(17, 19, 24, 0.035);
+  --nv-hover-strong: rgba(17, 19, 24, 0.065);
+  --nv-input-bg: var(--nv-bg-control);
+  --nv-input-border: rgba(17, 19, 24, 0.1);
+  --nv-overlay: rgba(17, 19, 24, 0.03);
+  --nv-overlay-strong: rgba(17, 19, 24, 0.06);
+  --nv-shadow-sm: 0 1px 2px rgba(17, 19, 24, 0.04);
+  --nv-shadow-md: 0 4px 20px rgba(17, 19, 24, 0.06);
+  --nv-shadow-lg: 0 12px 40px rgba(17, 19, 24, 0.08);
+  --nv-accent: #5b5bf6;
+  --nv-accent-hover: #7070f8;
+  --nv-accent-muted: rgba(91, 91, 246, 0.1);
+  --nv-accent-muted-strong: rgba(91, 91, 246, 0.16);
+  --nv-accent-text: #4f46e5;
+  --nv-accent-text-soft: #6366f1;
+  --nv-accent-glow: rgba(91, 91, 246, 0.22);
+  --nv-neon-cyan: #00c8e8;
+  --nv-neon-purple: #a855f7;
+  --nv-modal-backdrop: rgba(17, 19, 24, 0.45);
+  --nv-search-bg: #ffffff;
+  --nv-scrollbar: rgba(17, 19, 24, 0.12);
 }
 
 .dark {
   --nv-bg-main: #212121;
   --nv-bg-surface: #2d2d2d;
+  --nv-bg-elevated: #333333;
+  --nv-bg-control: rgba(255, 255, 255, 0.06);
+  --nv-bg-control-hover: rgba(255, 255, 255, 0.09);
+  --nv-bg-chat: #111113;
+  --nv-bg-table: #2d2d2d;
+  --nv-bg-table-head: #212121;
+  --nv-bg-table-hover: rgba(255, 255, 255, 0.03);
   --nv-text: #f5f5f5;
   --nv-text-muted: #d4d4d8;
   --nv-text-faint: #a3a3a3;
@@ -32,6 +62,17 @@
   --nv-input-border: rgba(255, 255, 255, 0.1);
   --nv-overlay: rgba(255, 255, 255, 0.04);
   --nv-overlay-strong: rgba(255, 255, 255, 0.08);
+  --nv-shadow-sm: none;
+  --nv-shadow-md: none;
+  --nv-shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.45);
+  --nv-accent-text: #a5a5ff;
+  --nv-accent-text-soft: #a5a5ff;
+  --nv-accent-muted: rgba(91, 91, 246, 0.14);
+  --nv-accent-muted-strong: rgba(91, 91, 246, 0.2);
+  --nv-accent-glow: rgba(91, 91, 246, 0.35);
+  --nv-modal-backdrop: rgba(0, 0, 0, 0.6);
+  --nv-search-bg: var(--nv-bg-control);
+  --nv-scrollbar: rgba(255, 255, 255, 0.12);
 }
 
 * {
@@ -48,7 +89,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Dashboard — tokens de tema */
+/* Dashboard shell */
 [data-noova-dashboard] {
   background-color: var(--nv-bg-main);
   color: var(--nv-text);
@@ -58,7 +99,12 @@ body {
   background-color: var(--nv-bg-surface);
 }
 
-/* Admin — fondo unificado del panel (#0d0e14) */
+html:not(.dark) [data-noova-sidebar] {
+  box-shadow: var(--nv-shadow-md);
+  border-right-color: var(--nv-border) !important;
+}
+
+/* Admin — siempre oscuro */
 [data-noova-admin] {
   --nv-bg-main: #0d0e14;
   --nv-bg-surface: #13141c;
@@ -66,15 +112,363 @@ body {
   color: #f5f5f5;
 }
 
-/* Modo claro: ajustes para utilidades pensadas en dark */
-html:not(.dark) [data-noova-dashboard] .text-white,
-html:not(.dark) [data-noova-sidebar] .text-white {
+/* ── Modo claro: remap utilidades pensadas para dark ── */
+html:not(.dark) [data-noova-dashboard],
+html:not(.dark) [data-noova-sidebar] {
+  color: var(--nv-text);
+}
+
+html:not(.dark) [data-noova-dashboard] .text-white:not([class*="nv-tag-neon"]),
+html:not(.dark) [data-noova-sidebar] .text-white:not([class*="nv-tag-neon"]) {
   color: var(--nv-text) !important;
+}
+
+/* Botones y badges de acento — texto blanco sobre fondo vivo */
+html:not(.dark) [data-noova-dashboard] .bg-\[\#5b5bf6\],
+html:not(.dark) [data-noova-dashboard] .bg-\[\#5b5bf6\].text-white,
+html:not(.dark) [data-noova-dashboard] .bg-\[\#7070f8\],
+html:not(.dark) [data-noova-dashboard] .nv-badge-vivid,
+html:not(.dark) [data-noova-dashboard] .nv-badge-vivid *,
+html:not(.dark) [data-noova-sidebar] .nv-badge-vivid,
+html:not(.dark) [data-noova-sidebar] .bg-\[\#5b5bf6\].text-white {
+  color: #ffffff !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .nv-badge-emerald:not(.nv-tag-neon),
+html:not(.dark) [data-noova-dashboard] .nv-badge-amber:not(.nv-tag-neon),
+html:not(.dark) [data-noova-dashboard] .nv-badge-sky:not(.nv-tag-neon),
+html:not(.dark) [data-noova-dashboard] .nv-badge-violet:not(.nv-tag-neon),
+html:not(.dark) [data-noova-dashboard] .nv-badge-orange:not(.nv-tag-neon) {
+  color: #ffffff !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .nv-btn-primary,
+html:not(.dark) [data-noova-dashboard] a.nv-btn-primary,
+html:not(.dark) [data-noova-dashboard] button.nv-btn-primary {
+  color: #ffffff !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .nv-badge-emerald:not(.nv-tag-neon) {
+  background-color: #059669 !important;
+  border-color: #047857 !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .nv-badge-amber:not(.nv-tag-neon) {
+  background-color: #f59e0b !important;
+  border-color: #d97706 !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .nv-badge-sky:not(.nv-tag-neon) {
+  background-color: #0284c7 !important;
+  border-color: #0369a1 !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .nv-badge-violet:not(.nv-tag-neon) {
+  background-color: #7c3aed !important;
+  border-color: #6d28d9 !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .nv-badge-orange:not(.nv-tag-neon) {
+  background-color: #f97316 !important;
+  border-color: #ea580c !important;
+}
+
+/* ── Tags neón — bandeja inbox, estados, calidad ── */
+.nv-tag-neon {
+  letter-spacing: 0.01em;
+}
+
+.dark [data-noova-dashboard] .nv-tag-neon-emerald,
+.dark [data-noova-sidebar] .nv-tag-neon-emerald {
+  border-color: rgba(16, 185, 129, 0.5) !important;
+  background-color: rgba(16, 185, 129, 0.22) !important;
+  color: #6ee7b7 !important;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.28), inset 0 0 12px rgba(16, 185, 129, 0.08);
+}
+
+.dark [data-noova-dashboard] .nv-tag-neon-violet,
+.dark [data-noova-sidebar] .nv-tag-neon-violet {
+  border-color: rgba(139, 92, 246, 0.5) !important;
+  background-color: rgba(139, 92, 246, 0.22) !important;
+  color: #c4b5fd !important;
+  box-shadow: 0 0 14px rgba(139, 92, 246, 0.28), inset 0 0 12px rgba(139, 92, 246, 0.08);
+}
+
+.dark [data-noova-dashboard] .nv-tag-neon-sky,
+.dark [data-noova-sidebar] .nv-tag-neon-sky {
+  border-color: rgba(14, 165, 233, 0.5) !important;
+  background-color: rgba(14, 165, 233, 0.22) !important;
+  color: #7dd3fc !important;
+  box-shadow: 0 0 14px rgba(14, 165, 233, 0.28), inset 0 0 12px rgba(14, 165, 233, 0.08);
+}
+
+.dark [data-noova-dashboard] .nv-tag-neon-amber,
+.dark [data-noova-sidebar] .nv-tag-neon-amber,
+.dark [data-noova-dashboard] .nv-tag-neon-orange,
+.dark [data-noova-sidebar] .nv-tag-neon-orange {
+  border-color: rgba(139, 92, 246, 0.5) !important;
+  background-color: rgba(139, 92, 246, 0.22) !important;
+  color: #c4b5fd !important;
+  box-shadow: 0 0 14px rgba(139, 92, 246, 0.28), inset 0 0 12px rgba(139, 92, 246, 0.08);
+}
+
+.dark [data-noova-dashboard] .nv-tag-neon-blue,
+.dark [data-noova-sidebar] .nv-tag-neon-blue {
+  border-color: rgba(59, 130, 246, 0.5) !important;
+  background-color: rgba(59, 130, 246, 0.22) !important;
+  color: #93c5fd !important;
+  box-shadow: 0 0 14px rgba(59, 130, 246, 0.28), inset 0 0 12px rgba(59, 130, 246, 0.08);
+}
+
+.dark [data-noova-dashboard] .nv-tag-neon-accent,
+.dark [data-noova-sidebar] .nv-tag-neon-accent {
+  border-color: rgba(91, 91, 246, 0.55) !important;
+  background-color: rgba(91, 91, 246, 0.22) !important;
+  color: #c4c4ff !important;
+  box-shadow: 0 0 16px rgba(91, 91, 246, 0.35), inset 0 0 12px rgba(91, 91, 246, 0.1);
+}
+
+/* Etiquetas estado naranja/ámbar → morado (tema oscuro) */
+.dark [data-noova-dashboard] .bg-amber-500\/15.text-amber-300,
+.dark [data-noova-dashboard] .bg-amber-500\/20.text-amber-400,
+.dark [data-noova-dashboard] .rounded-full.bg-amber-500\/15.text-amber-300,
+.dark [data-noova-dashboard] .rounded-full.bg-amber-500\/20.text-amber-400 {
+  background-color: rgba(139, 92, 246, 0.22) !important;
+  border-color: rgba(139, 92, 246, 0.4) !important;
+  color: #c4b5fd !important;
+}
+
+/* Tags neón — tema claro: fluorescentes sólidos, texto blanco, sin glow */
+html:not(.dark) [data-noova-dashboard] [class*="nv-tag-neon-"],
+html:not(.dark) [data-noova-dashboard] [class*="nv-tag-neon-"] *,
+html:not(.dark) [data-noova-sidebar] [class*="nv-tag-neon-"],
+html:not(.dark) [data-noova-sidebar] [class*="nv-tag-neon-"] * {
+  color: #ffffff !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .nv-tag-neon-emerald,
+html:not(.dark) [data-noova-sidebar] .nv-tag-neon-emerald {
+  background-color: #00e676 !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .nv-tag-neon-violet,
+html:not(.dark) [data-noova-sidebar] .nv-tag-neon-violet {
+  background-color: #e040fb !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .nv-tag-neon-sky,
+html:not(.dark) [data-noova-sidebar] .nv-tag-neon-sky {
+  background-color: #00bcd4 !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .nv-tag-neon-amber,
+html:not(.dark) [data-noova-sidebar] .nv-tag-neon-amber,
+html:not(.dark) [data-noova-dashboard] .nv-tag-neon-orange,
+html:not(.dark) [data-noova-sidebar] .nv-tag-neon-orange {
+  background-color: #8b5cf6 !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .nv-tag-neon-blue,
+html:not(.dark) [data-noova-sidebar] .nv-tag-neon-blue {
+  background-color: #2979ff !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .nv-tag-neon-accent,
+html:not(.dark) [data-noova-sidebar] .nv-tag-neon-accent {
+  background-color: #4558ff !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] [class*="nv-tag-neon-"] svg,
+html:not(.dark) [data-noova-sidebar] [class*="nv-tag-neon-"] svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Acentos sueltos (+23%, métricas) — fluorescentes planos, sin sombra */
+html:not(.dark) [data-noova-dashboard] .text-cyan-400,
+html:not(.dark) [data-noova-sidebar] .text-cyan-400 {
+  color: #00bcd4 !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .text-cyan-300,
+html:not(.dark) [data-noova-sidebar] .text-cyan-300 {
+  color: #00e5ff !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .text-green-400,
+html:not(.dark) [data-noova-sidebar] .text-green-400 {
+  color: #00e676 !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .text-emerald-400,
+html:not(.dark) [data-noova-sidebar] .text-emerald-400 {
+  color: #00e676 !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .text-emerald-300,
+html:not(.dark) [data-noova-sidebar] .text-emerald-300 {
+  color: #00c853 !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .text-blue-400,
+html:not(.dark) [data-noova-sidebar] .text-blue-400 {
+  color: #2979ff !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .text-violet-300,
+html:not(.dark) [data-noova-sidebar] .text-violet-300 {
+  color: #e040fb !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .text-violet-400,
+html:not(.dark) [data-noova-sidebar] .text-violet-400 {
+  color: #d500f9 !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .text-amber-300,
+html:not(.dark) [data-noova-sidebar] .text-amber-300 {
+  color: #92400e !important;
+  text-shadow: none !important;
+}
+
+/* Avisos amarillos — texto oscuro legible en tema claro */
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/10,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/15,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/20,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/\[\.06\],
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/\[\.08\] {
+  background-color: #fef3c7 !important;
+  border-color: #fbbf24 !important;
+  color: #78350f !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/10 .text-amber-200,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/10 .text-amber-200\/90,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/10 .text-amber-200\/60,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/15 .text-amber-200,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/15 .text-amber-300,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/20 .text-amber-200,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/\[\.06\] .text-amber-200,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/\[\.06\] .text-amber-200\/90,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/\[\.08\] .text-amber-100\/90,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/10.text-amber-200,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/10.text-amber-200\/90,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/\[\.06\].text-amber-200,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/\[\.06\].text-amber-200\/90,
+html:not(.dark) [data-noova-dashboard] .text-amber-200,
+html:not(.dark) [data-noova-dashboard] .text-amber-200\/90,
+html:not(.dark) [data-noova-dashboard] .text-amber-200\/60,
+html:not(.dark) [data-noova-dashboard] .text-amber-100\/90 {
+  color: #78350f !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/10 a.text-amber-300,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/\[\.06\] a.text-amber-300 {
+  color: #92400e !important;
+  font-weight: 600;
+}
+
+html:not(.dark) [data-noova-dashboard] .border-amber-500\/20.bg-amber-500\/10,
+html:not(.dark) [data-noova-dashboard] .border-amber-500\/25.bg-amber-500\/10,
+html:not(.dark) [data-noova-dashboard] .border-amber-500\/20.bg-amber-500\/\[\.06\],
+html:not(.dark) [data-noova-dashboard] .border-amber-500\/25.bg-amber-500\/\[\.06\],
+html:not(.dark) [data-noova-dashboard] .border-amber-500\/30.bg-amber-500\/\[\.08\] {
+  color: #78350f !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/10 .text-amber-400,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/15 .text-amber-400,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/\[\.06\] .text-amber-400,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/\[\.08\] .text-amber-400 {
+  color: #b45309 !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/10 strong,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/10 .text-amber-100,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/\[\.06\] strong {
+  color: #78350f !important;
+  font-weight: 600;
+}
+
+/* Etiquetas estado naranja/ámbar → morado (tema claro) */
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/15.text-amber-300,
+html:not(.dark) [data-noova-dashboard] .bg-amber-500\/20.text-amber-400,
+html:not(.dark) [data-noova-dashboard] .rounded-full.bg-amber-500\/15.text-amber-300,
+html:not(.dark) [data-noova-dashboard] .rounded-full.bg-amber-500\/20.text-amber-400 {
+  background-color: #8b5cf6 !important;
+  border-color: #7c3aed !important;
+  color: #ffffff !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .text-\[\#a5a5ff\],
+html:not(.dark) [data-noova-sidebar] .text-\[\#a5a5ff\] {
+  color: #536dfe !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .text-\[\#5b5bf6\],
+html:not(.dark) [data-noova-sidebar] .text-\[\#5b5bf6\] {
+  color: #536dfe !important;
+  text-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .text-\[\#00eaff\],
+html:not(.dark) [data-noova-sidebar] .text-\[\#00eaff\] {
+  color: #00e5ff !important;
+  text-shadow: none !important;
+}
+
+/* Buscadores — fondo blanco en tema claro */
+html:not(.dark) [data-noova-dashboard] .nv-search-input,
+html:not(.dark) [data-noova-sidebar] .nv-search-input {
+  background-color: #ffffff !important;
+  border-color: var(--nv-input-border) !important;
+  color: var(--nv-text) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .nv-search-input::placeholder {
+  color: var(--nv-text-faint) !important;
+}
+
+/* Tags neón — forzar blanco al final (gana sobre shims de color) */
+html:not(.dark) [data-noova-dashboard] [class*="nv-tag-neon-"],
+html:not(.dark) [data-noova-dashboard] [class*="nv-tag-neon-"] *,
+html:not(.dark) [data-noova-sidebar] [class*="nv-tag-neon-"],
+html:not(.dark) [data-noova-sidebar] [class*="nv-tag-neon-"] * {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
 }
 
 html:not(.dark) [data-noova-dashboard] .text-gray-200,
 html:not(.dark) [data-noova-sidebar] .text-gray-200 {
-  color: #3f3f46 !important;
+  color: #2d3340 !important;
 }
 
 html:not(.dark) [data-noova-dashboard] .text-gray-300,
@@ -93,9 +487,10 @@ html:not(.dark) [data-noova-sidebar] .text-gray-500 {
 }
 
 html:not(.dark) [data-noova-dashboard] .text-gray-600 {
-  color: #71717a !important;
+  color: #9ca3af !important;
 }
 
+html:not(.dark) [data-noova-dashboard] .border-white\/\[\.06\],
 html:not(.dark) [data-noova-dashboard] .border-white\/\[\.08\],
 html:not(.dark) [data-noova-sidebar] .border-white\/\[\.08\] {
   border-color: var(--nv-border) !important;
@@ -111,6 +506,11 @@ html:not(.dark) [data-noova-sidebar] .border-white\/\[\.12\] {
   border-color: var(--nv-border-strong) !important;
 }
 
+html:not(.dark) [data-noova-dashboard] .border-white\/\[\.20\],
+html:not(.dark) [data-noova-dashboard] .border-white\/\[\.22\] {
+  border-color: var(--nv-border-strong) !important;
+}
+
 html:not(.dark) [data-noova-dashboard] .bg-white\/\[\.02\],
 html:not(.dark) [data-noova-dashboard] .bg-white\/\[\.03\],
 html:not(.dark) [data-noova-dashboard] .bg-white\/\[\.04\],
@@ -118,15 +518,23 @@ html:not(.dark) [data-noova-sidebar] .bg-white\/\[\.04\] {
   background-color: var(--nv-overlay) !important;
 }
 
+html:not(.dark) [data-noova-dashboard] .bg-white\/\[\.05\],
 html:not(.dark) [data-noova-dashboard] .bg-white\/\[\.06\],
 html:not(.dark) [data-noova-sidebar] .bg-white\/\[\.06\] {
   background-color: var(--nv-hover-strong) !important;
 }
 
+html:not(.dark) [data-noova-dashboard] .bg-white\/\[\.08\],
+html:not(.dark) [data-noova-dashboard] .bg-white\/\[\.12\] {
+  background-color: var(--nv-hover-strong) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .hover\:bg-white\/\[\.05\]:hover,
 html:not(.dark) [data-noova-dashboard] .hover\:bg-white\/\[\.06\]:hover,
 html:not(.dark) [data-noova-sidebar] .hover\:bg-white\/\[\.06\]:hover,
 html:not(.dark) [data-noova-dashboard] .hover\:bg-white\/\[\.08\]:hover,
-html:not(.dark) [data-noova-sidebar] .hover\:bg-white\/\[\.08\]:hover {
+html:not(.dark) [data-noova-sidebar] .hover\:bg-white\/\[\.08\]:hover,
+html:not(.dark) [data-noova-dashboard] .hover\:bg-white\/\[\.12\]:hover {
   background-color: var(--nv-hover-strong) !important;
 }
 
@@ -135,42 +543,241 @@ html:not(.dark) [data-noova-sidebar] .hover\:text-white:hover {
   color: var(--nv-text) !important;
 }
 
+html:not(.dark) [data-noova-dashboard] .group:hover .group-hover\:text-gray-300 {
+  color: var(--nv-text-muted) !important;
+}
+
+/* Superficies oscuras hardcodeadas → tema claro */
+html:not(.dark) [data-noova-dashboard] .bg-\[\#12131a\],
+html:not(.dark) [data-noova-dashboard] .bg-\[\#0d0e14\],
+html:not(.dark) [data-noova-dashboard] .bg-\[\#1a1b24\],
+html:not(.dark) [data-noova-dashboard] .bg-\[\#09090f\] {
+  background-color: var(--nv-bg-surface) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .bg-black\/\[\.18\],
+html:not(.dark) [data-noova-dashboard] .bg-black\/\[\.25\] {
+  background-color: var(--nv-hover) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .hover\:bg-black\/\[\.25\]:hover {
+  background-color: var(--nv-hover-strong) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .border-black\/\[\.25\] {
+  border-color: var(--nv-border) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .bg-\[\#5b5bf6\]\/\[\.08\],
+html:not(.dark) [data-noova-dashboard] .bg-\[\#5b5bf6\]\/10 {
+  background-color: var(--nv-accent-muted) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .bg-\[\#5b5bf6\]\/\[\.14\],
+html:not(.dark) [data-noova-sidebar] .bg-\[\#5b5bf6\]\/\[\.14\] {
+  background-color: var(--nv-accent-muted-strong) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .nv-nav-active {
+  color: var(--nv-accent-text) !important;
+  background-color: var(--nv-accent-muted-strong) !important;
+}
+
 html:not(.dark) [data-noova-dashboard] input,
 html:not(.dark) [data-noova-dashboard] textarea,
 html:not(.dark) [data-noova-dashboard] select {
   color: var(--nv-text);
 }
 
-html:not(.dark) [data-noova-dashboard] .placeholder-gray-400::placeholder {
+html:not(.dark) [data-noova-dashboard] .placeholder-gray-400::placeholder,
+html:not(.dark) [data-noova-dashboard] input::placeholder,
+html:not(.dark) [data-noova-dashboard] textarea::placeholder {
   color: var(--nv-text-faint) !important;
 }
 
-[data-noova-dashboard] .text-gray-600 {
+html:not(.dark) [data-noova-sidebar] .text-gray-300 {
+  color: var(--nv-text-muted) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .bg-noova-surface {
+  box-shadow: var(--nv-shadow-sm);
+}
+
+/* Texto white/opacity → legible en claro */
+html:not(.dark) [data-noova-dashboard] .text-white\/25,
+html:not(.dark) [data-noova-dashboard] .text-white\/30,
+html:not(.dark) [data-noova-dashboard] .text-white\/35 {
+  color: var(--nv-text-faint) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .text-white\/40,
+html:not(.dark) [data-noova-dashboard] .text-white\/45,
+html:not(.dark) [data-noova-dashboard] .text-white\/50 {
+  color: var(--nv-text-faint) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .text-white\/55,
+html:not(.dark) [data-noova-dashboard] .text-white\/60 {
+  color: var(--nv-text-muted) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .text-white\/75,
+html:not(.dark) [data-noova-dashboard] .text-white\/80,
+html:not(.dark) [data-noova-dashboard] .text-white\/90 {
+  color: var(--nv-text) !important;
+}
+
+/* Controles — gris azulado (inputs, botones secundarios) */
+html:not(.dark) [data-noova-dashboard] input.border-white\/\[\.08\],
+html:not(.dark) [data-noova-dashboard] button.border-white\/\[\.08\],
+html:not(.dark) [data-noova-dashboard] .border-white\/\[\.08\].bg-white\/\[\.08\] {
+  background-color: var(--nv-bg-control) !important;
+  border-color: var(--nv-input-border) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] input.bg-white\/\[\.08\],
+html:not(.dark) [data-noova-dashboard] textarea.bg-white\/\[\.07\],
+html:not(.dark) [data-noova-dashboard] textarea.bg-white\/\[\.08\] {
+  background-color: var(--nv-bg-control) !important;
+  color: var(--nv-text) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .text-gray-100,
+html:not(.dark) [data-noova-sidebar] .text-gray-100 {
+  color: var(--nv-text) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] input::placeholder,
+html:not(.dark) [data-noova-dashboard] textarea::placeholder,
+html:not(.dark) [data-noova-dashboard] .placeholder\:text-white\/25::placeholder,
+html:not(.dark) [data-noova-dashboard] .placeholder\:text-white\/30::placeholder {
+  color: var(--nv-text-faint) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .bg-white\/\[\.10\]:not(.bg-\[\#5b5bf6\]) {
+  background-color: var(--nv-bg-control) !important;
+}
+
+/* Paneles oscuros hardcodeados */
+html:not(.dark) [data-noova-dashboard] .bg-\[\#111113\],
+html:not(.dark) [data-noova-dashboard] .bg-\[\#14151c\],
+html:not(.dark) [data-noova-dashboard] .bg-\[\#0b141a\] {
+  background-color: var(--nv-bg-chat) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .bg-\[\#1f2c34\] {
+  background-color: var(--nv-bg-control) !important;
+}
+
+/* Burbujas inbox / chat */
+.inbox-bubble-user {
+  background-color: #52525b;
+  color: #fff;
+}
+
+.inbox-bubble-human {
+  background-color: #3f3f46;
+  color: #fff;
+}
+
+.inbox-bubble-ai {
+  background-color: #18181b;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+html:not(.dark) [data-noova-dashboard] .inbox-bubble-user {
+  background-color: #eceef2 !important;
+  color: var(--nv-text) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .inbox-bubble-human {
+  background-color: #e8edf5 !important;
+  color: var(--nv-text) !important;
+  border: 1px solid #d4dce8 !important;
+  box-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .inbox-bubble-ai {
+  background-color: #f3f0ff !important;
+  color: var(--nv-text) !important;
+  border: 1px solid #e4deff !important;
+  box-shadow: none !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .inbox-bubble-user time,
+html:not(.dark) [data-noova-dashboard] .inbox-bubble-human time,
+html:not(.dark) [data-noova-dashboard] .inbox-bubble-ai time,
+html:not(.dark) [data-noova-dashboard] .inbox-bubble-user .text-white\/35,
+html:not(.dark) [data-noova-dashboard] .inbox-bubble-ai .text-white\/50 {
+  color: var(--nv-text-faint) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .bg-zinc-950,
+html:not(.dark) [data-noova-dashboard] .bg-zinc-900,
+html:not(.dark) [data-noova-dashboard] .bg-zinc-700,
+html:not(.dark) [data-noova-dashboard] .bg-zinc-600,
+html:not(.dark) [data-noova-dashboard] .bg-zinc-500 {
+  background-color: var(--nv-bg-control) !important;
+  color: var(--nv-text) !important;
+  border: 1px solid var(--nv-border);
+}
+
+/* Tablas — overrides solo en modo oscuro */
+.dark [data-noova-dashboard] .text-gray-600 {
   color: #a3a3a3 !important;
 }
 
-[data-noova-dashboard] .text-gray-500 {
+.dark [data-noova-dashboard] .text-gray-500 {
   color: #d4d4d8 !important;
 }
 
-[data-noova-dashboard] .text-gray-400 {
+.dark [data-noova-dashboard] .text-gray-400 {
   color: #e5e5e5 !important;
 }
 
-[data-noova-dashboard] thead th {
+.dark [data-noova-dashboard] thead th {
   color: #e5e5e5 !important;
 }
 
 html:not(.dark) [data-noova-dashboard] thead th {
   color: var(--nv-text-muted) !important;
+  background-color: var(--nv-bg-main) !important;
 }
 
-[data-noova-dashboard] tbody td {
+.dark [data-noova-dashboard] tbody td {
   color: #f5f5f5;
 }
 
 html:not(.dark) [data-noova-dashboard] tbody td {
-  color: var(--nv-text);
+  color: var(--nv-text) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .registry-table-row:hover,
+html:not(.dark) [data-noova-dashboard] tr:hover {
+  background-color: var(--nv-hover) !important;
+}
+
+/* Scrollbar dashboard */
+[data-noova-dashboard] ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+[data-noova-dashboard] ::-webkit-scrollbar-thumb {
+  background: var(--nv-scrollbar);
+  border-radius: 999px;
+}
+
+/* Modales dentro del dashboard */
+html:not(.dark) [data-noova-dashboard] .fixed.inset-0.bg-black\/60,
+html:not(.dark) [data-noova-dashboard] .fixed.inset-0.bg-black\/70 {
+  background-color: var(--nv-modal-backdrop) !important;
+}
+
+html:not(.dark) [data-noova-dashboard] .shadow-2xl {
+  box-shadow: var(--nv-shadow-lg) !important;
 }
 
 a {
@@ -185,28 +792,37 @@ button {
   transition: all 0.2s;
 }
 
-/* Login - fondo aurora */
+/* Login — fondo aurora (oscuro) */
 .bg-aurora {
   position: fixed;
   inset: 0;
   z-index: 0;
-  background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(91,91,246,.18) 0%, transparent 70%),
-              radial-gradient(ellipse 50% 40% at 80% 80%, rgba(91,91,246,.10) 0%, transparent 60%);
+  background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(91, 91, 246, 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(91, 91, 246, 0.1) 0%, transparent 60%);
   pointer-events: none;
 }
 
-/* Login - grid sutil */
+html:not(.dark) .bg-aurora {
+  background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(91, 91, 246, 0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(0, 200, 232, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 20% 90%, rgba(168, 85, 247, 0.06) 0%, transparent 60%);
+}
+
 .bg-grid {
   position: fixed;
   inset: 0;
   z-index: 0;
-  background-image: linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
   background-size: 40px 40px;
   pointer-events: none;
 }
 
-/* Botón primario (login) */
+html:not(.dark) .bg-grid {
+  background-image: linear-gradient(rgba(17, 19, 24, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 19, 24, 0.04) 1px, transparent 1px);
+}
+
 .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -216,19 +832,18 @@ button {
   font-size: 0.875rem;
   font-weight: 600;
   color: white;
-  background: #5b5bf6;
+  background: var(--nv-accent);
   border: none;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-primary:hover {
-  background: #7070f8;
+  background: var(--nv-accent-hover);
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(91, 91, 246, 0.35);
+  box-shadow: 0 8px 24px var(--nv-accent-glow);
 }
 
-/* Agente clientes — animaciones */
 @keyframes fade-in-up {
   from {
     opacity: 0;

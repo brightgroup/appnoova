@@ -2,18 +2,18 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ArrowRight, Loader2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { NoovaLogo } from "@/components/brand/NoovaLogo";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email,    setEmail]    = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +29,7 @@ export default function LoginPage() {
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
-        password
+        password,
       });
 
       if (authError) {
@@ -47,121 +47,116 @@ export default function LoginPage() {
       if (data.user) {
         router.push("/dashboard");
       }
-    } catch (err: any) {
+    } catch {
       setError("Error al iniciar sesión. Intenta de nuevo.");
       setLoading(false);
     }
   };
 
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#06070d] px-4 py-12">
+  const inputClass =
+    "w-full rounded-xl border border-[var(--nv-input-border)] bg-[var(--nv-input-bg)] px-4 py-3 text-sm text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] outline-none transition focus:border-[#5b5bf6]/50 focus:ring-2 focus:ring-[#5b5bf6]/15";
 
-        {/* Logo */}
-        <Link href="/" className="mb-10 flex items-center">
-          <div className="relative h-14 w-14">
-            <Image src="/logo-noova.png" alt="Noova 360" fill className="object-contain object-center" />
-          </div>
+  return (
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-noova-main px-4 py-12 overflow-hidden">
+      <div className="bg-aurora" aria-hidden />
+      <div className="bg-grid" aria-hidden />
+
+      <Link href="/" className="relative z-10 mb-10 flex items-center">
+        <NoovaLogo width={180} height={44} priority />
+      </Link>
+
+      <div
+        className="relative z-10 w-full max-w-[420px] rounded-3xl border border-[var(--nv-border-strong)] bg-[var(--nv-bg-surface)] p-8 sm:p-10 shadow-nv-lg"
+      >
+        <Link
+          href="/"
+          className="absolute top-6 right-6 p-1.5 rounded-lg border border-[var(--nv-border)] bg-[var(--nv-hover)] hover:bg-[var(--nv-hover-strong)] text-[var(--nv-text-faint)] hover:text-[var(--nv-text)] transition-all"
+          aria-label="Cerrar"
+        >
+          <X className="w-5 h-5" />
         </Link>
 
-        {/* Card de login */}
-        <div
-          className="w-full max-w-[420px] rounded-3xl p-8 sm:p-10 relative"
-          style={{
-            background: "linear-gradient(145deg, rgba(16,17,28,.97) 0%, rgba(10,11,20,.9) 100%)",
-            border: "1px solid rgba(255,255,255,.08)",
-            boxShadow: "0 0 0 1px rgba(91,91,246,.12), 0 24px 64px rgba(0,0,0,.6), 0 0 80px -32px rgba(91,91,246,.2)",
-          }}
-        >
-          {/* Botón cerrar */}
-          <Link
-            href="/"
-            className="absolute top-6 right-6 p-1.5 rounded-lg border border-white/[.1] bg-white/[.05] hover:bg-white/[.1] text-gray-400 hover:text-white transition-all"
-            aria-label="Cerrar"
-          >
-            <X className="w-5 h-5" />
-          </Link>
-
-          <div className="mb-8 text-center">
-            <h1 className="text-xl font-bold text-white">Bienvenido de vuelta</h1>
-            <p className="mt-1.5 text-sm text-gray-300">Inicia sesión en tu panel Noova 360</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-gray-300">
-                Correo electrónico
-              </label>
-              <input
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@noova360.com"
-                className="w-full rounded-xl border border-white/[.08] bg-white/[.04] px-4 py-3 text-sm text-white placeholder-gray-400 outline-none transition focus:border-[#5b5bf6]/60 focus:ring-2 focus:ring-[#5b5bf6]/20"
-              />
-            </div>
-
-            {/* Contraseña */}
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-gray-300">
-                Contraseña
-              </label>
-              <div className="relative">
-                <input
-                  type={showPass ? "text" : "password"}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full rounded-xl border border-white/[.08] bg-white/[.04] px-4 py-3 pr-11 text-sm text-white placeholder-gray-400 outline-none transition focus:border-[#5b5bf6]/60 focus:ring-2 focus:ring-[#5b5bf6]/20"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-white transition-colors"
-                  aria-label={showPass ? "Ocultar contraseña" : "Mostrar contraseña"}
-                >
-                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Error */}
-            {error && (
-              <p className="rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-xs font-medium text-red-400">
-                {error}
-              </p>
-            )}
-
-            {/* Botón submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#5b5bf6] py-3 text-sm font-semibold text-white transition-all hover:bg-[#7070f8] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Ingresando...</>
-              ) : (
-                <>Ingresar <ArrowRight className="w-4 h-4" /></>
-              )}
-            </button>
-          </form>
-
-          <p className="mt-6 text-center text-xs text-gray-300 leading-relaxed">
-            ¿Aún no tiene acceso?{" "}
-            <Link
-              href="/?solicitar=acceso"
-              className="text-[#5b5bf6] hover:text-[#a5a5ff] transition-colors font-semibold"
-            >
-              Solicitar acceso
-            </Link>
-          </p>
+        <div className="mb-8 text-center">
+          <h1 className="text-xl font-bold text-[var(--nv-text)]">Bienvenido de vuelta</h1>
+          <p className="mt-1.5 text-sm text-[var(--nv-text-muted)]">Inicia sesión en tu panel Noova 360</p>
         </div>
 
-        <p className="mt-8 text-xs text-gray-700">
-          © 2026 BG Soluciones · Noova 360
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-[var(--nv-text-muted)]">
+              Correo electrónico
+            </label>
+            <input
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="admin@noova360.com"
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-[var(--nv-text-muted)]">
+              Contraseña
+            </label>
+            <div className="relative">
+              <input
+                type={showPass ? "text" : "password"}
+                autoComplete="current-password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className={`${inputClass} pr-11`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPass(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--nv-text-faint)] hover:text-[var(--nv-text)] transition-colors"
+                aria-label={showPass ? "Ocultar contraseña" : "Mostrar contraseña"}
+              >
+                {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <p className="rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-xs font-medium text-red-500 dark:text-red-400">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#5b5bf6] py-3 text-sm font-semibold text-white transition-all hover:bg-[#7070f8] hover:shadow-[0_8px_24px_var(--nv-accent-glow)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Ingresando...
+              </>
+            ) : (
+              <>
+                Ingresar <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        </form>
+
+        <p className="mt-6 text-center text-xs text-[var(--nv-text-muted)] leading-relaxed">
+          ¿Aún no tiene acceso?{" "}
+          <Link
+            href="/?solicitar=acceso"
+            className="text-[var(--nv-accent-text)] hover:text-[#5b5bf6] transition-colors font-semibold"
+          >
+            Solicitar acceso
+          </Link>
         </p>
+      </div>
+
+      <p className="relative z-10 mt-8 text-xs text-[var(--nv-text-faint)]">
+        © 2026 BG Soluciones · Noova 360
+      </p>
     </div>
   );
 }

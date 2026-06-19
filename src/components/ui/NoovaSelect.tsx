@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
-import { accentFocus, registryListShell } from "@/lib/brand-ui";
+import { accentFocus, nvControl, registryListShell } from "@/lib/brand-ui";
 
 export interface NoovaSelectOption {
   value: string;
@@ -55,15 +55,15 @@ export function NoovaSelect({
         type="button"
         disabled={disabled}
         onClick={() => setOpen(o => !o)}
-        className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl text-sm text-left transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+        className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-sm text-left transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
           open
-            ? `border border-[#5b5bf6]/45 bg-noova-surface text-white ring-1 ring-[#5b5bf6]/20 ${accentFocus}`
-            : "border border-white/[.12] bg-noova-surface text-white hover:border-white/[.22]"
+            ? `border border-[#5b5bf6]/45 bg-[var(--nv-bg-control)] text-[var(--nv-text)] ring-1 ring-[#5b5bf6]/20 ${accentFocus}`
+            : `${nvControl}`
         }`}
       >
-        <span className={selected || value ? "text-white" : "text-gray-500"}>{display}</span>
+        <span className={selected || value ? "text-[var(--nv-text)]" : "text-[var(--nv-text-faint)]"}>{display}</span>
         <ChevronDown
-          className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          className={`w-4 h-4 text-[var(--nv-text-faint)] shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -75,8 +75,8 @@ export function NoovaSelect({
               onClick={() => pick("")}
               className={`w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center justify-between gap-2 ${
                 !value
-                  ? "text-[#a5a5ff] bg-[#5b5bf6]/10"
-                  : "text-gray-300 hover:bg-white/[.05] hover:text-white"
+                  ? "text-[var(--nv-accent-text-soft)] bg-[var(--nv-accent-muted)]"
+                  : "text-[var(--nv-text-muted)] hover:bg-[var(--nv-hover-strong)] hover:text-[var(--nv-text)]"
               }`}
             >
               <span>{emptyLabel}</span>
@@ -92,8 +92,8 @@ export function NoovaSelect({
                 onClick={() => pick(opt.value)}
                 className={`w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center justify-between gap-2 ${
                   active
-                    ? "text-[#a5a5ff] bg-[#5b5bf6]/10"
-                    : "text-gray-200 hover:bg-white/[.05] hover:text-white"
+                    ? "text-[var(--nv-accent-text-soft)] bg-[var(--nv-accent-muted)]"
+                    : "text-[var(--nv-text)] hover:bg-[var(--nv-hover-strong)]"
                 }`}
               >
                 <span className="truncate">{opt.label}</span>
@@ -141,10 +141,10 @@ export function NoovaListMenuItem({
       onClick={onClick}
       className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
         danger
-          ? "text-red-300 hover:bg-red-500/10"
+          ? "text-red-400 hover:bg-red-500/10"
           : active
-            ? "text-[#a5a5ff] bg-[#5b5bf6]/10"
-            : "text-gray-200 hover:bg-white/[.05] hover:text-white"
+            ? "text-[var(--nv-accent-text-soft)] bg-[var(--nv-accent-muted)]"
+            : "text-[var(--nv-text)] hover:bg-[var(--nv-hover-strong)]"
       }`}
     >
       {children}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { tagNeonAmber } from "@/lib/brand-ui";
 import { FileText, Loader2, MessageCircle, Send } from "lucide-react";
 import type { WhatsAppTemplateRecord } from "@/types/whatsapp-template";
 
@@ -35,7 +36,7 @@ export function InboxTemplateComposer({
 
   return (
     <div className="mx-auto max-w-2xl space-y-3">
-      <p className="rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200/80">
+      <p className={`rounded-lg px-3 py-1.5 text-xs ${tagNeonAmber}`}>
         Ventana de 24 h cerrada — elige una plantilla aprobada y completa las variables.
       </p>
 
@@ -51,8 +52,8 @@ export function InboxTemplateComposer({
                 onClick={() => onSelectTemplate(tpl.id)}
                 className={`rounded-xl border px-3 py-3 text-left transition-all ${
                   active
-                    ? "border-[#5b5bf6]/50 bg-[#5b5bf6]/10 shadow-[0_0_20px_rgba(91,91,246,0.12)]"
-                    : "border-white/[.08] bg-white/[.03] hover:border-white/[.14] hover:bg-white/[.05]"
+                    ? "border-[#5b5bf6]/50 bg-[var(--nv-accent-muted)] shadow-[0_0_20px_rgba(91,91,246,0.12)]"
+                    : "border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] hover:border-[var(--nv-border-strong)] hover:bg-[var(--nv-bg-control-hover)]"
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -69,17 +70,17 @@ export function InboxTemplateComposer({
       </div>
 
       {selected && selected.variable_labels.length > 0 && (
-        <div className="rounded-2xl border border-white/[.08] bg-white/[.02] p-4 space-y-3">
-          <p className="text-xs font-medium text-white/50">Variables del mensaje</p>
+        <div className="rounded-2xl border border-[var(--nv-border)] bg-[var(--nv-bg-elevated)] p-4 space-y-3">
+          <p className="text-xs font-medium text-[var(--nv-text-muted)]">Variables del mensaje</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {selected.variable_labels.map((label, i) => (
               <div key={`${label}-${i}`}>
-                <label className="mb-1.5 block text-xs font-mono text-[#a5a5ff]">{label}</label>
+                <label className="mb-1.5 block text-xs font-mono text-[var(--nv-accent-text-soft)]">{label}</label>
                 <input
                   value={variableValues[i] ?? ""}
                   onChange={e => onVariableChange(i, e.target.value)}
                   placeholder={`Valor para ${label}`}
-                  className="w-full rounded-xl border border-white/[.08] bg-white/[.05] px-3 py-2.5 text-sm text-white placeholder:text-white/25 focus:border-[#5b5bf6]/40 focus:outline-none focus:ring-1 focus:ring-[#5b5bf6]/20"
+                  className="w-full rounded-xl border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] px-3 py-2.5 text-sm text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] focus:border-[#5b5bf6]/40 focus:outline-none focus:ring-1 focus:ring-[#5b5bf6]/20"
                 />
               </div>
             ))}
@@ -89,13 +90,13 @@ export function InboxTemplateComposer({
 
       {selected && (
         <div className="flex justify-center">
-          <div className="w-full max-w-sm rounded-2xl border border-white/[.08] bg-[#0b141a] p-4">
-            <div className="mb-3 flex items-center gap-2 text-xs text-white/40">
-              <MessageCircle className="h-3.5 w-3.5 text-emerald-400" />
+          <div className="w-full max-w-sm rounded-2xl border border-[var(--nv-border)] bg-[var(--nv-bg-chat)] p-4">
+            <div className="mb-3 flex items-center gap-2 text-xs text-[var(--nv-text-faint)]">
+              <MessageCircle className="h-3.5 w-3.5 text-emerald-500" />
               Vista previa
             </div>
-            <div className="rounded-xl rounded-tl-sm bg-[#1f2c34] px-3 py-2.5">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#e9edef]">{previewText}</p>
+            <div className="rounded-xl rounded-tl-sm border border-[var(--nv-border)] bg-[var(--nv-bg-control)] px-3 py-2.5">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--nv-text)]">{previewText}</p>
             </div>
           </div>
         </div>

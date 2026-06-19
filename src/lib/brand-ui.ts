@@ -22,12 +22,12 @@ export const textFaint = "text-gray-400";
 
 /* ── Botones principales (CTA) ── */
 export const btnPrimary =
-  "inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold " +
+  "nv-btn-primary inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold " +
   "bg-[#5b5bf6] text-white hover:bg-[#7070f8] transition-colors " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
 export const btnPrimarySm =
-  "inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold " +
+  "nv-btn-primary inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold " +
   "bg-[#5b5bf6] text-white hover:bg-[#7070f8] transition-colors";
 
 /* ── Estilo sidebar / menú — minimalista ── */
@@ -65,18 +65,21 @@ export const tabIdle = "text-gray-300 border-transparent hover:text-white";
 
 /* ── Sidebar — acento azul vivo, minimalista ── */
 export const sidebarNavActive =
-  "text-white bg-[#5b5bf6]/[.14]";
+  "text-white bg-[#5b5bf6]/[.14] nv-nav-active";
 
 export const sidebarNavIdle =
-  "text-gray-300 hover:text-white hover:bg-white/[.06]";
+  "text-gray-300 hover:text-white hover:bg-white/[.06] nv-nav-idle";
 
 export const sidebarIconActive = "text-[#5b5bf6]";
 
 export const sidebarBadge =
-  "text-[10px] px-1.5 py-0.5 rounded-md bg-[#5b5bf6] text-white font-medium leading-none";
+  "nv-tag-neon nv-tag-neon-accent border-0 text-[10px] px-2.5 py-1 rounded-full text-white font-semibold leading-none";
+
+export const copilotBadge =
+  "nv-tag-neon nv-tag-neon-accent border-0 text-[11px] px-3 py-1.5 rounded-full text-white font-semibold leading-none";
 
 export const sidebarPlanCard =
-  "rounded-lg p-3 bg-white/[.04]";
+  "rounded-xl p-3.5 border border-[var(--nv-border)] bg-[var(--nv-hover)] hover:bg-[var(--nv-hover-strong)] transition-all duration-150";
 
 /* ── Acento de marca (reemplaza violet/indigo en toda la app) ── */
 export const accentText = "text-[#5b5bf6]";
@@ -89,7 +92,37 @@ export const accentBorderMedium = "border-[#5b5bf6]/30";
 export const accentFocus =
   "focus:border-[#5b5bf6]/50 focus:ring-1 focus:ring-[#5b5bf6]/20 focus:outline-none";
 export const accentBadge =
-  "text-xs px-2 py-0.5 rounded-full bg-[#5b5bf6]/14 text-[#a5a5ff]";
+  "nv-badge-vivid text-xs px-2 py-0.5 rounded-full bg-[#5b5bf6] text-white font-semibold";
+
+/* ── Tags neón (inbox bandeja, estados, calidad) — semitransparentes + glow ── */
+export const tagNeonBase = "nv-tag-neon inline-flex items-center font-semibold";
+
+export const tagNeonEmerald =
+  `${tagNeonBase} nv-tag-neon-emerald border-0 bg-emerald-500/20 text-white`;
+
+export const tagNeonViolet =
+  `${tagNeonBase} nv-tag-neon-violet border-0 bg-violet-500/20 text-white`;
+
+export const tagNeonSky =
+  `${tagNeonBase} nv-tag-neon-sky border-0 bg-sky-500/20 text-white`;
+
+export const tagNeonAmber =
+  `${tagNeonBase} nv-tag-neon-amber border-0 bg-violet-500/20 text-white`;
+
+export const tagNeonOrange =
+  `${tagNeonBase} nv-tag-neon-orange border-0 bg-violet-500/20 text-white`;
+
+/** Aviso / alerta informativa (URL fija, permisos, etc.) */
+export const noticeWarning =
+  "rounded-xl border border-amber-400/50 bg-amber-50 px-4 py-3 text-sm text-amber-950 " +
+  "dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200";
+
+export const tagNeonAccent =
+  `${tagNeonBase} nv-tag-neon-accent border-0 bg-[#5b5bf6]/20 text-white`;
+
+export const tagNeonBlue =
+  `${tagNeonBase} nv-tag-neon-blue border-0 bg-blue-500/20 text-white`;
+
 export const accentGradientIcon = "bg-gradient-to-br from-[#5b5bf6] to-[#7070f8]";
 export const accentGlow = "bg-[#5b5bf6]/10";
 export const accentCard =
@@ -98,13 +131,17 @@ export const accentNavActive =
   "bg-[#5b5bf6]/14 text-white border border-[#5b5bf6]/20";
 
 /* ── Inputs ── */
+export const nvControl =
+  "rounded-xl border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] text-[var(--nv-text)] " +
+  "transition-colors hover:border-[var(--nv-border-strong)] hover:bg-[var(--nv-bg-control-hover)]";
+
 export const inputSearch =
-  "w-full bg-noova-surface border border-white/[.12] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white " +
-  "placeholder-gray-400 focus:outline-none focus:border-white/[.22] focus:ring-1 focus:ring-white/[.10] transition-colors";
+  "nv-search-input w-full bg-[var(--nv-search-bg)] border border-[var(--nv-input-border)] rounded-lg pl-10 pr-4 py-2.5 text-sm text-[var(--nv-text)] " +
+  "placeholder-[var(--nv-text-faint)] focus:outline-none focus:border-[#5b5bf6]/45 focus:ring-1 focus:ring-[#5b5bf6]/15 transition-colors";
 
 /** Contenedor del menú desplegable (NoovaSelect) — no usar en tablas */
 export const registryListShell =
-  "rounded-xl border border-white/[.12] bg-noova-surface overflow-hidden shadow-2xl";
+  "rounded-xl border border-[var(--nv-border-strong)] bg-[var(--nv-bg-control)] overflow-hidden shadow-nv-md";
 
 /* ── Tablas (registro de llamadas / agentes) — sin recuadros, solo líneas horizontales ── */
 export const registryPage =
@@ -152,7 +189,7 @@ export const registryTableHeadCell =
   "px-5 py-3 text-left text-xs font-semibold text-white whitespace-nowrap";
 
 export const registryTableRow =
-  "border-b border-white/[.06] hover:bg-white/[.03] transition-colors group";
+  "border-b border-white/[.06] hover:bg-white/[.03] transition-colors group registry-table-row";
 
 export const registryTableRowClickable =
   "border-b border-white/[.06] hover:bg-white/[.03] cursor-pointer transition-colors group";
@@ -183,6 +220,13 @@ export const registryTableFooter =
 
 export const registryRowIcon =
   "text-gray-400 shrink-0";
+
+export const modalOverlay = "fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4";
+export const modalPanel =
+  "w-full rounded-xl border border-white/[.12] bg-[#12131a] shadow-2xl overflow-hidden";
+export const modalPanelSm = "w-full max-w-lg rounded-xl border border-white/[.12] bg-[#12131a] p-5 space-y-4";
+export const modalInput =
+  "w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white";
 
 export function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
