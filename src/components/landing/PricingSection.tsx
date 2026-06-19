@@ -29,7 +29,7 @@ const FREE_PLAN = {
   planInterest: "explorador"
 };
 
-const PAID_PLANS = [
+const PAID_PLANS_INSURANCE = [
   {
     id: "esencial",
     name: "Esencial",
@@ -89,6 +89,58 @@ const PAID_PLANS = [
   }
 ] as const;
 
+const PAID_PLANS_GENERIC = [
+  {
+    ...PAID_PLANS_INSURANCE[0],
+    subtitle: "Equipos pequeños",
+    features: [
+      "350.000 créditos / mes",
+      "Agentes de texto, Mi Link e inbox",
+      "Widget web y captación de leads",
+      "WhatsApp con ia (según consumo)",
+      "Soporte por chat y correo"
+    ]
+  },
+  {
+    ...PAID_PLANS_INSURANCE[1],
+    subtitle: "Pymes en expansión",
+    features: [
+      "1.500.000 créditos / mes",
+      "Agentes de texto ilimitados",
+      "Inbox omnicanal y CRM integrado",
+      "Soporte prioritario",
+      "Onboarding WhatsApp sin costo adicional"
+    ]
+  },
+  {
+    ...PAID_PLANS_INSURANCE[2],
+    subtitle: "Operación de alto volumen",
+    features: [
+      "3.800.000 créditos / mes",
+      "Todo lo del plan Crecimiento",
+      "Soporte dedicado",
+      "Multi-equipo y multi-sucursal",
+      "Implementación asistida"
+    ]
+  }
+] as const;
+
+const EXTRA_USAGE_INSURANCE = [
+  { label: "WhatsApp manual (inbox)", price: "$30" },
+  { label: "Llenado de formatos", price: "$50" },
+  { label: "Escaneo de documento (póliza PDF)", price: "$90" },
+  { label: "Generación de cotización", price: "$70" },
+  { label: "Agente de voz (por minuto)", price: "$350" }
+];
+
+const EXTRA_USAGE_GENERIC = [
+  { label: "WhatsApp manual (inbox)", price: "$30" },
+  { label: "Llenado de formularios", price: "$50" },
+  { label: "Procesamiento de documentos", price: "$90" },
+  { label: "Cotización asistida por ia", price: "$70" },
+  { label: "Agente de voz (por minuto)", price: "$350" }
+];
+
 const ENTERPRISE_PLAN = {
   id: "corporativo",
   name: "Corporativo",
@@ -106,14 +158,6 @@ const ENTERPRISE_PLAN = {
   planInterest: "corporativo"
 };
 
-const EXTRA_USAGE_ROWS = [
-  { label: "WhatsApp manual (inbox)", price: "$30" },
-  { label: "Llenado de formatos", price: "$50" },
-  { label: "Escaneo de documento (póliza PDF)", price: "$90" },
-  { label: "Generación de cotización", price: "$70" },
-  { label: "Agente de voz (por minuto)", price: "$350" }
-];
-
 function formatVolume(n: number): string {
   return n.toLocaleString("es-CO");
 }
@@ -126,20 +170,35 @@ function textCapFromCredits(credits: number, estimate: TextEstimate): number {
   return Math.floor(credits / textCreditsPerMsg(estimate));
 }
 
+type PaidPlan = {
+  id: string;
+  name: string;
+  subtitle: string;
+  priceLabel: string;
+  priceSuffix: string;
+  credits: number;
+  voiceCap: number;
+  features: readonly string[];
+  cta: string;
+  source: string;
+  planInterest: string;
+};
+
 /** 0 = Esencial, 1 = Crecimiento, 2 = Escala, 3 = Corporativo */
 function recommendPaidIndex(
+  paidPlans: readonly PaidPlan[],
   mode: UsageMode,
   textEstimate: TextEstimate,
   volume: number
 ): number {
   if (mode === "voice") {
-    const caps = PAID_PLANS.map(p => p.voiceCap);
+    const caps = paidPlans.map(p => p.voiceCap);
     if (volume <= caps[0]) return 0;
     if (volume <= caps[1]) return 1;
     if (volume <= caps[2]) return 2;
     return 3;
   }
-  const caps = PAID_PLANS.map(p =>
+  const caps = paidPlans.map(p =>
     textCapFromCredits(p.credits, textEstimate)
   );
   if (volume <= caps[0]) return 0;
@@ -175,17 +234,29 @@ function PlanCardShell({
   );
 }
 
-export default function PricingSection() {
+export default function PricingSection({
+  variant = "generic"
+}: {
+  variant?: "generic" | "insurance";
+}) {
   const [mode, setMode] = useState<UsageMode>("text");
   const [textEstimate, setTextEstimate] = useState<TextEstimate>("mix");
   const [volume, setVolume] = useState(8000);
+
+  const paidPlans = variant === "insurance" ? PAID_PLANS_INSURANCE : PAID_PLANS_GENERIC;
+  const extraUsageRows =
+    variant === "insurance" ? EXTRA_USAGE_INSURANCE : EXTRA_USAGE_GENERIC;
+  const extraUsageIntro =
+    variant === "insurance"
+      ? "Formularios, documentos, cotizaciones y voz usan el mismo saldo de créditos."
+      : "Documentos, formularios, cotizaciones y voz usan el mismo saldo de créditos.";
 
   const sliderMin = 500;
   const sliderMax = 65000;
 
   const recommendedIdx = useMemo(
-    () => recommendPaidIndex(mode, textEstimate, volume),
-    [mode, textEstimate, volume]
+    () => recommendPaidIndex(paidPlans, mode, textEstimate, volume),
+    [paidPlans, mode, textEstimate, volume]
   );
 
   const volumeLabel =
@@ -367,7 +438,7 @@ export default function PricingSection() {
 
       {/* Paid plans — 3 columns */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
-        {PAID_PLANS.map((plan, idx) => {
+        {paidPlans.map((plan, idx) => {
           const isRecommended = recommendedIdx === idx;
           const textCap = textCapFromCredits(plan.credits, textEstimate);
           const capLabel =
@@ -468,11 +539,9 @@ export default function PricingSection() {
       {/* Other usage */}
       <div className="rounded-2xl border border-white/[.08] bg-white/[.03] p-6 sm:p-8">
         <h3 className="text-lg font-bold mb-2">Otros consumos de créditos</h3>
-        <p className="text-sm text-gray-400 mb-6">
-          Formularios, documentos, cotizaciones y voz usan el mismo saldo de créditos.
-        </p>
+        <p className="text-sm text-gray-400 mb-6">{extraUsageIntro}</p>
         <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3">
-          {EXTRA_USAGE_ROWS.map(row => (
+          {extraUsageRows.map(row => (
             <div
               key={row.label}
               className="flex justify-between items-center py-2 border-b border-white/[.06] text-sm text-gray-300"

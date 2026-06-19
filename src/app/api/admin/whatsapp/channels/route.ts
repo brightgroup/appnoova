@@ -5,6 +5,7 @@ import { isMissingTableError } from "@/lib/supabase-table-error";
 import { normalizeWhatsAppE164, toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
 import { twilioWhatsAppWebhookUrl } from "@/lib/telephony/app-url";
 import { isTwilioWhatsAppConfigured } from "@/lib/whatsapp/twilio-whatsapp";
+import { configureTwilioWhatsAppSenderWebhook } from "@/lib/whatsapp/twilio-senders";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
@@ -116,6 +117,16 @@ export async function PATCH(req: NextRequest) {
   if (body.text_agent_id !== undefined) updates.text_agent_id = body.text_agent_id || null;
   if (body.friendly_name !== undefined) updates.friendly_name = body.friendly_name || null;
 
+  const { data: before } = await db
+    .from("whatsapp_channels")
+    .select("*")
+    .eq("id", channelId)
+    .maybeSingle();
+
+  if (!before) {
+    return NextResponse.json({ error: "Canal no encontrado" }, { status: 404 });
+  }
+
   const { data, error } = await db
     .from("whatsapp_channels")
     .update(updates)
@@ -128,6 +139,32 @@ export async function PATCH(req: NextRequest) {
   }
   if (!data) {
     return NextResponse.json({ error: "Canal no encontrado" }, { status: 404 });
+  }
+
+  const activating =
+    updates.status === "active" && String(before.status) !== "active";
+  const subSid = String(data.twilio_subaccount_sid ?? "").trim();
+  const subToken = String(data.twilio_subaccount_auth_token ?? "").trim();
+
+  if (activating && subSid && subToken) {
+    try {
+      const webhook = await configureTwilioWhatsAppSenderWebhook({
+        e164: String(data.e164),
+        accountSid: subSid,
+        authToken: subToken
+      });
+      return NextResponse.json({
+        channel: toWhatsAppChannelRecord(data),
+        webhook_configured: webhook
+      });
+    } catch (err) {
+      console.error("[admin/whatsapp] webhook configure:", err);
+      return NextResponse.json({
+        channel: toWhatsAppChannelRecord(data),
+        webhook_error:
+          err instanceof Error ? err.message : "No se pudo configurar webhook en Twilio"
+      });
+    }
   }
 
   return NextResponse.json({ channel: toWhatsAppChannelRecord(data) });

@@ -23,31 +23,38 @@ function isLinkHost(hostname: string): boolean {
   return Boolean(envHost && host === envHost);
 }
 
+function appBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_APP_URL || "https://app.noova360.com";
+}
+
+function isSharedAppPath(pathname: string): boolean {
+  return (
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/admin") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/favicon.png" ||
+    pathname === "/logo-noova.png" ||
+    pathname === "/noova-widget.js"
+  );
+}
+
 export function middleware(request: NextRequest) {
   const hostname = requestHostname(request);
   const { pathname } = request.nextUrl;
 
   if (pathname === "/admin/whatsapp/plantillas" || pathname.startsWith("/admin/whatsapp/plantillas/")) {
-    const appBase = process.env.NEXT_PUBLIC_APP_URL || "https://app.noova360.com";
-    return NextResponse.redirect(new URL("/admin/whatsapp?tab=aprobaciones", appBase));
+    return NextResponse.redirect(new URL("/admin/whatsapp?tab=aprobaciones", appBaseUrl()));
   }
 
   if (!isLinkHost(hostname)) {
     return NextResponse.next();
   }
 
-  if (
-    pathname.startsWith("/api") ||
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/admin") ||
-    pathname === "/favicon.ico" ||
-    pathname === "/logo-noova.png" ||
-    pathname === "/noova-widget.js"
-  ) {
+  if (isSharedAppPath(pathname)) {
     if (pathname.startsWith("/dashboard") || pathname.startsWith("/admin")) {
-      const appBase = process.env.NEXT_PUBLIC_APP_URL || "https://app.noova360.com";
-      return NextResponse.redirect(new URL(pathname + request.nextUrl.search, appBase));
+      return NextResponse.redirect(new URL(pathname + request.nextUrl.search, appBaseUrl()));
     }
     return NextResponse.next();
   }
