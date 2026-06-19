@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getOriApiKey, getOriModel } from "@/lib/google-ai";
-import { mergeCompanyContext } from "@/lib/merge-company-context";
-import { ORI_SYSTEM_PROMPT } from "@/lib/ori-prompt";
+import { buildOriSystemInstruction } from "@/lib/merge-ori-context";
+import {
+  formatPlatformHelpContext,
+  messageLooksLikePlatformQuestion,
+  retrievePlatformHelp,
+} from "@/lib/platform-help/retrieve";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
 import {
   checkBillingForUser,
@@ -77,7 +81,13 @@ export async function POST(req: NextRequest) {
     companyContextText = data?.content ?? "";
   }
 
-  const systemInstruction = mergeCompanyContext(ORI_SYSTEM_PROMPT, companyContextText);
+  const platformArticles =
+    messageLooksLikePlatformQuestion(lastUser.content)
+      ? retrievePlatformHelp(lastUser.content)
+      : [];
+  const platformHelp = formatPlatformHelpContext(platformArticles);
+
+  const systemInstruction = buildOriSystemInstruction(companyContextText, platformHelp);
   const model = getOriModel();
   const ai = new GoogleGenAI({ apiKey });
 

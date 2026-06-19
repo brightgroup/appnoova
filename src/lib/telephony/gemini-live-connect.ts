@@ -55,7 +55,8 @@ export async function connectGeminiLive(
         systemInstruction: buildPhoneAgentSystemInstruction(
           cfg.prompt,
           pending.companyContextText,
-          pending.agentName
+          pending.agentName,
+          cfg.source_template
         ),
         inputAudioTranscription: {},
         outputAudioTranscription: {}

@@ -1,4 +1,5 @@
 import { getPurposeMeta, type AgentChannel } from "@/lib/agent-purpose-catalog";
+import { appendVoiceAccentToPrompt } from "@/lib/voice-accent-profile";
 
 export type AgentLanguage = "es" | "en" | "multi";
 
@@ -52,12 +53,8 @@ function purposeObjective(purposeId: string, channel: AgentChannel, companyName:
 
 function interactionSteps(purposeId: string, channel: AgentChannel, agentName: string, companyName: string): string {
   const isVoice = channel === "voice";
-  const greetEs = isVoice
-    ? `“¡Hola! Soy *${agentName}*, tu asistente de **${companyName}**. ¿En qué puedo ayudarte hoy?”`
-    : `“¡Hola! Soy *${agentName}*, tu asistente de **${companyName}**. ¿En qué puedo ayudarte hoy?”`;
-  const greetEn = isVoice
-    ? `"Hello! I'm *${agentName}*, your assistant from **${companyName}**. How may I help you today?"`
-    : `"Hello! I'm *${agentName}*, your assistant from **${companyName}**. How can I help you today?"`;
+  const greetEs = `“¡Hola! Soy *${agentName}*, tu asistente de **${companyName}**. ¿En qué puedo ayudarte hoy?”`;
+  const greetEn = `"Hello! I'm *${agentName}*, your assistant from **${companyName}**. How can I help you today?"`;
 
   const intentBlock =
     purposeId === "lead-qualification"
@@ -92,9 +89,11 @@ function interactionSteps(purposeId: string, channel: AgentChannel, agentName: s
   - Inglés: “Thank you for contacting **${companyName}**. If you need anything else, I'm here to help.”`;
 }
 
-function languageSection(language: AgentLanguage, agentName: string, companyName: string): string {
+function languageSection(language: AgentLanguage, agentName: string, companyName: string, channel: AgentChannel): string {
   if (language === "es") {
-    return `- Responde **siempre en español** (preferiblemente español latinoamericano).\n- Si el usuario escribe en otro idioma, responde en español y ofrece continuar en ese idioma si lo prefiere.`;
+    return channel === "voice"
+      ? `- Responde **siempre en español colombiano paisa** (Medellín / Antioquia): natural, cálido y humano.\n- Si el usuario habla en otro idioma, responde en español colombiano y ofrece continuar en ese idioma si lo prefiere.`
+      : `- Responde **siempre en español colombiano**.\n- Si el usuario escribe en otro idioma, responde en español y ofrece continuar en ese idioma si lo prefiere.`;
   }
   if (language === "en") {
     return `- Responde **siempre en inglés**.\n- Si el usuario escribe en español, responde en inglés y ofrece cambiar de idioma si lo prefiere.`;
@@ -108,15 +107,14 @@ function languageSection(language: AgentLanguage, agentName: string, companyName
 Detecta el idioma del usuario y mantén la conversación en ese idioma, salvo que pida cambiarlo.`;
 }
 
-/** Genera prompt operativo estilo Dapta, adaptado al sector vía contexto de empresa */
-export function generateAgentPrompt(input: GenerateAgentPromptInput): string {
+function buildPromptBody(input: GenerateAgentPromptInput): string {
   const {
     channel,
     agentName,
     purposeId,
     companyName,
     companyDescription,
-    language = "multi",
+    language = channel === "voice" ? "es" : "multi",
     extraInstructions = "",
   } = input;
 
@@ -124,7 +122,7 @@ export function generateAgentPrompt(input: GenerateAgentPromptInput): string {
   const channelName = channelLabel(channel);
   const objective = purposeObjective(purposeId, channel, companyName);
   const steps = interactionSteps(purposeId, channel, agentName, companyName);
-  const langBlock = languageSection(language, agentName, companyName);
+  const langBlock = languageSection(language, agentName, companyName, channel);
   const companyBlurb = companyDescription.trim() || `Empresa que utiliza ${companyName} para automatizar atención y ventas con IA.`;
 
   const extraBlock = extraInstructions.trim()
@@ -185,20 +183,35 @@ ${langBlock}
 > **Nota:** Estas instrucciones deben revisarse antes de producción. Mantén una versión controlada de cualquier cambio.`;
 }
 
+/** Genera prompt operativo estilo Dapta, adaptado al sector vía contexto de empresa */
+export function generateAgentPrompt(input: GenerateAgentPromptInput): string {
+  const body = buildPromptBody(input);
+  return appendVoiceAccentToPrompt(body, input.channel, input.purposeId);
+}
+
 /** Prompt corto para runtime cuando no se usa el generador completo */
 export function generateShortAgentPrompt(input: GenerateAgentPromptInput): string {
-  const { channel, agentName, purposeId, companyName, companyDescription, language = "multi" } = input;
+  const {
+    channel,
+    agentName,
+    purposeId,
+    companyName,
+    companyDescription,
+    language = channel === "voice" ? "es" : "multi",
+  } = input;
   const purpose = getPurposeMeta(channel, purposeId);
   const langRule =
     language === "es"
-      ? "RESPONDE SIEMPRE EN ESPAÑOL COLOMBIANO."
+      ? channel === "voice"
+        ? "RESPONDE SIEMPRE EN ESPAÑOL COLOMBIANO PAISA (Medellín / Antioquia)."
+        : "RESPONDE SIEMPRE EN ESPAÑOL COLOMBIANO."
       : language === "en"
         ? "ALWAYS RESPOND IN ENGLISH."
         : "DETECTA EL IDIOMA DEL USUARIO Y RESPONDE EN ESE IDIOMA (español o inglés).";
 
   const medium = channel === "text" ? "chat de texto" : "llamada de voz";
 
-  return `${langRule} Sé claro, profesional y amable. Nunca muestres razonamiento interno.
+  const base = `${langRule} Sé claro, profesional y amable. Nunca muestres razonamiento interno.
 
 # Identidad
 Eres ${agentName}, asistente de ${medium} para **${companyName}**. Propósito: ${purpose.label}.
@@ -212,4 +225,6 @@ ${companyDescription.trim() || `${companyName} utiliza IA para atender clientes 
 
 # Instrucciones
 Responde de forma concisa. No inventes precios, plazos ni compromisos. Pide solo la información esencial.`;
+
+  return appendVoiceAccentToPrompt(base, channel, purposeId);
 }

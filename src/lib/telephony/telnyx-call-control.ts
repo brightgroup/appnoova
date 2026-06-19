@@ -82,16 +82,16 @@ export async function answerAndSpeak(
   await telnyxCallAction(callControlId, "speak", {
     payload: text,
     voice: "AWS.Polly.Lupe-Neural",
-    language: "es-MX",
+    language: "es-CO",
     payload_type: "text"
   });
 }
 
 export async function speakText(callControlId: string, text: string): Promise<void> {
-  const premium = {
+  const primary = {
     payload: text,
     voice: "AWS.Polly.Lupe-Neural",
-    language: "es-MX",
+    language: "es-CO",
     payload_type: "text"
   };
   const fallback = {
@@ -101,7 +101,7 @@ export async function speakText(callControlId: string, text: string): Promise<vo
     payload_type: "text"
   };
   try {
-    await telnyxCallAction(callControlId, "speak", premium);
+    await telnyxCallAction(callControlId, "speak", primary);
   } catch {
     await telnyxCallAction(callControlId, "speak", fallback);
   }

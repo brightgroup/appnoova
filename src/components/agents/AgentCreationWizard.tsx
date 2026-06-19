@@ -14,6 +14,10 @@ import {
   voiceGenderHint,
   voiceLabel,
 } from "@/lib/voice-name-inference";
+import {
+  suggestTemperatureForPurpose,
+  suggestVoiceForPurpose,
+} from "@/lib/voice-accent-profile";
 import type { CompanyContext } from "@/types/company-context";
 
 type WizardStep = "agent" | "company" | "preview";
@@ -51,7 +55,7 @@ export function AgentCreationWizard({
   const [step, setStep] = useState<WizardStep>("agent");
   const [purposeId, setPurposeId] = useState(purposes[0].id);
   const [agentName, setAgentName] = useState("");
-  const [language, setLanguage] = useState<AgentLanguage>("multi");
+  const [language, setLanguage] = useState<AgentLanguage>(channel === "voice" ? "es" : "multi");
   const [extraInstructions, setExtraInstructions] = useState("");
   const [contextMode, setContextMode] = useState<"existing" | "new">("existing");
   const [contexts, setContexts] = useState<CompanyContext[]>([]);
@@ -68,7 +72,7 @@ export function AgentCreationWizard({
     setStep("agent");
     setPurposeId(purposes[0].id);
     setAgentName("");
-    setLanguage("multi");
+    setLanguage(channel === "voice" ? "es" : "multi");
     setExtraInstructions("");
     setContextMode("existing");
     setSelectedContextId("");
@@ -77,7 +81,7 @@ export function AgentCreationWizard({
     setError("");
     setVoiceName("Puck");
     setVoiceManual(false);
-  }, [purposes]);
+  }, [purposes, channel]);
 
   const handleClose = () => {
     reset();
@@ -117,13 +121,18 @@ export function AgentCreationWizard({
   }, [open, loadContexts]);
 
   useEffect(() => {
+    if (channel !== "voice") return;
+    if (!voiceManual) {
+      setVoiceName(suggestVoiceForPurpose(purposeId));
+    }
+  }, [channel, purposeId, voiceManual]);
+
+  useEffect(() => {
     if (channel !== "voice" || voiceManual) return;
     const trimmed = agentName.trim();
-    if (trimmed.length < 2) {
-      setVoiceName("Puck");
-      return;
+    if (trimmed.length >= 2) {
+      setVoiceName(suggestVoiceForAgentName(trimmed));
     }
-    setVoiceName(suggestVoiceForAgentName(trimmed));
   }, [channel, agentName, voiceManual]);
 
   useEffect(() => {
@@ -199,7 +208,12 @@ export function AgentCreationWizard({
           prompt: generatedPrompt,
           company_context_id: contextId,
           color: purpose.color,
-          ...(channel === "voice" ? { voice_name: voiceName } : {}),
+          ...(channel === "voice"
+            ? {
+                voice_name: voiceName,
+                temperature: suggestTemperatureForPurpose(purposeId),
+              }
+            : {}),
         }),
       });
       const data = await res.json();

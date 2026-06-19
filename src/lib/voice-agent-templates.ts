@@ -1,7 +1,11 @@
 import type { VoiceAgentFormData } from "@/types/voice-agent";
 import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
 import { resolvePurposeId, getPurposeMeta } from "@/lib/agent-purpose-catalog";
-import { generateShortAgentPrompt } from "@/lib/agent-prompt-generator";
+import { generateAgentPrompt } from "@/lib/agent-prompt-generator";
+import {
+  suggestTemperatureForPurpose,
+  suggestVoiceForPurpose,
+} from "@/lib/voice-accent-profile";
 
 export interface VoiceTemplateMeta {
   name: string;
@@ -9,11 +13,13 @@ export interface VoiceTemplateMeta {
   color: string;
   tag: "Inbound" | "Outbound";
   description: string;
+  voice_name: string;
+  temperature: number;
 }
 
 function buildMeta(purposeId: string): VoiceTemplateMeta {
   const purpose = getPurposeMeta("voice", purposeId);
-  const prompt = generateShortAgentPrompt({
+  const prompt = generateAgentPrompt({
     channel: "voice",
     agentName: "Asistente",
     purposeId,
@@ -27,6 +33,8 @@ function buildMeta(purposeId: string): VoiceTemplateMeta {
     tag: purpose.tag === "Web" ? "Inbound" : purpose.tag,
     description: purpose.description,
     prompt,
+    voice_name: suggestVoiceForPurpose(purposeId),
+    temperature: suggestTemperatureForPurpose(purposeId),
   };
 }
 
@@ -51,10 +59,10 @@ export function getTemplateDefaults(templateId: string): VoiceAgentFormData {
     source_template: base,
     name: t.name,
     prompt: t.prompt,
-    voice_name: "Aoede",
+    voice_name: t.voice_name,
     model: DEFAULT_LIVE_MODEL,
     voice_speed: 1.0,
-    temperature: 1.0,
+    temperature: t.temperature,
     volume: 1.0,
     llm_model: DEFAULT_LIVE_MODEL,
     color: t.color,

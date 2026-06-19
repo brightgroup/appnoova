@@ -35,7 +35,7 @@ Abre **http://127.0.0.1:8000**
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Setup local, migraciones, scripts, convenciones |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arquitectura, canales, BD, APIs, flujos |
 | [docs/ROLLBACK-Y-BACKUPS.md](docs/ROLLBACK-Y-BACKUPS.md) | Rollback de código y backups de BD |
-| [docs/PRICING.md](docs/PRICING.md) | Modelo de precios y créditos |
+| [docs/ORI-AND-VOICE-ROADMAP.md](docs/ORI-AND-VOICE-ROADMAP.md) | Roadmap ORI, voz paisa y producción a escala |
 | [docs/adr/001-widget-standalone.md](docs/adr/001-widget-standalone.md) | Decisión: widget independiente de Mi Link |
 
 ## Estructura del repo

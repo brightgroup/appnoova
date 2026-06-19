@@ -7,7 +7,8 @@ import { getTemplateMeta } from "@/lib/voice-agent-templates";
 import { agentAvatarGradient, agentAvatarStyle } from "@/lib/voice-agent-display";
 import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
 import { geminiTemperature } from "@/lib/voice-agent-audio";
-import { mergeCompanyContext } from "@/lib/merge-company-context";
+import { buildPhoneAgentSystemInstruction } from "@/lib/telephony/phone-agent-instruction";
+import { buildVoiceKickoffMessage } from "@/lib/voice-accent-profile";
 import { parsePcmRate, pcmBase64ToFloat32, resampleTo16kPcm } from "@/lib/voice-session-audio";
 import { getAuthHeaders, getAuthToken } from "@/lib/voice-agents-api";
 import { encodeWav, mergePcmBuffers, downsamplePcm } from "@/lib/call-recording";
@@ -229,7 +230,10 @@ export function VoiceSessionPanel({
       sessionStartRef.current = Date.now();
 
       sessionRef.current?.sendClientContent({
-        turns: [{ role: "user", parts: [{ text: "Inicia la llamada con un saludo breve en español colombiano." }] }],
+        turns: [{
+          role: "user",
+          parts: [{ text: buildVoiceKickoffMessage(configRef.current.source_template) }],
+        }],
         turnComplete: true
       });
     }
@@ -473,10 +477,12 @@ export function VoiceSessionPanel({
           },
           thinkingConfig: { includeThoughts: false, thinkingBudget: 0 },
           temperature: geminiTemperature(cfg.temperature),
-          systemInstruction: `${mergeCompanyContext(cfg.prompt, companyContextRef.current)}
-
-Al iniciar la llamada, saluda con UNA sola frase breve en español colombiano y luego espera en silencio a que el usuario hable. No continúes hablando hasta que el usuario responda.
-Si el usuario se despide o indica que quiere terminar la conversación, despídete de forma breve y cordial (máximo una oración).`,
+          systemInstruction: buildPhoneAgentSystemInstruction(
+            cfg.prompt,
+            companyContextRef.current,
+            cfg.name,
+            cfg.source_template
+          ),
           inputAudioTranscription: {},
           outputAudioTranscription: {}
         },

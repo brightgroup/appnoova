@@ -1,4 +1,5 @@
 import { buildPhoneAgentSystemInstruction } from "@/lib/telephony/phone-agent-instruction";
+import { buildVoiceKickoffMessage } from "@/lib/voice-accent-profile";
 import { peekPendingBridgeSession } from "@/lib/telephony/bridge-session-store";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import { getPhoneTestCallSession } from "@/lib/telephony/test-call-session";
@@ -13,6 +14,7 @@ export interface BridgeConfigResponse {
   voice_name: string;
   temperature: number;
   system_instruction: string;
+  kickoff_message: string;
 }
 
 /** Config del agente para Pipecat (memoria primero, BD como respaldo). */
@@ -31,8 +33,10 @@ export async function getBridgeConfigForPipecat(
       system_instruction: buildPhoneAgentSystemInstruction(
         fromMemory.config.prompt,
         fromMemory.companyContextText,
-        fromMemory.agentName
-      )
+        fromMemory.agentName,
+        fromMemory.config.source_template
+      ),
+      kickoff_message: buildVoiceKickoffMessage(fromMemory.config.source_template),
     };
   }
 
@@ -54,7 +58,9 @@ export async function getBridgeConfigForPipecat(
     system_instruction: buildPhoneAgentSystemInstruction(
       agent.config.prompt,
       agent.companyContextText,
-      agent.agentName
-    )
+      agent.agentName,
+      agent.config.source_template
+    ),
+    kickoff_message: buildVoiceKickoffMessage(agent.config.source_template),
   };
 }

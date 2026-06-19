@@ -98,14 +98,16 @@ async def run_bot(
         ),
     )
 
+    kickoff = agent_config.get("kickoff_message") or (
+        "La llamada acaba de conectarse. Saluda con UNA sola frase breve "
+        "en español colombiano paisa y luego espera en silencio a que el usuario hable."
+    )
+
     context = LLMContext(
         [
             {
                 "role": "user",
-                "content": (
-                    "La llamada acaba de conectarse. Saluda con UNA sola frase breve "
-                    "en español colombiano y luego espera en silencio a que el usuario hable."
-                ),
+                "content": kickoff,
             }
         ]
     )

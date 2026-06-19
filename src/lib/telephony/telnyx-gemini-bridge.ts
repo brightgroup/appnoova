@@ -1,6 +1,7 @@
 import type { LiveServerMessage, Session } from "@google/genai";
 import type { WebSocket } from "ws";
 import { connectGeminiLive } from "@/lib/telephony/gemini-live-connect";
+import { buildVoiceKickoffMessage } from "@/lib/voice-accent-profile";
 import { isGoodbyeUtterance } from "@/lib/voice-goodbye-detection";
 import {
   chunkOutboundPayload,
@@ -233,7 +234,10 @@ export class TelnyxGeminiBridge {
       });
 
       this.gemini?.sendClientContent({
-        turns: [{ role: "user", parts: [{ text: "Inicia la llamada con un saludo breve en español colombiano." }] }],
+        turns: [{
+          role: "user",
+          parts: [{ text: buildVoiceKickoffMessage(this.pending.config.source_template) }],
+        }],
         turnComplete: true
       });
     }
