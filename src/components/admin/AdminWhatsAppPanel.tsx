@@ -27,6 +27,12 @@ import { NoovaSelect } from "@/components/ui/NoovaSelect";
 
 type Tab = "lines" | "approvals" | "requests";
 
+function resolveWhatsAppAdminTab(param: string | null): Tab {
+  if (param === "aprobaciones" || param === "approvals") return "approvals";
+  if (param === "requests" || param === "solicitudes") return "requests";
+  return "lines";
+}
+
 interface WhatsAppRequestRow {
   id: string;
   user_id: string;
@@ -55,8 +61,7 @@ interface PendingRow {
 
 export function AdminWhatsAppPanel() {
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") === "aprobaciones" ? "approvals" : "lines";
-  const [tab, setTab] = useState<Tab>(initialTab);
+  const [tab, setTab] = useState<Tab>(() => resolveWhatsAppAdminTab(searchParams.get("tab")));
 
   const [channels, setChannels] = useState<WhatsAppChannelRecord[]>([]);
   const [users, setUsers] = useState<{ id: string; email: string; nombre: string }[]>([]);
@@ -102,7 +107,9 @@ export function AdminWhatsAppPanel() {
 
     if (reqRes.ok) {
       setRequests(reqData.requests ?? []);
-      setPendingRequestsCount((reqData.requests ?? []).filter((r: any) => r.status === "pending").length);
+      setPendingRequestsCount((reqData.requests ?? []).filter((r: WhatsAppRequestRow) => r.status === "pending").length);
+    } else if (!error) {
+      setError(reqData.error || "Error al cargar solicitudes WhatsApp");
     }
 
     if (usersRes.data) setUsers(usersRes.data);
@@ -110,6 +117,10 @@ export function AdminWhatsAppPanel() {
   }, [approvalFilter]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    setTab(resolveWhatsAppAdminTab(searchParams.get("tab")));
+  }, [searchParams]);
 
   useEffect(() => {
     if (tab === "lines") return;

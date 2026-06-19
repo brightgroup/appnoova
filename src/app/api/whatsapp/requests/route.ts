@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserIdFromRequest, adminClient } from "@/lib/voice-agents-server";
+import { adminClient } from "@/lib/voice-agents-server";
 import { getOrgContextFromRequest } from "@/lib/org-server";
+import { notifyAdminsWhatsAppRequest } from "@/lib/email/notify-whatsapp-request";
 
 /** GET — solicitudes de WhatsApp del usuario autenticado. */
 export async function GET(req: NextRequest) {
@@ -70,6 +71,21 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const [{ data: profile }, agentRes] = await Promise.all([
+    db.from("profiles").select("email, full_name").eq("id", orgCtx.userId).maybeSingle(),
+    text_agent_id
+      ? db.from("text_agents").select("name").eq("id", text_agent_id).maybeSingle()
+      : Promise.resolve({ data: null })
+  ]);
+
+  notifyAdminsWhatsAppRequest({
+    request: data,
+    clientName: profile?.full_name ?? null,
+    clientEmail: profile?.email ?? null,
+    organizationName: orgCtx.organizationName,
+    agentName: agentRes.data?.name ?? null
+  }).catch(err => console.error("[whatsapp/requests] notify failed:", err));
 
   return NextResponse.json({ request: data });
 }
