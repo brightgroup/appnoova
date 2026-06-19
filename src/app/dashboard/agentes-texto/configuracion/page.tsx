@@ -14,6 +14,7 @@ import { normalizeTextAgentForm } from "@/lib/text-agent-form";
 import { TEXT_LLM_MODELS, TEXT_OUTPUT_TOKEN_OPTIONS } from "@/lib/text-agent-options";
 import type { TextAgentFormData, TextAgentRecord } from "@/types/text-agent";
 import type { CompanyContext } from "@/types/company-context";
+import type { DataTableRecord } from "@/types/data-table";
 import { TextAgentTestPanel } from "@/components/text/TextAgentTestPanel";
 import { ChatRegistryPanel } from "@/components/text/ChatRegistryPanel";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
@@ -57,6 +58,7 @@ function ConfigContent() {
     name: "",
     prompt: "",
     company_context_id: null,
+    data_table_id: null,
     temperature: 0.7,
     llm_model: TEXT_LLM_MODELS[0].id,
     max_output_tokens: 2048,
@@ -64,9 +66,19 @@ function ConfigContent() {
   });
 
   const [contexts, setContexts] = useState<CompanyContext[]>([]);
+  const [dataTables, setDataTables] = useState<DataTableRecord[]>([]);
   const [registryRefresh, setRegistryRefresh] = useState(0);
 
   const meta = getTextTemplateMeta(form.source_template);
+
+  const loadDataTables = useCallback(async () => {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/data-tables", { headers });
+      const data = await res.json();
+      if (res.ok) setDataTables(data.tables ?? []);
+    } catch { /* optional */ }
+  }, []);
 
   const loadContexts = useCallback(async () => {
     try {
@@ -111,6 +123,7 @@ function ConfigContent() {
 
   useEffect(() => { loadAgent(); }, [loadAgent]);
   useEffect(() => { loadContexts(); }, [loadContexts]);
+  useEffect(() => { loadDataTables(); }, [loadDataTables]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -258,6 +271,31 @@ function ConfigContent() {
                 >
                   Gestionar contextos de marca →
                 </Link>
+              </Field>
+
+              <Field label="Tabla de datos (catálogo)">
+                <NoovaSelect
+                  value={form.data_table_id ?? ""}
+                  onChange={v => setForm(f => ({
+                    ...f,
+                    data_table_id: v || null
+                  }))}
+                  allowEmpty={true}
+                  emptyLabel="Sin tabla (solo prompt)"
+                  options={dataTables.map(t => ({
+                    value: t.id,
+                    label: `${t.name} · ${t.row_count} filas`
+                  }))}
+                />
+                <Link
+                  href="/dashboard/tablas"
+                  className="inline-block mt-2 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]"
+                >
+                  Gestionar tablas de datos →
+                </Link>
+                <p className="text-[10px] text-gray-500 mt-1.5 leading-relaxed">
+                  El agente usará esta tabla como fuente autorizada de precios y productos.
+                </p>
               </Field>
 
               <SliderField

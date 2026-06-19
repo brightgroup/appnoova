@@ -8,7 +8,8 @@ import {
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { AdminUserModal, type AdminUserFormValues } from "@/components/admin/AdminUserModal";
-import { NoovaListMenu, NoovaListMenuItem } from "@/components/ui/NoovaSelect";
+import { NoovaAnchoredMenu } from "@/components/ui/NoovaAnchoredMenu";
+import { NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 import {
   adminRegistryPage, registryToolbar, adminRegistryContent,
   registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
@@ -241,38 +242,40 @@ export default function AdminUsers() {
                                 <MailCheck className="w-4 h-4" />
                               </button>
                             )}
-                            <div className="relative">
-                              <button type="button" onClick={() => setMenuId(menuId === u.id ? null : u.id)} className="p-1.5 rounded-lg text-gray-400 hover:bg-white/[.08]">
-                                <MoreHorizontal className="w-4 h-4" />
-                              </button>
-                              {menuId === u.id && (
-                                <NoovaListMenu className="absolute right-0 top-full mt-1 w-44 z-20">
-                                  <NoovaListMenuItem onClick={() => { setMenuId(null); setModal({ mode: "edit", user: u }); }}>
-                                    <span className="flex items-center gap-2"><Pencil className="w-3.5 h-3.5" /> Editar</span>
-                                  </NoovaListMenuItem>
-                                  {!protected_ && u.status !== "active" && (
-                                    <NoovaListMenuItem onClick={() => setStatus(u.id, "active")}>
-                                      <span className="flex items-center gap-2 text-green-400"><CheckCircle className="w-3.5 h-3.5" /> Activar</span>
-                                    </NoovaListMenuItem>
-                                  )}
-                                  {!protected_ && u.status === "active" && (
-                                    <NoovaListMenuItem onClick={() => setStatus(u.id, "suspended")}>
-                                      <span className="flex items-center gap-2 text-amber-400"><PauseCircle className="w-3.5 h-3.5" /> Suspender</span>
-                                    </NoovaListMenuItem>
-                                  )}
-                                  {!protected_ && u.status !== "disabled" && (
-                                    <NoovaListMenuItem onClick={() => setStatus(u.id, "disabled")}>
-                                      <span className="flex items-center gap-2 text-red-400"><Ban className="w-3.5 h-3.5" /> Desactivar</span>
-                                    </NoovaListMenuItem>
-                                  )}
-                                  {!protected_ && (
-                                    <NoovaListMenuItem danger onClick={() => { setMenuId(null); deleteUser(u); }}>
-                                      <span className="flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" /> Eliminar</span>
-                                    </NoovaListMenuItem>
-                                  )}
-                                </NoovaListMenu>
+                            <NoovaAnchoredMenu
+                              open={menuId === u.id}
+                              onClose={() => setMenuId(null)}
+                              menuClassName="w-44"
+                              anchor={
+                                <button type="button" onClick={() => setMenuId(menuId === u.id ? null : u.id)} className="p-1.5 rounded-lg text-gray-400 hover:bg-white/[.08]">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </button>
+                              }
+                            >
+                              <NoovaListMenuItem onClick={() => { setMenuId(null); setModal({ mode: "edit", user: u }); }}>
+                                <span className="flex items-center gap-2"><Pencil className="w-3.5 h-3.5" /> Editar</span>
+                              </NoovaListMenuItem>
+                              {!protected_ && u.status !== "active" && (
+                                <NoovaListMenuItem onClick={() => setStatus(u.id, "active")}>
+                                  <span className="flex items-center gap-2 text-green-400"><CheckCircle className="w-3.5 h-3.5" /> Activar</span>
+                                </NoovaListMenuItem>
                               )}
-                            </div>
+                              {!protected_ && u.status === "active" && (
+                                <NoovaListMenuItem onClick={() => setStatus(u.id, "suspended")}>
+                                  <span className="flex items-center gap-2 text-amber-400"><PauseCircle className="w-3.5 h-3.5" /> Suspender</span>
+                                </NoovaListMenuItem>
+                              )}
+                              {!protected_ && u.status !== "disabled" && (
+                                <NoovaListMenuItem onClick={() => setStatus(u.id, "disabled")}>
+                                  <span className="flex items-center gap-2 text-red-400"><Ban className="w-3.5 h-3.5" /> Desactivar</span>
+                                </NoovaListMenuItem>
+                              )}
+                              {!protected_ && (
+                                <NoovaListMenuItem danger onClick={() => { setMenuId(null); deleteUser(u); }}>
+                                  <span className="flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" /> Eliminar</span>
+                                </NoovaListMenuItem>
+                              )}
+                            </NoovaAnchoredMenu>
                           </div>
                         )}
                       </td>

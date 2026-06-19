@@ -2,7 +2,9 @@
 export type VoiceSourceTemplateId =
   | "lead-qualification"
   | "policy-reminder"
-  | "follow-up";
+  | "follow-up"
+  | "customer-service"
+  | "meeting-scheduling";
 
 export interface VoiceAgentStats {
   contacts_count: number;

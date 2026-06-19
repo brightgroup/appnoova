@@ -4,7 +4,7 @@ import { fetchWebsiteText } from "@/lib/fetch-website-text";
 import { getOriApiKey, getOriModel } from "@/lib/google-ai";
 import { getUserIdFromRequest } from "@/lib/voice-agents-server";
 
-const SUMMARY_PROMPT = `Eres un experto en corretaje de seguros en Colombia. Lee el sitio web y genera UN SOLO documento de contexto listo para copiar y pegar en un agente de IA (voz o texto).
+const SUMMARY_PROMPT = `Eres un experto en redacción de contexto empresarial para agentes de IA. Lee el sitio web y genera UN SOLO documento de contexto listo para copiar y pegar en un agente de IA (voz o texto).
 
 IMPORTANTE: No escribas un informe genérico ni secciones tipo "Identidad y posicionamiento". Debes seguir EXACTAMENTE el formato de plantilla abajo, reemplazando el contenido con datos reales del sitio.
 
@@ -14,11 +14,11 @@ FORMATO OBLIGATORIO (respeta títulos, negritas **, viñetas; NO incluyas títul
 [Párrafo de 3-5 oraciones: qué es la empresa, sector, a quién atiende (B2C/B2B), cobertura geográfica, canales de contacto principales. Tono profesional y claro.]
 
 **Productos / Servicios:**
-- **[Nombre del producto/línea]:** [Descripción concreta de qué cubre y para quién es, 1-2 oraciones.]
-- [Repite por CADA producto o línea de seguro mencionada en el sitio. Mínimo 3 ítems si hay información.]
+- **[Nombre del producto/línea]:** [Descripción concreta de qué ofrece y para quién es, 1-2 oraciones.]
+- [Repite por CADA producto o servicio mencionado en el sitio. Mínimo 3 ítems si hay información.]
 
 **Casos de uso del cliente:**
-- **[Sector o perfil]:** [Escenario realista de cómo un cliente usaría el seguro, 1-2 oraciones.]
+- **[Sector o perfil]:** [Escenario realista de cómo un cliente usaría el producto o servicio, 1-2 oraciones.]
 - [Mínimo 3 casos de uso distintos inferidos del portafolio del sitio.]
 
 **Propuesta de valor:**

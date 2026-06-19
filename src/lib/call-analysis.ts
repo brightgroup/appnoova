@@ -120,7 +120,7 @@ export async function analyzeCallTranscript(
       contents: [{
         role: "user",
         parts: [{
-          text: `Analiza esta llamada de un agente de seguros (español colombiano).
+          text: `Analiza esta llamada de un agente de voz comercial (español colombiano).
 Responde SOLO JSON válido, sin markdown. El campo extracted_data es obligatorio y no puede ir vacío.
 {
   "summary": "2-3 oraciones claras sobre qué pasó y el resultado",

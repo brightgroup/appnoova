@@ -42,7 +42,8 @@ import {
   VENTANA_WA_LABELS
 } from "@/lib/crm-contactability";
 import { downloadContactsCsv } from "@/lib/crm-export";
-import { NoovaListMenu, NoovaListMenuItem } from "@/components/ui/NoovaSelect";
+import { NoovaAnchoredMenu } from "@/components/ui/NoovaAnchoredMenu";
+import { NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 import type { CrmContact, CrmContactFilter } from "@/types/crm";
 
 const FUENTE_LABELS = Object.fromEntries(FUENTE_ORIGEN_OPTIONS.map(o => [o.value, o.label]));
@@ -167,13 +168,6 @@ export default function CrmContactsPage() {
     }
     void load(true);
   }, [search, load]);
-
-  useEffect(() => {
-    if (!openMenuId) return;
-    const close = () => setOpenMenuId(null);
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
-  }, [openMenuId]);
 
   const filtered = useMemo(() => {
     let list = contacts;
@@ -451,37 +445,39 @@ export default function CrmContactsPage() {
                   {formatCrmDateTime(c.updated_at)}
                 </td>
                 <td className={registryTableCell} onClick={e => e.stopPropagation()}>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={e => {
-                        e.stopPropagation();
-                        setOpenMenuId(prev => (prev === c.id ? null : c.id));
+                  <NoovaAnchoredMenu
+                    open={openMenuId === c.id}
+                    onClose={() => setOpenMenuId(null)}
+                    menuClassName="min-w-[140px]"
+                    anchor={
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setOpenMenuId(prev => (prev === c.id ? null : c.id));
+                        }}
+                        className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/[.06]"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+                    }
+                  >
+                    <NoovaListMenuItem onClick={() => router.push(`/dashboard/crm/contactos/${c.id}`)}>
+                      Abrir ficha
+                    </NoovaListMenuItem>
+                    <NoovaListMenuItem onClick={() => router.push(`/dashboard/crm/leads/nuevo?contact_id=${c.id}`)}>
+                      Crear lead
+                    </NoovaListMenuItem>
+                    <NoovaListMenuItem
+                      danger
+                      onClick={() => {
+                        setOpenMenuId(null);
+                        deleteOne(c.id, c.name);
                       }}
-                      className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/[.06]"
                     >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
-                    {openMenuId === c.id && (
-                      <NoovaListMenu className="absolute right-0 top-full mt-1 z-20 min-w-[140px]">
-                        <NoovaListMenuItem onClick={() => router.push(`/dashboard/crm/contactos/${c.id}`)}>
-                          Abrir ficha
-                        </NoovaListMenuItem>
-                        <NoovaListMenuItem onClick={() => router.push(`/dashboard/crm/leads/nuevo?contact_id=${c.id}`)}>
-                          Crear lead
-                        </NoovaListMenuItem>
-                        <NoovaListMenuItem
-                          danger
-                          onClick={() => {
-                            setOpenMenuId(null);
-                            deleteOne(c.id, c.name);
-                          }}
-                        >
-                          Eliminar
-                        </NoovaListMenuItem>
-                      </NoovaListMenu>
-                    )}
-                  </div>
+                      Eliminar
+                    </NoovaListMenuItem>
+                  </NoovaAnchoredMenu>
                 </td>
               </tr>
             ))}

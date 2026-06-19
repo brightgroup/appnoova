@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard, Building2, Loader2, Share2, Contact, Users } from "lucide-react";
+import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard, Building2, Loader2, Share2, Contact, Users, Database } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
@@ -373,6 +373,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </>
             ) : (
               <Building2 className={`w-5 h-5 flex-shrink-0 ${pathname === "/dashboard/contextos" ? sidebarIconActive : "text-gray-400"}`} />
+            )}
+          </Link>
+
+          {/* Tablas de datos */}
+          <Link
+            href="/dashboard/tablas"
+            className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              pathname === "/dashboard/tablas" || pathname.startsWith("/dashboard/tablas/")
+                ? sidebarNavActive
+                : sidebarNavIdle
+            }`}
+            title="Tablas de datos"
+          >
+            {sidebarOpen ? (
+              <>
+                <Database className={`w-5 h-5 flex-shrink-0 mr-3 ${pathname.startsWith("/dashboard/tablas") ? sidebarIconActive : "text-gray-400"}`} />
+                <span className="flex-1 text-left">Tablas</span>
+              </>
+            ) : (
+              <Database className={`w-5 h-5 flex-shrink-0 ${pathname.startsWith("/dashboard/tablas") ? sidebarIconActive : "text-gray-400"}`} />
             )}
           </Link>
 

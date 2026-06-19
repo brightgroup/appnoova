@@ -178,7 +178,7 @@ export async function generateOriQuote(
 ): Promise<CrmQuoteRecord> {
   const { runOriTextPrompt } = await import("@/lib/crm-gemini");
 
-  const baseSystem = `Eres Ori, copiloto de seguros en Colombia. Genera cotizaciones claras, profesionales y en español colombiano.
+  const baseSystem = `Eres Ori, copiloto comercial en Colombia. Genera cotizaciones claras, profesionales y en español colombiano.
 Incluye: saludo personalizado, producto/ramo sugerido, supuestos, rango o valor referencial (si no hay datos exactos, indícalo), próximo paso y cierre cordial.
 No inventes primas exactas sin datos — usa rangos orientativos o pide el dato faltante.
 Si hay contexto de oportunidad/lead, prioriza categoría y producto de la oportunidad sobre datos genéricos del contacto.

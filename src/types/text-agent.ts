@@ -1,6 +1,9 @@
 export type TextSourceTemplateId =
   | "customer-assistant"
   | "lead-qualification"
+  | "sales-inquiries"
+  | "website-qa"
+  | "meeting-scheduling"
   | "support-follow-up";
 
 export interface TextAgentStats {
@@ -16,6 +19,7 @@ export interface TextAgentFormData {
   name: string;
   prompt: string;
   company_context_id?: string | null;
+  data_table_id?: string | null;
   temperature: number;
   llm_model: string;
   max_output_tokens: number;

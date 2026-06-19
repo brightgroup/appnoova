@@ -11,6 +11,7 @@ export function normalizeTextAgentForm(raw: Partial<TextAgentFormData>): TextAge
     name: String(raw.name ?? "").trim(),
     prompt: String(raw.prompt ?? ""),
     company_context_id: raw.company_context_id ?? null,
+    data_table_id: raw.data_table_id ?? null,
     temperature: Number.isFinite(temperature) ? Math.min(2, Math.max(0.1, temperature)) : 0.7,
     llm_model: String(raw.llm_model ?? DEFAULT_TEXT_MODEL).trim() || DEFAULT_TEXT_MODEL,
     max_output_tokens: Number.isFinite(maxOutput) ? Math.min(8192, Math.max(256, maxOutput)) : 2048,

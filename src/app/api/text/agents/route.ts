@@ -122,14 +122,15 @@ export async function POST(req: NextRequest) {
     max_output_tokens: form.max_output_tokens,
     color: form.color ?? defaults.color,
     company_context_id: form.company_context_id || null,
+    data_table_id: form.data_table_id || null,
     updated_at: new Date().toISOString()
   };
 
   if (body.id) {
     let { data, error } = await updateTextAgentRow(db, row, body.id, userId);
 
-    if (error?.message?.includes("company_context_id")) {
-      const { company_context_id: _c, ...rest } = row;
+    if (error?.message?.includes("company_context_id") || error?.message?.includes("data_table_id")) {
+      const { company_context_id: _c, data_table_id: _d, ...rest } = row;
       ({ data, error } = await updateTextAgentRow(db, rest, body.id, userId));
     }
 
@@ -145,8 +146,8 @@ export async function POST(req: NextRequest) {
 
   let { data, error } = await insertTextAgentRow(db, row);
 
-  if (error?.message?.includes("company_context_id")) {
-    const { company_context_id: _c, ...rest } = row;
+  if (error?.message?.includes("company_context_id") || error?.message?.includes("data_table_id")) {
+    const { company_context_id: _c, data_table_id: _d, ...rest } = row;
     ({ data, error } = await insertTextAgentRow(db, rest));
   }
 

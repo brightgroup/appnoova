@@ -42,7 +42,7 @@ export default function Dashboard() {
         <div className="max-w-7xl">
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">Bienvenido a Noova 360</h1>
-            <p className="text-gray-400">Panel de control - IA Operativa para Corredores de Seguros</p>
+            <p className="text-gray-400">Panel de control — IA operativa para tu negocio</p>
           </div>
 
           {/* Stats Grid */}
@@ -104,7 +104,7 @@ export default function Dashboard() {
                   <p className="text-gray-400">✓ <span className="text-white">156</span> conversaciones procesadas</p>
                   <p className="text-gray-400">✓ <span className="text-white">42</span> cotizaciones generadas</p>
                   <p className="text-gray-400">✓ <span className="text-white">28</span> leads clasificados</p>
-                  <p className="text-gray-400">✓ <span className="text-white">15</span> llamadas de renovación completadas</p>
+                  <p className="text-gray-400">✓ <span className="text-white">15</span> llamadas de recordatorio completadas</p>
                 </div>
               </div>
             </div>

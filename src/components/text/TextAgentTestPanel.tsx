@@ -20,9 +20,9 @@ interface TextAgentTestPanelProps {
 }
 
 const STARTER_PROMPTS = [
-  "Hola, quiero cotizar un seguro de auto",
-  "¿Qué documentos necesito para una póliza?",
-  "Tengo una duda sobre mi siniestro"
+  "Hola, quiero información sobre sus productos",
+  "¿Cuáles son sus horarios de atención?",
+  "Me gustaría agendar una reunión"
 ];
 
 export function TextAgentTestPanel({

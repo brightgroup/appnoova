@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 
-export const REGISTRY_PAGE_SIZES = [10, 25, 50] as const;
+export const REGISTRY_PAGE_SIZES = [10, 25, 50, 100] as const;
 export const REGISTRY_DEFAULT_PAGE_SIZE = 25;
+
+export interface RegistryPaginationOptions {
+  defaultPageSize?: number;
+}
 
 export interface RegistryPaginationState {
   page: number;
@@ -18,10 +22,11 @@ export interface RegistryPaginationState {
 
 export function useRegistryPagination(
   total: number,
-  resetKey?: unknown
+  resetKey?: unknown,
+  options?: RegistryPaginationOptions
 ): RegistryPaginationState {
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(REGISTRY_DEFAULT_PAGE_SIZE);
+  const [pageSize, setPageSize] = useState(options?.defaultPageSize ?? REGISTRY_DEFAULT_PAGE_SIZE);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const pageSafe = Math.min(page, totalPages);

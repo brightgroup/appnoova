@@ -19,33 +19,33 @@ interface Message {
 const QUICK_ACTIONS = [
   {
     icon: RefreshCw,
-    label: "Renovación",
-    prompt: "Ayúdame a redactar un guion breve para recordar la renovación de una póliza de auto que vence en 15 días."
+    label: "Recordatorio",
+    prompt: "Ayúdame a redactar un guion breve para recordar a un cliente un pago o vencimiento que ocurre en 15 días."
   },
   {
     icon: Users,
     label: "Calificar lead",
-    prompt: "¿Qué preguntas clave debo hacer para calificar un prospecto de seguro de vida?"
+    prompt: "¿Qué preguntas clave debo hacer para calificar un prospecto entrante?"
   },
   {
     icon: FileText,
-    label: "Coberturas",
-    prompt: "Explícame en términos simples la diferencia entre póliza todo riesgo y básica."
+    label: "Propuesta",
+    prompt: "Explícame en términos simples cómo presentar nuestra propuesta de valor a un cliente nuevo."
   },
   {
     icon: Mail,
     label: "Email",
-    prompt: "Redacta un email corto de seguimiento a un lead que pidió cotización y no respondió."
+    prompt: "Redacta un email corto de seguimiento a un lead que pidió información y no respondió."
   },
   {
     icon: Phone,
     label: "Guion de llamada",
-    prompt: "Crea un guion breve para confirmar datos antes de renovar una póliza de hogar."
+    prompt: "Crea un guion breve para confirmar datos antes de agendar una reunión comercial."
   }
 ];
 
 export default function OriCopilotoPage() {
-  const [userName, setUserName] = useState("Corredor");
+  const [userName, setUserName] = useState("Usuario");
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -62,7 +62,7 @@ export default function OriCopilotoPage() {
         user?.user_metadata?.nombre ||
         user?.user_metadata?.full_name ||
         user?.email?.split("@")[0] ||
-        "Corredor";
+        "Usuario";
       setUserName(name.split(" ")[0]);
     });
   }, []);

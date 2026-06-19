@@ -70,7 +70,7 @@ export async function analyzeLeadFromConversation(input: {
     return emptyAnalysis();
   }
 
-  const system = `Eres Ori, copiloto comercial de un CRM de seguros en Colombia.
+  const system = `Eres Ori, copiloto comercial de un CRM en Colombia.
 Analizas conversaciones de WhatsApp para:
 1) Decidir si crear una oportunidad (lead) nueva.
 2) Determinar en qué etapa del pipeline debe estar el lead abierto.

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getOriApiKey } from "@/lib/google-ai";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
+import { buildDataTableContext } from "@/lib/data-tables/retrieve";
+import { mergeDataTableContext } from "@/lib/data-tables/format-context";
 import { geminiTextTemperature } from "@/lib/text-agent-form";
 import { persistChatTurn } from "@/lib/text-conversation-persist";
 import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
@@ -87,7 +89,17 @@ export async function POST(req: NextRequest) {
     companyContextText = data?.content ?? "";
   }
 
-  const systemInstruction = mergeCompanyContext(String(agent.prompt), companyContextText);
+  let dataTableContext = "";
+  if (agent.data_table_id) {
+    dataTableContext = await buildDataTableContext(
+      db,
+      String(agent.data_table_id),
+      lastUser.content.trim(),
+      billing.organizationId
+    );
+  }
+  const promptWithCatalog = mergeDataTableContext(String(agent.prompt), dataTableContext || null);
+  const systemInstruction = mergeCompanyContext(promptWithCatalog, companyContextText);
   const model = String(agent.llm_model || "gemini-2.5-flash");
   const temperature = geminiTextTemperature(Number(agent.temperature) || 0.7);
   const maxOutputTokens = Number(agent.max_output_tokens) || 2048;

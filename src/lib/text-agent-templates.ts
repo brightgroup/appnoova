@@ -1,7 +1,7 @@
 import type { TextAgentFormData } from "@/types/text-agent";
 import { DEFAULT_TEXT_MODEL } from "@/lib/text-agent-options";
-
-const LANG_RULE = `RESPONDE SIEMPRE EN ESPAÑOL COLOMBIANO. Sé claro, profesional y amable. Nunca uses inglés ni muestres razonamiento interno.`;
+import { resolvePurposeId, getPurposeMeta } from "@/lib/agent-purpose-catalog";
+import { generateShortAgentPrompt } from "@/lib/agent-prompt-generator";
 
 export interface TextTemplateMeta {
   name: string;
@@ -11,68 +11,43 @@ export interface TextTemplateMeta {
   description: string;
 }
 
-export const TEXT_AGENT_TEMPLATES: Record<string, TextTemplateMeta> = {
-  "customer-assistant": {
-    name: "Valentina – Asistente al Cliente",
-    color: "from-[#5b5bf6] to-[#7070f8]",
-    tag: "Web",
-    description: "Atiende clientes finales: cotizaciones, pólizas y siniestros.",
-    prompt: `${LANG_RULE}
+function buildMeta(purposeId: string): TextTemplateMeta {
+  const purpose = getPurposeMeta("text", purposeId);
+  const prompt = generateShortAgentPrompt({
+    channel: "text",
+    agentName: purpose.label.split("–").pop()?.trim() || "Asistente",
+    purposeId,
+    companyName: "Mi empresa",
+    companyDescription: "",
+    language: "es",
+  });
+  return {
+    name: purpose.label,
+    color: purpose.color,
+    tag: purpose.tag,
+    description: purpose.description,
+    prompt,
+  };
+}
 
-# Identidad
-Eres Valentina, asistente virtual de texto para clientes de un corredor de seguros en Colombia. Tu tono es cercano, claro y confiable.
-
-# Objetivos
-- **Objetivo principal:** Resolver dudas, guiar cotizaciones y consultas de pólizas.
-- **Objetivos secundarios:** Recopilar datos básicos y escalar a un asesor humano cuando sea necesario.
-
-# Instrucciones
-Responde de forma concisa. Si falta información para cotizar o consultar, pide solo lo esencial. No inventes coberturas ni precios.`
-  },
-  "lead-qualification": {
-    name: "Valentina – Calificación de Leads",
-    color: "from-[#1d4ed8] to-[#38bdf8]",
-    tag: "Inbound",
-    description: "Califica prospectos por chat y recopila datos clave.",
-    prompt: `${LANG_RULE}
-
-# Identidad
-Eres Valentina, asistente de texto para calificación de leads de seguros. Eres profesional, eficiente y empática.
-
-# Objetivos
-- **Objetivo principal:** Obtener nombre, tipo de seguro, urgencia y datos de contacto.
-- **Objetivos secundarios:** Confirmar interés real y dejar el lead listo para un asesor.
-
-# Instrucciones
-Haz una pregunta a la vez. No vendas; califica. Resume al final los datos recopilados.`
-  },
-  "support-follow-up": {
-    name: "Valentina – Seguimiento",
-    color: "from-[#1e40af] to-[#67e8f9]",
-    tag: "Outbound",
-    description: "Reactiva leads y da seguimiento a oportunidades abiertas.",
-    prompt: `${LANG_RULE}
-
-# Identidad
-Eres Valentina, asistente de seguimiento por chat para un corredor de seguros.
-
-# Objetivos
-- **Objetivo principal:** Retomar contacto con leads que no respondieron.
-- **Objetivos secundarios:** Identificar objeciones y proponer el siguiente paso.
-
-# Instrucciones
-Sé breve y respetuosa. Recuerda el contexto previo si el usuario lo menciona. Ofrece ayuda concreta.`
-  }
-};
+export const TEXT_AGENT_TEMPLATES: Record<string, TextTemplateMeta> = Object.fromEntries(
+  [
+    "lead-qualification",
+    "sales-inquiries",
+    "customer-assistant",
+    "website-qa",
+    "meeting-scheduling",
+    "support-follow-up",
+  ].map(id => [id, buildMeta(id)])
+);
 
 export function resolveBaseTextTemplateId(templateId: string): string {
-  const base = templateId.split("::")[0]?.trim() || templateId;
-  return base in TEXT_AGENT_TEMPLATES ? base : "customer-assistant";
+  return resolvePurposeId("text", templateId);
 }
 
 export function getTextTemplateDefaults(templateId: string): TextAgentFormData {
   const base = resolveBaseTextTemplateId(templateId);
-  const t = TEXT_AGENT_TEMPLATES[base];
+  const t = TEXT_AGENT_TEMPLATES[base] ?? buildMeta("customer-assistant");
   return {
     source_template: base,
     name: t.name,
@@ -81,11 +56,11 @@ export function getTextTemplateDefaults(templateId: string): TextAgentFormData {
     temperature: 0.7,
     llm_model: DEFAULT_TEXT_MODEL,
     max_output_tokens: 2048,
-    color: t.color
+    color: t.color,
   };
 }
 
 export function getTextTemplateMeta(templateId: string): TextTemplateMeta {
   const base = resolveBaseTextTemplateId(templateId);
-  return TEXT_AGENT_TEMPLATES[base];
+  return TEXT_AGENT_TEMPLATES[base] ?? buildMeta("customer-assistant");
 }

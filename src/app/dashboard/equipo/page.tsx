@@ -8,7 +8,8 @@ import {
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { InviteMemberModal } from "@/components/equipo/InviteMemberModal";
-import { NoovaListMenu, NoovaListMenuItem } from "@/components/ui/NoovaSelect";
+import { NoovaAnchoredMenu } from "@/components/ui/NoovaAnchoredMenu";
+import { NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 import {
   registryPage, registryToolbar, registryContent,
   registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
@@ -346,28 +347,30 @@ export default function EquipoPage() {
                           ) : (
                             <div className="flex items-center gap-2">
                               {!m.is_owner && (
-                                <div className="relative">
-                                  <button
-                                    type="button"
-                                    onClick={() => setRoleMenuId((p) => (p === m.id ? null : m.id))}
-                                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs border border-white/[.08] text-gray-400 hover:text-white"
-                                  >
-                                    Rol <ChevronDown className="w-3 h-3" />
-                                  </button>
-                                  {roleMenuId === m.id && (
-                                    <NoovaListMenu className="absolute right-0 top-full mt-1 w-44 z-10">
-                                      {roles.map((r) => (
-                                        <NoovaListMenuItem
-                                          key={r.id}
-                                          active={r.id === m.role_id}
-                                          onClick={() => changeRole(m.id, r.id)}
-                                        >
-                                          {r.name}
-                                        </NoovaListMenuItem>
-                                      ))}
-                                    </NoovaListMenu>
-                                  )}
-                                </div>
+                                <NoovaAnchoredMenu
+                                  open={roleMenuId === m.id}
+                                  onClose={() => setRoleMenuId(null)}
+                                  menuClassName="w-44"
+                                  anchor={
+                                    <button
+                                      type="button"
+                                      onClick={() => setRoleMenuId(p => (p === m.id ? null : m.id))}
+                                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs border border-white/[.08] text-gray-400 hover:text-white"
+                                    >
+                                      Rol <ChevronDown className="w-3 h-3" />
+                                    </button>
+                                  }
+                                >
+                                  {roles.map(r => (
+                                    <NoovaListMenuItem
+                                      key={r.id}
+                                      active={r.id === m.role_id}
+                                      onClick={() => changeRole(m.id, r.id)}
+                                    >
+                                      {r.name}
+                                    </NoovaListMenuItem>
+                                  ))}
+                                </NoovaAnchoredMenu>
                               )}
                               {canAdmin && m.status === "active" && (
                                 <button

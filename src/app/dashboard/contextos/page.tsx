@@ -205,7 +205,7 @@ export default function ContextosPage() {
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   className={inputCls}
-                  placeholder="Ej. Correduría ABC, Marca Mapfre Juan"
+                  placeholder="Ej. Mi Empresa, Marca comercial"
                 />
               </Field>
 
@@ -246,7 +246,7 @@ export default function ContextosPage() {
                   onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
                   rows={14}
                   className={`${inputCls} font-mono text-sm leading-relaxed resize-y min-h-[280px]`}
-                  placeholder={`Ejemplo:\n- Correduría ABC, Bogotá\n- Seguros: vida, auto, hogar (Mapfre, SBS, Allianz)\n- Horario: lun–vie 8am–6pm\n- Tono: profesional y cercano`}
+                  placeholder={`Ejemplo:\n- Empresa ABC, Bogotá\n- Productos: servicios, planes o catálogo principal\n- Horario: lun–vie 8am–6pm\n- Tono: profesional y cercano`}
                 />
               </Field>
 
