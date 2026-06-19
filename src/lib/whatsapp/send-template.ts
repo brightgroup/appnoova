@@ -9,6 +9,7 @@ import { readWhatsAppMeta } from "@/lib/whatsapp/compliance";
 import { WHATSAPP_CONVERSATION_CHANNEL, toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import { persistHumanReply } from "@/lib/text-conversation-persist";
+import { checkBillingForOrg, recordUsageSafe, resolveOrgIdForUser } from "@/lib/billing/meter";
 
 export async function sendWhatsAppTemplateForConversation(input: {
   db: SupabaseClient;
@@ -89,6 +90,24 @@ export async function sendWhatsAppTemplateForConversation(input: {
   const rendered = renderTemplatePreview(template.body_preview, input.variableValues);
   const contentVariables = buildContentVariables(input.variableValues);
 
+  const orgId = channel.organization_id
+    ? String(channel.organization_id)
+    : await resolveOrgIdForUser(input.db, input.userId);
+
+  if (orgId) {
+    const billing = await checkBillingForOrg(input.db, orgId);
+    if (!billing.allowed) {
+      return {
+        ok: false,
+        code: billing.reason,
+        error:
+          billing.reason === "no_credits"
+            ? "Sin créditos este mes. Recarga para enviar plantillas WhatsApp."
+            : "Cuenta suspendida. Regulariza el pago para enviar WhatsApp."
+      };
+    }
+  }
+
   try {
     await sendTwilioWhatsAppTemplate({
       toE164: contactE164,
@@ -115,6 +134,21 @@ export async function sendWhatsAppTemplateForConversation(input: {
 
   if (!persist.ok) {
     return { ok: false, error: persist.error ?? "Plantilla enviada pero no se guardó en Inbox" };
+  }
+
+  if (orgId) {
+    await recordUsageSafe({
+      db: input.db,
+      organizationId: orgId,
+      userId: input.userId,
+      eventType: "whatsapp_manual",
+      channel: WHATSAPP_CONVERSATION_CHANNEL,
+      provider: "twilio",
+      twilioMessages: 1,
+      referenceType: "text_agent_conversation",
+      referenceId: input.conversationId,
+      idempotencyKey: `wa_tpl_${input.templateId}_${input.conversationId}_${Date.now()}`
+    });
   }
 
   return { ok: true };

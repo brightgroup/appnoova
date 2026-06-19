@@ -3,6 +3,7 @@ import { getTextAgentUserIdFromRequest, textAgentsAdminClient } from "@/lib/text
 import { computeContactActions, hasSuppression } from "@/lib/crm-contactability";
 import { telnyxPlaceCall } from "@/lib/telephony/telnyx-call-control";
 import { createCrmOutboundCallSession } from "@/lib/telephony/crm-call-session";
+import { billingBlockedMessage, checkBillingForUser } from "@/lib/billing/meter";
 import { toE164 } from "@/lib/telephony/e164";
 import { enrichCrmContact, toCrmContact } from "@/lib/crm-record";
 
@@ -74,6 +75,14 @@ export async function POST(_req: NextRequest, ctx: Ctx) {
 
   if (!connectionId) {
     return NextResponse.json({ error: "TELNYX_CONNECTION_ID no configurado" }, { status: 503 });
+  }
+
+  const billing = await checkBillingForUser(db, userId);
+  if (!billing.allowed) {
+    return NextResponse.json(
+      { error: billingBlockedMessage(billing.reason), code: billing.reason },
+      { status: 402 }
+    );
   }
 
   try {

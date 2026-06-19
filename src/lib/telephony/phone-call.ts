@@ -155,7 +155,7 @@ export async function logPhoneTestCall(
     isTest: boolean;
     meta?: Record<string, unknown>;
   }
-) {
+): Promise<string | null> {
   const db = adminClient();
   const label =
     opts.direction === "outbound"
@@ -164,11 +164,11 @@ export async function logPhoneTestCall(
         ? "Prueba telefónica - Llamada entrante"
         : "Inbound - Llamada entrante";
 
-  await db.from("voice_agent_calls").insert({
+  const { data, error } = await db.from("voice_agent_calls").insert({
     user_id: ctx.phone.user_id,
     voice_agent_id: ctx.phone.voice_agent_id,
     phone_number: opts.counterpartyE164,
-    status: opts.isTest ? "ended_success" : "missed",
+    status: opts.isTest ? "ended_success" : "in_progress",
     status_label: label,
     summary:
       opts.direction === "outbound"
@@ -182,5 +182,11 @@ export async function logPhoneTestCall(
       to: opts.direction === "outbound" ? opts.counterpartyE164 : ctx.phone.e164,
       ...(opts.meta ?? {})
     }
-  });
+  }).select("id").single();
+
+  if (error) {
+    console.error("[phone-call] logPhoneTestCall:", error.message);
+    return null;
+  }
+  return data?.id ? String(data.id) : null;
 }

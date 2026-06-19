@@ -14,6 +14,7 @@ import {
   setPendingBridgeSession
 } from "@/lib/telephony/bridge-session-store";
 import { finalizePhoneTestCall } from "@/lib/telephony/finalize-phone-test-call";
+import { finalizeInboundTelnyxCall } from "@/lib/telephony/finalize-inbound-call";
 import {
   decodeTelnyxClientState,
   getPhoneTestCallSession,
@@ -219,6 +220,12 @@ export async function POST(req: NextRequest) {
           }
         })();
       }, 4000);
+    } else if (!isOutbound(direction)) {
+      try {
+        await finalizeInboundTelnyxCall(callId, payload);
+      } catch (e) {
+        console.error("[telnyx:voice] finalize inbound hangup error:", e);
+      }
     }
   }
 

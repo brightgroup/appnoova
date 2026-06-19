@@ -3,6 +3,7 @@ import {
   creditsForEvent,
   geminiCostUsd,
   usdToCop,
+  voiceBillableMinutes,
   TWILIO_WA_USD_PER_MSG,
   VOICE_USD_PER_MINUTE,
   type UsageEventType
@@ -223,4 +224,45 @@ export async function recordUsageSafe(input: RecordUsageInput): Promise<void> {
   } catch (err) {
     console.error(`[billing] recordUsage (${input.eventType}) threw:`, err);
   }
+}
+
+/** Descuenta créditos de voz por minutos (mín. 1 min si hubo duración). Idempotente por callId. */
+export async function chargeVoiceCall(input: {
+  db: SupabaseClient;
+  organizationId: string;
+  userId: string;
+  callId: string;
+  durationSec: number;
+  voiceAgentId?: string;
+  channel?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  const billedMinutes = voiceBillableMinutes(input.durationSec);
+  if (billedMinutes <= 0) return;
+
+  await recordUsageSafe({
+    db: input.db,
+    organizationId: input.organizationId,
+    userId: input.userId,
+    eventType: "voice",
+    channel: input.channel ?? "voice",
+    quantity: billedMinutes,
+    provider: "telnyx",
+    voiceMinutes: input.durationSec / 60,
+    referenceType: "voice_agent_call",
+    referenceId: input.callId,
+    idempotencyKey: `voice_${input.callId}`,
+    metadata: {
+      duration_sec: input.durationSec,
+      voice_agent_id: input.voiceAgentId,
+      ...(input.metadata ?? {})
+    }
+  });
+}
+
+export function billingBlockedMessage(reason: string): string {
+  if (reason === "no_credits") {
+    return "Te quedaste sin créditos este mes. Recarga o espera tu próxima fecha de facturación.";
+  }
+  return "Tu cuenta está suspendida. Regulariza el pago para continuar.";
 }

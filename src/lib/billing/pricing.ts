@@ -86,3 +86,13 @@ export function creditsForEvent(eventType: UsageEventType, quantity = 1): number
   const unit = CREDIT_COST[eventType] ?? 0;
   return Math.max(0, Math.round(unit * quantity));
 }
+
+/** Minutos facturables de voz: mínimo 1 minuto si hubo conexión. */
+export function voiceBillableMinutes(durationSec: number): number {
+  if (durationSec <= 0) return 0;
+  return Math.max(1, Math.ceil(durationSec / 60));
+}
+
+export function creditsForVoiceDuration(durationSec: number): number {
+  return creditsForEvent("voice", voiceBillableMinutes(durationSec));
+}

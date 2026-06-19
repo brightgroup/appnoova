@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { telnyxPlaceCall } from "@/lib/telephony/telnyx-call-control";
 import { createPhoneTestCallSession } from "@/lib/telephony/test-call-session";
+import { billingBlockedMessage, checkBillingForUser } from "@/lib/billing/meter";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
 
 /** POST — llamada saliente de prueba: remitente (línea Telnyx) → destinatario (número de prueba). */
@@ -62,6 +63,14 @@ export async function POST(req: NextRequest) {
 
   if (!connectionId) {
     return NextResponse.json({ error: "TELNYX_CONNECTION_ID no configurado" }, { status: 503 });
+  }
+
+  const billing = await checkBillingForUser(db, userId);
+  if (!billing.allowed) {
+    return NextResponse.json(
+      { error: billingBlockedMessage(billing.reason), code: billing.reason },
+      { status: 402 }
+    );
   }
 
   try {

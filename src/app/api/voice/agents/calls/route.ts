@@ -4,6 +4,12 @@ import { deriveQualityLabel } from "@/lib/voice-agent-display";
 import { buildFallbackSummary, estimateCallCredits } from "@/lib/voice-call-utils";
 import { uploadCallRecording } from "@/lib/voice-call-storage";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
+import {
+  billingBlockedMessage,
+  chargeVoiceCall,
+  checkBillingForUser,
+  resolveOrgIdForUser
+} from "@/lib/billing/meter";
 import type { TranscriptEntry, VoiceAgentCallRecord } from "@/types/voice-agent-call";
 
 interface CallPostBody {
@@ -182,6 +188,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Agente no encontrado" }, { status: 404 });
   }
 
+  const billing = await checkBillingForUser(db, userId);
+  if (!billing.allowed) {
+    return NextResponse.json(
+      { error: billingBlockedMessage(billing.reason), code: billing.reason },
+      { status: 402 }
+    );
+  }
+
   const transcript = (body.transcript ?? []) as TranscriptEntry[];
   const durationSec = Number(body.duration_sec) || 0;
   const credits = Number(body.credits) || estimateCallCredits(durationSec);
@@ -262,6 +276,20 @@ export async function POST(req: NextRequest) {
     })
     .eq("id", agentId)
     .eq("user_id", userId);
+
+  const orgId = billing.organizationId ?? (await resolveOrgIdForUser(db, userId));
+  if (orgId && durationSec > 0) {
+    await chargeVoiceCall({
+      db,
+      organizationId: orgId,
+      userId,
+      callId: String(call.id),
+      durationSec,
+      voiceAgentId: agentId,
+      channel: "web_test",
+      metadata: { source: "web_test" }
+    });
+  }
 
   return NextResponse.json({ call: toRecord({ ...call, audio_url: audioUrl }) });
 }

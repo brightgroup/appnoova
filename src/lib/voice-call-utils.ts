@@ -1,3 +1,4 @@
+import { creditsForVoiceDuration } from "@/lib/billing/pricing";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
 
 export function formatCallDuration(sec: number): string {
@@ -51,7 +52,7 @@ export function formatTranscriptTime(sec: number): string {
 }
 
 export function estimateCallCredits(durationSec: number): number {
-  return Math.max(1, Math.round(durationSec * 6));
+  return creditsForVoiceDuration(durationSec);
 }
 
 export function displayCallId(id: string): string {
