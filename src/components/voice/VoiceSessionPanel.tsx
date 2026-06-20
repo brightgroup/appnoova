@@ -2,11 +2,11 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Mic, MicOff, PhoneOff, Loader2, Sparkles } from "lucide-react";
-import { GoogleGenAI, Modality, type Session, type LiveServerMessage } from "@google/genai";
+import { GoogleGenAI, type Session, type LiveServerMessage } from "@google/genai";
 import { getTemplateMeta } from "@/lib/voice-agent-templates";
 import { agentAvatarGradient, agentAvatarStyle } from "@/lib/voice-agent-display";
 import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
-import { geminiTemperature } from "@/lib/voice-agent-audio";
+import { buildGeminiLiveSessionConfig } from "@/lib/gemini-live-config";
 import { buildPhoneAgentSystemInstruction } from "@/lib/telephony/phone-agent-instruction";
 import { buildVoiceKickoffMessage } from "@/lib/voice-accent-profile";
 import { parsePcmRate, pcmBase64ToFloat32, resampleTo16kPcm } from "@/lib/voice-session-audio";
@@ -470,22 +470,16 @@ export function VoiceSessionPanel({
       const ai = new GoogleGenAI({ apiKey });
       const session = await ai.live.connect({
         model: cfg.model || DEFAULT_LIVE_MODEL,
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: cfg.voice_name || "Aoede" } }
-          },
-          thinkingConfig: { includeThoughts: false, thinkingBudget: 0 },
-          temperature: geminiTemperature(cfg.temperature),
+        config: buildGeminiLiveSessionConfig({
           systemInstruction: buildPhoneAgentSystemInstruction(
             cfg.prompt,
             companyContextRef.current,
             cfg.name,
             cfg.source_template
           ),
-          inputAudioTranscription: {},
-          outputAudioTranscription: {}
-        },
+          voiceName: cfg.voice_name || "Kore",
+          temperature: cfg.temperature,
+        }),
         callbacks: {
           onmessage: handleServerMessage,
           onerror: (e: ErrorEvent) => {

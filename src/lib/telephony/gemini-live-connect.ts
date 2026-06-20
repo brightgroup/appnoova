@@ -1,8 +1,8 @@
-import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from "@google/genai";
+import { GoogleGenAI, type LiveServerMessage, type Session } from "@google/genai";
+import { buildGeminiLiveSessionConfig } from "@/lib/gemini-live-config";
 import { getVoiceGoogleApiKey } from "@/lib/google-ai";
 import { buildPhoneAgentSystemInstruction } from "@/lib/telephony/phone-agent-instruction";
 import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
-import { geminiTemperature } from "@/lib/voice-agent-audio";
 import type { PendingBridgeSession } from "@/lib/telephony/bridge-session-store";
 
 export interface GeminiLiveCallbacks {
@@ -45,22 +45,16 @@ export async function connectGeminiLive(
   try {
     const session = await ai.live.connect({
       model,
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: cfg.voice_name || "Aoede" } }
-        },
-        thinkingConfig: { includeThoughts: false, thinkingBudget: 0 },
-        temperature: geminiTemperature(cfg.temperature),
+      config: buildGeminiLiveSessionConfig({
         systemInstruction: buildPhoneAgentSystemInstruction(
           cfg.prompt,
           pending.companyContextText,
           pending.agentName,
           cfg.source_template
         ),
-        inputAudioTranscription: {},
-        outputAudioTranscription: {}
-      },
+        voiceName: cfg.voice_name || "Kore",
+        temperature: cfg.temperature,
+      }),
       callbacks: buildCallbacks(callbacks)
     });
     console.info("[telnyx-gemini] socket abierto", { callControlId: pending.callControlId });

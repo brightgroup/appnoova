@@ -28,8 +28,8 @@ const FEMALE_FIRST_NAMES = new Set([
 
 const DEFAULT_VOICES: Record<InferredVoiceGender, string> = {
   male: "Charon",
-  female: "Aoede",
-  neutral: "Puck",
+  female: "Kore",
+  neutral: "Kore",
 };
 
 /** Infiere género de voz a partir del nombre del agente (heurística español). */

@@ -1,7 +1,7 @@
 export const GEMINI_VOICES = [
+  { id: "Kore", label: "Kore – Femenina, clara (recomendada paisa)" },
   { id: "Aoede", label: "Aoede – Femenina, cálida" },
-  { id: "Kore", label: "Kore – Femenina, clara" },
-  { id: "Charon", label: "Charon – Masculina, profunda" },
+  { id: "Charon", label: "Charon – Masculina, profunda (recordatorios)" },
   { id: "Fenrir", label: "Fenrir – Masculina, enérgica" },
   { id: "Puck", label: "Puck – Neutra, amigable" }
 ] as const;

@@ -67,7 +67,7 @@ async def run_bot(
     session_start = time.time()
     model = agent_config.get("model") or DEFAULT_MODEL
     voice = agent_config.get("voice_name") or "Aoede"
-    temperature = float(agent_config.get("temperature") or 1.0)
+    temperature = max(float(agent_config.get("temperature") or 1.0), 0.92)
     system_instruction = agent_config.get("system_instruction") or ""
 
     hangup_scheduled = False

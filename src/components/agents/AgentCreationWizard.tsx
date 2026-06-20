@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  X, Loader2, Sparkles, ChevronRight, ChevronLeft, Check, Building2, Bot, Eye,
+  X, Loader2, Sparkles, ChevronRight, ChevronLeft, Check, Building2, Phone,
 } from "lucide-react";
 import { btnPrimary, btnGhost } from "@/lib/brand-ui";
 import { TEXT_AGENT_PURPOSES, VOICE_AGENT_PURPOSES, type AgentChannel } from "@/lib/agent-purpose-catalog";
 import { generateAgentPrompt, type AgentLanguage } from "@/lib/agent-prompt-generator";
 import { getPurposeMeta } from "@/lib/agent-purpose-catalog";
-import { GEMINI_VOICES } from "@/lib/voice-agent-options";
+import { GEMINI_VOICES, DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
 import {
   suggestVoiceForAgentName,
   voiceGenderHint,
@@ -17,10 +17,13 @@ import {
 import {
   suggestTemperatureForPurpose,
   suggestVoiceForPurpose,
+  getVoiceAccentProfile,
 } from "@/lib/voice-accent-profile";
+import { AgentTestPanel } from "@/components/voice/AgentTestPanel";
+import type { VoiceAgentFormData } from "@/types/voice-agent";
 import type { CompanyContext } from "@/types/company-context";
 
-type WizardStep = "agent" | "company" | "preview";
+type WizardStep = "agent" | "company" | "preview" | "test";
 
 interface AgentCreationWizardProps {
   channel: AgentChannel;
@@ -31,14 +34,20 @@ interface AgentCreationWizardProps {
   apiPath: "/api/text/agents" | "/api/voice/agents";
 }
 
-const STEPS: { id: WizardStep; label: string }[] = [
+const TEXT_STEPS: { id: WizardStep; label: string }[] = [
   { id: "agent", label: "Contexto del agente" },
   { id: "company", label: "Contexto de empresa" },
   { id: "preview", label: "Probar agente" },
 ];
 
+const VOICE_STEPS: { id: WizardStep; label: string }[] = [
+  { id: "agent", label: "Agente y voz" },
+  { id: "company", label: "Empresa" },
+  { id: "test", label: "Probar" },
+];
+
 const LANGUAGE_OPTIONS: { value: AgentLanguage; label: string }[] = [
-  { value: "es", label: "Español — Latinoamérica" },
+  { value: "es", label: "Español — Colombia" },
   { value: "en", label: "English" },
   { value: "multi", label: "Multi-idioma" },
 ];
@@ -52,6 +61,7 @@ export function AgentCreationWizard({
   apiPath,
 }: AgentCreationWizardProps) {
   const purposes = channel === "text" ? TEXT_AGENT_PURPOSES : VOICE_AGENT_PURPOSES;
+  const steps = channel === "voice" ? VOICE_STEPS : TEXT_STEPS;
   const [step, setStep] = useState<WizardStep>("agent");
   const [purposeId, setPurposeId] = useState(purposes[0].id);
   const [agentName, setAgentName] = useState("");
@@ -65,8 +75,11 @@ export function AgentCreationWizard({
   const [loadingContexts, setLoadingContexts] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [voiceName, setVoiceName] = useState("Puck");
+  const [voiceName, setVoiceName] = useState(() =>
+    channel === "voice" ? suggestVoiceForPurpose(purposes[0].id) : "Puck"
+  );
   const [voiceManual, setVoiceManual] = useState(false);
+  const [createdAgentId, setCreatedAgentId] = useState<string | null>(null);
 
   const reset = useCallback(() => {
     setStep("agent");
@@ -79,8 +92,9 @@ export function AgentCreationWizard({
     setCompanyName("");
     setCompanyDescription("");
     setError("");
-    setVoiceName("Puck");
+    setVoiceName(channel === "voice" ? suggestVoiceForPurpose(purposes[0].id) : "Puck");
     setVoiceManual(false);
+    setCreatedAgentId(null);
   }, [purposes, channel]);
 
   const handleClose = () => {
@@ -146,6 +160,7 @@ export function AgentCreationWizard({
 
   const resolvedCompanyName = companyName.trim() || "Mi empresa";
   const resolvedAgentName = agentName.trim() || "Asistente";
+  const accentProfile = getVoiceAccentProfile(purposeId);
 
   const generatedPrompt = useMemo(
     () =>
@@ -161,9 +176,23 @@ export function AgentCreationWizard({
     [channel, resolvedAgentName, purposeId, resolvedCompanyName, companyDescription, language, extraInstructions]
   );
 
+  const draftVoiceConfig = useMemo((): VoiceAgentFormData => ({
+    source_template: purposeId,
+    name: resolvedAgentName,
+    prompt: generatedPrompt,
+    company_context_id: selectedContextId || null,
+    voice_name: voiceName,
+    model: DEFAULT_LIVE_MODEL,
+    voice_speed: 1.0,
+    temperature: suggestTemperatureForPurpose(purposeId),
+    volume: 1.0,
+    llm_model: DEFAULT_LIVE_MODEL,
+    color: getPurposeMeta(channel, purposeId).color,
+  }), [purposeId, resolvedAgentName, generatedPrompt, selectedContextId, voiceName, channel]);
+
   const purposeMeta = getPurposeMeta(channel, purposeId);
   const channelLabel = channel === "text" ? "Texto" : "Voz";
-  const stepIndex = STEPS.findIndex(s => s.id === step);
+  const stepIndex = steps.findIndex(s => s.id === step);
 
   const canContinueAgent = agentName.trim().length >= 2;
   const canContinueCompany =
@@ -192,7 +221,7 @@ export function AgentCreationWizard({
     return data.context.id as string;
   };
 
-  const handleCreate = async () => {
+  const handleCreate = async (goToTest = false): Promise<string | null> => {
     setSaving(true);
     setError("");
     try {
@@ -220,20 +249,40 @@ export function AgentCreationWizard({
       if (!res.ok || !data.agent?.id) {
         throw new Error(data.error || "No se pudo crear el agente");
       }
+      const id = data.agent.id as string;
+      setCreatedAgentId(id);
+
+      if (channel === "voice" && goToTest) {
+        setStep("test");
+        return id;
+      }
+
       handleClose();
-      onCreated(data.agent.id);
+      onCreated(id);
+      return id;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear el agente");
+      return null;
     } finally {
       setSaving(false);
     }
+  };
+
+  const finishVoiceWizard = () => {
+    const id = createdAgentId;
+    handleClose();
+    if (id) onCreated(id);
   };
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl p-4">
-      <div className="relative bg-noova-surface border border-white/[.10] rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <div
+        className={`relative bg-noova-surface border border-white/[.10] rounded-3xl w-full flex flex-col shadow-2xl overflow-hidden ${
+          step === "test" && channel === "voice" ? "max-w-4xl max-h-[92vh]" : "max-w-3xl max-h-[90vh]"
+        }`}
+      >
         <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#5b5bf6]/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Header */}
@@ -253,9 +302,8 @@ export function AgentCreationWizard({
             </div>
           </div>
 
-          {/* Stepper */}
           <div className="flex items-center gap-2 mb-2">
-            {STEPS.map((s, i) => (
+            {steps.map((s, i) => (
               <div key={s.id} className="flex items-center gap-2 flex-1 min-w-0">
                 <div
                   className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
@@ -275,7 +323,7 @@ export function AgentCreationWizard({
                 >
                   {s.label}
                 </span>
-                {i < STEPS.length - 1 && (
+                {i < steps.length - 1 && (
                   <div className={`flex-1 h-px ${i < stepIndex ? "bg-[#5b5bf6]/40" : "bg-white/[.08]"}`} />
                 )}
               </div>
@@ -284,12 +332,16 @@ export function AgentCreationWizard({
         </div>
 
         {/* Body */}
-        <div className="relative flex-1 overflow-y-auto px-8 py-6 min-h-0">
+        <div className={`relative flex-1 min-h-0 ${step === "test" && channel === "voice" ? "flex flex-col overflow-hidden" : "overflow-y-auto px-8 py-6"}`}>
           {step === "agent" && (
-            <div className="space-y-6">
+            <div className="space-y-6 px-8 py-6">
               <div>
-                <h2 className="text-xl font-bold text-white">Elige el comportamiento de tu agente</h2>
-                <p className="text-sm text-gray-500 mt-1">Selecciona una plantilla general y personaliza los datos básicos.</p>
+                <h2 className="text-xl font-bold text-white">Elige plantilla y voz</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {channel === "voice"
+                    ? "Selecciona el propósito, el nombre y la voz para tu primera prueba."
+                    : "Selecciona una plantilla general y personaliza los datos básicos."}
+                </p>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -297,7 +349,12 @@ export function AgentCreationWizard({
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => setPurposeId(p.id)}
+                    onClick={() => {
+                      setPurposeId(p.id);
+                      if (channel === "voice" && !voiceManual) {
+                        setVoiceName(suggestVoiceForPurpose(p.id));
+                      }
+                    }}
                     className={`text-left p-4 rounded-2xl border transition-all ${
                       purposeId === p.id
                         ? "border-[#5b5bf6]/50 bg-[#5b5bf6]/10 ring-1 ring-[#5b5bf6]/30"
@@ -318,14 +375,9 @@ export function AgentCreationWizard({
                     type="text"
                     value={agentName}
                     onChange={e => setAgentName(e.target.value)}
-                    placeholder={channel === "voice" ? "Ej. Juan, Valentina, Carlos" : "Ej. Juan, Valentina, Asistente web"}
+                    placeholder={channel === "voice" ? "Ej. Manuela, Juan, Valentina" : "Ej. Juan, Valentina, Asistente web"}
                     className="w-full bg-noova-main border border-white/[.12] rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#5b5bf6]/50"
                   />
-                  <p className="text-[11px] text-gray-600 mt-1">
-                    {channel === "voice"
-                      ? "El nombre define cómo se presenta y qué voz sugerimos."
-                      : "Así se presentará el agente ante tus clientes."}
-                  </p>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">Idioma *</label>
@@ -335,60 +387,58 @@ export function AgentCreationWizard({
                     className="w-full bg-noova-main border border-white/[.12] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
                   >
                     {LANGUAGE_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
+                      <option key={o.value} value={o.value} className="bg-[#232329]">{o.label}</option>
                     ))}
                   </select>
                 </div>
               </div>
 
               {channel === "voice" && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Voz del agente *</label>
+                <div className="rounded-2xl border border-[#5b5bf6]/20 bg-[#5b5bf6]/5 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-xs font-semibold text-[#a5a5ff] uppercase tracking-wide">Voz para probar *</label>
+                    <span className="text-[10px] text-gray-500">{accentProfile.label}</span>
+                  </div>
                   <select
                     value={voiceName}
                     onChange={e => {
                       setVoiceManual(true);
                       setVoiceName(e.target.value);
                     }}
-                    className="w-full bg-noova-main border border-white/[.12] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
+                    className="w-full bg-[#232329] border border-white/[.12] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
                   >
                     {GEMINI_VOICES.map(v => (
-                      <option key={v.id} value={v.id}>{v.label}</option>
+                      <option key={v.id} value={v.id} className="bg-[#232329]">{v.label}</option>
                     ))}
                   </select>
-                  <p className="text-[11px] text-gray-600 mt-1">
-                    {agentName.trim().length >= 2
-                      ? voiceGenderHint(agentName)
-                      : "Escribe el nombre del agente para sugerir una voz acorde."}
+                  <p className="text-[11px] text-gray-500 leading-relaxed">
+                    {agentName.trim().length >= 2 ? voiceGenderHint(agentName) : "El acento paisa viene del prompt; el timbre lo eliges aquí."}
                     {!voiceManual && agentName.trim().length >= 2 && (
-                      <span className="text-[#a5a5ff]"> ({voiceLabel(voiceName)})</span>
+                      <span className="text-[#a5a5ff]"> Sugerida: {voiceLabel(voiceName)}.</span>
                     )}
                   </p>
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                  Instrucciones importantes
-                </label>
+                <label className="block text-xs font-medium text-gray-400 mb-1.5">Instrucciones importantes (opcional)</label>
                 <textarea
                   value={extraInstructions}
                   onChange={e => setExtraInstructions(e.target.value)}
                   rows={3}
-                  placeholder="Ej. Quiero que este agente atienda leads de mi empresa y capture nombre, email y motivo de contacto."
+                  placeholder="Ej. Captura nombre, email y motivo de contacto."
                   className="w-full bg-noova-main border border-white/[.12] rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#5b5bf6]/50 resize-none"
                 />
-                <p className="text-[11px] text-gray-600 mt-1">Define el tono, objetivos extra o reglas específicas de tu negocio.</p>
               </div>
             </div>
           )}
 
           {step === "company" && (
-            <div className="space-y-6">
+            <div className="space-y-6 px-8 py-6">
               <div>
                 <h2 className="text-xl font-bold text-white">Contexto de la empresa</h2>
                 <p className="text-sm text-gray-500 mt-1">
-                  Usa un contexto existente o crea uno nuevo. Con esto generamos un prompt adaptado a tu sector.
+                  Con esto el agente conoce tu marca. El prompt completo lo ajustas después en configuración.
                 </p>
               </div>
 
@@ -431,14 +481,11 @@ export function AgentCreationWizard({
                     className="w-full bg-noova-main border border-white/[.12] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
                   >
                     {contexts.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}{c.is_default ? " (predeterminado)" : ""}</option>
+                      <option key={c.id} value={c.id} className="bg-[#232329]">
+                        {c.name}{c.is_default ? " (predeterminado)" : ""}
+                      </option>
                     ))}
                   </select>
-                  {companyDescription && (
-                    <div className="mt-3 p-4 rounded-xl bg-white/[.03] border border-white/[.08] text-xs text-gray-400 leading-relaxed max-h-32 overflow-y-auto">
-                      {companyDescription.slice(0, 400)}{companyDescription.length > 400 ? "…" : ""}
-                    </div>
-                  )}
                 </div>
               ) : (
                 <>
@@ -458,115 +505,140 @@ export function AgentCreationWizard({
                       value={companyDescription}
                       onChange={e => setCompanyDescription(e.target.value)}
                       rows={6}
-                      placeholder="Describe tu empresa, productos o servicios, mercado objetivo y propuesta de valor. Cuanto más detalle, mejor será el prompt generado."
+                      placeholder="Productos, servicios, tono de marca y propuesta de valor."
                       className="w-full bg-noova-main border border-white/[.12] rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#5b5bf6]/50 resize-none"
                     />
-                    <p className="text-[11px] text-gray-600 mt-1">
-                      Mínimo 20 caracteres. Este texto adapta el agente a tu sector (retail, servicios, salud, etc.).
-                    </p>
+                    <p className="text-[11px] text-gray-600 mt-1">Mínimo 20 caracteres.</p>
                   </div>
                 </>
               )}
             </div>
           )}
 
-          {step === "preview" && (
-            <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#5b5bf6]/15 flex items-center justify-center shrink-0">
-                  <Eye className="w-5 h-5 text-[#a5a5ff]" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-white">Prompt generado</h2>
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    Revisa la plantilla sugerida para <strong className="text-gray-300">{resolvedAgentName}</strong> — {purposeMeta.label} en <strong className="text-gray-300">{resolvedCompanyName}</strong>.
-                    {channel === "voice" && (
-                      <> Voz: <strong className="text-gray-300">{voiceLabel(voiceName)}</strong>.</>
-                    )}
-                  </p>
-                </div>
+          {step === "preview" && channel === "text" && (
+            <div className="space-y-4 px-8 py-6">
+              <div>
+                <h2 className="text-xl font-bold text-white">Listo para crear</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Agente <strong className="text-gray-300">{resolvedAgentName}</strong> — {purposeMeta.label} para{" "}
+                  <strong className="text-gray-300">{resolvedCompanyName}</strong>.
+                </p>
               </div>
-
-              <div className="rounded-xl border border-white/[.08] bg-noova-main overflow-hidden">
-                <div className="px-4 py-2 border-b border-white/[.06] flex items-center gap-2 text-xs text-gray-500">
-                  <Bot className="w-3.5 h-3.5" /> Vista previa Markdown
-                </div>
-                <pre className="p-4 text-xs text-gray-300 leading-relaxed whitespace-pre-wrap font-mono max-h-[340px] overflow-y-auto">
-                  {generatedPrompt}
-                </pre>
-              </div>
-
               <p className="text-xs text-gray-600">
-                Podrás editar este prompt en la configuración del agente después de crearlo.
+                Podrás editar el prompt en la configuración del agente después de crearlo.
               </p>
             </div>
           )}
 
+          {step === "test" && channel === "voice" && createdAgentId && (
+            <div className="flex-1 flex flex-col min-h-[420px] overflow-hidden">
+              <div className="px-6 py-3 border-b border-white/[.06] shrink-0">
+                <h2 className="text-lg font-bold text-white">Prueba tu agente</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {resolvedAgentName} · {voiceLabel(voiceName)} · {purposeMeta.label}. Ajusta el prompt en configuración cuando quieras.
+                </p>
+              </div>
+              <AgentTestPanel
+                sourceTemplate={purposeId}
+                agentId={createdAgentId}
+                agentName={resolvedAgentName}
+                agentConfig={draftVoiceConfig}
+                companyContext={companyDescription.trim()}
+                ready
+              />
+            </div>
+          )}
+
           {error && (
-            <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/25 text-xs text-red-300">
+            <div className="mx-8 mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/25 text-xs text-red-300">
               {error}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="relative px-8 py-5 border-t border-white/[.06] flex items-center justify-between shrink-0 bg-noova-surface">
-          {step === "agent" ? (
-            <button type="button" onClick={handleClose} className={btnGhost}>
-              Cancelar
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setStep(step === "preview" ? "company" : "agent")}
-              className={`${btnGhost} gap-1.5`}
-              disabled={saving}
-            >
-              <ChevronLeft className="w-4 h-4" /> Atrás
-            </button>
-          )}
+        {!(step === "test" && channel === "voice") && (
+          <div className="relative px-8 py-5 border-t border-white/[.06] flex items-center justify-between shrink-0 bg-noova-surface">
+            {step === "agent" ? (
+              <button type="button" onClick={handleClose} className={btnGhost}>
+                Cancelar
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setStep(step === "preview" || step === "test" ? "company" : "agent")}
+                className={`${btnGhost} gap-1.5`}
+                disabled={saving}
+              >
+                <ChevronLeft className="w-4 h-4" /> Atrás
+              </button>
+            )}
 
-          {step === "agent" && (
-            <button
-              type="button"
-              disabled={!canContinueAgent}
-              onClick={() => setStep("company")}
-              className={`${btnPrimary} gap-1.5 disabled:opacity-40`}
-            >
-              Continuar <ChevronRight className="w-4 h-4" />
-            </button>
-          )}
+            {step === "agent" && (
+              <button
+                type="button"
+                disabled={!canContinueAgent}
+                onClick={() => setStep("company")}
+                className={`${btnPrimary} gap-1.5 disabled:opacity-40`}
+              >
+                Continuar <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
 
-          {step === "company" && (
-            <button
-              type="button"
-              disabled={!canContinueCompany || loadingContexts}
-              onClick={() => setStep("preview")}
-              className={`${btnPrimary} gap-1.5 disabled:opacity-40`}
-            >
-              Ver prompt <ChevronRight className="w-4 h-4" />
-            </button>
-          )}
+            {step === "company" && (
+              <button
+                type="button"
+                disabled={!canContinueCompany || loadingContexts || saving}
+                onClick={() => {
+                  if (channel === "voice") void handleCreate(true);
+                  else setStep("preview");
+                }}
+                className={`${btnPrimary} gap-1.5 disabled:opacity-40`}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Preparando…
+                  </>
+                ) : channel === "voice" ? (
+                  <>
+                    <Phone className="w-4 h-4" /> Probar agente
+                  </>
+                ) : (
+                  <>
+                    Continuar <ChevronRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            )}
 
-          {step === "preview" && (
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void handleCreate()}
-              className={`${btnPrimary} gap-2 disabled:opacity-60`}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Creando…
-                </>
-              ) : (
-                <>
-                  <Building2 className="w-4 h-4" /> Guardar y probar
-                </>
-              )}
+            {step === "preview" && channel === "text" && (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void handleCreate(false)}
+                className={`${btnPrimary} gap-2 disabled:opacity-60`}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Creando…
+                  </>
+                ) : (
+                  <>
+                    <Building2 className="w-4 h-4" /> Crear agente
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        )}
+
+        {step === "test" && channel === "voice" && (
+          <div className="relative px-8 py-4 border-t border-white/[.06] flex items-center justify-end shrink-0 bg-noova-surface">
+            <button type="button" onClick={finishVoiceWizard} className={btnPrimary}>
+              Listo
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -36,6 +36,7 @@ Abre **http://127.0.0.1:8000**
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arquitectura, canales, BD, APIs, flujos |
 | [docs/ROLLBACK-Y-BACKUPS.md](docs/ROLLBACK-Y-BACKUPS.md) | Rollback de código y backups de BD |
 | [docs/ORI-AND-VOICE-ROADMAP.md](docs/ORI-AND-VOICE-ROADMAP.md) | Roadmap ORI, voz paisa y producción a escala |
+| [docs/GEMINI-LIVE-VOICE.md](docs/GEMINI-LIVE-VOICE.md) | Voz paisa: prompt experto y knobs de AI Studio |
 | [docs/adr/001-widget-standalone.md](docs/adr/001-widget-standalone.md) | Decisión: widget independiente de Mi Link |
 
 ## Estructura del repo

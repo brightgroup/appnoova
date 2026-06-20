@@ -80,7 +80,7 @@ Cliente ↔ Telnyx (PSTN) ↔ WebSocket (server.ts) ↔ TelnyxGeminiBridge ↔ G
 
 | Fase | Entregable | Prioridad |
 |------|------------|-----------|
-| **V1** ✅ | Prompts paisa + fallback es-CO + perfiles plantilla | Alta |
+| **V1** ✅ | Prompt experto paisa + `gemini-live-config` + doc AI Studio | Alta |
 | **V2** | Inbound producción con Gemini Live (hoy solo saludo Polly) | **Crítica** |
 | **V3** | Load test 50–100 concurrentes, cuotas Telnyx/Gemini | Alta |
 | **V4** | Redis para sesiones bridge + worker de voz separado | Media |
@@ -171,4 +171,5 @@ No existe garantía al 100 %. Objetivo: **99.5–99.9 %** con:
 | Bridge voz | `server.ts`, `telnyx-gemini-bridge.ts` |
 | Acento voz | `src/lib/voice-accent-profile.ts` |
 | Diagnóstico | `src/app/api/telephony/diagnostics/route.ts` |
+| Config AI Studio | [docs/GEMINI-LIVE-VOICE.md](GEMINI-LIVE-VOICE.md) |
 | Pipecat | `services/pipecat-voice/bot.py` |

@@ -39,6 +39,7 @@
   --nv-modal-backdrop: rgba(17, 19, 24, 0.45);
   --nv-search-bg: #ffffff;
   --nv-scrollbar: rgba(17, 19, 24, 0.12);
+  --nv-bg-popover: #ffffff;
 }
 
 .dark {
@@ -73,6 +74,7 @@
   --nv-modal-backdrop: rgba(0, 0, 0, 0.6);
   --nv-search-bg: var(--nv-bg-control);
   --nv-scrollbar: rgba(255, 255, 255, 0.12);
+  --nv-bg-popover: #232329;
 }
 
 * {

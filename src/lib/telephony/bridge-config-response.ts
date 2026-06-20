@@ -4,6 +4,7 @@ import { peekPendingBridgeSession } from "@/lib/telephony/bridge-session-store";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import { getPhoneTestCallSession } from "@/lib/telephony/test-call-session";
 import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
+import { geminiLiveTemperature } from "@/lib/gemini-live-config";
 import { geminiTemperature } from "@/lib/voice-agent-audio";
 
 export interface BridgeConfigResponse {
@@ -29,7 +30,7 @@ export async function getBridgeConfigForPipecat(
       agent_name: fromMemory.agentName,
       model: fromMemory.config.model || DEFAULT_LIVE_MODEL,
       voice_name: fromMemory.config.voice_name || "Aoede",
-      temperature: geminiTemperature(fromMemory.config.temperature),
+      temperature: geminiLiveTemperature(geminiTemperature(fromMemory.config.temperature)),
       system_instruction: buildPhoneAgentSystemInstruction(
         fromMemory.config.prompt,
         fromMemory.companyContextText,
@@ -54,7 +55,7 @@ export async function getBridgeConfigForPipecat(
     agent_name: agent.agentName,
     model: agent.config.model || DEFAULT_LIVE_MODEL,
     voice_name: agent.config.voice_name || "Aoede",
-    temperature: geminiTemperature(agent.config.temperature),
+    temperature: geminiLiveTemperature(geminiTemperature(agent.config.temperature)),
     system_instruction: buildPhoneAgentSystemInstruction(
       agent.config.prompt,
       agent.companyContextText,

@@ -261,7 +261,7 @@ function ConfigContent() {
         <div className="flex-1 flex min-h-0 overflow-hidden">
 
           {/* Left: voice settings */}
-          <div className="w-72 border-r border-white/[.08] p-5 overflow-y-auto shrink-0">
+          <div className="w-72 border-r border-white/[.08] p-5 overflow-y-auto overflow-x-visible shrink-0">
             <h2 className="text-sm font-semibold text-gray-300 mb-4">Configuración de voz</h2>
 
             <div className="space-y-4">
