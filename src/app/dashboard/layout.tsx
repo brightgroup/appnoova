@@ -14,6 +14,7 @@ import { CANALES_NAV } from "@/lib/canales-nav";
 import { AGENTES_VOZ_NAV } from "@/lib/agentes-voz-nav";
 import { AGENTES_TEXTO_NAV } from "@/lib/agentes-texto-nav";
 import { CRM_NAV } from "@/lib/crm-nav";
+import { DesktopOnlyGate } from "@/components/layout/DesktopOnlyGate";
 import type { LucideIcon } from "lucide-react";
 
 function formatCreditsShort(n: number): string {
@@ -172,6 +173,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
+    <DesktopOnlyGate>
     <div className="flex h-screen bg-noova-main text-white" data-noova-dashboard>
       {showShell && (
       <div
@@ -562,5 +564,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {children}
       </div>
     </div>
+    </DesktopOnlyGate>
   );
 }

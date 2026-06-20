@@ -12,6 +12,7 @@ import {
 import {
   sidebarNavActive, sidebarNavIdle, sidebarIconActive, accentGradientIcon
 } from "@/lib/brand-ui";
+import { DesktopOnlyGate } from "@/components/layout/DesktopOnlyGate";
 
 const NAV_ITEMS = [
   { href: "/admin",               label: "Panel",            icon: LayoutDashboard, exact: true },
@@ -102,6 +103,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
 
   return (
+    <DesktopOnlyGate>
     <div className="flex h-screen bg-[#0d0e14] text-white overflow-hidden" data-noova-admin>
 
       {showShell && (
@@ -188,5 +190,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {children}
       </main>
     </div>
+    </DesktopOnlyGate>
   );
 }

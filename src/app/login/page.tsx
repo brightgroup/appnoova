@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ArrowRight, Loader2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { NoovaLogo } from "@/components/brand/NoovaLogo";
+import { DesktopOnlyGate } from "@/components/layout/DesktopOnlyGate";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -57,9 +58,9 @@ export default function LoginPage() {
     "w-full rounded-xl border border-[var(--nv-input-border)] bg-[var(--nv-input-bg)] px-4 py-3 text-sm text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] outline-none transition focus:border-[#5b5bf6]/50 focus:ring-2 focus:ring-[#5b5bf6]/15";
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-noova-main px-4 py-12 overflow-hidden">
-      <div className="bg-aurora" aria-hidden />
-      <div className="bg-grid" aria-hidden />
+    <DesktopOnlyGate>
+    <div className="login-page-bg relative flex min-h-screen flex-col items-center justify-center px-4 py-12 overflow-hidden">
+      <div className="login-page-glow" aria-hidden />
 
       <Link href="/" className="relative z-10 mb-10 flex items-center">
         <NoovaLogo width={180} height={44} priority />
@@ -158,5 +159,6 @@ export default function LoginPage() {
         © 2026 BG Soluciones · Noova 360
       </p>
     </div>
+    </DesktopOnlyGate>
   );
 }

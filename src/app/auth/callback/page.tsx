@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { DesktopOnlyGate } from "@/components/layout/DesktopOnlyGate";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -57,9 +58,9 @@ export default function AuthCallbackPage() {
   }, [router]);
 
   return (
-    <>
-      <div className="bg-aurora" aria-hidden="true" />
-      <div className="bg-grid"   aria-hidden="true" />
+    <DesktopOnlyGate>
+    <div className="login-page-bg relative min-h-screen">
+      <div className="login-page-glow" aria-hidden="true" />
 
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4">
         <div
@@ -108,6 +109,7 @@ export default function AuthCallbackPage() {
 
         <p className="mt-8 text-xs text-gray-700">© 2026 BG Soluciones · Noova 360</p>
       </div>
-    </>
+    </div>
+    </DesktopOnlyGate>
   );
 }

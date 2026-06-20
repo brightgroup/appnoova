@@ -794,7 +794,28 @@ button {
   transition: all 0.2s;
 }
 
-/* Login — fondo aurora (oscuro) */
+/* Login — fondo sólido moderno (sin grid) */
+.login-page-bg {
+  background-color: #06070d;
+}
+
+html:not(.dark) .login-page-bg {
+  background-color: #dfe2e8;
+}
+
+.login-page-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 75% 55% at 50% -12%, rgba(91, 91, 246, 0.13) 0%, transparent 68%);
+}
+
+html:not(.dark) .login-page-glow {
+  background: radial-gradient(ellipse 75% 55% at 50% -12%, rgba(91, 91, 246, 0.07) 0%, transparent 68%);
+}
+
+/* Login — fondo aurora (oscuro) — legacy, preferir .login-page-glow */
 .bg-aurora {
   position: fixed;
   inset: 0;
