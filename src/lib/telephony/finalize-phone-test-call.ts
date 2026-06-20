@@ -115,6 +115,7 @@ export async function finalizePhoneTestCall(input: {
         callId: session.id,
         durationSec,
         voiceAgentId: session.voice_agent_id,
+        voiceProvider: agent.config.voice_provider === "elevenlabs" ? "elevenlabs" : "google",
         metadata: { call_control_id: input.callControlId, source: "phone_test" }
       });
     }

@@ -18,6 +18,8 @@ export interface PhoneTestCallMeta {
   phone_number_id?: string;
   test_number_id?: string;
   agent_name?: string;
+  voice_provider?: "google" | "elevenlabs";
+  conversation_id?: string;
   last_event?: string;
   error?: string;
   greeting?: string;
@@ -35,18 +37,22 @@ export async function createPhoneTestCallSession(input: {
   from: string;
   to: string;
   agentName: string;
+  voiceProvider?: "google" | "elevenlabs";
 }): Promise<string> {
   const db = adminClient();
+  const isPremium = input.voiceProvider === "elevenlabs";
   const metadata: PhoneTestCallMeta = {
     phone_test: true,
     call_control_id: input.callControlId,
     phase: "dialing",
     from: input.from,
     to: input.to,
-    phone_number_id: input.phoneNumberId,
+    phone_number_id: input.phoneNumberId || undefined,
     test_number_id: input.testNumberId,
     agent_name: input.agentName,
-    last_event: "call.dialing"
+    voice_provider: isPremium ? "elevenlabs" : "google",
+    ...(isPremium ? { conversation_id: input.callControlId } : {}),
+    last_event: isPremium ? "elevenlabs.dialing" : "call.dialing"
   };
 
   const { data, error } = await db
@@ -56,7 +62,7 @@ export async function createPhoneTestCallSession(input: {
       voice_agent_id: input.voiceAgentId,
       phone_number: input.to,
       status: "in_progress",
-      status_label: "Prueba telefónica - Marcando",
+      status_label: isPremium ? "Prueba premium - Marcando" : "Prueba telefónica - Marcando",
       summary: `Llamada de prueba de ${input.agentName} hacia ${input.to}.`,
       metadata
     })

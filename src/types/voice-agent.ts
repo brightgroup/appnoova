@@ -15,6 +15,8 @@ export interface VoiceAgentStats {
   quality_label: string;
 }
 
+export type VoiceProvider = "google" | "elevenlabs";
+
 export interface VoiceAgentFormData {
   /** Preset demo del que se precargó este agente (solo referencia). */
   source_template: VoiceSourceTemplateId | string;
@@ -22,6 +24,10 @@ export interface VoiceAgentFormData {
   prompt: string;
   /** Marca / contexto de empresa asignado a este agente. */
   company_context_id?: string | null;
+  /** google = Gemini Live; elevenlabs = voz premium */
+  voice_provider?: VoiceProvider;
+  elevenlabs_agent_id?: string | null;
+  elevenlabs_voice_id?: string | null;
   voice_name: string;
   model: string;
   voice_speed: number;

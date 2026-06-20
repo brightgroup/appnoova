@@ -19,8 +19,7 @@ function DesktopOnlyMessage() {
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#5b5bf6]/15 border border-[#5b5bf6]/25">
           <Monitor className="h-6 w-6 text-[#a5a5ff]" />
         </div>
-        <h1 className="text-lg font-bold text-[var(--nv-text)]">Solo disponible en computador</h1>
-        <p className="mt-3 text-sm text-[var(--nv-text-muted)] leading-relaxed">
+        <p className="text-sm text-[var(--nv-text-muted)] leading-relaxed">
           Noova 360 requiere una pantalla de escritorio (mínimo {DESKTOP_MIN_WIDTH_PX}px de ancho) para
           mostrar todos los módulos con claridad. Accede desde tu PC o laptop.
         </p>

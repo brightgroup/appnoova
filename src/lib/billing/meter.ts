@@ -6,7 +6,10 @@ import {
   voiceBillableMinutes,
   TWILIO_WA_USD_PER_MSG,
   VOICE_USD_PER_MINUTE,
-  type UsageEventType
+  VOICE_PREMIUM_USD_PER_MINUTE,
+  creditsForVoiceDuration,
+  type UsageEventType,
+  type VoiceBillingProvider,
 } from "@/lib/billing/pricing";
 
 export interface GeminiUsage {
@@ -111,7 +114,7 @@ export interface RecordUsageInput {
   quantity?: number;
   /** Sobrescribe los créditos calculados. */
   creditsOverride?: number;
-  provider?: "google" | "twilio" | "telnyx" | null;
+  provider?: "google" | "twilio" | "telnyx" | "elevenlabs" | null;
   model?: string | null;
   gemini?: GeminiUsage | null;
   /** Mensajes Twilio involucrados (entrante + saliente) para el costo real. */
@@ -159,7 +162,11 @@ export async function recordUsage(input: RecordUsageInput): Promise<RecordUsageR
       providerCostUsd += input.twilioMessages * TWILIO_WA_USD_PER_MSG;
     }
     if (input.voiceMinutes) {
-      providerCostUsd += input.voiceMinutes * VOICE_USD_PER_MINUTE;
+      const rate =
+        input.eventType === "voice_premium"
+          ? VOICE_PREMIUM_USD_PER_MINUTE
+          : VOICE_USD_PER_MINUTE;
+      providerCostUsd += input.voiceMinutes * rate;
     }
   }
 
@@ -235,19 +242,25 @@ export async function chargeVoiceCall(input: {
   durationSec: number;
   voiceAgentId?: string;
   channel?: string;
+  voiceProvider?: VoiceBillingProvider;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
   const billedMinutes = voiceBillableMinutes(input.durationSec);
   if (billedMinutes <= 0) return;
 
+  const provider = input.voiceProvider ?? "google";
+  const eventType = provider === "elevenlabs" ? "voice_premium" : "voice";
+  const credits = creditsForVoiceDuration(input.durationSec, provider);
+
   await recordUsageSafe({
     db: input.db,
     organizationId: input.organizationId,
     userId: input.userId,
-    eventType: "voice",
+    eventType,
     channel: input.channel ?? "voice",
     quantity: billedMinutes,
-    provider: "telnyx",
+    creditsOverride: credits,
+    provider: provider === "elevenlabs" ? "elevenlabs" : "telnyx",
     voiceMinutes: input.durationSec / 60,
     referenceType: "voice_agent_call",
     referenceId: input.callId,
@@ -255,8 +268,9 @@ export async function chargeVoiceCall(input: {
     metadata: {
       duration_sec: input.durationSec,
       voice_agent_id: input.voiceAgentId,
-      ...(input.metadata ?? {})
-    }
+      voice_provider: provider,
+      ...(input.metadata ?? {}),
+    },
   });
 }
 

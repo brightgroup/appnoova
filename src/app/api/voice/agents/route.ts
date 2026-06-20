@@ -3,6 +3,8 @@ import { getTemplateDefaults, resolveBaseTemplateId } from "@/lib/voice-agent-te
 import { normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
 import { toVoiceAgentListItem, toVoiceAgentRecord } from "@/lib/voice-agent-record";
 import { insertVoiceAgentRow, updateVoiceAgentRow } from "@/lib/voice-agents-db";
+import { deleteElevenLabsAgent } from "@/lib/elevenlabs/sync-agent";
+import { syncVoiceAgentToElevenLabs } from "@/lib/elevenlabs/voice-agent-sync";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
 
 function dbNotReady() {
@@ -137,6 +139,7 @@ export async function POST(req: NextRequest) {
     template_id: sourceTemplate,
     name: agentName,
     prompt: form.prompt,
+    voice_provider: form.voice_provider ?? "google",
     voice_name: form.voice_name,
     model: form.model,
     voice_speed: form.voice_speed,
@@ -149,7 +152,55 @@ export async function POST(req: NextRequest) {
   };
 
   if (body.id) {
-    let { data, error } = await updateVoiceAgentRow(db, row, body.id, userId);
+    const { data: existingAgent, error: existingErr } = await db
+      .from("voice_agents")
+      .select("voice_provider, elevenlabs_agent_id")
+      .eq("id", body.id)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (existingErr) {
+      return NextResponse.json({ error: existingErr.message }, { status: 500 });
+    }
+    if (!existingAgent) {
+      return NextResponse.json({ error: "Agente no encontrado" }, { status: 404 });
+    }
+
+    const lockedProvider = existingAgent.voice_provider === "elevenlabs" ? "elevenlabs" : "google";
+    if (form.voice_provider && form.voice_provider !== lockedProvider) {
+      return NextResponse.json(
+        { error: "No se puede cambiar el proveedor de voz. Crea un agente nuevo." },
+        { status: 400 }
+      );
+    }
+
+    const updateForm = normalizeVoiceAgentForm({
+      ...form,
+      voice_provider: lockedProvider,
+      elevenlabs_agent_id: existingAgent.elevenlabs_agent_id,
+    });
+
+    let elevenlabsFields: { elevenlabs_agent_id?: string | null; elevenlabs_voice_id?: string | null } = {};
+    if (lockedProvider === "elevenlabs") {
+      try {
+        elevenlabsFields = await syncVoiceAgentToElevenLabs(
+          db,
+          userId,
+          updateForm,
+          existingAgent.elevenlabs_agent_id
+        );
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Error al sincronizar agente premium";
+        return NextResponse.json({ error: message }, { status: 502 });
+      }
+    }
+
+    let { data, error } = await updateVoiceAgentRow(
+      db,
+      { ...row, voice_provider: lockedProvider, ...elevenlabsFields },
+      body.id,
+      userId
+    );
 
     if (error?.message?.includes("company_context_id")) {
       const { company_context_id: _c, ...rest } = row;
@@ -166,7 +217,17 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  let { data, error } = await insertVoiceAgentRow(db, row);
+  let elevenlabsFields: { elevenlabs_agent_id?: string | null; elevenlabs_voice_id?: string | null } = {};
+  if (form.voice_provider === "elevenlabs") {
+    try {
+      elevenlabsFields = await syncVoiceAgentToElevenLabs(db, userId, form);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Error al sincronizar agente premium";
+      return NextResponse.json({ error: message }, { status: 502 });
+    }
+  }
+
+  let { data, error } = await insertVoiceAgentRow(db, { ...row, ...elevenlabsFields });
 
   if (error?.message?.includes("company_context_id")) {
     const { company_context_id: _c, ...rest } = row;
@@ -200,7 +261,7 @@ export async function DELETE(req: NextRequest) {
 
   const { data: existing, error: fetchErr } = await db
     .from("voice_agents")
-    .select("id")
+    .select("id, elevenlabs_agent_id, voice_provider")
     .eq("id", agentId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -220,6 +281,10 @@ export async function DELETE(req: NextRequest) {
 
   if (deleteErr) {
     return NextResponse.json({ error: deleteErr.message }, { status: 500 });
+  }
+
+  if (existing.voice_provider === "elevenlabs" && existing.elevenlabs_agent_id) {
+    await deleteElevenLabsAgent(existing.elevenlabs_agent_id);
   }
 
   return NextResponse.json({ ok: true });

@@ -14,6 +14,7 @@ import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { formatPhoneDisplay } from "@/lib/telephony/format-phone";
 import type { PhoneNumberRecord } from "@/types/phone-number";
 import type { TestPhoneNumberRecord } from "@/types/test-phone-number";
+import type { VoiceProvider } from "@/types/voice-agent";
 
 type CallPhase = "dialing" | "ringing" | "answered" | "speaking" | "connected" | "ended" | "failed";
 
@@ -32,6 +33,7 @@ interface ActiveCall {
 interface PhoneTestPanelProps {
   agentId: string | null;
   agentName: string;
+  voiceProvider?: VoiceProvider;
   onCallDetected?: () => void;
 }
 
@@ -61,7 +63,8 @@ function formatDuration(sec: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTestPanelProps) {
+export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", onCallDetected }: PhoneTestPanelProps) {
+  const isPremium = voiceProvider === "elevenlabs";
   const [agentLines, setAgentLines] = useState<PhoneNumberRecord[]>([]);
   const [testNumbers, setTestNumbers] = useState<TestPhoneNumberRecord[]>([]);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
@@ -83,26 +86,30 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
     setLoading(true);
     try {
       const headers = await getAuthHeaders();
-      const [lineRes, testRes] = await Promise.all([
-        fetch(`/api/telephony/numbers?agent_id=${agentId}`, { headers }),
-        fetch("/api/telephony/test-numbers?active=1", { headers })
-      ]);
-      const lineData = await lineRes.json();
+      const testRes = await fetch("/api/telephony/test-numbers?active=1", { headers });
       const testData = await testRes.json();
 
-      const lines: PhoneNumberRecord[] = lineRes.ok ? (lineData.phone_numbers ?? []) : [];
       const tests: TestPhoneNumberRecord[] = testRes.ok
         ? (testData.test_numbers ?? []).filter((n: TestPhoneNumberRecord) => n.active !== false)
         : [];
 
-      setAgentLines(lines);
+      if (isPremium) {
+        setAgentLines([]);
+        setSelectedLineId(null);
+      } else {
+        const lineRes = await fetch(`/api/telephony/numbers?agent_id=${agentId}`, { headers });
+        const lineData = await lineRes.json();
+        const lines: PhoneNumberRecord[] = lineRes.ok ? (lineData.phone_numbers ?? []) : [];
+        setAgentLines(lines);
+        setSelectedLineId(prev => (prev && lines.some(l => l.id === prev) ? prev : lines[0]?.id ?? null));
+      }
+
       setTestNumbers(tests);
-      setSelectedLineId(prev => (prev && lines.some(l => l.id === prev) ? prev : lines[0]?.id ?? null));
       setSelectedTestId(prev => (prev && tests.some(t => t.id === prev) ? prev : tests[0]?.id ?? null));
     } finally {
       setLoading(false);
     }
-  }, [agentId]);
+  }, [agentId, isPremium]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -122,7 +129,7 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
 
   const selectedLine = agentLines.find(l => l.id === selectedLineId) ?? null;
   const selectedTest = testNumbers.find(n => n.id === selectedTestId) ?? null;
-  const canTest = Boolean(agentId && selectedLine && selectedTest);
+  const canTest = Boolean(agentId && selectedTest && (isPremium || selectedLine));
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -132,10 +139,10 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
   const pollStatus = useCallback(async (callControlId: string) => {
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch(
-        `/api/telephony/test-call/status?call_control_id=${encodeURIComponent(callControlId)}`,
-        { headers }
-      );
+      const statusUrl = isPremium
+        ? `/api/voice/agents/elevenlabs/call-status?conversation_id=${encodeURIComponent(callControlId)}`
+        : `/api/telephony/test-call/status?call_control_id=${encodeURIComponent(callControlId)}`;
+      const res = await fetch(statusUrl, { headers });
       if (!res.ok) return;
       const data = await res.json();
       setActiveCall(prev => {
@@ -152,10 +159,16 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
       if (data.phase === "ended" || data.phase === "failed") {
         stopPolling();
         try {
-          await fetch("/api/telephony/test-call/finalize", {
+          const finalizeUrl = isPremium
+            ? "/api/voice/agents/elevenlabs/call-status"
+            : "/api/telephony/test-call/finalize";
+          const finalizeBody = isPremium
+            ? { conversation_id: callControlId }
+            : { call_control_id: callControlId };
+          await fetch(finalizeUrl, {
             method: "POST",
             headers,
-            body: JSON.stringify({ call_control_id: callControlId })
+            body: JSON.stringify(finalizeBody)
           });
         } catch {
           /* ignore */
@@ -165,7 +178,7 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
     } catch {
       /* ignore transient poll errors */
     }
-  }, [onCallDetected, stopPolling]);
+  }, [onCallDetected, stopPolling, isPremium]);
 
   useEffect(() => {
     if (!activeCall) return;
@@ -183,14 +196,20 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
     setError("");
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch("/api/telephony/test-call", {
+      const url = isPremium
+        ? "/api/voice/agents/elevenlabs/outbound-call"
+        : "/api/telephony/test-call";
+      const body = isPremium
+        ? { voice_agent_id: agentId, test_number_id: selectedTest!.id }
+        : {
+            voice_agent_id: agentId,
+            phone_number_id: selectedLine!.id,
+            test_number_id: selectedTest!.id
+          };
+      const res = await fetch(url, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          voice_agent_id: agentId,
-          phone_number_id: selectedLine!.id,
-          test_number_id: selectedTest!.id
-        })
+        body: JSON.stringify(body)
       });
       const data = await res.json();
       if (!res.ok) {
@@ -322,6 +341,16 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-8">
+      {isPremium && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/[.06] p-4">
+          <p className="text-sm font-medium text-amber-100">Agente de voz premium</p>
+          <p className={`text-xs ${textMuted} mt-1`}>
+            Solo necesitas el número destinatario de prueba. La llamada sale por tu línea configurada.
+          </p>
+        </div>
+      )}
+
+      {!isPremium && (
       <RegistryTableLayout
         search={lineSearch}
         onSearchChange={setLineSearch}
@@ -400,6 +429,7 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
           </div>
         ) : null}
       </RegistryTableLayout>
+      )}
 
       <RegistryTableLayout
         search={testSearch}
@@ -474,9 +504,19 @@ export function PhoneTestPanel({ agentId, agentName, onCallDetected }: PhoneTest
                 <p className="text-sm font-medium text-white">Listo para probar</p>
               </div>
               <p className={`text-xs ${textSecondary}`}>
-                Desde <span className="font-mono text-white">{formatPhoneDisplay(selectedLine!.e164)}</span> hacia{" "}
-                <span className="font-mono text-white">{formatPhoneDisplay(selectedTest!.e164)}</span>.
-                Contesta en tu celular para escuchar al agente.
+                {isPremium ? (
+                  <>
+                    Hacia{" "}
+                    <span className="font-mono text-white">{formatPhoneDisplay(selectedTest!.e164)}</span>
+                    .
+                  </>
+                ) : (
+                  <>
+                    Desde <span className="font-mono text-white">{formatPhoneDisplay(selectedLine!.e164)}</span> hacia{" "}
+                    <span className="font-mono text-white">{formatPhoneDisplay(selectedTest!.e164)}</span>.
+                  </>
+                )}
+                {" "}Contesta en tu celular para escuchar al agente.
               </p>
             </div>
             <button onClick={startTestCall} disabled={starting} className={`${btnPrimary} shrink-0`}>

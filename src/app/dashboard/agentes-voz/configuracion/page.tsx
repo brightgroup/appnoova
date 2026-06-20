@@ -12,6 +12,8 @@ import { getAuthHeaders } from "@/lib/voice-agents-api";
 import { getTemplateMeta } from "@/lib/voice-agent-templates";
 import { normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
 import { GEMINI_VOICES, VOICE_MODELS, LLM_MODELS } from "@/lib/voice-agent-options";
+import { DEFAULT_ELEVENLABS_VOICE_ID, ELEVENLABS_DEFAULT_VOICES } from "@/lib/elevenlabs/default-voices";
+import { VOICE_CREDITS_PER_MINUTE, VOICE_PREMIUM_CREDITS_PER_MINUTE } from "@/lib/billing/pricing";
 import type { VoiceAgentFormData, VoiceAgentRecord } from "@/types/voice-agent";
 import type { CompanyContext } from "@/types/company-context";
 import { AgentTestPanel } from "@/components/voice/AgentTestPanel";
@@ -70,6 +72,9 @@ function ConfigContent() {
 
   const [contexts, setContexts] = useState<CompanyContext[]>([]);
   const [registryRefresh, setRegistryRefresh] = useState(0);
+  const [elevenlabsVoices, setElevenlabsVoices] = useState<{ id: string; label: string }[]>([]);
+
+  const isPremium = form.voice_provider === "elevenlabs";
 
   const meta = getTemplateMeta(form.source_template);
   const assignedContext = contexts.find(c => c.id === form.company_context_id);
@@ -118,6 +123,18 @@ function ConfigContent() {
 
   useEffect(() => { loadAgent(); }, [loadAgent]);
   useEffect(() => { loadContexts(); }, [loadContexts]);
+
+  useEffect(() => {
+    if (!isPremium) return;
+    (async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch("/api/voice/elevenlabs/voices", { headers });
+        const data = await res.json();
+        if (res.ok && data.voices?.length) setElevenlabsVoices(data.voices);
+      } catch { /* optional */ }
+    })();
+  }, [isPremium]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -197,6 +214,7 @@ function ConfigContent() {
             <h1 className="text-lg font-bold truncate">{form.name}</h1>
             <p className="text-xs text-gray-400">
               Plantilla: {meta.tag} · {meta.description}
+              {isPremium ? ` · Premium (${VOICE_PREMIUM_CREDITS_PER_MINUTE} cr/min)` : ` · Estándar (${VOICE_CREDITS_PER_MINUTE} cr/min)`}
               {!saved && " · Sin guardar aún"}
             </p>
           </div>
@@ -265,6 +283,16 @@ function ConfigContent() {
             <h2 className="text-sm font-semibold text-gray-300 mb-4">Configuración de voz</h2>
 
             <div className="space-y-4">
+              <div className={`p-3 rounded-xl border ${isPremium ? "border-amber-500/30 bg-amber-500/10" : "border-[#5b5bf6]/30 bg-[#5b5bf6]/10"}`}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">Motor</p>
+                <p className="text-xs text-white font-medium">
+                  {isPremium ? "Voz premium" : "Voz estándar"}
+                </p>
+                <p className="text-[10px] text-gray-500 mt-1">
+                  El proveedor se elige al crear el agente.
+                </p>
+              </div>
+
               <Field label="Marca / contexto">
                 <NoovaSelect
                   value={form.company_context_id ?? ""}
@@ -287,24 +315,42 @@ function ConfigContent() {
                 </Link>
               </Field>
 
-              <Field label="Voz">
-                <NoovaSelect
-                  value={form.voice_name}
-                  onChange={v => setForm(f => ({ ...f, voice_name: v }))}
-                  allowEmpty={false}
-                  options={GEMINI_VOICES.map(v => ({ value: v.id, label: v.label }))}
-                />
-              </Field>
+              {isPremium ? (
+                <Field label="Voz premium">
+                  <NoovaSelect
+                    value={form.elevenlabs_voice_id ?? DEFAULT_ELEVENLABS_VOICE_ID}
+                    onChange={v => setForm(f => ({ ...f, elevenlabs_voice_id: v }))}
+                    allowEmpty={false}
+                    options={(elevenlabsVoices.length ? elevenlabsVoices : ELEVENLABS_DEFAULT_VOICES).map(v => ({
+                      value: v.id,
+                      label: v.label,
+                    }))}
+                  />
+                </Field>
+              ) : (
+                <>
+                  <Field label="Voz">
+                    <NoovaSelect
+                      value={form.voice_name}
+                      onChange={v => setForm(f => ({ ...f, voice_name: v }))}
+                      allowEmpty={false}
+                      options={GEMINI_VOICES.map(v => ({ value: v.id, label: v.label }))}
+                    />
+                  </Field>
 
-              <Field label="Modelo de voz">
-                <NoovaSelect
-                  value={form.model}
-                  onChange={v => setForm(f => ({ ...f, model: v }))}
-                  allowEmpty={false}
-                  options={VOICE_MODELS.map(m => ({ value: m.id, label: m.label }))}
-                />
-              </Field>
+                  <Field label="Modelo de voz">
+                    <NoovaSelect
+                      value={form.model}
+                      onChange={v => setForm(f => ({ ...f, model: v }))}
+                      allowEmpty={false}
+                      options={VOICE_MODELS.map(m => ({ value: m.id, label: m.label }))}
+                    />
+                  </Field>
+                </>
+              )}
 
+              {!isPremium && (
+              <>
               <SliderField
                 label="Velocidad de voz"
                 hint="Reproducción del audio en la prueba (0.5 lento · 1.5 rápido)"
@@ -313,15 +359,6 @@ function ConfigContent() {
                 max={1.5}
                 step={0.05}
                 onChange={v => setForm(f => ({ ...f, voice_speed: v }))}
-              />
-              <SliderField
-                label="Temperatura"
-                hint="Creatividad de Lia vía Gemini (0 = precisa · 2 = más libre)"
-                value={form.temperature}
-                min={0.1}
-                max={2}
-                step={0.1}
-                onChange={v => setForm(f => ({ ...f, temperature: v }))}
               />
               <SliderField
                 label="Volumen"
@@ -341,6 +378,18 @@ function ConfigContent() {
                   options={LLM_MODELS.map(m => ({ value: m.id, label: m.label }))}
                 />
               </Field>
+              </>
+              )}
+
+              <SliderField
+                label="Temperatura"
+                hint={isPremium ? "Creatividad del agente premium (0 = precisa · 2 = más libre)" : "Creatividad del agente (0 = precisa · 2 = más libre)"}
+                value={form.temperature}
+                min={0.1}
+                max={2}
+                step={0.1}
+                onChange={v => setForm(f => ({ ...f, temperature: v }))}
+              />
             </div>
 
             <div className="mt-6 p-3 rounded-xl bg-[#5b5bf6]/10 border border-[#5b5bf6]/20">

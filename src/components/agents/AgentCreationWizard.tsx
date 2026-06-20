@@ -18,7 +18,10 @@ import {
   suggestTemperatureForPurpose,
   suggestVoiceForPurpose,
 } from "@/lib/voice-accent-profile";
+import { DEFAULT_ELEVENLABS_VOICE_ID } from "@/lib/elevenlabs/default-voices";
+import { VOICE_CREDITS_PER_MINUTE, VOICE_PREMIUM_CREDITS_PER_MINUTE } from "@/lib/billing/pricing";
 import type { CompanyContext } from "@/types/company-context";
+import type { VoiceProvider } from "@/types/voice-agent";
 
 type WizardStep = "agent" | "company";
 
@@ -70,6 +73,10 @@ export function AgentCreationWizard({
     isVoice ? suggestVoiceForPurpose(purposes[0].id) : "Puck"
   );
   const [voiceManual, setVoiceManual] = useState(false);
+  const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>("google");
+  const [elevenlabsVoiceId, setElevenlabsVoiceId] = useState(DEFAULT_ELEVENLABS_VOICE_ID);
+  const [elevenlabsVoices, setElevenlabsVoices] = useState<{ id: string; label: string }[]>([]);
+  const [loadingElVoices, setLoadingElVoices] = useState(false);
 
   const reset = useCallback(() => {
     setStep("agent");
@@ -85,6 +92,8 @@ export function AgentCreationWizard({
     setError("");
     setVoiceName(isVoice ? suggestVoiceForPurpose(purposes[0].id) : "Puck");
     setVoiceManual(false);
+    setVoiceProvider("google");
+    setElevenlabsVoiceId(DEFAULT_ELEVENLABS_VOICE_ID);
   }, [purposes, isVoice]);
 
   const handleClose = () => {
@@ -123,6 +132,30 @@ export function AgentCreationWizard({
     if (!open) return;
     void loadContexts();
   }, [open, loadContexts]);
+
+  useEffect(() => {
+    if (!open || !isVoice || voiceProvider !== "elevenlabs") return;
+    let cancelled = false;
+    (async () => {
+      setLoadingElVoices(true);
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch("/api/voice/elevenlabs/voices", { headers });
+        const data = await res.json();
+        if (!cancelled && res.ok && data.voices?.length) {
+          setElevenlabsVoices(data.voices);
+          setElevenlabsVoiceId(prev =>
+            data.voices.some((v: { id: string }) => v.id === prev) ? prev : data.voices[0].id
+          );
+        }
+      } catch {
+        /* fallback en select */
+      } finally {
+        if (!cancelled) setLoadingElVoices(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, isVoice, voiceProvider, getAuthHeaders]);
 
   useEffect(() => {
     if (!isVoice || voiceManual) return;
@@ -211,7 +244,9 @@ export function AgentCreationWizard({
           color: purpose.color,
           ...(isVoice
             ? {
+                voice_provider: voiceProvider,
                 voice_name: voiceName,
+                elevenlabs_voice_id: voiceProvider === "elevenlabs" ? elevenlabsVoiceId : null,
                 temperature: suggestTemperatureForPurpose(purposeId),
               }
             : {}),
@@ -331,6 +366,38 @@ export function AgentCreationWizard({
                 </div>
               </div>
 
+              {isVoice && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-2">Motor de voz</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setVoiceProvider("google")}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        voiceProvider === "google"
+                          ? "border-[#5b5bf6]/50 bg-[#5b5bf6]/10 ring-1 ring-[#5b5bf6]/30"
+                          : "border-white/[.08] bg-white/[.02] hover:border-white/[.16]"
+                      }`}
+                    >
+                      <p className="text-xs font-semibold text-white">Estándar</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">{VOICE_CREDITS_PER_MINUTE} cr/min</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVoiceProvider("elevenlabs")}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        voiceProvider === "elevenlabs"
+                          ? "border-amber-500/50 bg-amber-500/10 ring-1 ring-amber-500/30"
+                          : "border-white/[.08] bg-white/[.02] hover:border-white/[.16]"
+                      }`}
+                    >
+                      <p className="text-xs font-semibold text-white">Premium</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">{VOICE_PREMIUM_CREDITS_PER_MINUTE} cr/min</p>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className={`grid gap-3 ${isVoice ? "sm:grid-cols-2" : ""}`}>
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">Nombre del agente *</label>
@@ -343,24 +410,41 @@ export function AgentCreationWizard({
                   />
                 </div>
                 {isVoice ? (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1.5">Voz</label>
-                    <select
-                      value={voiceName}
-                      onChange={e => {
-                        setVoiceManual(true);
-                        setVoiceName(e.target.value);
-                      }}
-                      className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
-                    >
-                      {GEMINI_VOICES.map(v => (
-                        <option key={v.id} value={v.id} className="bg-[#232329]">{v.label}</option>
-                      ))}
-                    </select>
-                    {agentName.trim().length >= 2 && (
-                      <p className="text-[10px] text-gray-600 mt-1">{voiceLabel(voiceName)}</p>
-                    )}
-                  </div>
+                  voiceProvider === "elevenlabs" ? (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 mb-1.5">Voz premium</label>
+                      <select
+                        value={elevenlabsVoiceId}
+                        onChange={e => setElevenlabsVoiceId(e.target.value)}
+                        disabled={loadingElVoices}
+                        className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500/50 disabled:opacity-60"
+                      >
+                        {(elevenlabsVoices.length ? elevenlabsVoices : [{ id: DEFAULT_ELEVENLABS_VOICE_ID, label: "Voz predeterminada" }]).map(v => (
+                          <option key={v.id} value={v.id} className="bg-[#232329]">{v.label}</option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-gray-600 mt-1">Prueba solo por teléfono</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 mb-1.5">Voz</label>
+                      <select
+                        value={voiceName}
+                        onChange={e => {
+                          setVoiceManual(true);
+                          setVoiceName(e.target.value);
+                        }}
+                        className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
+                      >
+                        {GEMINI_VOICES.map(v => (
+                          <option key={v.id} value={v.id} className="bg-[#232329]">{v.label}</option>
+                        ))}
+                      </select>
+                      {agentName.trim().length >= 2 && (
+                        <p className="text-[10px] text-gray-600 mt-1">{voiceLabel(voiceName)}</p>
+                      )}
+                    </div>
+                  )
                 ) : (
                   <div>
                     <label className="block text-xs font-medium text-gray-400 mb-1.5">Idioma</label>

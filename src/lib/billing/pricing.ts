@@ -16,6 +16,7 @@ export type UsageEventType =
   | "whatsapp_ai"
   | "whatsapp_manual"
   | "voice"
+  | "voice_premium"
   | "doc_scan"
   | "form_fill"
   | "quote";
@@ -31,13 +32,18 @@ export const CREDIT_COST: Record<UsageEventType, number> = {
   text_test: 10,
   whatsapp_ai: 60,
   whatsapp_manual: 30,
-  voice: 900, // por minuto (precio al público)
+  voice: 900, // por minuto — Gemini Live (estándar)
+  voice_premium: 1200, // por minuto — ElevenLabs Agents
   doc_scan: 90,
   form_fill: 50,
   quote: 70
 };
 
 export const VOICE_CREDITS_PER_MINUTE = CREDIT_COST.voice;
+export const VOICE_PREMIUM_CREDITS_PER_MINUTE = CREDIT_COST.voice_premium;
+
+/** Costo real ElevenLabs Agents + Telnyx (USD/min, estimado). */
+export const VOICE_PREMIUM_USD_PER_MINUTE = 0.12;
 
 /** Precios reales de Gemini (USD por millón de tokens). */
 interface GeminiModelPrice {
@@ -93,6 +99,12 @@ export function voiceBillableMinutes(durationSec: number): number {
   return Math.max(1, Math.ceil(durationSec / 60));
 }
 
-export function creditsForVoiceDuration(durationSec: number): number {
-  return creditsForEvent("voice", voiceBillableMinutes(durationSec));
+export type VoiceBillingProvider = "google" | "elevenlabs";
+
+export function creditsForVoiceDuration(
+  durationSec: number,
+  provider: VoiceBillingProvider = "google"
+): number {
+  const eventType = provider === "elevenlabs" ? "voice_premium" : "voice";
+  return creditsForEvent(eventType, voiceBillableMinutes(durationSec));
 }
