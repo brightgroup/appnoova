@@ -9,7 +9,6 @@ import {
 import { getElevenLabsApiKey } from "@/lib/elevenlabs/config";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 import { getElevenLabsWebSessionCredentials } from "@/lib/elevenlabs/session-credentials";
-import { checkElevenLabsAgentHealth } from "@/lib/elevenlabs/provider-health";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
 
 /** GET — credenciales de sesión web (WebRTC) para agente premium del usuario. */
@@ -56,22 +55,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const health = await checkElevenLabsAgentHealth(agent.elevenlabs_agent_id);
-    if (!health.ok) {
-      return NextResponse.json(
-        {
-          error: PREMIUM_USER_MESSAGES.temporarilyUnavailable,
-          code: "premium_unavailable",
-        },
-        { status: 503 }
-      );
-    }
-
     const creds = await getElevenLabsWebSessionCredentials(agent.elevenlabs_agent_id);
     const temporal = buildColombiaTemporalContext();
     return NextResponse.json({
-      ...creds,
-      connectionType: "webrtc",
+      conversationToken: creds.conversationToken,
       dynamicVariables: temporal.dynamicVariables,
     });
   } catch (e) {

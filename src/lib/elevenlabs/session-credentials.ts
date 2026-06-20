@@ -10,7 +10,7 @@ export async function getElevenLabsConversationToken(agentId: string): Promise<s
   return token;
 }
 
-/** Signed URL (fallback WebSocket). */
+/** Signed URL (WebSocket — solo uso legacy, no prueba web premium). */
 export async function getElevenLabsSignedUrl(agentId: string): Promise<string> {
   const data = await elevenLabsFetch<{ signed_url?: string }>(
     `/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(agentId)}`
@@ -20,12 +20,9 @@ export async function getElevenLabsSignedUrl(agentId: string): Promise<string> {
   return url;
 }
 
+/** WebRTC token — mismo camino que el widget ElevenLabs (sin fallback WebSocket). */
 export async function getElevenLabsWebSessionCredentials(
   agentId: string
-): Promise<{ conversationToken?: string; signedUrl?: string }> {
-  try {
-    return { conversationToken: await getElevenLabsConversationToken(agentId) };
-  } catch {
-    return { signedUrl: await getElevenLabsSignedUrl(agentId) };
-  }
+): Promise<{ conversationToken: string }> {
+  return { conversationToken: await getElevenLabsConversationToken(agentId) };
 }

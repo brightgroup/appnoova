@@ -1,12 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Mic, MicOff, PhoneOff, Loader2, Sparkles, RefreshCw, Wifi, WifiOff } from "lucide-react";
-import {
-  VoiceConversation,
-  type DisconnectionDetails,
-  type Status,
-} from "@elevenlabs/client";
+import { Mic, MicOff, PhoneOff, Loader2, Sparkles, RefreshCw } from "lucide-react";
+import { VoiceConversation, type DisconnectionDetails } from "@elevenlabs/client";
 import { getTemplateMeta } from "@/lib/voice-agent-templates";
 import { agentAvatarGradient, agentAvatarStyle } from "@/lib/voice-agent-display";
 import { getAuthHeaders, getAuthToken } from "@/lib/voice-agents-api";
@@ -17,26 +13,23 @@ import {
   disconnectDetailText,
   isQuotaOrBillingError,
   isQuotaDisconnect,
-  isRecoverableDisconnect,
   logPremiumInternalIssue,
 } from "@/lib/elevenlabs/disconnect-label";
+import {
+  fetchPremiumWebSession,
+  premiumDisconnectReason,
+} from "@/lib/elevenlabs/premium-web-session";
 import { btnPrimary, btnGhost } from "@/lib/brand-ui";
 import { isGoodbyeUtterance } from "@/lib/voice-goodbye-detection";
 import type { VoiceSessionPanelProps } from "@/components/voice/VoiceSessionPanel";
 
-type SessionState = "idle" | "connecting" | "listening" | "speaking" | "reconnecting" | "unstable" | "error" | "ending";
-type LinkQuality = "good" | "fair" | "poor";
+type SessionState = "idle" | "connecting" | "listening" | "speaking" | "ending" | "error";
 
 interface TranscriptLine {
-  role: "user" | "agent" | "system";
+  role: "user" | "agent";
   text: string;
   time_sec: number;
 }
-
-const MAX_AUTO_RECONNECT = 2;
-const RECONNECT_DELAY_MS = 1500;
-const UNMOUNT_GRACE_MS = 400;
-const FINALIZE_AUDIO_WAIT_MS = 3500;
 
 export function PremiumVoiceSessionPanel({
   sourceTemplate,
@@ -59,9 +52,6 @@ export function PremiumVoiceSessionPanel({
   const [error, setError] = useState("");
   const [duration, setDuration] = useState(0);
   const [statusHint, setStatusHint] = useState("");
-  const [linkQuality, setLinkQuality] = useState<LinkQuality>("good");
-  const [reconnectCount, setReconnectCount] = useState(0);
-  const [canManualReconnect, setCanManualReconnect] = useState(false);
 
   const conversationRef = useRef<VoiceConversation | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -71,48 +61,27 @@ export function PremiumVoiceSessionPanel({
   const callSavedRef = useRef(false);
   const endingRef = useRef(false);
   const userEndedRef = useRef(false);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const unmountTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mountedRef = useRef(true);
   const sessionEpochRef = useRef(0);
-  const reconnectCountRef = useRef(0);
   const agentIdRef = useRef(agentId);
   const durationRef = useRef(0);
   const mutedRef = useRef(false);
-  const errorStreakRef = useRef(0);
-  const quotaBlockedRef = useRef(false);
-  const lastDisconnectRef = useRef<DisconnectionDetails | null>(null);
   const conversationIdRef = useRef<string | null>(null);
-  const connectSessionRef = useRef<(opts?: { isReconnect?: boolean }) => Promise<boolean>>(async () => false);
+  const lastDisconnectRef = useRef<DisconnectionDetails | null>(null);
   const goodbyeTriggeredRef = useRef(false);
   const autoHangupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stopSessionRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => { agentIdRef.current = agentId; }, [agentId]);
   useEffect(() => { durationRef.current = duration; }, [duration]);
   useEffect(() => { mutedRef.current = muted; }, [muted]);
-  useEffect(() => { reconnectCountRef.current = reconnectCount; }, [reconnectCount]);
 
   useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    const active = ["listening", "speaking", "connecting", "reconnecting", "unstable"].includes(state);
+    const active = state === "listening" || state === "speaking" || state === "connecting";
     onCallStatusChange?.(active, duration);
   }, [state, duration, onCallStatusChange]);
 
   useEffect(() => {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: "smooth" });
   }, [transcript]);
-
-  const clearReconnectTimer = useCallback(() => {
-    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-    reconnectTimerRef.current = null;
-  }, []);
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -140,58 +109,26 @@ export function PremiumVoiceSessionPanel({
     };
     transcriptLinesRef.current = [...transcriptLinesRef.current, line];
     setTranscript(prev => [...prev, line]);
-    return line;
-  }, []);
-
-  const scheduleAutoHangup = useCallback((role: "user" | "agent") => {
-    if (goodbyeTriggeredRef.current || userEndedRef.current || endingRef.current) return;
-    goodbyeTriggeredRef.current = true;
-    setStatusHint(
-      role === "user"
-        ? "Despedida detectada · Colgando..."
-        : `${agentName} se despidió · Colgando...`
-    );
-    const delayMs = role === "agent" ? 2200 : 2800;
-    if (autoHangupTimerRef.current) clearTimeout(autoHangupTimerRef.current);
-    autoHangupTimerRef.current = setTimeout(() => {
-      void stopSessionRef.current();
-    }, delayMs);
-  }, [agentName]);
-
-  const checkGoodbyeAndHangup = useCallback((role: "user" | "agent", text: string) => {
-    if (goodbyeTriggeredRef.current || userEndedRef.current || endingRef.current) return;
-    if (!isGoodbyeUtterance(text)) return;
-    scheduleAutoHangup(role);
-  }, [scheduleAutoHangup]);
-
-  const updateLinkFromStatus = useCallback((status: Status) => {
-    if (status === "connected") {
-      setLinkQuality("good");
-      errorStreakRef.current = 0;
-    } else if (status === "connecting" || status === "disconnecting") {
-      setLinkQuality("fair");
-    }
   }, []);
 
   const saveCallRecord = useCallback(async (snapshot: {
     lines: TranscriptLine[];
     durationSec: number;
-    disconnectReason?: string;
+    disconnectReason: string;
     disconnectDetails?: DisconnectionDetails | null;
     conversationId?: string | null;
   }) => {
     const id = agentIdRef.current;
-    if (!id || callSavedRef.current) return false;
-    const contentLines = snapshot.lines.filter(l => l.role !== "system");
-    if (snapshot.durationSec < 1 && contentLines.length === 0) return false;
+    if (!id || callSavedRef.current) return;
+    if (snapshot.durationSec < 1 && snapshot.lines.length === 0) return;
 
     callSavedRef.current = true;
     try {
       const token = await getAuthToken();
       if (!token) {
-        setError("Sesión no válida. Inicia sesión de nuevo.");
         callSavedRef.current = false;
-        return false;
+        setError("Sesión no válida. Inicia sesión de nuevo.");
+        return;
       }
 
       const quotaHit = snapshot.disconnectDetails
@@ -205,19 +142,13 @@ export function PremiumVoiceSessionPanel({
           voice_agent_id: id,
           phone_number: "Prueba web premium",
           duration_sec: snapshot.durationSec,
-          disconnect_reason: snapshot.disconnectReason
-            ?? (userEndedRef.current ? "User Ended" : "Connection Ended"),
+          disconnect_reason: snapshot.disconnectReason,
           status_label: quotaHit ? "Ended - Interrupción" : undefined,
-          transcript: contentLines.map(({ role, text, time_sec }) => ({
-            role: role === "system" ? "agent" : role,
-            text,
-            time_sec,
-          })),
+          transcript: snapshot.lines.map(({ role, text, time_sec }) => ({ role, text, time_sec })),
           metadata: {
             source: "web_test",
             voice_provider: "elevenlabs",
             conversation_id: snapshot.conversationId ?? conversationIdRef.current,
-            reconnect_attempts: reconnectCountRef.current,
             quota_exceeded: quotaHit,
             disconnect_reason_detail: disconnectDetailText(snapshot.disconnectDetails),
           },
@@ -228,375 +159,210 @@ export function PremiumVoiceSessionPanel({
       if (!res.ok) {
         callSavedRef.current = false;
         setError(data.error || "No se pudo guardar la llamada.");
-        return false;
+        return;
       }
       onCallSaved?.();
-      return true;
     } catch {
       callSavedRef.current = false;
       setError("Error de red al guardar la llamada.");
-      return false;
     }
   }, [onCallSaved]);
 
-  const hardStopAudio = useCallback(async () => {
-    clearReconnectTimer();
+  const persistSnapshot = useCallback((disconnectReason: string) => {
+    void saveCallRecord({
+      lines: [...transcriptLinesRef.current],
+      durationSec: durationRef.current,
+      disconnectReason,
+      disconnectDetails: lastDisconnectRef.current,
+      conversationId: conversationIdRef.current,
+    });
+  }, [saveCallRecord]);
+
+  const resetSessionState = useCallback(() => {
+    stopTimer();
+    sessionStartRef.current = null;
+    conversationRef.current = null;
+    conversationIdRef.current = null;
+    lastDisconnectRef.current = null;
+    userEndedRef.current = false;
+    goodbyeTriggeredRef.current = false;
+    if (autoHangupTimerRef.current) clearTimeout(autoHangupTimerRef.current);
+    autoHangupTimerRef.current = null;
+    setDuration(0);
+    setMuted(false);
+    setStatusHint("");
+    setState("idle");
+  }, [stopTimer]);
+
+  const endConversation = useCallback(async () => {
     const conv = conversationRef.current;
     conversationRef.current = null;
     if (!conv) return;
-    try {
-      conv.setVolume({ volume: 0 });
-    } catch {
-      /* ignore */
-    }
     try {
       await conv.endSession();
     } catch {
       /* ignore */
     }
-  }, [clearReconnectTimer]);
+  }, []);
 
-  const teardownConversation = useCallback(async () => {
-    await hardStopAudio();
-  }, [hardStopAudio]);
-
-  const resetUi = useCallback(() => {
-    stopTimer();
-    sessionStartRef.current = null;
-    setState("idle");
-    setDuration(0);
-    setStatusHint("");
-    setMuted(false);
-    setLinkQuality("good");
-    setReconnectCount(0);
-    reconnectCountRef.current = 0;
-    setCanManualReconnect(false);
-    errorStreakRef.current = 0;
-    quotaBlockedRef.current = false;
-    lastDisconnectRef.current = null;
-    conversationIdRef.current = null;
-    userEndedRef.current = false;
-  }, [stopTimer]);
-
-  const persistSnapshot = useCallback(async (opts?: {
-    disconnectReason?: string;
-    disconnectDetails?: DisconnectionDetails | null;
-    conversationId?: string | null;
-  }) => {
-    await saveCallRecord({
-      lines: [...transcriptLinesRef.current],
-      durationSec: durationRef.current,
-      disconnectReason: opts?.disconnectReason,
-      disconnectDetails: opts?.disconnectDetails ?? lastDisconnectRef.current,
-      conversationId: opts?.conversationId ?? conversationIdRef.current,
-    });
-  }, [saveCallRecord]);
-
-  const finalizeSession = useCallback(async (opts?: { navigateAway?: boolean; keepTranscript?: boolean }) => {
+  const finishSession = useCallback((opts?: { navigateAway?: boolean; clearTranscript?: boolean }) => {
     if (endingRef.current) return;
     endingRef.current = true;
-    clearReconnectTimer();
-    setState("ending");
-    setStatusHint("Finalizando sesión...");
-
-    await hardStopAudio();
     sessionEpochRef.current += 1;
+    setState("ending");
 
-    const convId = conversationIdRef.current;
-    if (convId) {
-      await new Promise(r => setTimeout(r, FINALIZE_AUDIO_WAIT_MS));
-    }
+    void endConversation().finally(() => {
+      const reason = premiumDisconnectReason(
+        lastDisconnectRef.current ?? { reason: "user" },
+        userEndedRef.current
+      );
+      persistSnapshot(reason);
 
-    const snapshot = {
-      lines: [...transcriptLinesRef.current],
-      durationSec: durationRef.current,
-      disconnectReason: userEndedRef.current ? "User Ended" : "Connection Ended",
-      disconnectDetails: lastDisconnectRef.current,
-      conversationId: convId,
-    };
-    const saved = await saveCallRecord(snapshot);
+      if (opts?.clearTranscript !== false) {
+        transcriptLinesRef.current = [];
+        setTranscript([]);
+      }
+      resetSessionState();
+      endingRef.current = false;
 
-    if (!opts?.keepTranscript) {
-      transcriptLinesRef.current = [];
-      setTranscript([]);
-    }
-    resetUi();
-    endingRef.current = false;
+      if (opts?.navigateAway) onEndCall?.();
+    });
+  }, [endConversation, onEndCall, persistSnapshot, resetSessionState]);
 
-    if (opts?.navigateAway && (saved || (snapshot.durationSec < 1 && snapshot.lines.length === 0))) {
-      onEndCall?.();
-    }
-  }, [clearReconnectTimer, hardStopAudio, onEndCall, resetUi, saveCallRecord]);
+  const scheduleAutoHangup = useCallback((role: "user" | "agent") => {
+    if (goodbyeTriggeredRef.current || userEndedRef.current || endingRef.current) return;
+    goodbyeTriggeredRef.current = true;
+    setStatusHint(
+      role === "user"
+        ? "Despedida detectada · Colgando..."
+        : `${agentName} se despidió · Colgando...`
+    );
+    if (autoHangupTimerRef.current) clearTimeout(autoHangupTimerRef.current);
+    autoHangupTimerRef.current = setTimeout(() => {
+      userEndedRef.current = true;
+      finishSession({ navigateAway: true });
+    }, role === "agent" ? 2200 : 2800);
+  }, [agentName, finishSession]);
 
-  const handleDisconnect = useCallback(async (details: DisconnectionDetails, epoch: number) => {
+  const handleDisconnect = useCallback((details: DisconnectionDetails, epoch: number) => {
+    if (epoch !== sessionEpochRef.current || userEndedRef.current) return;
     conversationRef.current = null;
     lastDisconnectRef.current = details;
-    const quotaHit = isQuotaDisconnect(details);
-    if (quotaHit) quotaBlockedRef.current = true;
-
-    const recoverable = !quotaHit && isRecoverableDisconnect(details);
-    const label = describePremiumDisconnect(details);
-
-    if (details.reason === "user") {
-      userEndedRef.current = true;
-      await finalizeSession({ navigateAway: true });
-      return;
-    }
-
-    if (recoverable && reconnectCountRef.current < MAX_AUTO_RECONNECT && !userEndedRef.current) {
-      const attempt = reconnectCountRef.current + 1;
-      reconnectCountRef.current = attempt;
-      setReconnectCount(attempt);
-      setState("reconnecting");
-      setStatusHint(`Reconectando (${attempt}/${MAX_AUTO_RECONNECT})...`);
-      appendTranscript("system", "Reconectando…");
-
-      clearReconnectTimer();
-      reconnectTimerRef.current = setTimeout(() => {
-        if (epoch !== sessionEpochRef.current || userEndedRef.current) return;
-        void connectSessionRef.current({ isReconnect: true });
-      }, RECONNECT_DELAY_MS);
-      return;
-    }
-
-    setState("error");
-    setError(label);
-    setCanManualReconnect(recoverable && !quotaHit);
-    setLinkQuality("poor");
-    appendTranscript("system", label);
     sessionEpochRef.current += 1;
-    clearReconnectTimer();
-    await persistSnapshot({
-      disconnectReason: quotaHit ? "Service Unavailable" : "Connection Ended",
-      disconnectDetails: details,
-    });
-  }, [appendTranscript, clearReconnectTimer, finalizeSession, persistSnapshot]);
 
-  const connectSession = useCallback(async (opts?: { isReconnect?: boolean }) => {
+    if (details.reason !== "user") {
+      const label = describePremiumDisconnect(details);
+      setError(label);
+      setState("error");
+      persistSnapshot(
+        isQuotaDisconnect(details) ? "Service Unavailable" : premiumDisconnectReason(details, false)
+      );
+    } else {
+      finishSession({ navigateAway: true });
+    }
+  }, [finishSession, persistSnapshot]);
+
+  const startSession = useCallback(async () => {
     const id = agentIdRef.current;
-    if (!id || endingRef.current || quotaBlockedRef.current) return false;
+    if (!id || endingRef.current) return;
 
-    const epoch = ++sessionEpochRef.current;
+    sessionEpochRef.current += 1;
+    const epoch = sessionEpochRef.current;
+
+    userEndedRef.current = false;
+    callSavedRef.current = false;
+    goodbyeTriggeredRef.current = false;
+    lastDisconnectRef.current = null;
+    conversationIdRef.current = null;
+    transcriptLinesRef.current = [];
+    setTranscript([]);
     setError("");
-    setCanManualReconnect(false);
-    setState(opts?.isReconnect ? "reconnecting" : "connecting");
-    setStatusHint(opts?.isReconnect ? "Restableciendo conexión..." : "Preparando sesión...");
-    setLinkQuality("fair");
+    setState("connecting");
+    setStatusHint("Conectando...");
 
     try {
-      if (!opts?.isReconnect) {
-        await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        });
-      }
-
       const headers = await getAuthHeaders();
-      const res = await fetch(
-        `/api/voice/agents/elevenlabs/session?voice_agent_id=${encodeURIComponent(id)}`,
-        { headers }
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        if (res.status === 429 || res.status === 503 || data.code === "premium_unavailable") {
-          quotaBlockedRef.current = true;
-          logPremiumInternalIssue("session_api", { status: res.status, code: data.code, detail: data.error });
-          throw new Error(PREMIUM_USER_MESSAGES.temporarilyUnavailable);
-        }
-        logPremiumInternalIssue("session_api", { status: res.status, detail: data.error });
-        throw new Error(PREMIUM_USER_MESSAGES.sessionStartFailed);
-      }
-      if (epoch !== sessionEpochRef.current || !mountedRef.current) return false;
+      const session = await fetchPremiumWebSession(id, headers);
+      if (epoch !== sessionEpochRef.current) return;
 
-      setStatusHint("Conectando audio en tiempo real...");
-
-      const sessionOptions = {
-        ...(data.conversationToken
-          ? {
-              conversationToken: data.conversationToken as string,
-              connectionType: "webrtc" as const,
-            }
-          : {
-              signedUrl: data.signedUrl as string,
-              connectionType: "websocket" as const,
-            }),
-        ...(data.dynamicVariables
-          ? { dynamicVariables: data.dynamicVariables as Record<string, string> }
-          : {}),
-        onConnect: ({ conversationId }: { conversationId: string }) => {
+      // Mismo patrón que el widget ElevenLabs: token WebRTC + variables dinámicas.
+      const conversation = await VoiceConversation.startSession({
+        conversationToken: session.conversationToken,
+        connectionType: "webrtc",
+        dynamicVariables: session.dynamicVariables,
+        onConnect: ({ conversationId }) => {
           if (epoch !== sessionEpochRef.current) return;
           if (conversationId) conversationIdRef.current = conversationId;
           startTimer();
           setState("listening");
           setStatusHint("");
-          setLinkQuality("good");
-          errorStreakRef.current = 0;
-          if (opts?.isReconnect) {
-            appendTranscript("system", "Conexión restablecida.");
-          }
         },
-        onDisconnect: (details: DisconnectionDetails) => {
-          if (epoch !== sessionEpochRef.current || userEndedRef.current) return;
+        onDisconnect: details => {
+          if (epoch !== sessionEpochRef.current) return;
           logPremiumInternalIssue("disconnect", {
             reason: details.reason,
             detail: disconnectDetailText(details),
           });
-          void handleDisconnect(details, epoch);
+          handleDisconnect(details, epoch);
         },
-        onError: (message: string) => {
+        onError: message => {
           if (epoch !== sessionEpochRef.current) return;
           logPremiumInternalIssue("sdk_error", { message });
           if (isQuotaOrBillingError(message)) {
-            quotaBlockedRef.current = true;
             setError(PREMIUM_USER_MESSAGES.temporarilyUnavailable);
             setState("error");
-            setCanManualReconnect(false);
-            setLinkQuality("poor");
             sessionEpochRef.current += 1;
-            void persistSnapshot({
-              disconnectReason: "Service Unavailable",
-              disconnectDetails: null,
-            });
-            return;
-          }
-          errorStreakRef.current += 1;
-          if (errorStreakRef.current >= 2) {
-            setLinkQuality("poor");
-            setState(prev => (prev === "speaking" || prev === "listening" ? "unstable" : prev));
+            persistSnapshot("Service Unavailable");
           }
         },
-        onMessage: ({ message, role }: { message: string; role: "user" | "agent" }) => {
+        onMessage: ({ message, role }) => {
           if (epoch !== sessionEpochRef.current || userEndedRef.current) return;
           appendTranscript(role, message);
-          checkGoodbyeAndHangup(role, message);
+          if (!goodbyeTriggeredRef.current && isGoodbyeUtterance(message)) {
+            scheduleAutoHangup(role);
+          }
         },
-        onModeChange: ({ mode }: { mode: "speaking" | "listening" }) => {
+        onModeChange: ({ mode }) => {
           if (epoch !== sessionEpochRef.current) return;
           setState(mode === "speaking" ? "speaking" : "listening");
         },
-        onStatusChange: ({ status }: { status: Status }) => {
-          if (epoch !== sessionEpochRef.current) return;
-          updateLinkFromStatus(status);
-        },
-        onInterruption: () => {
-          if (epoch !== sessionEpochRef.current) return;
-          setStatusHint("Interrupción detectada — sigue hablando con naturalidad.");
-          window.setTimeout(() => {
-            if (epoch === sessionEpochRef.current) setStatusHint("");
-          }, 2500);
-        },
-      };
+      });
 
-      await hardStopAudio();
-      const conversation = await VoiceConversation.startSession(sessionOptions);
       if (epoch !== sessionEpochRef.current) {
-        try {
-          await conversation.endSession();
-        } catch {
-          /* stale session */
-        }
-        return false;
+        try { await conversation.endSession(); } catch { /* stale */ }
+        return;
       }
 
       conversationRef.current = conversation;
       conversation.setMicMuted(mutedRef.current);
-      return true;
     } catch (err) {
-      if (epoch !== sessionEpochRef.current) return false;
+      if (epoch !== sessionEpochRef.current) return;
       const internal = err instanceof Error ? err.message : String(err);
-      const quotaHit = isQuotaOrBillingError(internal) || quotaBlockedRef.current;
-      if (quotaHit) quotaBlockedRef.current = true;
-      logPremiumInternalIssue("connect_failed", { error: internal, quotaHit });
+      const status = (err as { status?: number }).status;
+      const code = (err as { code?: string }).code;
+      logPremiumInternalIssue("connect_failed", { error: internal, status, code });
+
+      const quotaHit =
+        status === 429
+        || status === 503
+        || code === "premium_unavailable"
+        || isQuotaOrBillingError(internal);
+
       setError(
         quotaHit
           ? PREMIUM_USER_MESSAGES.temporarilyUnavailable
           : describePremiumErrorMessage(internal)
       );
       setState("error");
-      setCanManualReconnect(!quotaHit);
-      if (quotaHit) {
-        void persistSnapshot({
-          disconnectReason: "Service Unavailable",
-          disconnectDetails: null,
-        });
-      }
-      return false;
     }
-  }, [appendTranscript, checkGoodbyeAndHangup, handleDisconnect, hardStopAudio, persistSnapshot, startTimer, updateLinkFromStatus]);
+  }, [appendTranscript, handleDisconnect, persistSnapshot, scheduleAutoHangup, startTimer]);
 
-  useEffect(() => {
-    connectSessionRef.current = connectSession;
-  }, [connectSession]);
-
-  const startSession = useCallback(async () => {
-    userEndedRef.current = false;
-    callSavedRef.current = false;
-    quotaBlockedRef.current = false;
-    goodbyeTriggeredRef.current = false;
-    if (autoHangupTimerRef.current) clearTimeout(autoHangupTimerRef.current);
-    autoHangupTimerRef.current = null;
-    lastDisconnectRef.current = null;
-    conversationIdRef.current = null;
-    transcriptLinesRef.current = [];
-    setTranscript([]);
-    setReconnectCount(0);
-    reconnectCountRef.current = 0;
-    await connectSession({ isReconnect: false });
-  }, [connectSession]);
-
-  const stopSession = useCallback(async () => {
+  const stopSession = useCallback(() => {
     if (endingRef.current) return;
     if (autoHangupTimerRef.current) clearTimeout(autoHangupTimerRef.current);
-    autoHangupTimerRef.current = null;
     userEndedRef.current = true;
-    await finalizeSession({ navigateAway: true });
-  }, [finalizeSession]);
-
-  useEffect(() => {
-    stopSessionRef.current = stopSession;
-  }, [stopSession]);
-
-  const manualReconnect = useCallback(async () => {
-    setError("");
-    setReconnectCount(0);
-    reconnectCountRef.current = 0;
-    userEndedRef.current = false;
-    await connectSession({ isReconnect: true });
-  }, [connectSession]);
-
-  const dismissError = useCallback(async () => {
-    sessionEpochRef.current += 1;
-    await hardStopAudio();
-    await persistSnapshot({ disconnectReason: "User Dismissed Error" });
-    setError("");
-    setState("idle");
-    setCanManualReconnect(false);
-    quotaBlockedRef.current = false;
-  }, [hardStopAudio, persistSnapshot]);
-
-  useEffect(() => {
-    return () => {
-      if (unmountTimerRef.current) clearTimeout(unmountTimerRef.current);
-      unmountTimerRef.current = setTimeout(() => {
-        if (!mountedRef.current && conversationRef.current) {
-          sessionEpochRef.current += 1;
-          void conversationRef.current.endSession().catch(() => {});
-          conversationRef.current = null;
-        }
-      }, UNMOUNT_GRACE_MS);
-      stopTimer();
-      clearReconnectTimer();
-      if (autoHangupTimerRef.current) clearTimeout(autoHangupTimerRef.current);
-    };
-  }, [clearReconnectTimer, stopTimer]);
-
-  useEffect(() => {
-    return () => {
-      if (unmountTimerRef.current) {
-        clearTimeout(unmountTimerRef.current);
-        unmountTimerRef.current = null;
-      }
-    };
-  }, []);
+    finishSession({ navigateAway: true });
+  }, [finishSession]);
 
   useEffect(() => {
     const conv = conversationRef.current;
@@ -604,20 +370,25 @@ export function PremiumVoiceSessionPanel({
     conv.setMicMuted(muted);
   }, [muted, state]);
 
-  const isActive = state === "listening" || state === "speaking" || state === "unstable";
-  const isConnecting = state === "connecting" || state === "reconnecting" || state === "ending";
+  useEffect(() => {
+    return () => {
+      stopTimer();
+      if (autoHangupTimerRef.current) clearTimeout(autoHangupTimerRef.current);
+      sessionEpochRef.current += 1;
+      const conv = conversationRef.current;
+      conversationRef.current = null;
+      if (conv) void conv.endSession().catch(() => {});
+    };
+  }, [stopTimer]);
+
+  const isActive = state === "listening" || state === "speaking";
+  const isConnecting = state === "connecting" || state === "ending";
   const statusLabel =
     state === "idle" ? "Lista para iniciar" :
     state === "connecting" ? (statusHint || "Conectando...") :
-    state === "reconnecting" ? (statusHint || "Reconectando...") :
     state === "ending" ? (statusHint || "Finalizando...") :
-    state === "unstable" ? "Conexión inestable" :
     state === "listening" ? "Escuchando" :
     state === "speaking" ? "Hablando" : "Desconectado";
-
-  const qualityLabel =
-    linkQuality === "good" ? "Conexión estable" :
-    linkQuality === "fair" ? "Sincronizando..." : "Señal débil";
 
   return (
     <div className="flex-1 flex min-h-0 p-4 gap-4 overflow-hidden">
@@ -646,23 +417,12 @@ export function PremiumVoiceSessionPanel({
             </div>
             <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[.04] border border-white/[.08]">
               <span className={`w-1.5 h-1.5 rounded-full ${
-                isActive && linkQuality === "good" ? "bg-emerald-400 animate-pulse" :
+                isActive ? "bg-emerald-400 animate-pulse" :
                 isConnecting ? "bg-amber-400 animate-pulse" :
-                linkQuality === "poor" || state === "error" ? "bg-red-400" :
-                state === "unstable" ? "bg-amber-400 animate-pulse" : "bg-gray-500"
+                state === "error" ? "bg-red-400" : "bg-gray-500"
               }`} />
               <span className="text-[11px] text-gray-400">{statusLabel}</span>
             </div>
-            {(isActive || isConnecting) && (
-              <div className="mt-2 inline-flex items-center gap-1 text-[10px] text-gray-500">
-                {linkQuality === "poor" ? (
-                  <WifiOff className="w-3 h-3 text-amber-400" />
-                ) : (
-                  <Wifi className="w-3 h-3 text-emerald-400/80" />
-                )}
-                {qualityLabel}
-              </div>
-            )}
             {isActive && duration > 0 && (
               <p className="text-lg font-semibold text-white tabular-nums mt-3">
                 {String(Math.floor(duration / 60)).padStart(2, "0")}:{String(duration % 60).padStart(2, "0")}
@@ -674,22 +434,22 @@ export function PremiumVoiceSessionPanel({
             {state === "idle" || state === "error" ? (
               <>
                 <button
-                  onClick={() => void (state === "error" && canManualReconnect ? manualReconnect() : startSession())}
+                  onClick={() => void startSession()}
                   disabled={!ready || !agentId}
                   className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold ${btnPrimary} disabled:opacity-50`}
                 >
-                  {state === "error" && canManualReconnect ? (
-                    <><RefreshCw className="w-4 h-4" /> Reconectar</>
+                  {state === "error" ? (
+                    <><RefreshCw className="w-4 h-4" /> Reintentar</>
                   ) : (
                     <><Mic className="w-4 h-4" /> Iniciar sesión</>
                   )}
                 </button>
                 {state === "error" && (
                   <button
-                    onClick={() => void dismissError()}
+                    onClick={() => { setError(""); setState("idle"); }}
                     className={`w-full ${btnGhost} text-xs`}
                   >
-                    Cerrar sin reconectar
+                    Cerrar
                   </button>
                 )}
               </>
@@ -711,7 +471,7 @@ export function PremiumVoiceSessionPanel({
                   {muted ? "Micrófono silenciado" : "Micrófono activo"}
                 </button>
                 <button
-                  onClick={() => void stopSession()}
+                  onClick={() => stopSession()}
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-red-500/[.08] border border-red-500/25 text-red-400"
                 >
                   <PhoneOff className="w-4 h-4" /> Terminar sesión
@@ -742,30 +502,23 @@ export function PremiumVoiceSessionPanel({
             <div className="flex flex-col items-center justify-center h-full text-center px-6">
               <p className="text-sm text-gray-300">Sin conversación aún</p>
               <p className="text-xs text-gray-500 mt-2 max-w-xs">
-                Conexión directa en tiempo real con voz premium. Usa auriculares para mejor calidad.
+                Conexión WebRTC directa con voz premium. Usa auriculares para mejor calidad.
               </p>
             </div>
           ) : (
             transcript.map((line, i) => (
               <div
                 key={i}
-                className={`flex ${
-                  line.role === "user" ? "justify-end" :
-                  line.role === "system" ? "justify-center" : "justify-start"
-                }`}
+                className={`flex ${line.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div className={`max-w-[82%] px-4 py-3 rounded-2xl text-[13px] ${
                   line.role === "user"
                     ? "bg-[#5b5bf6]/15 border border-[#5b5bf6]/20 text-gray-100"
-                    : line.role === "system"
-                      ? "bg-amber-500/[.06] border border-amber-500/15 text-amber-200/90 text-[11px]"
-                      : "bg-white/[.03] border border-white/[.07] text-gray-200"
+                    : "bg-white/[.03] border border-white/[.07] text-gray-200"
                 }`}>
-                  {line.role !== "system" && (
-                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 text-gray-500">
-                      {line.role === "user" ? "Tú" : agentName}
-                    </p>
-                  )}
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 text-gray-500">
+                    {line.role === "user" ? "Tú" : agentName}
+                  </p>
                   {line.text}
                 </div>
               </div>
