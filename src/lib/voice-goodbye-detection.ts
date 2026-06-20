@@ -13,7 +13,9 @@ const GOODBYE_PATTERNS: RegExp[] = [
   /\bque est[eé]s bien\b/i,
   /\bme despido\b/i,
   /\bterminamos (la )?llamada\b/i,
-  /\b(cierro|cerramos) (la )?llamada\b/i,
+  /\b(cuelga|cuelgue|cuélgame|termine|termina|finaliza) (la )?(llamada|sesi[oó]n|conversaci[oó]n)\b/i,
+  /\b(puedes|puede) colgar\b/i,
+  /\b(listo|eso es todo|nada m[aá]s|no necesito m[aá]s)\b/i,
   /\bbye\b/i,
   /\bgood\s?bye\b/i,
   /\bhasta (m[aá]s )?tarde\b/i

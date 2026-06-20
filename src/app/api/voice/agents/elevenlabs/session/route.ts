@@ -7,6 +7,7 @@ import {
   logPremiumInternalIssue,
 } from "@/lib/elevenlabs/disconnect-label";
 import { getElevenLabsApiKey } from "@/lib/elevenlabs/config";
+import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 import { getElevenLabsWebSessionCredentials } from "@/lib/elevenlabs/session-credentials";
 import { checkElevenLabsAgentHealth } from "@/lib/elevenlabs/provider-health";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
@@ -67,7 +68,12 @@ export async function GET(req: NextRequest) {
     }
 
     const creds = await getElevenLabsWebSessionCredentials(agent.elevenlabs_agent_id);
-    return NextResponse.json(creds);
+    const temporal = buildColombiaTemporalContext();
+    return NextResponse.json({
+      ...creds,
+      connectionType: "webrtc",
+      dynamicVariables: temporal.dynamicVariables,
+    });
   } catch (e) {
     const internal = e instanceof Error ? e.message : "session_start_failed";
     logPremiumInternalIssue("session_credentials", {

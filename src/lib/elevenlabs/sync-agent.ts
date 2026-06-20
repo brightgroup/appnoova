@@ -1,4 +1,5 @@
 import { elevenLabsFetch } from "@/lib/elevenlabs/client";
+import { ELEVENLABS_TEMPORAL_PROMPT_BLOCK } from "@/lib/colombia-calendar";
 import {
   DEFAULT_ELEVENLABS_VOICE_ID,
   PREMIUM_CALL_ENDING_PROMPT,
@@ -29,7 +30,7 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
       language: "es",
       disable_first_message_interruptions: false,
       prompt: {
-        prompt: `${input.prompt.trim()}${PREMIUM_CALL_ENDING_PROMPT}`,
+        prompt: `${ELEVENLABS_TEMPORAL_PROMPT_BLOCK}\n\n${input.prompt.trim()}${PREMIUM_CALL_ENDING_PROMPT}`,
         llm: ELEVENLABS_DEFAULT_LLM,
         temperature,
       },
@@ -38,17 +39,17 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
       quality: "high",
     },
     turn: {
-      turn_timeout: 7,
+      turn_timeout: 5,
       turn_eagerness: "eager",
       mode: "turn",
+      speculative_turn: true,
     },
     tts: {
       voice_id: voiceId,
       model_id: ELEVENLABS_TTS_MODEL_ID,
-      // 0–1 = mejor calidad de voz; 3–4 sacrifica calidad por latencia.
-      optimize_streaming_latency: 1,
-      stability: 0.55,
-      similarity_boost: 0.82,
+      optimize_streaming_latency: 3,
+      stability: 0.5,
+      similarity_boost: 0.8,
     },
     conversation: {
       max_duration_seconds: 600,

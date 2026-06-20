@@ -1,5 +1,6 @@
 import { elevenLabsFetch } from "@/lib/elevenlabs/client";
 import { getElevenLabsPhoneNumberId } from "@/lib/elevenlabs/config";
+import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 
 export interface ElevenLabsOutboundCallResult {
   conversationId: string;
@@ -25,6 +26,9 @@ export async function placeElevenLabsOutboundCall(input: {
       agent_phone_number_id: phoneNumberId,
       to_number: input.toE164,
       telephony_call_config: { ringing_timeout_secs: 60 },
+      conversation_initiation_client_data: {
+        dynamic_variables: buildColombiaTemporalContext().dynamicVariables,
+      },
     },
   });
 

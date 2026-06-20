@@ -7,7 +7,7 @@ const WIDGET_SLUG = getLandingWidgetSlug();
 const WIDGET_COLOR = process.env.NEXT_PUBLIC_LANDING_WIDGET_COLOR?.trim() || "#5b5bf6";
 
 /**
- * Burbuja de chat en la landing (/).
+ * Burbuja de chat en la landing de seguros (/iaseguros).
  * Usa el widget web (canal web_embed), no Mi Link.
  * ?preview=1 permite mostrar el widget aunque esté en borrador (solo este slug).
  */

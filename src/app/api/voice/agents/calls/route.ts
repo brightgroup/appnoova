@@ -14,7 +14,7 @@ import {
 import type { TranscriptEntry, VoiceAgentCallRecord } from "@/types/voice-agent-call";
 import { getElevenLabsConversation } from "@/lib/elevenlabs/outbound-call";
 import {
-  getElevenLabsConversationAudio,
+  getElevenLabsConversationAudioWithRetry,
   waitForElevenLabsConversationReady,
 } from "@/lib/elevenlabs/premium-voices";
 
@@ -37,6 +37,32 @@ interface CallPostBody {
   metadata?: Record<string, unknown>;
   credits?: number;
   skip_analysis?: boolean;
+}
+
+async function backfillPremiumCallAudio(
+  db: ReturnType<typeof adminClient>,
+  userId: string,
+  callId: string,
+  conversationId: string
+): Promise<string | null> {
+  await waitForElevenLabsConversationReady(conversationId, { maxAttempts: 8, delayMs: 750 });
+  const audio = await getElevenLabsConversationAudioWithRetry(conversationId, {
+    maxAttempts: 5,
+    delayMs: 1200,
+  });
+  if (!audio?.buffer.length) return null;
+
+  const audioUrl = await uploadCallRecording(
+    db,
+    userId,
+    callId,
+    audio.buffer,
+    audio.contentType || "audio/mpeg"
+  );
+  if (audioUrl) {
+    await db.from("voice_agent_calls").update({ audio_url: audioUrl }).eq("id", callId);
+  }
+  return audioUrl;
 }
 
 async function enrichPremiumWebCall(input: {
@@ -69,7 +95,7 @@ async function enrichPremiumWebCall(input: {
   let audioBuffer: Buffer | null = null;
   let audioMime: string | null = null;
   try {
-    const audio = await getElevenLabsConversationAudio(input.conversationId);
+    const audio = await getElevenLabsConversationAudioWithRetry(input.conversationId);
     if (audio) {
       audioBuffer = audio.buffer;
       audioMime = audio.contentType;
@@ -164,7 +190,23 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     if (!data) return NextResponse.json({ error: "Llamada no encontrada" }, { status: 404 });
-    return NextResponse.json({ call: toRecord(data), dbReady: true });
+
+    let callRow = data as Record<string, unknown>;
+    if (!callRow.audio_url) {
+      const meta = (callRow.metadata as Record<string, unknown>) ?? {};
+      const conversationId = String(meta.conversation_id ?? "").trim();
+      if (conversationId && meta.voice_provider === "elevenlabs") {
+        const audioUrl = await backfillPremiumCallAudio(
+          db,
+          userId,
+          String(callRow.id),
+          conversationId
+        );
+        if (audioUrl) callRow = { ...callRow, audio_url: audioUrl };
+      }
+    }
+
+    return NextResponse.json({ call: toRecord(callRow), dbReady: true });
   }
 
   if (!agentId) {

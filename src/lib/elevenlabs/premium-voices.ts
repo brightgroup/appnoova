@@ -56,13 +56,13 @@ export async function getElevenLabsConversationAudio(
   return { buffer, contentType };
 }
 
-/** Espera a que ElevenLabs procese la conversación tras colgar. */
+/** Espera a que ElevenLabs marque la conversación como done (audio listo). */
 export async function waitForElevenLabsConversationReady(
   conversationId: string,
   opts?: { maxAttempts?: number; delayMs?: number }
 ): Promise<boolean> {
-  const maxAttempts = opts?.maxAttempts ?? 8;
-  const delayMs = opts?.delayMs ?? 750;
+  const maxAttempts = opts?.maxAttempts ?? 12;
+  const delayMs = opts?.delayMs ?? 1000;
 
   for (let i = 0; i < maxAttempts; i++) {
     try {
@@ -70,13 +70,28 @@ export async function waitForElevenLabsConversationReady(
         `/convai/conversations/${encodeURIComponent(conversationId)}`
       );
       const status = String(data.status ?? "");
-      if (status === "done" || status === "failed" || status === "processing") {
-        return true;
-      }
+      if (status === "done" || status === "failed") return true;
     } catch {
       /* retry */
     }
     await new Promise(r => setTimeout(r, delayMs));
   }
   return false;
+}
+
+export async function getElevenLabsConversationAudioWithRetry(
+  conversationId: string,
+  opts?: { maxAttempts?: number; delayMs?: number }
+): Promise<{ buffer: Buffer; contentType: string } | null> {
+  const maxAttempts = opts?.maxAttempts ?? 6;
+  const delayMs = opts?.delayMs ?? 1500;
+
+  for (let i = 0; i < maxAttempts; i++) {
+    const audio = await getElevenLabsConversationAudio(conversationId);
+    if (audio && audio.buffer.length > 0) return audio;
+    if (i < maxAttempts - 1) {
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+  return null;
 }

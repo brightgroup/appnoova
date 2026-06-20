@@ -35,7 +35,6 @@ import {
 import PricingSection from "@/components/landing/PricingSection";
 import LeadCaptureButton from "@/components/landing/LeadCaptureButton";
 import { LeadCaptureProvider, LeadCaptureUrlOpener } from "@/components/landing/LeadCaptureProvider";
-import LandingWidgetEmbed from "@/components/landing/LandingWidgetEmbed";
 
 const STATS = [
   { value: "+300K", label: "Conversaciones gestionadas" },
@@ -719,7 +718,6 @@ export default function NoovaLandingPage() {
     <LeadCaptureProvider>
       <LeadCaptureUrlOpener />
       <LandingPageContent />
-      <LandingWidgetEmbed />
     </LeadCaptureProvider>
   );
 }
