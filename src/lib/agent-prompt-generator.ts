@@ -1,5 +1,6 @@
 import { getPurposeMeta, type AgentChannel } from "@/lib/agent-purpose-catalog";
 import { appendVoiceAccentToPrompt } from "@/lib/voice-accent-profile";
+import { buildVoiceInteractionSteps } from "@/lib/voice-purpose-flows";
 
 export type AgentLanguage = "es" | "en" | "multi";
 
@@ -121,7 +122,10 @@ function buildPromptBody(input: GenerateAgentPromptInput): string {
   const purpose = getPurposeMeta(channel, purposeId);
   const channelName = channelLabel(channel);
   const objective = purposeObjective(purposeId, channel, companyName);
-  const steps = interactionSteps(purposeId, channel, agentName, companyName);
+  const steps =
+    channel === "voice"
+      ? buildVoiceInteractionSteps(purposeId, agentName, companyName)
+      : interactionSteps(purposeId, channel, agentName, companyName);
   const langBlock = languageSection(language, agentName, companyName, channel);
   const companyBlurb = companyDescription.trim() || `Empresa que utiliza ${companyName} para automatizar atención y ventas con IA.`;
 

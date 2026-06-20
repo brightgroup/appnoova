@@ -1,0 +1,12 @@
+node_modules
+.next
+.next-dev
+.git
+.github
+*.md
+.env*
+!.env.example
+terminals
+.cursor
+agent-transcripts
+services/pipecat-voice
