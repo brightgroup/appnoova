@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { billingBlockedMessage, checkBillingForUser } from "@/lib/billing/meter";
 import { placeElevenLabsOutboundCall } from "@/lib/elevenlabs/outbound-call";
+import { getElevenLabsPhoneLineInfo } from "@/lib/elevenlabs/phone-line";
 import { getElevenLabsApiKey, getElevenLabsPhoneNumberId } from "@/lib/elevenlabs/config";
 import { createPhoneTestCallSession } from "@/lib/telephony/test-call-session";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
@@ -71,18 +72,21 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const line = await getElevenLabsPhoneLineInfo();
     const { conversationId } = await placeElevenLabsOutboundCall({
       agentId: agent.elevenlabs_agent_id,
       toE164: test.e164,
     });
 
+    const fromE164 = line.e164 ?? "Premium";
+
     const callId = await createPhoneTestCallSession({
       userId,
       voiceAgentId: voice_agent_id,
       callControlId: conversationId,
-      phoneNumberId: "",
+      phoneNumberId: line.phoneNumberId ?? "",
       testNumberId: test_number_id,
-      from: "ElevenLabs SIP",
+      from: fromE164,
       to: test.e164,
       agentName: agent.name,
       voiceProvider: "elevenlabs",
@@ -93,7 +97,7 @@ export async function POST(req: NextRequest) {
       call_id: callId,
       call_control_id: conversationId,
       conversation_id: conversationId,
-      from: "ElevenLabs",
+      from: fromE164,
       to: test.e164,
       agent_name: agent.name,
       phase: "dialing",

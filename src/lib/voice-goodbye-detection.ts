@@ -8,6 +8,7 @@ const GOODBYE_PATTERNS: RegExp[] = [
   /\b(chao|chau)\b/i,
   /\bfue un gusto\b/i,
   /\bgracias por (llamar|contactarnos|contactar|comunicarte|su llamada|llamarnos)\b/i,
+  /\b(muchas )?gracias[.!?\s]*$/i,
   /\bque tengas (un )?(buen|excelente|lindo|hermoso) (d[ií]a|tarde|noche)\b/i,
   /\bque le vaya bien\b/i,
   /\bque est[eé]s bien\b/i,
@@ -18,21 +19,42 @@ const GOODBYE_PATTERNS: RegExp[] = [
   /\b(listo|eso es todo|nada m[aá]s|no necesito m[aá]s)\b/i,
   /\bbye\b/i,
   /\bgood\s?bye\b/i,
-  /\bhasta (m[aá]s )?tarde\b/i
+  /\bhasta (m[aá]s )?tarde\b/i,
 ];
+
+const SHORT_GOODBYE_EXACT = new Set([
+  "chao",
+  "chau",
+  "bye",
+  "adios",
+  "adiós",
+  "listo",
+]);
 
 const GREETING_ONLY =
   /^(hola|buenos d[ií]as|buenas tardes|buenas noches|bienvenido)[!.?\s]*$/i;
 
-export function isGoodbyeUtterance(text: string): boolean {
-  const normalized = text
+function normalizeGoodbyeText(text: string): string {
+  return text
     .normalize("NFD")
     .replace(/\p{M}/gu, "")
     .toLowerCase()
-    .trim();
+    .trim()
+    .replace(/[.!?]+$/g, "");
+}
 
-  if (normalized.length < 5) return false;
+export function isGoodbyeUtterance(text: string): boolean {
+  const normalized = normalizeGoodbyeText(text);
+  if (!normalized) return false;
   if (GREETING_ONLY.test(normalized)) return false;
 
-  return GOODBYE_PATTERNS.some(p => p.test(normalized));
+  if (SHORT_GOODBYE_EXACT.has(normalized)) return true;
+  if (GOODBYE_PATTERNS.some(p => p.test(normalized))) return true;
+
+  const words = normalized.split(/\s+/).filter(Boolean);
+  const lastWord = words[words.length - 1] ?? "";
+  if (SHORT_GOODBYE_EXACT.has(lastWord)) return true;
+
+  const tail = words.slice(-4).join(" ");
+  return GOODBYE_PATTERNS.some(p => p.test(tail));
 }

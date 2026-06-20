@@ -451,7 +451,7 @@ function ConfigContent() {
       )}
 
       {activeTab === "canales" && agentId && (
-        <AgentPhoneChannelPanel agentId={agentId} />
+        <AgentPhoneChannelPanel agentId={agentId} isPremium={isPremium} />
       )}
 
       {/* Probar agente — web o teléfono */}

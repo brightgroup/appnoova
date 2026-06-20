@@ -1,6 +1,11 @@
 import { adminClient } from "@/lib/voice-agents-server";
 import { chargeVoiceCall, resolveOrgIdForUser } from "@/lib/billing/meter";
 import { getElevenLabsConversation } from "@/lib/elevenlabs/outbound-call";
+import {
+  getElevenLabsConversationAudioWithRetry,
+  waitForElevenLabsConversationReady,
+} from "@/lib/elevenlabs/premium-voices";
+import { uploadCallRecording } from "@/lib/voice-call-storage";
 import { buildCallRecordFields, splitCallRecordFields, updateAgentCallsCount } from "@/lib/voice/persist-call-record";
 import { getPhoneTestCallSession, updatePhoneTestCallSession } from "@/lib/telephony/test-call-session";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
@@ -68,10 +73,32 @@ export async function finalizeElevenLabsPremiumCall(input: {
   const { dbFields, callsCountNext } = splitCallRecordFields(built);
 
   const db = adminClient();
+
+  let audioUrl: string | null = null;
+  try {
+    await waitForElevenLabsConversationReady(input.conversationId, { maxAttempts: 8, delayMs: 750 });
+    const audio = await getElevenLabsConversationAudioWithRetry(input.conversationId, {
+      maxAttempts: 5,
+      delayMs: 1200,
+    });
+    if (audio?.buffer.length) {
+      audioUrl = await uploadCallRecording(
+        db,
+        session.user_id,
+        session.id,
+        audio.buffer,
+        audio.contentType || "audio/mpeg"
+      );
+    }
+  } catch (err) {
+    console.warn("[elevenlabs-finalize] audio:", err);
+  }
+
   await db
     .from("voice_agent_calls")
     .update({
       ...dbFields,
+      ...(audioUrl ? { audio_url: audioUrl } : {}),
       status: durationSec > 0 ? "ended_success" : "missed",
       metadata: {
         ...meta,
