@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Globe, Phone, Sparkles } from "lucide-react";
+import { Globe, Phone } from "lucide-react";
 import { btnFilterActive, btnFilterGroup, btnFilterIdle } from "@/lib/brand-ui";
 import { PhoneTestPanel } from "@/components/telephony/PhoneTestPanel";
 import { VoiceSessionPanel, type VoiceSessionPanelProps } from "@/components/voice/VoiceSessionPanel";
+import { PremiumVoiceSessionPanel } from "@/components/voice/PremiumVoiceSessionPanel";
 
 type TestMode = "web" | "phone";
 
@@ -37,15 +38,7 @@ export function AgentTestPanel({ agentName, agentConfig, ...voiceProps }: AgentT
 
       {mode === "web" ? (
         isPremium ? (
-          <div className="flex-1 flex items-center justify-center p-8 text-center">
-            <div className="max-w-md">
-              <Sparkles className="w-8 h-8 text-amber-400 mx-auto mb-3" />
-              <p className="text-sm font-medium text-white">Prueba web no disponible en premium</p>
-              <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                Los agentes premium se prueban por teléfono. Usa la pestaña &quot;Probar con teléfono&quot;.
-              </p>
-            </div>
-          </div>
+          <PremiumVoiceSessionPanel agentConfig={agentConfig} {...voiceProps} />
         ) : (
           <VoiceSessionPanel agentConfig={agentConfig} {...voiceProps} />
         )

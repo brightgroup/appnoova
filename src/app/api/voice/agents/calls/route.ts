@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeCallTranscript } from "@/lib/call-analysis";
 import { deriveQualityLabel } from "@/lib/voice-agent-display";
-import { buildFallbackSummary, estimateCallCredits } from "@/lib/voice-call-utils";
+import { buildFallbackSummary } from "@/lib/voice-call-utils";
+import { creditsForVoiceDuration } from "@/lib/billing/pricing";
 import { uploadCallRecording } from "@/lib/voice-call-storage";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
 import {
@@ -160,11 +161,11 @@ export async function POST(req: NextRequest) {
 
   const db = adminClient();
 
-  let agentRow: { id: string; name: string; calls_count?: number } | null = null;
+  let agentRow: { id: string; name: string; calls_count?: number; voice_provider?: string } | null = null;
 
   const { data: agentWithStats, error: statsErr } = await db
     .from("voice_agents")
-    .select("id, name, calls_count")
+    .select("id, name, calls_count, voice_provider")
     .eq("id", agentId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -172,7 +173,7 @@ export async function POST(req: NextRequest) {
   if (statsErr?.message?.includes("calls_count")) {
     const { data: agentBasic, error: basicErr } = await db
       .from("voice_agents")
-      .select("id, name")
+      .select("id, name, voice_provider")
       .eq("id", agentId)
       .eq("user_id", userId)
       .maybeSingle();
@@ -196,9 +197,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const voiceProvider = agentRow.voice_provider === "elevenlabs" ? "elevenlabs" : "google";
   const transcript = (body.transcript ?? []) as TranscriptEntry[];
   const durationSec = Number(body.duration_sec) || 0;
-  const credits = Number(body.credits) || estimateCallCredits(durationSec);
+  const credits = Number(body.credits) || creditsForVoiceDuration(durationSec, voiceProvider);
   const now = new Date();
 
   const analysis = body.skip_analysis
@@ -286,6 +288,7 @@ export async function POST(req: NextRequest) {
       callId: String(call.id),
       durationSec,
       voiceAgentId: agentId,
+      voiceProvider,
       channel: "web_test",
       metadata: { source: "web_test" }
     });

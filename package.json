@@ -14,6 +14,7 @@
     "email:configure-supabase": "node scripts/configure-supabase-resend-smtp.mjs"
   },
   "dependencies": {
+    "@elevenlabs/client": "^1.12.0",
     "@google/genai": "^2.8.0",
     "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/supabase-js": "^2.45.0",
