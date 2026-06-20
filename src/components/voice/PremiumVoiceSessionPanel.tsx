@@ -10,11 +10,20 @@ import {
 import { getTemplateMeta } from "@/lib/voice-agent-templates";
 import { agentAvatarGradient, agentAvatarStyle } from "@/lib/voice-agent-display";
 import { getAuthHeaders, getAuthToken } from "@/lib/voice-agents-api";
-import { describePremiumDisconnect, isRecoverableDisconnect } from "@/lib/elevenlabs/disconnect-label";
+import {
+  PREMIUM_USER_MESSAGES,
+  describePremiumDisconnect,
+  describePremiumErrorMessage,
+  disconnectDetailText,
+  isQuotaOrBillingError,
+  isQuotaDisconnect,
+  isRecoverableDisconnect,
+  logPremiumInternalIssue,
+} from "@/lib/elevenlabs/disconnect-label";
 import { btnPrimary, btnGhost } from "@/lib/brand-ui";
 import type { VoiceSessionPanelProps } from "@/components/voice/VoiceSessionPanel";
 
-type SessionState = "idle" | "connecting" | "listening" | "speaking" | "reconnecting" | "unstable" | "error";
+type SessionState = "idle" | "connecting" | "listening" | "speaking" | "reconnecting" | "unstable" | "error" | "ending";
 type LinkQuality = "good" | "fair" | "poor";
 
 interface TranscriptLine {
@@ -69,6 +78,9 @@ export function PremiumVoiceSessionPanel({
   const durationRef = useRef(0);
   const mutedRef = useRef(false);
   const errorStreakRef = useRef(0);
+  const quotaBlockedRef = useRef(false);
+  const lastDisconnectRef = useRef<DisconnectionDetails | null>(null);
+  const conversationIdRef = useRef<string | null>(null);
   const connectSessionRef = useRef<(opts?: { isReconnect?: boolean }) => Promise<boolean>>(async () => false);
 
   useEffect(() => { agentIdRef.current = agentId; }, [agentId]);
@@ -137,6 +149,9 @@ export function PremiumVoiceSessionPanel({
   const saveCallRecord = useCallback(async (snapshot: {
     lines: TranscriptLine[];
     durationSec: number;
+    disconnectReason?: string;
+    disconnectDetails?: DisconnectionDetails | null;
+    conversationId?: string | null;
   }) => {
     const id = agentIdRef.current;
     if (!id || callSavedRef.current) return false;
@@ -152,6 +167,10 @@ export function PremiumVoiceSessionPanel({
         return false;
       }
 
+      const quotaHit = snapshot.disconnectDetails
+        ? isQuotaDisconnect(snapshot.disconnectDetails)
+        : false;
+
       const res = await fetch("/api/voice/agents/calls", {
         method: "POST",
         headers: await getAuthHeaders(),
@@ -159,13 +178,22 @@ export function PremiumVoiceSessionPanel({
           voice_agent_id: id,
           phone_number: "Prueba web premium",
           duration_sec: snapshot.durationSec,
-          disconnect_reason: userEndedRef.current ? "User Ended" : "Connection Ended",
+          disconnect_reason: snapshot.disconnectReason
+            ?? (userEndedRef.current ? "User Ended" : "Connection Ended"),
+          status_label: quotaHit ? "Ended - Interrupción" : undefined,
           transcript: contentLines.map(({ role, text, time_sec }) => ({
             role: role === "system" ? "agent" : role,
             text,
             time_sec,
           })),
-          metadata: { source: "web_test", voice_provider: "elevenlabs" },
+          metadata: {
+            source: "web_test",
+            voice_provider: "elevenlabs",
+            conversation_id: snapshot.conversationId ?? conversationIdRef.current,
+            reconnect_attempts: reconnectCountRef.current,
+            quota_exceeded: quotaHit,
+            disconnect_reason_detail: disconnectDetailText(snapshot.disconnectDetails),
+          },
         }),
       });
 
@@ -184,18 +212,26 @@ export function PremiumVoiceSessionPanel({
     }
   }, [onCallSaved]);
 
-  const teardownConversation = useCallback(async (endRemote: boolean) => {
+  const hardStopAudio = useCallback(async () => {
     clearReconnectTimer();
     const conv = conversationRef.current;
     conversationRef.current = null;
-    if (conv && endRemote) {
-      try {
-        await conv.endSession();
-      } catch {
-        /* ignore */
-      }
+    if (!conv) return;
+    try {
+      conv.setVolume({ volume: 0 });
+    } catch {
+      /* ignore */
+    }
+    try {
+      await conv.endSession();
+    } catch {
+      /* ignore */
     }
   }, [clearReconnectTimer]);
+
+  const teardownConversation = useCallback(async () => {
+    await hardStopAudio();
+  }, [hardStopAudio]);
 
   const resetUi = useCallback(() => {
     stopTimer();
@@ -209,19 +245,47 @@ export function PremiumVoiceSessionPanel({
     reconnectCountRef.current = 0;
     setCanManualReconnect(false);
     errorStreakRef.current = 0;
+    quotaBlockedRef.current = false;
+    lastDisconnectRef.current = null;
+    conversationIdRef.current = null;
     userEndedRef.current = false;
   }, [stopTimer]);
+
+  const persistSnapshot = useCallback(async (opts?: {
+    disconnectReason?: string;
+    disconnectDetails?: DisconnectionDetails | null;
+    conversationId?: string | null;
+  }) => {
+    await saveCallRecord({
+      lines: [...transcriptLinesRef.current],
+      durationSec: durationRef.current,
+      disconnectReason: opts?.disconnectReason,
+      disconnectDetails: opts?.disconnectDetails ?? lastDisconnectRef.current,
+      conversationId: opts?.conversationId ?? conversationIdRef.current,
+    });
+  }, [saveCallRecord]);
 
   const finalizeSession = useCallback(async (opts?: { navigateAway?: boolean; keepTranscript?: boolean }) => {
     if (endingRef.current) return;
     endingRef.current = true;
     clearReconnectTimer();
+    setState("ending");
+    setStatusHint("Finalizando sesión...");
 
-    await teardownConversation(!userEndedRef.current);
+    await hardStopAudio();
+    sessionEpochRef.current += 1;
+
+    const convId = conversationIdRef.current;
+    if (convId) {
+      await new Promise(r => setTimeout(r, 2000));
+    }
 
     const snapshot = {
       lines: [...transcriptLinesRef.current],
       durationSec: durationRef.current,
+      disconnectReason: userEndedRef.current ? "User Ended" : "Connection Ended",
+      disconnectDetails: lastDisconnectRef.current,
+      conversationId: convId,
     };
     const saved = await saveCallRecord(snapshot);
 
@@ -235,11 +299,15 @@ export function PremiumVoiceSessionPanel({
     if (opts?.navigateAway && (saved || (snapshot.durationSec < 1 && snapshot.lines.length === 0))) {
       onEndCall?.();
     }
-  }, [clearReconnectTimer, onEndCall, resetUi, saveCallRecord, teardownConversation]);
+  }, [clearReconnectTimer, hardStopAudio, onEndCall, resetUi, saveCallRecord]);
 
   const handleDisconnect = useCallback(async (details: DisconnectionDetails, epoch: number) => {
     conversationRef.current = null;
-    const recoverable = isRecoverableDisconnect(details);
+    lastDisconnectRef.current = details;
+    const quotaHit = isQuotaDisconnect(details);
+    if (quotaHit) quotaBlockedRef.current = true;
+
+    const recoverable = !quotaHit && isRecoverableDisconnect(details);
     const label = describePremiumDisconnect(details);
 
     if (details.reason === "user") {
@@ -254,7 +322,7 @@ export function PremiumVoiceSessionPanel({
       setReconnectCount(attempt);
       setState("reconnecting");
       setStatusHint(`Reconectando (${attempt}/${MAX_AUTO_RECONNECT})...`);
-      appendTranscript("system", `Conexión inestable. Reintentando (${attempt}/${MAX_AUTO_RECONNECT})...`);
+      appendTranscript("system", "Reconectando…");
 
       clearReconnectTimer();
       reconnectTimerRef.current = setTimeout(() => {
@@ -266,14 +334,20 @@ export function PremiumVoiceSessionPanel({
 
     setState("error");
     setError(label);
-    setCanManualReconnect(recoverable);
+    setCanManualReconnect(recoverable && !quotaHit);
     setLinkQuality("poor");
     appendTranscript("system", label);
-  }, [appendTranscript, clearReconnectTimer, finalizeSession]);
+    sessionEpochRef.current += 1;
+    clearReconnectTimer();
+    await persistSnapshot({
+      disconnectReason: quotaHit ? "Service Unavailable" : "Connection Ended",
+      disconnectDetails: details,
+    });
+  }, [appendTranscript, clearReconnectTimer, finalizeSession, persistSnapshot]);
 
   const connectSession = useCallback(async (opts?: { isReconnect?: boolean }) => {
     const id = agentIdRef.current;
-    if (!id || endingRef.current) return false;
+    if (!id || endingRef.current || quotaBlockedRef.current) return false;
 
     const epoch = ++sessionEpochRef.current;
     setError("");
@@ -295,7 +369,15 @@ export function PremiumVoiceSessionPanel({
         { headers }
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "No se pudo iniciar la sesión premium");
+      if (!res.ok) {
+        if (res.status === 429 || res.status === 503 || data.code === "premium_unavailable") {
+          quotaBlockedRef.current = true;
+          logPremiumInternalIssue("session_api", { status: res.status, code: data.code, detail: data.error });
+          throw new Error(PREMIUM_USER_MESSAGES.temporarilyUnavailable);
+        }
+        logPremiumInternalIssue("session_api", { status: res.status, detail: data.error });
+        throw new Error(PREMIUM_USER_MESSAGES.sessionStartFailed);
+      }
       if (epoch !== sessionEpochRef.current || !mountedRef.current) return false;
 
       setStatusHint("Conectando audio en tiempo real...");
@@ -304,8 +386,9 @@ export function PremiumVoiceSessionPanel({
         ...(data.conversationToken
           ? { conversationToken: data.conversationToken as string }
           : { signedUrl: data.signedUrl as string }),
-        onConnect: () => {
+        onConnect: ({ conversationId }: { conversationId: string }) => {
           if (epoch !== sessionEpochRef.current) return;
+          if (conversationId) conversationIdRef.current = conversationId;
           startTimer();
           setState("listening");
           setStatusHint("");
@@ -317,19 +400,36 @@ export function PremiumVoiceSessionPanel({
         },
         onDisconnect: (details: DisconnectionDetails) => {
           if (epoch !== sessionEpochRef.current || userEndedRef.current) return;
+          logPremiumInternalIssue("disconnect", {
+            reason: details.reason,
+            detail: disconnectDetailText(details),
+          });
           void handleDisconnect(details, epoch);
         },
         onError: (message: string) => {
           if (epoch !== sessionEpochRef.current) return;
+          logPremiumInternalIssue("sdk_error", { message });
+          if (isQuotaOrBillingError(message)) {
+            quotaBlockedRef.current = true;
+            setError(PREMIUM_USER_MESSAGES.temporarilyUnavailable);
+            setState("error");
+            setCanManualReconnect(false);
+            setLinkQuality("poor");
+            sessionEpochRef.current += 1;
+            void persistSnapshot({
+              disconnectReason: "Service Unavailable",
+              disconnectDetails: null,
+            });
+            return;
+          }
           errorStreakRef.current += 1;
           if (errorStreakRef.current >= 2) {
             setLinkQuality("poor");
             setState(prev => (prev === "speaking" || prev === "listening" ? "unstable" : prev));
           }
-          console.warn("[premium-voice]", message);
         },
         onMessage: ({ message, role }: { message: string; role: "user" | "agent" }) => {
-          if (epoch !== sessionEpochRef.current) return;
+          if (epoch !== sessionEpochRef.current || userEndedRef.current) return;
           appendTranscript(role, message);
         },
         onModeChange: ({ mode }: { mode: "speaking" | "listening" }) => {
@@ -349,7 +449,7 @@ export function PremiumVoiceSessionPanel({
         },
       };
 
-      await teardownConversation(true);
+      await hardStopAudio();
       const conversation = await VoiceConversation.startSession(sessionOptions);
       if (epoch !== sessionEpochRef.current) {
         try {
@@ -365,13 +465,26 @@ export function PremiumVoiceSessionPanel({
       return true;
     } catch (err) {
       if (epoch !== sessionEpochRef.current) return false;
-      const message = err instanceof Error ? err.message : "No se pudo conectar";
-      setError(message);
+      const internal = err instanceof Error ? err.message : String(err);
+      const quotaHit = isQuotaOrBillingError(internal) || quotaBlockedRef.current;
+      if (quotaHit) quotaBlockedRef.current = true;
+      logPremiumInternalIssue("connect_failed", { error: internal, quotaHit });
+      setError(
+        quotaHit
+          ? PREMIUM_USER_MESSAGES.temporarilyUnavailable
+          : describePremiumErrorMessage(internal)
+      );
       setState("error");
-      setCanManualReconnect(true);
+      setCanManualReconnect(!quotaHit);
+      if (quotaHit) {
+        void persistSnapshot({
+          disconnectReason: "Service Unavailable",
+          disconnectDetails: null,
+        });
+      }
       return false;
     }
-  }, [appendTranscript, handleDisconnect, startTimer, teardownConversation, updateLinkFromStatus]);
+  }, [appendTranscript, handleDisconnect, hardStopAudio, persistSnapshot, startTimer, updateLinkFromStatus]);
 
   useEffect(() => {
     connectSessionRef.current = connectSession;
@@ -380,6 +493,9 @@ export function PremiumVoiceSessionPanel({
   const startSession = useCallback(async () => {
     userEndedRef.current = false;
     callSavedRef.current = false;
+    quotaBlockedRef.current = false;
+    lastDisconnectRef.current = null;
+    conversationIdRef.current = null;
     transcriptLinesRef.current = [];
     setTranscript([]);
     setReconnectCount(0);
@@ -388,8 +504,8 @@ export function PremiumVoiceSessionPanel({
   }, [connectSession]);
 
   const stopSession = useCallback(async () => {
+    if (endingRef.current) return;
     userEndedRef.current = true;
-    sessionEpochRef.current += 1;
     await finalizeSession({ navigateAway: true });
   }, [finalizeSession]);
 
@@ -403,12 +519,13 @@ export function PremiumVoiceSessionPanel({
 
   const dismissError = useCallback(async () => {
     sessionEpochRef.current += 1;
-    clearReconnectTimer();
-    await teardownConversation(true);
+    await hardStopAudio();
+    await persistSnapshot({ disconnectReason: "User Dismissed Error" });
     setError("");
     setState("idle");
     setCanManualReconnect(false);
-  }, [clearReconnectTimer, teardownConversation]);
+    quotaBlockedRef.current = false;
+  }, [hardStopAudio, persistSnapshot]);
 
   useEffect(() => {
     return () => {
@@ -441,11 +558,12 @@ export function PremiumVoiceSessionPanel({
   }, [muted, state]);
 
   const isActive = state === "listening" || state === "speaking" || state === "unstable";
-  const isConnecting = state === "connecting" || state === "reconnecting";
+  const isConnecting = state === "connecting" || state === "reconnecting" || state === "ending";
   const statusLabel =
     state === "idle" ? "Lista para iniciar" :
     state === "connecting" ? (statusHint || "Conectando...") :
     state === "reconnecting" ? (statusHint || "Reconectando...") :
+    state === "ending" ? (statusHint || "Finalizando...") :
     state === "unstable" ? "Conexión inestable" :
     state === "listening" ? "Escuchando" :
     state === "speaking" ? "Hablando" : "Desconectado";
@@ -577,7 +695,7 @@ export function PremiumVoiceSessionPanel({
             <div className="flex flex-col items-center justify-center h-full text-center px-6">
               <p className="text-sm text-gray-300">Sin conversación aún</p>
               <p className="text-xs text-gray-500 mt-2 max-w-xs">
-                Conexión directa en tiempo real. Si se corta, reintentamos automáticamente hasta 2 veces.
+                Conexión directa en tiempo real con voz premium. Usa auriculares para mejor calidad.
               </p>
             </div>
           ) : (

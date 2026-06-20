@@ -11,11 +11,14 @@ export async function POST(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   if (!getElevenLabsApiKey()) {
-    return NextResponse.json({ error: "ELEVENLABS_API_KEY no configurado" }, { status: 503 });
+    return NextResponse.json(
+      { error: "La voz premium no está disponible temporalmente" },
+      { status: 503 }
+    );
   }
   if (!getElevenLabsPhoneNumberId()) {
     return NextResponse.json(
-      { error: "Número de salida premium no configurado. Contacta soporte." },
+      { error: "La llamada premium no está disponible temporalmente" },
       { status: 503 }
     );
   }

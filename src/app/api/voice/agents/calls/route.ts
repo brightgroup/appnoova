@@ -12,6 +12,11 @@ import {
   resolveOrgIdForUser
 } from "@/lib/billing/meter";
 import type { TranscriptEntry, VoiceAgentCallRecord } from "@/types/voice-agent-call";
+import { getElevenLabsConversation } from "@/lib/elevenlabs/outbound-call";
+import {
+  getElevenLabsConversationAudio,
+  waitForElevenLabsConversationReady,
+} from "@/lib/elevenlabs/premium-voices";
 
 interface CallPostBody {
   voice_agent_id?: string;
@@ -32,6 +37,48 @@ interface CallPostBody {
   metadata?: Record<string, unknown>;
   credits?: number;
   skip_analysis?: boolean;
+}
+
+async function enrichPremiumWebCall(input: {
+  conversationId: string;
+  clientTranscript: TranscriptEntry[];
+  clientDurationSec: number;
+}): Promise<{
+  transcript: TranscriptEntry[];
+  durationSec: number;
+  audioBuffer: Buffer | null;
+  audioMime: string | null;
+}> {
+  await waitForElevenLabsConversationReady(input.conversationId);
+
+  let transcript = input.clientTranscript;
+  let durationSec = input.clientDurationSec;
+
+  try {
+    const conv = await getElevenLabsConversation(input.conversationId);
+    if (conv.transcript.length > transcript.length) {
+      transcript = conv.transcript;
+    }
+    if (conv.callDurationSecs > durationSec) {
+      durationSec = conv.callDurationSecs;
+    }
+  } catch (err) {
+    console.warn("[calls] enrich premium transcript:", err);
+  }
+
+  let audioBuffer: Buffer | null = null;
+  let audioMime: string | null = null;
+  try {
+    const audio = await getElevenLabsConversationAudio(input.conversationId);
+    if (audio) {
+      audioBuffer = audio.buffer;
+      audioMime = audio.contentType;
+    }
+  } catch (err) {
+    console.warn("[calls] enrich premium audio:", err);
+  }
+
+  return { transcript, durationSec, audioBuffer, audioMime };
 }
 
 async function parseCallPostBody(req: NextRequest): Promise<{
@@ -198,8 +245,24 @@ export async function POST(req: NextRequest) {
   }
 
   const voiceProvider = agentRow.voice_provider === "elevenlabs" ? "elevenlabs" : "google";
-  const transcript = (body.transcript ?? []) as TranscriptEntry[];
-  const durationSec = Number(body.duration_sec) || 0;
+  let transcript = (body.transcript ?? []) as TranscriptEntry[];
+  let durationSec = Number(body.duration_sec) || 0;
+  let premiumAudioBuffer: Buffer | null = null;
+  let premiumAudioMime: string | null = null;
+
+  const conversationId = String(body.metadata?.conversation_id ?? "").trim();
+  if (voiceProvider === "elevenlabs" && conversationId) {
+    const enriched = await enrichPremiumWebCall({
+      conversationId,
+      clientTranscript: transcript,
+      clientDurationSec: durationSec,
+    });
+    transcript = enriched.transcript;
+    durationSec = enriched.durationSec;
+    premiumAudioBuffer = enriched.audioBuffer;
+    premiumAudioMime = enriched.audioMime;
+  }
+
   const credits = Number(body.credits) || creditsForVoiceDuration(durationSec, voiceProvider);
   const now = new Date();
 
@@ -255,6 +318,20 @@ export async function POST(req: NextRequest) {
   }
 
   let audioUrl = call.audio_url as string | null;
+
+  if (call.id && !audioBlob && premiumAudioBuffer && premiumAudioBuffer.length > 0) {
+    audioUrl = await uploadCallRecording(
+      db,
+      userId,
+      String(call.id),
+      premiumAudioBuffer,
+      premiumAudioMime || "audio/mpeg"
+    );
+    if (audioUrl) {
+      await db.from("voice_agent_calls").update({ audio_url: audioUrl }).eq("id", call.id);
+      call.audio_url = audioUrl;
+    }
+  }
 
   if (call.id && audioBlob && audioBlob.size > 0) {
     const buffer = Buffer.from(await audioBlob.arrayBuffer());

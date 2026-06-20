@@ -9,7 +9,10 @@ export async function GET(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   if (!getElevenLabsApiKey()) {
-    return NextResponse.json({ error: "Voz premium no configurada en el servidor" }, { status: 503 });
+    return NextResponse.json(
+      { error: "La voz premium no está disponible temporalmente" },
+      { status: 503 }
+    );
   }
 
   try {

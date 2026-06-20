@@ -1,7 +1,9 @@
 import { elevenLabsFetch } from "@/lib/elevenlabs/client";
 import {
   DEFAULT_ELEVENLABS_VOICE_ID,
+  PREMIUM_CALL_ENDING_PROMPT,
 } from "@/lib/elevenlabs/default-voices";
+import { listCuratedPremiumVoices } from "@/lib/elevenlabs/premium-voices";
 import { ELEVENLABS_DEFAULT_LLM, ELEVENLABS_TTS_MODEL_ID } from "@/lib/elevenlabs/config";
 
 export interface ElevenLabsSyncInput {
@@ -25,15 +27,31 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
     agent: {
       first_message: buildFirstMessage(input.name.trim() || "su asesor", companyName),
       language: "es",
+      disable_first_message_interruptions: false,
       prompt: {
-        prompt: input.prompt.trim(),
+        prompt: `${input.prompt.trim()}${PREMIUM_CALL_ENDING_PROMPT}`,
         llm: ELEVENLABS_DEFAULT_LLM,
         temperature,
       },
     },
+    asr: {
+      quality: "high",
+    },
+    turn: {
+      turn_timeout: 7,
+      turn_eagerness: "eager",
+      mode: "turn",
+    },
     tts: {
       voice_id: voiceId,
       model_id: ELEVENLABS_TTS_MODEL_ID,
+      // 0–1 = mejor calidad de voz; 3–4 sacrifica calidad por latencia.
+      optimize_streaming_latency: 1,
+      stability: 0.55,
+      similarity_boost: 0.82,
+    },
+    conversation: {
+      max_duration_seconds: 600,
     },
   };
 }
@@ -82,20 +100,6 @@ export async function deleteElevenLabsAgent(agentId: string | null | undefined):
 }
 
 export async function listElevenLabsVoices(): Promise<{ id: string; label: string }[]> {
-  try {
-    const data = await elevenLabsFetch<{
-      voices?: { voice_id: string; name: string; labels?: Record<string, string> }[];
-    }>("/voices");
-    const voices = data.voices ?? [];
-    return voices
-      .filter(v => v.voice_id && v.name)
-      .map(v => ({
-        id: v.voice_id,
-        label: v.labels?.language?.includes("es") ? `${v.name} (ES)` : v.name,
-      }))
-      .slice(0, 40);
-  } catch {
-    const { ELEVENLABS_DEFAULT_VOICES } = await import("@/lib/elevenlabs/default-voices");
-    return ELEVENLABS_DEFAULT_VOICES.map(v => ({ id: v.id, label: v.label }));
-  }
+  const voices = await listCuratedPremiumVoices();
+  return voices.map(v => ({ id: v.id, label: v.label }));
 }
