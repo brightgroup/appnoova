@@ -49,6 +49,8 @@ export interface ElevenLabsConversationDetail {
   callDurationSecs: number;
   transcript: { role: "user" | "agent"; text: string; time_sec: number }[];
   terminationReason?: string;
+  errorCode?: number;
+  errorReason?: string;
 }
 
 export async function getElevenLabsConversation(
@@ -57,7 +59,11 @@ export async function getElevenLabsConversation(
   const data = await elevenLabsFetch<{
     status?: string;
     transcript?: { role?: string; message?: string; time_in_call_secs?: number }[];
-    metadata?: { call_duration_secs?: number };
+    metadata?: {
+      call_duration_secs?: number;
+      error?: { code?: number; reason?: string };
+      termination_reason?: string;
+    };
     analysis?: { transcript_summary?: string };
   }>(`/convai/conversations/${encodeURIComponent(conversationId)}`);
 
@@ -69,11 +75,19 @@ export async function getElevenLabsConversation(
       time_sec: Number(t.time_in_call_secs) || 0,
     }));
 
+  const errorReason = data.metadata?.error?.reason?.trim();
+  const terminationReason =
+    errorReason
+    || data.metadata?.termination_reason?.trim()
+    || data.analysis?.transcript_summary;
+
   return {
     status: String(data.status ?? "initiated"),
     callDurationSecs: Number(data.metadata?.call_duration_secs) || 0,
     transcript,
-    terminationReason: data.analysis?.transcript_summary,
+    terminationReason,
+    errorCode: data.metadata?.error?.code,
+    errorReason,
   };
 }
 

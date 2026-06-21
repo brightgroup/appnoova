@@ -1,6 +1,6 @@
 import { elevenLabsFetch } from "@/lib/elevenlabs/client";
 import { listElevenLabsPhoneNumbers } from "@/lib/elevenlabs/phone-line";
-import { requirePlatformSipConfig, type PlatformSipConfig } from "@/lib/elevenlabs/sip-config";
+import { resolvePlatformSipConfig, type PlatformSipConfig } from "@/lib/elevenlabs/sip-config";
 
 export interface SyncElevenLabsPhoneLineInput {
   e164: string;
@@ -90,7 +90,7 @@ async function updateElevenLabsPhoneNumber(
 export async function syncElevenLabsPhoneLine(
   input: SyncElevenLabsPhoneLineInput
 ): Promise<SyncElevenLabsPhoneLineResult> {
-  const cfg = requirePlatformSipConfig();
+  const cfg = await resolvePlatformSipConfig();
 
   let phoneNumberId = input.existingPhoneNumberId?.trim() || null;
   let created = false;

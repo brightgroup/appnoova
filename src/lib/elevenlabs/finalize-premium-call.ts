@@ -59,7 +59,7 @@ export async function finalizeElevenLabsPremiumCall(input: {
     disconnectReason: input.disconnectReason ?? "ElevenLabs call ended",
     transcript,
     callsCount: agent.callsCount,
-    statusLabel: durationSec > 0 ? "Ended - Llamada premium exitosa" : "Ended - Sin conexión",
+    statusLabel: durationSec > 0 ? "Ended - Llamada premium exitosa" : "Ended - Error de conexión",
     metadata: {
       source: "phone_test",
       voice_provider: "elevenlabs",

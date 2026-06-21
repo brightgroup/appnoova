@@ -4,6 +4,7 @@ import {
   mapElevenLabsStatusToPhase,
 } from "@/lib/elevenlabs/outbound-call";
 import { finalizeElevenLabsPremiumCall } from "@/lib/elevenlabs/finalize-premium-call";
+import { describeElevenLabsSipError } from "@/lib/elevenlabs/sip-config";
 import {
   computeConnectedDuration,
   getPhoneTestCallSession,
@@ -32,6 +33,9 @@ export async function GET(req: NextRequest) {
   try {
     const conv = await getElevenLabsConversation(conversationId);
     const phase = mapElevenLabsStatusToPhase(conv.status);
+    const sipError = conv.errorReason
+      ? describeElevenLabsSipError(conv.errorReason)
+      : undefined;
 
     if (phase === "connected" && !session.metadata.answered_at) {
       await updatePhoneTestCallSession(conversationId, {
@@ -47,7 +51,7 @@ export async function GET(req: NextRequest) {
           conversationId,
           durationSec: conv.callDurationSecs,
           transcript: conv.transcript,
-          disconnectReason: conv.terminationReason ?? conv.status,
+          disconnectReason: sipError ?? conv.terminationReason ?? conv.status,
         });
       }
     } else {
@@ -55,6 +59,7 @@ export async function GET(req: NextRequest) {
         phase: phase === "connected" ? "connected" : phase,
         status_label: phase === "connected" ? "Prueba premium - En llamada" : labelForPhase(phase).replace("telefónica", "premium"),
         last_event: `elevenlabs.${conv.status}`,
+        ...(sipError ? { error: sipError } : {}),
       });
     }
 
@@ -63,11 +68,16 @@ export async function GET(req: NextRequest) {
     const durationSec =
       conv.callDurationSecs > 0 ? conv.callDurationSecs : computeConnectedDuration(meta);
 
+    const displayPhase = meta.finalized ? "ended" : phase;
+    const callError = sipError ?? meta.error;
+
     return NextResponse.json({
-      phase: meta.finalized ? "ended" : phase,
-      status_label: refreshed?.status_label ?? labelForPhase(phase),
+      phase: displayPhase === "failed" || (displayPhase === "ended" && callError) ? "failed" : displayPhase,
+      status_label: callError
+        ? "Prueba premium - Error"
+        : refreshed?.status_label ?? labelForPhase(phase),
       duration_sec: durationSec,
-      error: meta.error,
+      error: callError,
       provider: "elevenlabs",
     });
   } catch (e) {

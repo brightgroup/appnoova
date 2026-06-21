@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { billingBlockedMessage, checkBillingForUser } from "@/lib/billing/meter";
 import { getElevenLabsApiKey } from "@/lib/elevenlabs/config";
+import { resolvePlatformSipConfig } from "@/lib/elevenlabs/sip-config";
 import { placeElevenLabsOutboundCall } from "@/lib/elevenlabs/outbound-call";
 import { resolveElevenLabsPhoneLine } from "@/lib/elevenlabs/phone-line";
 import { createPhoneTestCallSession } from "@/lib/telephony/test-call-session";
@@ -88,9 +89,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  try {
+    await resolvePlatformSipConfig();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "SIP premium no configurado";
+    return NextResponse.json({ error: message, code: "premium_sip_not_configured" }, { status: 503 });
+  }
+
   const line = await resolveElevenLabsPhoneLine(phone, {
     elevenlabsAgentId: agent.elevenlabs_agent_id,
-    resync: !phone.elevenlabs_phone_number_id,
+    resync: true,
   });
 
   if (!line.configured || !line.phoneNumberId) {

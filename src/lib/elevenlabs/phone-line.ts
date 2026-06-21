@@ -1,7 +1,7 @@
 import { elevenLabsFetch } from "@/lib/elevenlabs/client";
 import { getElevenLabsPhoneNumberId } from "@/lib/elevenlabs/config";
 import { syncElevenLabsPhoneLine } from "@/lib/elevenlabs/import-phone-line";
-import { getPlatformSipConfig } from "@/lib/elevenlabs/sip-config";
+import { resolvePlatformSipConfig } from "@/lib/elevenlabs/sip-config";
 
 export interface ElevenLabsPhoneLineInfo {
   configured: boolean;
@@ -30,8 +30,9 @@ export async function resolveElevenLabsPhoneLine(
   let syncError = phone.elevenlabs_sync_error ?? null;
   let syncedAt = phone.elevenlabs_synced_at ?? null;
 
-  if ((!phoneNumberId || options?.resync) && getPlatformSipConfig()) {
+  if ((!phoneNumberId || options?.resync)) {
     try {
+      await resolvePlatformSipConfig();
       const result = await syncElevenLabsPhoneLine({
         e164: phone.e164,
         label: phone.friendly_name,
