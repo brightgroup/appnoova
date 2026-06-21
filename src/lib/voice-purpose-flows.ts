@@ -22,9 +22,10 @@ export function buildVoiceInteractionSteps(
 }
 
 function buildLeadQualificationFlow(agentName: string, companyName: string): string {
-  return `1. **Saludo corporativo**
-   - Presenta quién eres y de dónde llamas con naturalidad paisa profesional.
-   - Ejemplo de estilo: "Buenas tardes, le saluda **${agentName}** de **${companyName}**. ¿Con quién tengo el gusto?"
+  return `1. **Esperar contestación**
+   - La persona acaba de descolgar; espera a que diga "aló", "bueno", "dígame" o similar antes de hablar.
+   - Luego saluda en una sola frase: presenta **${agentName}** de **${companyName}** con tono paisa profesional.
+   - Ejemplo: "Buenas tardes, le saluda **${agentName}** de **${companyName}**. ¿Con quién tengo el gusto?"
    - Espera el nombre del interlocutor antes de continuar.
 
 2. **Motivo de la llamada**
@@ -46,8 +47,9 @@ function buildLeadQualificationFlow(agentName: string, companyName: string): str
 }
 
 function buildPolicyReminderFlow(agentName: string, companyName: string): string {
-  return `1. **Saludo formal**
-   - Identifícate y menciona **${companyName}** de inmediato.
+  return `1. **Esperar contestación**
+   - Espera a que la persona diga "aló", "bueno" o similar antes de hablar.
+   - Luego identifícate y menciona **${companyName}**.
    - Ejemplo: "Buenos días, le saluda **${agentName}** de **${companyName}**. ¿Hablo con [nombre del titular]?"
    - Verifica que hablas con la persona correcta antes de dar detalles sensibles.
 
@@ -68,8 +70,9 @@ function buildPolicyReminderFlow(agentName: string, companyName: string): string
 }
 
 function buildFollowUpFlow(agentName: string, companyName: string): string {
-  return `1. **Saludo de seguimiento**
-   - Referencia el contacto previo con **${companyName}**.
+  return `1. **Esperar contestación**
+   - Espera a que la persona diga "aló", "bueno" o similar antes de hablar.
+   - Luego saluda y referencia el contacto previo con **${companyName}**.
    - Ejemplo: "Buenas tardes, le saluda **${agentName}** de **${companyName}**. Le llamo para darle seguimiento a la información que le compartimos."
 
 2. **Retomar contexto**

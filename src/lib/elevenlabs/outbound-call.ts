@@ -32,6 +32,12 @@ export async function placeElevenLabsOutboundCall(input: {
       telephony_call_config: { ringing_timeout_secs: 60 },
       conversation_initiation_client_data: {
         dynamic_variables: buildColombiaTemporalContext().dynamicVariables,
+        // Sin first_message: ElevenLabs espera a que la persona diga "aló" antes de hablar.
+        conversation_config_override: {
+          agent: {
+            first_message: "",
+          },
+        },
       },
     },
   });

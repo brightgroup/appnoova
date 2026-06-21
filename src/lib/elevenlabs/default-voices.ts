@@ -28,6 +28,17 @@ export const ELEVENLABS_DEFAULT_VOICES = CURATED_PREMIUM_VOICES.map(v => ({
   label: v.label,
 }));
 
+/**
+ * Llamadas salientes por teléfono: el humano contesta con "aló"/"bueno" antes de que hable la IA.
+ * Se combina con first_message vacío en outbound-call (ElevenLabs espera al usuario).
+ */
+export const PREMIUM_OUTBOUND_PICKUP_PROMPT = `
+
+## Apertura en llamada saliente (obligatorio)
+- Tú iniciaste la llamada; la persona acaba de contestar. NO hables hasta que diga algo ("aló", "bueno", "dígame", "hola", "sí", etc.).
+- Cuando responda, saluda en UNA sola frase breve y natural (presenta nombre y empresa) y continúa el guion.
+- No repitas el saludo si ya saludaste; no hables encima de la persona.`;
+
 /** Instrucción de cierre — el agente debe usar end_call al despedirse. */
 export const PREMIUM_CALL_ENDING_PROMPT = `
 

@@ -89,7 +89,7 @@ export const VOICE_AGENT_PURPOSES: AgentPurposeMeta[] = [
     id: "lead-qualification",
     label: "Calificación de leads",
     emoji: "🎯",
-    tag: "Inbound",
+    tag: "Outbound",
     description: "Llama a prospectos, califica intención y recopila datos clave.",
     stat: "+40% conversión",
     statColor: "text-[#38bdf8]",

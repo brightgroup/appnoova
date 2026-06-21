@@ -4,6 +4,7 @@ import {
   DEFAULT_ELEVENLABS_VOICE_ID,
   PREMIUM_CALL_ENDING_PROMPT,
   PREMIUM_END_CALL_TOOL,
+  PREMIUM_OUTBOUND_PICKUP_PROMPT,
 } from "@/lib/elevenlabs/default-voices";
 import { listCuratedPremiumVoices } from "@/lib/elevenlabs/premium-voices";
 import { ELEVENLABS_DEFAULT_LLM, ELEVENLABS_TTS_MODEL_ID } from "@/lib/elevenlabs/config";
@@ -21,6 +22,19 @@ function buildFirstMessage(agentName: string, companyName: string): string {
   return `Buenas tardes, le saluda ${agentName} de ${companyName}. ¿Con quién tengo el gusto?`;
 }
 
+/** Permite anular first_message en cada llamada SIP (p. ej. esperar el "aló" del cliente). */
+function buildPlatformSettings() {
+  return {
+    overrides: {
+      conversation_config_override: {
+        agent: {
+          first_message: true,
+        },
+      },
+    },
+  };
+}
+
 function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string) {
   const voiceId = input.elevenlabsVoiceId?.trim() || DEFAULT_ELEVENLABS_VOICE_ID;
   const temperature = Math.min(1.2, Math.max(0.3, Number(input.temperature) || 0.85));
@@ -32,7 +46,7 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
       // Igual que el widget EL: no interrumpir el saludo inicial por ruido ambiente.
       disable_first_message_interruptions: true,
       prompt: {
-        prompt: `${ELEVENLABS_TEMPORAL_PROMPT_BLOCK}\n\n${input.prompt.trim()}${PREMIUM_CALL_ENDING_PROMPT}`,
+        prompt: `${ELEVENLABS_TEMPORAL_PROMPT_BLOCK}\n\n${input.prompt.trim()}${PREMIUM_OUTBOUND_PICKUP_PROMPT}${PREMIUM_CALL_ENDING_PROMPT}`,
         llm: ELEVENLABS_DEFAULT_LLM,
         temperature,
         tools: [PREMIUM_END_CALL_TOOL],
@@ -65,6 +79,7 @@ export async function syncElevenLabsAgent(
 ): Promise<{ agentId: string; voiceId: string }> {
   const companyName = input.companyName?.trim() || "Mi empresa";
   const conversation_config = buildConversationConfig(input, companyName);
+  const platform_settings = buildPlatformSettings();
   const voiceId = conversation_config.tts.voice_id;
 
   if (input.existingAgentId?.trim()) {
@@ -73,6 +88,7 @@ export async function syncElevenLabsAgent(
       json: {
         name: input.name.trim(),
         conversation_config,
+        platform_settings,
       },
     });
     return { agentId: input.existingAgentId.trim(), voiceId };
@@ -83,6 +99,7 @@ export async function syncElevenLabsAgent(
     json: {
       name: input.name.trim(),
       conversation_config,
+      platform_settings,
     },
   });
 
