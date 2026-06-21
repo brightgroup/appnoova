@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Phone, Loader2, Copy, CheckCircle2, Plus, Link2, Unlink } from "lucide-react";
+import { Phone, Loader2, Copy, CheckCircle2, Plus, Link2, Unlink, AlertCircle } from "lucide-react";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import type { PhoneNumberRecord } from "@/types/phone-number";
 import { btnPrimarySm, btnGhost, textMuted, textSecondary } from "@/lib/brand-ui";
@@ -16,7 +16,6 @@ interface AgentPhoneChannelPanelProps {
 
 export function AgentPhoneChannelPanel({ agentId, isPremium = false }: AgentPhoneChannelPanelProps) {
   const [line, setLine] = useState<PhoneNumberRecord | null>(null);
-  const [premiumLine, setPremiumLine] = useState<{ e164: string | null; label: string | null; configured: boolean } | null>(null);
   const [availableLines, setAvailableLines] = useState<PhoneNumberRecord[]>([]);
   const [selectedLineId, setSelectedLineId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -30,20 +29,6 @@ export function AgentPhoneChannelPanel({ agentId, isPremium = false }: AgentPhon
     setError("");
     try {
       const headers = await getAuthHeaders();
-      if (isPremium) {
-        const res = await fetch("/api/voice/agents/elevenlabs/phone-line", { headers });
-        const data = await res.json();
-        setPremiumLine(res.ok ? {
-          configured: Boolean(data.configured),
-          e164: data.e164 ?? null,
-          label: data.label ?? null,
-        } : { configured: false, e164: null, label: null });
-        setLine(null);
-        setAvailableLines([]);
-        return;
-      }
-
-      setPremiumLine(null);
       const [assignedRes, allRes] = await Promise.all([
         fetch(`/api/telephony/numbers?agent_id=${agentId}`, { headers }),
         fetch("/api/telephony/numbers", { headers })
@@ -63,7 +48,7 @@ export function AgentPhoneChannelPanel({ agentId, isPremium = false }: AgentPhon
     } finally {
       setLoading(false);
     }
-  }, [agentId, isPremium]);
+  }, [agentId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -111,12 +96,14 @@ export function AgentPhoneChannelPanel({ agentId, isPremium = false }: AgentPhon
   }
 
   async function copyNumber() {
-    const e164 = isPremium ? premiumLine?.e164 : line?.e164;
-    if (!e164) return;
-    await navigator.clipboard.writeText(e164);
+    if (!line?.e164) return;
+    await navigator.clipboard.writeText(line.e164);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
+
+  const premiumSynced = !isPremium || Boolean(line?.elevenlabs_phone_number_id && !line?.elevenlabs_sync_error);
+  const premiumPending = isPremium && line && !premiumSynced;
 
   if (loading) {
     return (
@@ -136,7 +123,7 @@ export function AgentPhoneChannelPanel({ agentId, isPremium = false }: AgentPhon
           </div>
           <p className={`text-sm ${textMuted}`}>
             {isPremium
-              ? "Línea premium para llamadas salientes (SIP ElevenLabs)."
+              ? "Asigna una línea Noova — se sincroniza automáticamente para llamadas premium."
               : "Asigna una línea Noova a este agente."}
           </p>
         </div>
@@ -145,48 +132,35 @@ export function AgentPhoneChannelPanel({ agentId, isPremium = false }: AgentPhon
           <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400">{error}</div>
         )}
 
-        {isPremium ? (
-          premiumLine?.configured && premiumLine.e164 ? (
-            <div className="rounded-2xl border border-white/[.10] bg-noova-surface p-6 space-y-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className={`text-xs uppercase tracking-wide ${textMuted} mb-1`}>
-                    {premiumLine.label ?? "Línea premium"}
-                  </p>
-                  <p className="text-2xl font-bold text-white font-mono">{premiumLine.e164}</p>
-                </div>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Activa
-                </span>
+        {premiumPending && (
+          <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[.06] p-4 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-100">Sincronización premium pendiente</p>
+                <p className={`text-xs ${textMuted} mt-1 leading-relaxed`}>
+                  {line.elevenlabs_sync_error ??
+                    "La línea está asignada pero aún no se vinculó con el proveedor de voz premium. Desvincula y vuelve a asignar, o contacta soporte."}
+                </p>
               </div>
-              <button onClick={copyNumber} className={btnPrimarySm}>
-                {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied ? "Copiado" : "Copiar"}
-              </button>
-              <p className={`text-xs ${textMuted} leading-relaxed`}>
-                Esta línea se configura en el servidor con{" "}
-                <code className="text-gray-300">ELEVENLABS_PHONE_NUMBER_ID</code>.
-                Úsala en <strong className="text-white">Probar → teléfono</strong>.
-              </p>
             </div>
-          ) : (
-            <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[.06] p-6 space-y-3">
-              <p className="text-sm font-medium text-amber-100">Línea premium pendiente</p>
-              <p className={`text-xs ${textMuted} leading-relaxed`}>
-                Importa tu número en ElevenLabs → Phone Numbers y define{" "}
-                <code className="text-gray-300">ELEVENLABS_PHONE_NUMBER_ID</code> en el servidor.
-              </p>
-            </div>
-          )
-        ) : line ? (
+          </div>
+        )}
+
+        {line ? (
           <div className="rounded-2xl border border-white/[.10] bg-noova-surface p-6 space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className={`text-xs uppercase tracking-wide ${textMuted} mb-1`}>Línea asignada</p>
                 <p className="text-2xl font-bold text-white font-mono">{line.e164}</p>
               </div>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Activa
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                premiumPending
+                  ? "bg-amber-500/15 text-amber-400 border-amber-500/25"
+                  : "bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
+              }`}>
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {premiumPending ? "Pendiente sync" : "Activa"}
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -199,6 +173,12 @@ export function AgentPhoneChannelPanel({ agentId, isPremium = false }: AgentPhon
                 Desvincular
               </button>
             </div>
+
+            {isPremium && premiumSynced && (
+              <p className={`text-xs ${textMuted} leading-relaxed`}>
+                Línea vinculada para llamadas premium. Úsala en <strong className="text-white">Probar → teléfono</strong>.
+              </p>
+            )}
 
             {availableLines.length > 0 && (
               <div className="pt-4 border-t border-white/[.08] space-y-2">
@@ -256,11 +236,9 @@ export function AgentPhoneChannelPanel({ agentId, isPremium = false }: AgentPhon
           </div>
         )}
 
-        {!isPremium && (
         <Link href="/dashboard/agentes-voz/numeros" className={`inline-flex text-xs ${textMuted} hover:text-white`}>
           Ver todas mis líneas →
         </Link>
-        )}
       </div>
 
       <ClientLineWizard

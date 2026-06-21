@@ -26,6 +26,10 @@ export interface PhoneNumberRecord {
   assigned_by: string | null;
   assigned_at: string;
   released_at: string | null;
+  /** ID remoto ElevenLabs (import SIP) — voz premium */
+  elevenlabs_phone_number_id?: string | null;
+  elevenlabs_sync_error?: string | null;
+  elevenlabs_synced_at?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -18,13 +18,6 @@ import type { VoiceProvider } from "@/types/voice-agent";
 
 type CallPhase = "dialing" | "ringing" | "answered" | "speaking" | "connected" | "ended" | "failed";
 
-interface PremiumLineInfo {
-  configured: boolean;
-  e164: string | null;
-  label: string | null;
-  available_numbers?: { phone_number_id: string; phone_number: string; label: string }[];
-}
-
 interface ActiveCall {
   callId: string;
   callControlId: string;
@@ -73,7 +66,6 @@ function formatDuration(sec: number) {
 export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", onCallDetected }: PhoneTestPanelProps) {
   const isPremium = voiceProvider === "elevenlabs";
   const [agentLines, setAgentLines] = useState<PhoneNumberRecord[]>([]);
-  const [premiumLine, setPremiumLine] = useState<PremiumLineInfo | null>(null);
   const [testNumbers, setTestNumbers] = useState<TestPhoneNumberRecord[]>([]);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [selectedTestId, setSelectedTestId] = useState<string | null>(null);
@@ -101,32 +93,18 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
         ? (testData.test_numbers ?? []).filter((n: TestPhoneNumberRecord) => n.active !== false)
         : [];
 
-      if (isPremium) {
-        setAgentLines([]);
-        setSelectedLineId(null);
-        const lineRes = await fetch("/api/voice/agents/elevenlabs/phone-line", { headers });
-        const lineData = await lineRes.json();
-        setPremiumLine(lineRes.ok ? {
-          configured: Boolean(lineData.configured),
-          e164: lineData.e164 ?? null,
-          label: lineData.label ?? null,
-          available_numbers: lineData.available_numbers ?? [],
-        } : { configured: false, e164: null, label: null, available_numbers: [] });
-      } else {
-        setPremiumLine(null);
-        const lineRes = await fetch(`/api/telephony/numbers?agent_id=${agentId}`, { headers });
-        const lineData = await lineRes.json();
-        const lines: PhoneNumberRecord[] = lineRes.ok ? (lineData.phone_numbers ?? []) : [];
-        setAgentLines(lines);
-        setSelectedLineId(prev => (prev && lines.some(l => l.id === prev) ? prev : lines[0]?.id ?? null));
-      }
+      const lineRes = await fetch(`/api/telephony/numbers?agent_id=${agentId}`, { headers });
+      const lineData = await lineRes.json();
+      const lines: PhoneNumberRecord[] = lineRes.ok ? (lineData.phone_numbers ?? []) : [];
+      setAgentLines(lines);
+      setSelectedLineId(prev => (prev && lines.some(l => l.id === prev) ? prev : lines[0]?.id ?? null));
 
       setTestNumbers(tests);
       setSelectedTestId(prev => (prev && tests.some(t => t.id === prev) ? prev : tests[0]?.id ?? null));
     } finally {
       setLoading(false);
     }
-  }, [agentId, isPremium]);
+  }, [agentId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -146,12 +124,10 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
 
   const selectedLine = agentLines.find(l => l.id === selectedLineId) ?? null;
   const selectedTest = testNumbers.find(n => n.id === selectedTestId) ?? null;
-  const premiumLineReady = isPremium && Boolean(premiumLine?.configured);
-  const canTest = Boolean(
-    agentId
-    && selectedTest
-    && (isPremium ? premiumLineReady : selectedLine)
+  const lineReady = selectedLine && (
+    !isPremium || Boolean(selectedLine.elevenlabs_phone_number_id && !selectedLine.elevenlabs_sync_error)
   );
+  const canTest = Boolean(agentId && selectedTest && lineReady);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -221,13 +197,11 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
       const url = isPremium
         ? "/api/voice/agents/elevenlabs/outbound-call"
         : "/api/telephony/test-call";
-      const body = isPremium
-        ? { voice_agent_id: agentId, test_number_id: selectedTest!.id }
-        : {
-            voice_agent_id: agentId,
-            phone_number_id: selectedLine!.id,
-            test_number_id: selectedTest!.id
-          };
+      const body = {
+        voice_agent_id: agentId,
+        phone_number_id: selectedLine!.id,
+        test_number_id: selectedTest!.id,
+      };
       const res = await fetch(url, {
         method: "POST",
         headers,
@@ -236,11 +210,6 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "No se pudo iniciar la llamada");
-        if (data.code === "premium_phone_not_configured" && data.available_numbers?.length) {
-          setError(
-            `${data.error} IDs disponibles: ${data.available_numbers.map((n: { phone_number_id: string; phone_number: string }) => `${n.phone_number} (${n.phone_number_id})`).join(", ")}`
-          );
-        }
         return;
       }
       setActiveCall({
@@ -267,9 +236,8 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
   }
 
   async function copySender() {
-    const e164 = isPremium ? premiumLine?.e164 : selectedLine?.e164;
-    if (!e164) return;
-    await navigator.clipboard.writeText(e164);
+    if (!selectedLine?.e164) return;
+    await navigator.clipboard.writeText(selectedLine.e164);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -372,12 +340,12 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-8">
       <RegistryTableLayout
-        search={isPremium ? "" : lineSearch}
-        onSearchChange={isPremium ? () => {} : setLineSearch}
+        search={lineSearch}
+        onSearchChange={setLineSearch}
         searchPlaceholder="Buscar remitente"
         onRefresh={load}
         action={
-          (isPremium ? premiumLine?.e164 : selectedLine) ? (
+          selectedLine ? (
             <button onClick={copySender} className={btnPrimarySm}>
               {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               {copied ? "Copiado" : "Copiar remitente"}
@@ -385,35 +353,15 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
           ) : undefined
         }
         alerts={
-          isPremium ? (
-            !premiumLineReady ? (
-              <div className="rounded-xl border border-amber-500/25 bg-amber-500/[.06] p-4 mb-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-amber-100">Línea premium no configurada</p>
-                    <p className={`text-xs ${textMuted} mt-1`}>
-                      Importa tu número en ElevenLabs → Phone Numbers (SIP/Telnyx) y define{" "}
-                      <code className="text-white">ELEVENLABS_PHONE_NUMBER_ID</code> en el servidor.
-                    </p>
-                    {(premiumLine?.available_numbers?.length ?? 0) > 0 && (
-                      <p className={`text-xs ${textMuted} mt-2`}>
-                        Números en ElevenLabs:{" "}
-                        {premiumLine!.available_numbers!.map(n => `${n.phone_number} (${n.phone_number_id})`).join(" · ")}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : undefined
-          ) : agentLines.length === 0 ? (
+          agentLines.length === 0 ? (
             <div className="rounded-xl border border-amber-500/25 bg-amber-500/[.06] p-4 mb-4">
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-amber-100">Sin línea asignada a este agente</p>
                   <p className={`text-xs ${textMuted} mt-1`}>
-                    Asigna una línea Telnyx en <strong className="text-white">Canales</strong>.
+                    Asigna una línea Noova en <strong className="text-white">Canales</strong>
+                    {isPremium ? " — se sincroniza automáticamente para voz premium." : "."}
                   </p>
                   <Link
                     href={`/dashboard/agentes-voz/configuracion?id=${agentId}&tab=canales`}
@@ -424,45 +372,28 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
                 </div>
               </div>
             </div>
+          ) : isPremium && selectedLine && !lineReady ? (
+            <div className="rounded-xl border border-amber-500/25 bg-amber-500/[.06] p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-100">Línea premium pendiente de sincronizar</p>
+                  <p className={`text-xs ${textMuted} mt-1`}>
+                    {selectedLine.elevenlabs_sync_error ??
+                      "Desvincula y vuelve a asignar la línea en Canales, o contacta soporte."}
+                  </p>
+                </div>
+              </div>
+            </div>
           ) : undefined
         }
       >
         <p className="text-sm font-semibold text-white mb-3">Número remitente</p>
         <p className={`text-xs ${textMuted} -mt-2 mb-3`}>
-          {isPremium
-            ? "Línea premium importada en ElevenLabs (SIP)"
-            : "Línea Noova / Telnyx asignada al agente en Canales"}
+          Línea Noova asignada al agente en Canales
+          {isPremium ? " (voz premium)" : ""}
         </p>
-        {isPremium ? (
-          premiumLineReady ? (
-            <div className={registryTableWrap}>
-              <table className={registryTable}>
-                <thead className={registryTableHead}>
-                  <tr className={registryTableHeadRow}>
-                    <th className={registryTableHeadCell}>Nombre</th>
-                    <th className={registryTableHeadCell}>Número</th>
-                    <th className={registryTableHeadCell}>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className={registryTableRowClickable}>
-                    <td className={`${registryTableCell} text-gray-200`}>
-                      {premiumLine?.label ?? "Línea premium"}
-                    </td>
-                    <td className={`${registryTableCell} font-mono text-sm text-white`}>
-                      {premiumLine?.e164 ? formatPhoneDisplay(premiumLine.e164) : "Configurada en servidor"}
-                    </td>
-                    <td className={registryTableCell}>
-                      <span className="inline-flex items-center gap-1.5 text-emerald-400">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400" /> Activo
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          ) : null
-        ) : agentLines.length > 0 ? (
+        {agentLines.length > 0 ? (
           <div className={registryTableWrap}>
             <table className={registryTable}>
               <thead className={registryTableHead}>
@@ -475,6 +406,7 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
               <tbody>
                 {filteredLines.map(line => {
                   const selected = line.id === selectedLineId;
+                  const synced = !isPremium || Boolean(line.elevenlabs_phone_number_id && !line.elevenlabs_sync_error);
                   return (
                     <tr
                       key={line.id}
@@ -491,8 +423,9 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
                         {selected && <span className="ml-2 text-[10px] text-gray-400 font-sans">Actual</span>}
                       </td>
                       <td className={registryTableCell}>
-                        <span className="inline-flex items-center gap-1.5 text-emerald-400">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400" /> Activo
+                        <span className={`inline-flex items-center gap-1.5 ${synced ? "text-emerald-400" : "text-amber-400"}`}>
+                          <span className={`w-2 h-2 rounded-full ${synced ? "bg-emerald-400" : "bg-amber-400"}`} />
+                          {synced ? "Activo" : "Pendiente"}
                         </span>
                       </td>
                     </tr>
@@ -577,21 +510,10 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
                 <p className="text-sm font-medium text-white">Listo para probar</p>
               </div>
               <p className={`text-xs ${textSecondary}`}>
-                {isPremium ? (
-                  <>
-                    Desde{" "}
-                    <span className="font-mono text-white">
-                      {premiumLine?.e164 ? formatPhoneDisplay(premiumLine.e164) : "línea premium"}
-                    </span>
-                    {" "}hacia{" "}
-                    <span className="font-mono text-white">{formatPhoneDisplay(selectedTest!.e164)}</span>.
-                  </>
-                ) : (
-                  <>
-                    Desde <span className="font-mono text-white">{formatPhoneDisplay(selectedLine!.e164)}</span> hacia{" "}
-                    <span className="font-mono text-white">{formatPhoneDisplay(selectedTest!.e164)}</span>.
-                  </>
-                )}
+                Desde{" "}
+                <span className="font-mono text-white">{formatPhoneDisplay(selectedLine!.e164)}</span>
+                {" "}hacia{" "}
+                <span className="font-mono text-white">{formatPhoneDisplay(selectedTest!.e164)}</span>.
                 {" "}Contesta en tu celular para escuchar al agente.
               </p>
             </div>

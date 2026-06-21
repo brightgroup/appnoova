@@ -10,10 +10,14 @@ export interface ElevenLabsOutboundCallResult {
 export async function placeElevenLabsOutboundCall(input: {
   agentId: string;
   toE164: string;
+  agentPhoneNumberId?: string | null;
 }): Promise<ElevenLabsOutboundCallResult> {
-  const phoneNumberId = getElevenLabsPhoneNumberId();
+  const phoneNumberId =
+    input.agentPhoneNumberId?.trim() || getElevenLabsPhoneNumberId();
   if (!phoneNumberId) {
-    throw new Error("ELEVENLABS_PHONE_NUMBER_ID no configurado en el servidor");
+    throw new Error(
+      "Sin línea premium sincronizada — asigna una línea Telnyx al agente en Canales"
+    );
   }
 
   const data = await elevenLabsFetch<{

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { billingBlockedMessage, checkBillingForUser } from "@/lib/billing/meter";
+import { getElevenLabsApiKey } from "@/lib/elevenlabs/config";
 import { placeElevenLabsOutboundCall } from "@/lib/elevenlabs/outbound-call";
-import { getElevenLabsPhoneLineInfo, listElevenLabsPhoneNumbers } from "@/lib/elevenlabs/phone-line";
-import { getElevenLabsApiKey, getElevenLabsPhoneNumberId } from "@/lib/elevenlabs/config";
+import { resolveElevenLabsPhoneLine } from "@/lib/elevenlabs/phone-line";
 import { createPhoneTestCallSession } from "@/lib/telephony/test-call-session";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
 
@@ -17,28 +17,19 @@ export async function POST(req: NextRequest) {
       { status: 503 }
     );
   }
-  if (!getElevenLabsPhoneNumberId()) {
-    const available = await listElevenLabsPhoneNumbers();
-    return NextResponse.json(
-      {
-        error: available.length
-          ? "Falta ELEVENLABS_PHONE_NUMBER_ID en el servidor. Importa tu número en ElevenLabs y configura el ID."
-          : "No hay línea telefónica importada en ElevenLabs. Ve a Phone Numbers e importa tu número SIP/Telnyx.",
-        code: "premium_phone_not_configured",
-        available_numbers: available,
-      },
-      { status: 503 }
-    );
-  }
 
   const body = await req.json();
-  const { voice_agent_id, test_number_id } = body as {
+  const { voice_agent_id, phone_number_id, test_number_id } = body as {
     voice_agent_id?: string;
+    phone_number_id?: string;
     test_number_id?: string;
   };
 
-  if (!voice_agent_id || !test_number_id) {
-    return NextResponse.json({ error: "voice_agent_id y test_number_id requeridos" }, { status: 400 });
+  if (!voice_agent_id || !phone_number_id || !test_number_id) {
+    return NextResponse.json(
+      { error: "voice_agent_id, phone_number_id y test_number_id requeridos" },
+      { status: 400 }
+    );
   }
 
   const db = adminClient();
@@ -50,7 +41,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const [{ data: test }, { data: agent }] = await Promise.all([
+  const [{ data: phone }, { data: test }, { data: agent }] = await Promise.all([
+    db
+      .from("phone_numbers")
+      .select(
+        "id, e164, friendly_name, voice_agent_id, elevenlabs_phone_number_id, elevenlabs_sync_error, elevenlabs_synced_at"
+      )
+      .eq("id", phone_number_id)
+      .eq("user_id", userId)
+      .eq("voice_agent_id", voice_agent_id)
+      .eq("status", "active")
+      .maybeSingle(),
     db
       .from("test_phone_numbers")
       .select("*")
@@ -65,6 +66,12 @@ export async function POST(req: NextRequest) {
       .maybeSingle(),
   ]);
 
+  if (!phone) {
+    return NextResponse.json(
+      { error: "Línea remitente no asignada a este agente", code: "premium_phone_not_assigned" },
+      { status: 400 }
+    );
+  }
   if (!test) {
     return NextResponse.json({ error: "Número destinatario no encontrado" }, { status: 400 });
   }
@@ -75,23 +82,56 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Este agente no es de voz premium" }, { status: 400 });
   }
   if (!agent.elevenlabs_agent_id) {
-    return NextResponse.json({ error: "Agente premium sin sincronizar. Guarda la configuración primero." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Agente premium sin sincronizar. Guarda la configuración primero." },
+      { status: 400 }
+    );
+  }
+
+  const line = await resolveElevenLabsPhoneLine(phone, {
+    elevenlabsAgentId: agent.elevenlabs_agent_id,
+    resync: !phone.elevenlabs_phone_number_id,
+  });
+
+  if (!line.configured || !line.phoneNumberId) {
+    return NextResponse.json(
+      {
+        error:
+          line.syncError ??
+          "Línea premium sin sincronizar — asigna la línea en Canales o contacta soporte",
+        code: "premium_phone_not_configured",
+      },
+      { status: 503 }
+    );
+  }
+
+  if (line.phoneNumberId !== phone.elevenlabs_phone_number_id) {
+    await db
+      .from("phone_numbers")
+      .update({
+        elevenlabs_phone_number_id: line.phoneNumberId,
+        elevenlabs_sync_error: line.syncError ?? null,
+        elevenlabs_synced_at: line.syncedAt ?? new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", phone.id)
+      .eq("user_id", userId);
   }
 
   try {
-    const line = await getElevenLabsPhoneLineInfo();
     const { conversationId } = await placeElevenLabsOutboundCall({
       agentId: agent.elevenlabs_agent_id,
       toE164: test.e164,
+      agentPhoneNumberId: line.phoneNumberId,
     });
 
-    const fromE164 = line.e164 ?? "Premium";
+    const fromE164 = line.e164 ?? phone.e164;
 
     const callId = await createPhoneTestCallSession({
       userId,
       voiceAgentId: voice_agent_id,
       callControlId: conversationId,
-      phoneNumberId: line.phoneNumberId ?? "",
+      phoneNumberId: phone_number_id,
       testNumberId: test_number_id,
       from: fromE164,
       to: test.e164,
