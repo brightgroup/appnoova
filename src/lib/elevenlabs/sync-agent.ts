@@ -41,16 +41,16 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
     },
     turn: {
       turn_timeout: 7,
-      turn_eagerness: "normal",
+      turn_eagerness: "low",
       mode: "turn",
       speculative_turn: false,
     },
     tts: {
       voice_id: voiceId,
       model_id: ELEVENLABS_TTS_MODEL_ID,
-      optimize_streaming_latency: 1,
-      stability: 0.55,
-      similarity_boost: 0.82,
+      optimize_streaming_latency: 0,
+      stability: 0.72,
+      similarity_boost: 0.78,
     },
     conversation: {
       max_duration_seconds: 600,

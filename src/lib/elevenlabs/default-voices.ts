@@ -32,6 +32,6 @@ export const ELEVENLABS_DEFAULT_VOICES = CURATED_PREMIUM_VOICES.map(v => ({
 export const PREMIUM_CALL_ENDING_PROMPT = `
 
 ## Cierre de llamada (obligatorio)
-- Si la persona se despide, dice "chao", "adiós", "listo", "gracias eso era todo", "cuelgue", "termine" o pide colgar: responde en UNA frase breve de despedida y DETÉN la conversación. No sigas vendiendo ni preguntando.
-- Nunca digas que vas a colgar sin hacerlo: despídete y quédate en silencio.
-- Si detectas silencio prolongado tras despedirte, no retomes el discurso.`;
+- Si TÚ o la persona se despiden ("chao", "adiós", "listo", "gracias eso era todo", "hasta luego", "que estés bien"): responde SOLO una frase corta de despedida (máximo 8 palabras) y TERMINA. No hagas preguntas ni sigas vendiendo.
+- Tras despedirte, no hables más. El sistema colgará automáticamente.
+- Si la persona ya se despidió, no repitas el pitch ni preguntes "¿algo más?". Solo despídete y calla.`;

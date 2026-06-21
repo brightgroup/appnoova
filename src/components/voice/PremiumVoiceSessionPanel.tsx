@@ -68,10 +68,9 @@ export function PremiumVoiceSessionPanel({
   const conversationIdRef = useRef<string | null>(null);
   const lastDisconnectRef = useRef<DisconnectionDetails | null>(null);
   const goodbyeTriggeredRef = useRef(false);
-  const pendingGoodbyeHangupRef = useRef(false);
+  const goodbyeHangupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const agentSpeakingRef = useRef(false);
   const pendingUserTextRef = useRef("");
-  const goodbyeHangupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { agentIdRef.current = agentId; }, [agentId]);
   useEffect(() => { durationRef.current = duration; }, [duration]);
@@ -189,7 +188,6 @@ export function PremiumVoiceSessionPanel({
     lastDisconnectRef.current = null;
     userEndedRef.current = false;
     goodbyeTriggeredRef.current = false;
-    pendingGoodbyeHangupRef.current = false;
     agentSpeakingRef.current = false;
     pendingUserTextRef.current = "";
     if (goodbyeHangupTimerRef.current) clearTimeout(goodbyeHangupTimerRef.current);
@@ -214,7 +212,6 @@ export function PremiumVoiceSessionPanel({
   const finishSession = useCallback((opts?: { navigateAway?: boolean; clearTranscript?: boolean }) => {
     if (endingRef.current) return;
     endingRef.current = true;
-    pendingGoodbyeHangupRef.current = false;
     if (goodbyeHangupTimerRef.current) clearTimeout(goodbyeHangupTimerRef.current);
     goodbyeHangupTimerRef.current = null;
     sessionEpochRef.current += 1;
@@ -238,20 +235,13 @@ export function PremiumVoiceSessionPanel({
     });
   }, [endConversation, onEndCall, persistSnapshot, resetSessionState]);
 
-  const executeGoodbyeHangup = useCallback(() => {
-    if (!pendingGoodbyeHangupRef.current || endingRef.current) return;
-    pendingGoodbyeHangupRef.current = false;
-    finishSession({ navigateAway: true });
-  }, [finishSession]);
-
-  const queueGoodbyeHangup = useCallback((role: "user" | "agent") => {
+  const scheduleGoodbyeHangup = useCallback((role: "user" | "agent") => {
     if (goodbyeTriggeredRef.current || userEndedRef.current || endingRef.current) return;
     goodbyeTriggeredRef.current = true;
-    pendingGoodbyeHangupRef.current = true;
     userEndedRef.current = true;
     setStatusHint(
       role === "user"
-        ? "Despedida detectada · Esperando cierre..."
+        ? "Despedida detectada · Colgando..."
         : `${agentName} se despidió · Colgando...`
     );
 
@@ -260,16 +250,22 @@ export function PremiumVoiceSessionPanel({
       try { conv.setMicMuted(true); } catch { /* ignore */ }
     }
 
-    if (!agentSpeakingRef.current) {
-      executeGoodbyeHangup();
-      return;
-    }
-
+    const delayMs = role === "agent" ? 2200 : 2800;
     if (goodbyeHangupTimerRef.current) clearTimeout(goodbyeHangupTimerRef.current);
     goodbyeHangupTimerRef.current = setTimeout(() => {
-      executeGoodbyeHangup();
-    }, 10000);
-  }, [agentName, executeGoodbyeHangup]);
+      finishSession({ navigateAway: true });
+    }, delayMs);
+  }, [agentName, finishSession]);
+
+  const flushPendingUserText = useCallback((checkGoodbye: boolean) => {
+    const userText = pendingUserTextRef.current.trim();
+    if (!userText) return;
+    pendingUserTextRef.current = "";
+    appendTranscript("user", userText);
+    if (checkGoodbye && !goodbyeTriggeredRef.current && isGoodbyeUtterance(userText)) {
+      scheduleGoodbyeHangup("user");
+    }
+  }, [appendTranscript, scheduleGoodbyeHangup]);
 
   const handleDisconnect = useCallback((details: DisconnectionDetails, epoch: number) => {
     if (epoch !== sessionEpochRef.current || userEndedRef.current) return;
@@ -349,16 +345,18 @@ export function PremiumVoiceSessionPanel({
 
           if (role === "user") {
             pendingUserTextRef.current = trimmed;
+            if (!goodbyeTriggeredRef.current && isGoodbyeUtterance(trimmed)) {
+              appendTranscript("user", trimmed);
+              pendingUserTextRef.current = "";
+              scheduleGoodbyeHangup("user");
+            }
             return;
           }
 
-          if (pendingUserTextRef.current) {
-            appendTranscript("user", pendingUserTextRef.current);
-            pendingUserTextRef.current = "";
-          }
+          flushPendingUserText(true);
           appendTranscript("agent", trimmed);
           if (!goodbyeTriggeredRef.current && isGoodbyeUtterance(trimmed)) {
-            queueGoodbyeHangup("agent");
+            scheduleGoodbyeHangup("agent");
           }
         },
         onModeChange: ({ mode }) => {
@@ -366,17 +364,10 @@ export function PremiumVoiceSessionPanel({
           agentSpeakingRef.current = mode === "speaking";
           setState(mode === "speaking" ? "speaking" : "listening");
 
-          if (mode === "speaking" && pendingUserTextRef.current && !goodbyeTriggeredRef.current) {
-            const userText = pendingUserTextRef.current;
-            pendingUserTextRef.current = "";
-            appendTranscript("user", userText);
-            if (isGoodbyeUtterance(userText)) {
-              queueGoodbyeHangup("user");
-            }
-          }
-
-          if (mode === "listening" && pendingGoodbyeHangupRef.current) {
-            executeGoodbyeHangup();
+          if (mode === "speaking") {
+            flushPendingUserText(true);
+          } else if (mode === "listening") {
+            flushPendingUserText(true);
           }
         },
       });
@@ -408,7 +399,7 @@ export function PremiumVoiceSessionPanel({
       );
       setState("error");
     }
-  }, [appendTranscript, executeGoodbyeHangup, handleDisconnect, persistSnapshot, queueGoodbyeHangup, startTimer]);
+  }, [appendTranscript, flushPendingUserText, handleDisconnect, persistSnapshot, scheduleGoodbyeHangup, startTimer]);
 
   const stopSession = useCallback(() => {
     if (endingRef.current) return;

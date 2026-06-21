@@ -64,8 +64,11 @@ export function AgentPhoneChannelPanel({ agentId, isPremium = false }: AgentPhon
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "No se pudo asignar la línea");
+        setError(data.error || data.sync_warning || "No se pudo asignar la línea");
         return;
+      }
+      if (data.sync_warning) {
+        setError(`Línea asignada, pero la sync premium falló: ${data.sync_warning}`);
       }
       await load();
     } finally {

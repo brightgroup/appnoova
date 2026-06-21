@@ -101,7 +101,6 @@ export async function PATCH(req: NextRequest) {
       elevenlabsFields = {
         elevenlabs_sync_error: message,
       };
-      return NextResponse.json({ error: message, code: "premium_line_sync_failed" }, { status: 502 });
     }
   }
 
@@ -118,5 +117,8 @@ export async function PATCH(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ phone_number: data });
+  return NextResponse.json({
+    phone_number: data,
+    sync_warning: elevenlabsFields.elevenlabs_sync_error ?? null,
+  });
 }

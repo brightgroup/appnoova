@@ -19,7 +19,10 @@ function parseCsv(value: string | undefined): string[] {
 
 /** Credenciales SIP plataforma (Telnyx ↔ ElevenLabs) — una sola vez en env. */
 export function getPlatformSipConfig(): PlatformSipConfig | null {
-  const outboundAddress = process.env.ELEVENLABS_SIP_OUTBOUND_ADDRESS?.trim();
+  const telnyxConfigured = Boolean(process.env.TELNYX_API_KEY?.trim());
+  const outboundAddress =
+    process.env.ELEVENLABS_SIP_OUTBOUND_ADDRESS?.trim()
+    || (telnyxConfigured ? "sip.telnyx.com" : null);
   if (!outboundAddress) return null;
 
   const transport = (process.env.ELEVENLABS_SIP_TRANSPORT?.trim() || "tcp") as SipTransport;
@@ -46,9 +49,10 @@ export function requirePlatformSipConfig(): PlatformSipConfig {
 }
 
 export function platformSipConfigStatus(): { configured: boolean; missing: string[] } {
-  const missing: string[] = [];
-  if (!process.env.ELEVENLABS_SIP_OUTBOUND_ADDRESS?.trim()) {
-    missing.push("ELEVENLABS_SIP_OUTBOUND_ADDRESS");
+  const telnyxConfigured = Boolean(process.env.TELNYX_API_KEY?.trim());
+  const explicitAddress = Boolean(process.env.ELEVENLABS_SIP_OUTBOUND_ADDRESS?.trim());
+  if (!explicitAddress && !telnyxConfigured) {
+    return { configured: false, missing: ["ELEVENLABS_SIP_OUTBOUND_ADDRESS o TELNYX_API_KEY"] };
   }
-  return { configured: missing.length === 0, missing };
+  return { configured: true, missing: [] };
 }
