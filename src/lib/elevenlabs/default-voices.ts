@@ -28,10 +28,17 @@ export const ELEVENLABS_DEFAULT_VOICES = CURATED_PREMIUM_VOICES.map(v => ({
   label: v.label,
 }));
 
-/** Instrucción de cierre — el agente debe colgar cuando el usuario se despide. */
+/** Instrucción de cierre — el agente debe usar end_call al despedirse. */
 export const PREMIUM_CALL_ENDING_PROMPT = `
 
 ## Cierre de llamada (obligatorio)
-- Si TÚ o la persona se despiden ("chao", "adiós", "listo", "gracias eso era todo", "hasta luego", "que estés bien"): responde SOLO una frase corta de despedida (máximo 8 palabras) y TERMINA. No hagas preguntas ni sigas vendiendo.
-- Tras despedirte, no hables más. El sistema colgará automáticamente.
-- Si la persona ya se despidió, no repitas el pitch ni preguntes "¿algo más?". Solo despídete y calla.`;
+- Si la persona se despide ("chao", "adiós", "gracias", "hasta luego", "cuelga", "listo"): responde UNA frase corta de despedida y usa la herramienta end_call de inmediato.
+- Si TÚ te despides, di tu frase de cierre y usa end_call — no preguntes "¿algo más?" ni "¿sigue ahí?".
+- Nunca sigas hablando después de una despedida. end_call es obligatorio tras cerrar.`;
+
+export const PREMIUM_END_CALL_TOOL = {
+  type: "system" as const,
+  name: "end_call",
+  description:
+    "Colgar la llamada cuando el usuario se despide o cuando ya dijiste tu despedida final. Usar tras chao, adiós, gracias, hasta luego, cuelga o listo.",
+};

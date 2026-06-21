@@ -257,15 +257,23 @@ export function PremiumVoiceSessionPanel({
     }, delayMs);
   }, [agentName, finishSession]);
 
+  const checkGoodbyeAndHangup = useCallback(() => {
+    if (goodbyeTriggeredRef.current || endingRef.current) return;
+    const lines = transcriptLinesRef.current;
+    if (lines.length === 0) return;
+    const last = lines[lines.length - 1];
+    if (last && isGoodbyeUtterance(last.text)) {
+      scheduleGoodbyeHangup(last.role);
+    }
+  }, [scheduleGoodbyeHangup]);
+
   const flushPendingUserText = useCallback((checkGoodbye: boolean) => {
     const userText = pendingUserTextRef.current.trim();
     if (!userText) return;
     pendingUserTextRef.current = "";
     appendTranscript("user", userText);
-    if (checkGoodbye && !goodbyeTriggeredRef.current && isGoodbyeUtterance(userText)) {
-      scheduleGoodbyeHangup("user");
-    }
-  }, [appendTranscript, scheduleGoodbyeHangup]);
+    if (checkGoodbye) checkGoodbyeAndHangup();
+  }, [appendTranscript, checkGoodbyeAndHangup]);
 
   const handleDisconnect = useCallback((details: DisconnectionDetails, epoch: number) => {
     if (epoch !== sessionEpochRef.current || userEndedRef.current) return;
@@ -348,16 +356,14 @@ export function PremiumVoiceSessionPanel({
             if (!goodbyeTriggeredRef.current && isGoodbyeUtterance(trimmed)) {
               appendTranscript("user", trimmed);
               pendingUserTextRef.current = "";
-              scheduleGoodbyeHangup("user");
+              checkGoodbyeAndHangup();
             }
             return;
           }
 
           flushPendingUserText(true);
           appendTranscript("agent", trimmed);
-          if (!goodbyeTriggeredRef.current && isGoodbyeUtterance(trimmed)) {
-            scheduleGoodbyeHangup("agent");
-          }
+          checkGoodbyeAndHangup();
         },
         onModeChange: ({ mode }) => {
           if (epoch !== sessionEpochRef.current) return;
@@ -399,7 +405,7 @@ export function PremiumVoiceSessionPanel({
       );
       setState("error");
     }
-  }, [appendTranscript, flushPendingUserText, handleDisconnect, persistSnapshot, scheduleGoodbyeHangup, startTimer]);
+  }, [appendTranscript, checkGoodbyeAndHangup, flushPendingUserText, handleDisconnect, persistSnapshot, startTimer]);
 
   const stopSession = useCallback(() => {
     if (endingRef.current) return;

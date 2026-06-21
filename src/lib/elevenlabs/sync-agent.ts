@@ -3,6 +3,7 @@ import { ELEVENLABS_TEMPORAL_PROMPT_BLOCK } from "@/lib/colombia-calendar";
 import {
   DEFAULT_ELEVENLABS_VOICE_ID,
   PREMIUM_CALL_ENDING_PROMPT,
+  PREMIUM_END_CALL_TOOL,
 } from "@/lib/elevenlabs/default-voices";
 import { listCuratedPremiumVoices } from "@/lib/elevenlabs/premium-voices";
 import { ELEVENLABS_DEFAULT_LLM, ELEVENLABS_TTS_MODEL_ID } from "@/lib/elevenlabs/config";
@@ -34,6 +35,7 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
         prompt: `${ELEVENLABS_TEMPORAL_PROMPT_BLOCK}\n\n${input.prompt.trim()}${PREMIUM_CALL_ENDING_PROMPT}`,
         llm: ELEVENLABS_DEFAULT_LLM,
         temperature,
+        tools: [PREMIUM_END_CALL_TOOL],
       },
     },
     asr: {
@@ -41,7 +43,7 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
     },
     turn: {
       turn_timeout: 7,
-      turn_eagerness: "low",
+      turn_eagerness: "patient",
       mode: "turn",
       speculative_turn: false,
     },
