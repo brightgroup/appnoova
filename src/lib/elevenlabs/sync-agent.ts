@@ -1,3 +1,4 @@
+import { getPurposeMeta } from "@/lib/agent-purpose-catalog";
 import { elevenLabsFetch } from "@/lib/elevenlabs/client";
 import { ELEVENLABS_TEMPORAL_PROMPT_BLOCK } from "@/lib/colombia-calendar";
 import {
@@ -5,6 +6,7 @@ import {
   PREMIUM_CALL_ENDING_PROMPT,
   PREMIUM_END_CALL_TOOL,
   PREMIUM_OUTBOUND_PICKUP_PROMPT,
+  buildPremiumFirstMessage,
 } from "@/lib/elevenlabs/default-voices";
 import { listCuratedPremiumVoices } from "@/lib/elevenlabs/premium-voices";
 import { ELEVENLABS_DEFAULT_LLM, ELEVENLABS_TTS_MODEL_ID } from "@/lib/elevenlabs/config";
@@ -18,8 +20,8 @@ export interface ElevenLabsSyncInput {
   existingAgentId?: string | null;
 }
 
-function buildFirstMessage(agentName: string, companyName: string): string {
-  return `Buenas tardes, le saluda ${agentName} de ${companyName}. ¿Con quién tengo el gusto?`;
+function isOutboundVoicePurpose(purposeId: string): boolean {
+  return getPurposeMeta("voice", purposeId).tag === "Outbound";
 }
 
 /** Permite anular first_message en cada llamada SIP (p. ej. esperar el "aló" del cliente). */
@@ -38,13 +40,18 @@ function buildPlatformSettings() {
 function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string) {
   const voiceId = input.elevenlabsVoiceId?.trim() || DEFAULT_ELEVENLABS_VOICE_ID;
   const temperature = Math.min(1.2, Math.max(0.3, Number(input.temperature) || 0.85));
+  const outbound = isOutboundVoicePurpose(input.purposeId);
+  const agentName = input.name.trim() || "su asesor";
 
   return {
     agent: {
-      first_message: buildFirstMessage(input.name.trim() || "su asesor", companyName),
+      // Outbound telefónico: vacío → ElevenLabs espera el "aló" del cliente.
+      first_message: outbound
+        ? ""
+        : buildPremiumFirstMessage(agentName, companyName),
       language: "es",
-      // Igual que el widget EL: no interrumpir el saludo inicial por ruido ambiente.
-      disable_first_message_interruptions: true,
+      // Solo inbound/web: no interrumpir el saludo inicial por ruido ambiente.
+      disable_first_message_interruptions: !outbound,
       prompt: {
         prompt: `${ELEVENLABS_TEMPORAL_PROMPT_BLOCK}\n\n${input.prompt.trim()}${PREMIUM_OUTBOUND_PICKUP_PROMPT}${PREMIUM_CALL_ENDING_PROMPT}`,
         llm: ELEVENLABS_DEFAULT_LLM,

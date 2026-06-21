@@ -19,6 +19,7 @@ import {
   fetchPremiumWebSession,
   premiumDisconnectReason,
 } from "@/lib/elevenlabs/premium-web-session";
+import { buildPremiumFirstMessage } from "@/lib/elevenlabs/default-voices";
 import { btnPrimary, btnGhost } from "@/lib/brand-ui";
 import { isGoodbyeUtterance } from "@/lib/voice-goodbye-detection";
 import type { VoiceSessionPanelProps } from "@/components/voice/VoiceSessionPanel";
@@ -35,12 +36,14 @@ export function PremiumVoiceSessionPanel({
   sourceTemplate,
   agentId,
   agentConfig,
+  companyContext,
   ready = true,
   onEndCall,
   onCallSaved,
   onCallStatusChange,
 }: VoiceSessionPanelProps) {
   const meta = getTemplateMeta(sourceTemplate);
+  const isOutboundTemplate = meta.tag === "Outbound";
   const avatarGradient = agentAvatarGradient(agentConfig.color || meta.color);
   const avatarStyle = agentAvatarStyle(agentConfig.color || meta.color);
   const agentName = agentConfig.name?.trim() || "Agente";
@@ -316,11 +319,19 @@ export function PremiumVoiceSessionPanel({
       const session = await fetchPremiumWebSession(id, headers);
       if (epoch !== sessionEpochRef.current) return;
 
+      // Outbound en teléfono usa first_message vacío; en web restauramos saludo proactivo.
+      const webFirstMessage = isOutboundTemplate
+        ? buildPremiumFirstMessage(agentName, companyContext?.trim() || "Mi empresa")
+        : undefined;
+
       // Mismo patrón que el widget ElevenLabs: token WebRTC + variables dinámicas.
       const conversation = await VoiceConversation.startSession({
         conversationToken: session.conversationToken,
         connectionType: "webrtc",
         dynamicVariables: session.dynamicVariables,
+        ...(webFirstMessage
+          ? { overrides: { agent: { firstMessage: webFirstMessage } } }
+          : {}),
         onConnect: ({ conversationId }) => {
           if (epoch !== sessionEpochRef.current) return;
           if (conversationId) conversationIdRef.current = conversationId;
@@ -405,7 +416,7 @@ export function PremiumVoiceSessionPanel({
       );
       setState("error");
     }
-  }, [appendTranscript, checkGoodbyeAndHangup, flushPendingUserText, handleDisconnect, persistSnapshot, startTimer]);
+  }, [agentName, appendTranscript, checkGoodbyeAndHangup, companyContext, flushPendingUserText, handleDisconnect, isOutboundTemplate, persistSnapshot, startTimer]);
 
   const stopSession = useCallback(() => {
     if (endingRef.current) return;

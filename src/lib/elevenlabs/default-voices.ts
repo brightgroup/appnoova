@@ -28,6 +28,11 @@ export const ELEVENLABS_DEFAULT_VOICES = CURATED_PREMIUM_VOICES.map(v => ({
   label: v.label,
 }));
 
+/** Saludo proactivo para agentes inbound o prueba web outbound. */
+export function buildPremiumFirstMessage(agentName: string, companyName: string): string {
+  return `Buenas tardes, le saluda ${agentName} de ${companyName}. ¿Con quién tengo el gusto?`;
+}
+
 /**
  * Llamadas salientes por teléfono: el humano contesta con "aló"/"bueno" antes de que hable la IA.
  * Se combina con first_message vacío en outbound-call (ElevenLabs espera al usuario).
