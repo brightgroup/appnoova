@@ -22,6 +22,7 @@ interface PremiumLineInfo {
   configured: boolean;
   e164: string | null;
   label: string | null;
+  available_numbers?: { phone_number_id: string; phone_number: string; label: string }[];
 }
 
 interface ActiveCall {
@@ -109,7 +110,8 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
           configured: Boolean(lineData.configured),
           e164: lineData.e164 ?? null,
           label: lineData.label ?? null,
-        } : { configured: false, e164: null, label: null });
+          available_numbers: lineData.available_numbers ?? [],
+        } : { configured: false, e164: null, label: null, available_numbers: [] });
       } else {
         setPremiumLine(null);
         const lineRes = await fetch(`/api/telephony/numbers?agent_id=${agentId}`, { headers });
@@ -144,7 +146,7 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
 
   const selectedLine = agentLines.find(l => l.id === selectedLineId) ?? null;
   const selectedTest = testNumbers.find(n => n.id === selectedTestId) ?? null;
-  const premiumLineReady = isPremium && Boolean(premiumLine?.configured && premiumLine.e164);
+  const premiumLineReady = isPremium && Boolean(premiumLine?.configured);
   const canTest = Boolean(
     agentId
     && selectedTest
@@ -234,6 +236,11 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "No se pudo iniciar la llamada");
+        if (data.code === "premium_phone_not_configured" && data.available_numbers?.length) {
+          setError(
+            `${data.error} IDs disponibles: ${data.available_numbers.map((n: { phone_number_id: string; phone_number: string }) => `${n.phone_number} (${n.phone_number_id})`).join(", ")}`
+          );
+        }
         return;
       }
       setActiveCall({
@@ -386,9 +393,15 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
                   <div>
                     <p className="text-sm font-medium text-amber-100">Línea premium no configurada</p>
                     <p className={`text-xs ${textMuted} mt-1`}>
-                      Configura <code className="text-white">ELEVENLABS_PHONE_NUMBER_ID</code> en el servidor
-                      con el número importado en ElevenLabs → Phone Numbers.
+                      Importa tu número en ElevenLabs → Phone Numbers (SIP/Telnyx) y define{" "}
+                      <code className="text-white">ELEVENLABS_PHONE_NUMBER_ID</code> en el servidor.
                     </p>
+                    {(premiumLine?.available_numbers?.length ?? 0) > 0 && (
+                      <p className={`text-xs ${textMuted} mt-2`}>
+                        Números en ElevenLabs:{" "}
+                        {premiumLine!.available_numbers!.map(n => `${n.phone_number} (${n.phone_number_id})`).join(" · ")}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -437,7 +450,7 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
                       {premiumLine?.label ?? "Línea premium"}
                     </td>
                     <td className={`${registryTableCell} font-mono text-sm text-white`}>
-                      {formatPhoneDisplay(premiumLine!.e164!)}
+                      {premiumLine?.e164 ? formatPhoneDisplay(premiumLine.e164) : "Configurada en servidor"}
                     </td>
                     <td className={registryTableCell}>
                       <span className="inline-flex items-center gap-1.5 text-emerald-400">
@@ -568,7 +581,7 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
                   <>
                     Desde{" "}
                     <span className="font-mono text-white">
-                      {formatPhoneDisplay(premiumLine!.e164!)}
+                      {premiumLine?.e164 ? formatPhoneDisplay(premiumLine.e164) : "línea premium"}
                     </span>
                     {" "}hacia{" "}
                     <span className="font-mono text-white">{formatPhoneDisplay(selectedTest!.e164)}</span>.

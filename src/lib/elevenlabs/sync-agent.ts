@@ -28,7 +28,8 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
     agent: {
       first_message: buildFirstMessage(input.name.trim() || "su asesor", companyName),
       language: "es",
-      disable_first_message_interruptions: false,
+      // Igual que el widget EL: no interrumpir el saludo inicial por ruido ambiente.
+      disable_first_message_interruptions: true,
       prompt: {
         prompt: `${ELEVENLABS_TEMPORAL_PROMPT_BLOCK}\n\n${input.prompt.trim()}${PREMIUM_CALL_ENDING_PROMPT}`,
         llm: ELEVENLABS_DEFAULT_LLM,
@@ -39,17 +40,17 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
       quality: "high",
     },
     turn: {
-      turn_timeout: 5,
-      turn_eagerness: "eager",
+      turn_timeout: 7,
+      turn_eagerness: "normal",
       mode: "turn",
-      speculative_turn: true,
+      speculative_turn: false,
     },
     tts: {
       voice_id: voiceId,
       model_id: ELEVENLABS_TTS_MODEL_ID,
-      optimize_streaming_latency: 3,
-      stability: 0.5,
-      similarity_boost: 0.8,
+      optimize_streaming_latency: 1,
+      stability: 0.55,
+      similarity_boost: 0.82,
     },
     conversation: {
       max_duration_seconds: 600,

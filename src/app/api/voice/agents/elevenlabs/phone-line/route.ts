@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getElevenLabsApiKey } from "@/lib/elevenlabs/config";
-import { getElevenLabsPhoneLineInfo } from "@/lib/elevenlabs/phone-line";
+import { getElevenLabsApiKey, getElevenLabsPhoneNumberId } from "@/lib/elevenlabs/config";
+import { getElevenLabsPhoneLineInfo, listElevenLabsPhoneNumbers } from "@/lib/elevenlabs/phone-line";
 import { getUserIdFromRequest } from "@/lib/voice-agents-server";
 
 /** GET — línea remitente premium (ElevenLabs SIP) para pruebas telefónicas. */
@@ -16,5 +16,9 @@ export async function GET(req: NextRequest) {
   }
 
   const line = await getElevenLabsPhoneLineInfo();
-  return NextResponse.json(line);
+  const availableNumbers = line.configured ? [] : await listElevenLabsPhoneNumbers();
+  return NextResponse.json({
+    ...line,
+    available_numbers: availableNumbers,
+  });
 }

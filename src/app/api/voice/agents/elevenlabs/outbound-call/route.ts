@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { billingBlockedMessage, checkBillingForUser } from "@/lib/billing/meter";
 import { placeElevenLabsOutboundCall } from "@/lib/elevenlabs/outbound-call";
-import { getElevenLabsPhoneLineInfo } from "@/lib/elevenlabs/phone-line";
+import { getElevenLabsPhoneLineInfo, listElevenLabsPhoneNumbers } from "@/lib/elevenlabs/phone-line";
 import { getElevenLabsApiKey, getElevenLabsPhoneNumberId } from "@/lib/elevenlabs/config";
 import { createPhoneTestCallSession } from "@/lib/telephony/test-call-session";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
@@ -18,8 +18,15 @@ export async function POST(req: NextRequest) {
     );
   }
   if (!getElevenLabsPhoneNumberId()) {
+    const available = await listElevenLabsPhoneNumbers();
     return NextResponse.json(
-      { error: "La llamada premium no está disponible temporalmente" },
+      {
+        error: available.length
+          ? "Falta ELEVENLABS_PHONE_NUMBER_ID en el servidor. Importa tu número en ElevenLabs y configura el ID."
+          : "No hay línea telefónica importada en ElevenLabs. Ve a Phone Numbers e importa tu número SIP/Telnyx.",
+        code: "premium_phone_not_configured",
+        available_numbers: available,
+      },
       { status: 503 }
     );
   }
