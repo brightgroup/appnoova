@@ -3,6 +3,10 @@ import { adminClient } from "@/lib/voice-agents-server";
 import { getOrgContextFromRequest } from "@/lib/org-server";
 import { assertEmbeddedSignupConfigured } from "@/lib/meta/embedded-signup-config";
 import { provisionWhatsAppFromEmbeddedSignup } from "@/lib/whatsapp/embedded-signup-provision";
+import {
+  isMetaDirectWhatsAppEnabled,
+  provisionWhatsAppFromEmbeddedSignupMeta
+} from "@/lib/whatsapp/meta-provision";
 import { toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
 
 /** POST — finalizar vinculación tras Meta Embedded Signup. */
@@ -26,6 +30,7 @@ export async function POST(req: NextRequest) {
     display_phone_number?: string;
     text_agent_id?: string;
     friendly_name?: string;
+    auth_code?: string;
   };
 
   try {
@@ -42,7 +47,7 @@ export async function POST(req: NextRequest) {
   const db = adminClient();
 
   try {
-    const result = await provisionWhatsAppFromEmbeddedSignup(db, {
+    const input = {
       userId: orgCtx.userId,
       organizationId: orgCtx.organizationId,
       wabaId,
@@ -51,7 +56,15 @@ export async function POST(req: NextRequest) {
       displayPhoneNumber: body.display_phone_number ?? null,
       textAgentId: body.text_agent_id ?? null,
       friendlyName: body.friendly_name ?? null
-    });
+    };
+
+    const result = isMetaDirectWhatsAppEnabled()
+      ? await provisionWhatsAppFromEmbeddedSignupMeta(db, {
+          ...input,
+          authCode: body.auth_code ?? null,
+          displayPhoneNumber: body.display_phone_number ?? null
+        })
+      : await provisionWhatsAppFromEmbeddedSignup(db, input);
 
     const { data: channelRow } = await db
       .from("whatsapp_channels")

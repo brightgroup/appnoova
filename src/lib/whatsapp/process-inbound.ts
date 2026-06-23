@@ -26,7 +26,7 @@ import {
   WHATSAPP_OPT_OUT_CONFIRMATION
 } from "@/lib/whatsapp/compliance";
 import { buildWhatsAppInboundContent } from "@/lib/whatsapp/media-understanding";
-import { sendTwilioWhatsAppMessage } from "@/lib/whatsapp/twilio-whatsapp";
+import { sendWhatsAppTextMessage } from "@/lib/whatsapp/send-transport";
 import {
   checkBillingForOrg,
   readGeminiUsage,
@@ -35,7 +35,7 @@ import {
 } from "@/lib/billing/meter";
 import type { TwilioWhatsAppMediaItem } from "@/lib/whatsapp/twilio-media";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
-import { WHATSAPP_CONVERSATION_CHANNEL } from "@/lib/whatsapp-channel";
+import { WHATSAPP_CONVERSATION_CHANNEL, toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
 import type { TextChatMessage } from "@/types/text-agent-conversation";
 
 export interface TwilioWhatsAppInbound {
@@ -115,6 +115,7 @@ async function updateWhatsAppConversationMetadata(
 }
 
 async function sendWhatsAppIfAllowed(
+  db: SupabaseClient,
   channel: WhatsAppChannelRecord,
   toE164: string,
   body: string,
@@ -127,14 +128,7 @@ async function sendWhatsAppIfAllowed(
   }
 
   try {
-    await sendTwilioWhatsAppMessage({
-      toE164,
-      fromE164: channel.e164,
-      messagingServiceSid: channel.twilio_messaging_service_sid,
-      body,
-      accountSid: channel.twilio_subaccount_sid,
-      authToken: channel.twilio_subaccount_auth_token
-    });
+    await sendWhatsAppTextMessage({ db, channel, toE164, body });
     return { ok: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error al enviar WhatsApp";
@@ -252,6 +246,7 @@ export async function processTwilioWhatsAppInbound(
     await syncAndEnrichCrmFromInbound(db, channel, persisted.conversationId, inbound, nowIso, optedOutAfter);
 
     await sendWhatsAppIfAllowed(
+      db,
       channel,
       inbound.fromE164,
       WHATSAPP_OPT_OUT_CONFIRMATION,
@@ -463,6 +458,7 @@ export async function processTwilioWhatsAppInbound(
   );
 
   const sendResult = await sendWhatsAppIfAllowed(
+    db,
     channel,
     inbound.fromE164,
     reply,
@@ -563,15 +559,13 @@ export async function sendWhatsAppOutboundForConversation(
   }
 
   try {
-    await sendTwilioWhatsAppMessage({
+    const channel = toWhatsAppChannelRecord(channelRow as Record<string, unknown>);
+    await sendWhatsAppTextMessage({
+      db,
+      channel,
+      channelRaw: channelRow as Record<string, unknown>,
       toE164: contactE164,
-      fromE164: String(channelRow.e164),
-      messagingServiceSid: channelRow.twilio_messaging_service_sid
-        ? String(channelRow.twilio_messaging_service_sid)
-        : null,
-      body,
-      accountSid: channelRow.twilio_subaccount_sid,
-      authToken: channelRow.twilio_subaccount_auth_token
+      body
     });
 
     if (outboundOrgId) {

@@ -30,6 +30,24 @@ export async function getWhatsAppChannelByE164(
   return match ? toWhatsAppChannelRecord(match) : null;
 }
 
+export async function getWhatsAppChannelByMetaPhoneNumberId(
+  db: SupabaseClient,
+  phoneNumberId: string
+): Promise<WhatsAppChannelRecord | null> {
+  const id = phoneNumberId.trim();
+  if (!id) return null;
+
+  const { data, error } = await db
+    .from("whatsapp_channels")
+    .select("*")
+    .eq("meta_phone_number_id", id)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return toWhatsAppChannelRecord(data);
+}
+
 export async function getWhatsAppChannelById(
   db: SupabaseClient,
   userId: string,

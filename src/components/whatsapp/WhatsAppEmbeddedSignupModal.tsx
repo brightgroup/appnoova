@@ -82,6 +82,7 @@ export function WhatsAppEmbeddedSignupModal({
   const [status, setStatus] = useState("");
   const [pendingSession, setPendingSession] = useState<EmbeddedSignupSession | null>(null);
   const pendingSessionRef = useRef<EmbeddedSignupSession | null>(null);
+  const authCodeRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -89,11 +90,14 @@ export function WhatsAppEmbeddedSignupModal({
     setStatus("");
     setPendingSession(null);
     pendingSessionRef.current = null;
+    authCodeRef.current = null;
 
     fetch("/api/whatsapp/embedded-signup/config")
       .then(res => res.json())
       .then(data => setConfig(data))
-      .catch(() => setConfig({ enabled: false, appId: null, configId: null, solutionId: null }));
+      .catch(() =>
+        setConfig({ enabled: false, provider: "twilio", appId: null, configId: null, solutionId: null })
+      );
 
     getAuthHeaders()
       .then(headers => fetch("/api/text/agents", { headers }))
@@ -107,7 +111,7 @@ export function WhatsAppEmbeddedSignupModal({
   const completeSignup = useCallback(
     async (session: EmbeddedSignupSession) => {
       setLoading(true);
-      setStatus("Registrando número en Twilio…");
+      setStatus(config?.provider === "meta" ? "Vinculando con Meta Cloud API…" : "Registrando número en Twilio…");
       setError("");
 
       try {
@@ -120,6 +124,7 @@ export function WhatsAppEmbeddedSignupModal({
             phone_number_id: session.phoneNumberId,
             display_phone_number: session.displayPhoneNumber,
             phone_e164: form.phone_e164.trim() || undefined,
+            auth_code: authCodeRef.current || undefined,
             text_agent_id: form.text_agent_id || undefined,
             friendly_name: form.friendly_name.trim() || undefined
           })
@@ -144,7 +149,7 @@ export function WhatsAppEmbeddedSignupModal({
         setPendingSession(null);
       }
     },
-    [form.friendly_name, form.phone_e164, form.text_agent_id, onClose, onSuccess]
+    [form.friendly_name, form.phone_e164, form.text_agent_id, onClose, onSuccess, config?.provider]
   );
 
   useEffect(() => {
@@ -202,8 +207,12 @@ export function WhatsAppEmbeddedSignupModal({
   }, [config?.appId, initFacebookSdk, sdkReady]);
 
   const launchEmbeddedSignup = () => {
-    if (!config?.enabled || !config.configId || !config.solutionId) {
-      setError("Vinculación automática no disponible — contacta a soporte");
+    if (!config?.appId || !config.configId) {
+      setError("Vinculación automática no configurada — contacta a soporte");
+      return;
+    }
+    if (config.provider === "twilio" && !config.solutionId) {
+      setError("Falta TWILIO_WHATSAPP_SOLUTION_ID — esperando respuesta de Twilio");
       return;
     }
     if (!window.FB || !sdkReady) {
@@ -216,8 +225,10 @@ export function WhatsAppEmbeddedSignupModal({
     setLoading(true);
 
     window.FB.login(
-      () => {
-        // Twilio Tech Provider: el código OAuth no se usa; la sesión llega por postMessage.
+      (response: { authResponse?: { code?: string } }) => {
+        if (response.authResponse?.code) {
+          authCodeRef.current = response.authResponse.code;
+        }
       },
       {
         config_id: config.configId,
@@ -226,7 +237,9 @@ export function WhatsAppEmbeddedSignupModal({
         override_default_response_type: true,
         extras: {
           sessionInfoVersion: 3,
-          setup: { solutionID: config.solutionId }
+          ...(config.provider === "twilio" && config.solutionId
+            ? { setup: { solutionID: config.solutionId } }
+            : { setup: {} })
         }
       }
     );
@@ -240,7 +253,7 @@ export function WhatsAppEmbeddedSignupModal({
 
   if (!open) return null;
 
-  const canConnect = config?.enabled && sdkReady;
+  const canConnect = Boolean(config?.enabled && sdkReady);
 
   return (
     <>
