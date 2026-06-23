@@ -20,6 +20,12 @@ function resolveAvatarColors(colorClass: string | null | undefined): [string, st
   return AGENT_COLOR_GRADIENTS[key] ?? DEFAULT_AVATAR_COLORS;
 }
 
+/** Color sólido (un tono) para avatares minimalistas. */
+export function agentAvatarSolidColor(colorClass: string | null | undefined): string {
+  const [from] = resolveAvatarColors(colorClass);
+  return from;
+}
+
 /** Gradiente CSS para avatar (evita clases Tailwind dinámicas que no compilan). */
 export function agentAvatarGradient(colorClass: string | null | undefined): string {
   const [from, to] = resolveAvatarColors(colorClass);

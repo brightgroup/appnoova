@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Mic, MicOff, PhoneOff, Loader2, Sparkles, RefreshCw } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Loader2, RefreshCw, MessageSquare, Headphones, Star } from "lucide-react";
 import { VoiceConversation, type DisconnectionDetails } from "@elevenlabs/client";
 import { getTemplateMeta } from "@/lib/voice-agent-templates";
-import { agentAvatarGradient, agentAvatarStyle } from "@/lib/voice-agent-display";
 import { getAuthHeaders, getAuthToken } from "@/lib/voice-agents-api";
 import {
   PREMIUM_USER_MESSAGES,
@@ -19,9 +18,10 @@ import {
   fetchPremiumWebSession,
   premiumDisconnectReason,
 } from "@/lib/elevenlabs/premium-web-session";
-import { buildPremiumFirstMessage } from "@/lib/elevenlabs/default-voices";
-import { btnPrimary, btnGhost } from "@/lib/brand-ui";
+import { buildPremiumFirstMessage, resolvePremiumVoiceSubtitle } from "@/lib/elevenlabs/default-voices";
+import { btnGhost } from "@/lib/brand-ui";
 import { isGoodbyeUtterance } from "@/lib/voice-goodbye-detection";
+import { PremiumVoiceAvatar } from "@/components/voice/PremiumVoiceAvatar";
 import type { VoiceSessionPanelProps } from "@/components/voice/VoiceSessionPanel";
 
 type SessionState = "idle" | "connecting" | "listening" | "speaking" | "ending" | "error";
@@ -44,10 +44,9 @@ export function PremiumVoiceSessionPanel({
 }: VoiceSessionPanelProps) {
   const meta = getTemplateMeta(sourceTemplate);
   const isOutboundTemplate = meta.tag === "Outbound";
-  const avatarGradient = agentAvatarGradient(agentConfig.color || meta.color);
-  const avatarStyle = agentAvatarStyle(agentConfig.color || meta.color);
   const agentName = agentConfig.name?.trim() || "Agente";
   const agentInitial = agentName.charAt(0).toUpperCase() || "A";
+  const voiceSubtitle = resolvePremiumVoiceSubtitle(agentConfig.elevenlabs_voice_id);
 
   const [state, setState] = useState<SessionState>("idle");
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
@@ -443,149 +442,191 @@ export function PremiumVoiceSessionPanel({
 
   const isActive = state === "listening" || state === "speaking";
   const isConnecting = state === "connecting" || state === "ending";
+  const avatarMode =
+    state === "speaking" ? "speaking" :
+    state === "listening" ? "listening" :
+    isConnecting ? "connecting" : "idle";
+
   const statusLabel =
-    state === "idle" ? "Lista para iniciar" :
+    state === "idle" ? "Lista para conversar" :
     state === "connecting" ? (statusHint || "Conectando...") :
     state === "ending" ? (statusHint || "Finalizando...") :
-    state === "listening" ? "Escuchando" :
-    state === "speaking" ? "Hablando" : "Desconectado";
+    state === "listening" ? "En línea · Escuchando" :
+    state === "speaking" ? "En línea · Hablando" :
+    state === "error" ? "Error de conexión" : "Desconectado";
+
+  const webrtcLabel =
+    isActive ? "WebRTC · Conectado" :
+    isConnecting ? "WebRTC · Conectando" :
+    state === "error" ? "WebRTC · Error" : "WebRTC · Listo";
+
+  const statusDotClass =
+    isActive ? "bg-emerald-400 premium-voice-dot-live" :
+    isConnecting ? "bg-amber-400 animate-pulse" :
+    state === "error" ? "bg-red-400" : "bg-emerald-400/70";
 
   return (
     <div className="flex-1 flex min-h-0 p-4 gap-4 overflow-hidden">
-      <aside className="w-[300px] shrink-0 flex flex-col gap-3">
-        <div className="flex-1 rounded-2xl border border-white/[.10] bg-noova-surface p-5 flex flex-col min-h-[420px]">
-          <div className="flex flex-col items-center text-center pb-5 border-b border-white/[.06]">
-            <div className="relative mb-3">
-              {isActive && (
-                <div
-                  className="absolute -inset-2 rounded-full opacity-70 blur-xl animate-pulse"
-                  style={{ background: avatarGradient }}
-                />
-              )}
-              <div
-                className="relative w-[80px] h-[80px] rounded-full flex items-center justify-center border-2 border-white/35 ring-1 ring-white/15"
-                style={avatarStyle}
-              >
-                <span className="text-[32px] font-bold text-white leading-none select-none drop-shadow-sm">
-                  {agentInitial}
+        <aside className="w-[min(100%,320px)] shrink-0 flex flex-col">
+          <div className="flex-1 rounded-2xl border border-white/[.08] bg-[#0c0c10]/80 backdrop-blur-sm p-6 flex flex-col min-h-[440px]">
+            <div className="flex flex-col items-center text-center flex-1">
+              <PremiumVoiceAvatar
+                initial={agentInitial}
+                mode={avatarMode}
+              />
+
+              <h2 className="mt-5 text-xl font-bold text-white tracking-tight">{agentName}</h2>
+              <p className="mt-1 text-xs text-gray-500">{voiceSubtitle}</p>
+
+              <div className="mt-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#243048]/60 border border-[#8FA4E8]/20">
+                <Star className="w-3 h-3 text-[#8FA4E8] fill-[#8FA4E8]" />
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#a8b8ee]">
+                  Premium
                 </span>
               </div>
-            </div>
-            <p className="text-sm font-semibold text-white tracking-tight">{agentName}</p>
-            <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/25">
-              <span className="text-[10px] text-amber-200/90 font-medium">Premium</span>
-            </div>
-            <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[.04] border border-white/[.08]">
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                isActive ? "bg-emerald-400 animate-pulse" :
-                isConnecting ? "bg-amber-400 animate-pulse" :
-                state === "error" ? "bg-red-400" : "bg-gray-500"
-              }`} />
-              <span className="text-[11px] text-gray-400">{statusLabel}</span>
-            </div>
-            {isActive && duration > 0 && (
-              <p className="text-lg font-semibold text-white tabular-nums mt-3">
-                {String(Math.floor(duration / 60)).padStart(2, "0")}:{String(duration % 60).padStart(2, "0")}
-              </p>
-            )}
-          </div>
 
-          <div className="pt-5 space-y-2.5 flex-1">
-            {state === "idle" || state === "error" ? (
-              <>
-                <button
-                  onClick={() => void startSession()}
-                  disabled={!ready || !agentId}
-                  className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold ${btnPrimary} disabled:opacity-50`}
-                >
-                  {state === "error" ? (
-                    <><RefreshCw className="w-4 h-4" /> Reintentar</>
-                  ) : (
-                    <><Mic className="w-4 h-4" /> Iniciar sesión</>
-                  )}
-                </button>
-                {state === "error" && (
-                  <button
-                    onClick={() => { setError(""); setState("idle"); }}
-                    className={`w-full ${btnGhost} text-xs`}
-                  >
-                    Cerrar
-                  </button>
-                )}
-              </>
-            ) : isConnecting ? (
-              <button disabled className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm text-gray-400 border border-white/[.08] cursor-not-allowed">
-                <Loader2 className="w-4 h-4 animate-spin" /> {statusHint || "Conectando..."}
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={() => setMuted(m => !m)}
-                  className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border ${
-                    muted
-                      ? "bg-red-500/[.08] border-red-500/25 text-red-400"
-                      : "bg-white/[.03] border-white/[.08] text-gray-300"
-                  }`}
-                >
-                  {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                  {muted ? "Micrófono silenciado" : "Micrófono activo"}
-                </button>
-                <button
-                  onClick={() => stopSession()}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-red-500/[.08] border border-red-500/25 text-red-400"
-                >
-                  <PhoneOff className="w-4 h-4" /> Terminar sesión
-                </button>
-              </>
-            )}
-          </div>
-
-          {error && (
-            <div className="mt-3 p-3 rounded-xl bg-red-500/[.06] border border-red-500/20 text-[11px] text-red-400 leading-relaxed">
-              {error}
-            </div>
-          )}
-
-          {statusHint && isActive && (
-            <p className="mt-3 text-[10px] text-gray-500 leading-relaxed text-center">{statusHint}</p>
-          )}
-        </div>
-      </aside>
-
-      <section className="flex-1 min-w-0 flex flex-col rounded-2xl border border-white/[.10] bg-noova-surface overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-white/[.06] flex items-center gap-2 shrink-0">
-          <Sparkles className="w-4 h-4 text-amber-400/80" />
-          <span className="text-xs font-semibold text-gray-300">Transcripción en vivo</span>
-        </div>
-        <div ref={transcriptRef} className="flex-1 overflow-y-auto p-5 space-y-3 min-h-[360px]">
-          {transcript.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center px-6">
-              <p className="text-sm text-gray-300">Sin conversación aún</p>
-              <p className="text-xs text-gray-500 mt-2 max-w-xs">
-                Conexión WebRTC directa con voz premium. Usa auriculares para mejor calidad.
-              </p>
-            </div>
-          ) : (
-            transcript.map((line, i) => (
-              <div
-                key={i}
-                className={`flex ${line.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div className={`max-w-[82%] px-4 py-3 rounded-2xl text-[13px] ${
-                  line.role === "user"
-                    ? "bg-[#5b5bf6]/15 border border-[#5b5bf6]/20 text-gray-100"
-                    : "bg-white/[.03] border border-white/[.07] text-gray-200"
-                }`}>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 text-gray-500">
-                    {line.role === "user" ? "Tú" : agentName}
-                  </p>
-                  {line.text}
-                </div>
+              <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[.03] border border-white/[.08]">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${statusDotClass}`} />
+                <span className="text-[11px] text-gray-400">{statusLabel}</span>
               </div>
-            ))
-          )}
-        </div>
-      </section>
-    </div>
+
+              {isActive && duration > 0 && (
+                <p className="text-2xl font-semibold text-white tabular-nums mt-4 tracking-tight">
+                  {String(Math.floor(duration / 60)).padStart(2, "0")}:{String(duration % 60).padStart(2, "0")}
+                </p>
+              )}
+            </div>
+
+            <div className="mt-auto pt-6 space-y-2.5">
+              {state === "idle" || state === "error" ? (
+                <>
+                  <button
+                    onClick={() => void startSession()}
+                    disabled={!ready || !agentId}
+                    className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#5b5bf6] to-[#7c6cf6] hover:from-[#6b6bf7] hover:to-[#8b7cf7] shadow-[0_8px_32px_rgba(91,91,246,0.35)] transition-all disabled:opacity-45 disabled:shadow-none"
+                  >
+                    {state === "error" ? (
+                      <><RefreshCw className="w-4 h-4" /> Reintentar</>
+                    ) : (
+                      <><Mic className="w-4 h-4" /> Iniciar conversación</>
+                    )}
+                  </button>
+                  {state === "idle" && (
+                    <p className="text-[11px] text-gray-600 text-center leading-relaxed px-1">
+                      Permite el micrófono cuando el navegador lo solicite.
+                    </p>
+                  )}
+                  {state === "error" && (
+                    <button
+                      onClick={() => { setError(""); setState("idle"); }}
+                      className={`w-full ${btnGhost} text-xs`}
+                    >
+                      Cerrar
+                    </button>
+                  )}
+                </>
+              ) : isConnecting ? (
+                <button
+                  disabled
+                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm text-gray-400 border border-white/[.08] bg-white/[.02] cursor-not-allowed"
+                >
+                  <Loader2 className="w-4 h-4 animate-spin" /> {statusHint || "Conectando..."}
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setMuted(m => !m)}
+                    className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+                      muted
+                        ? "bg-red-500/[.08] border-red-500/25 text-red-400"
+                        : "bg-white/[.03] border-white/[.08] text-gray-300 hover:bg-white/[.05]"
+                    }`}
+                  >
+                    {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                    {muted ? "Micrófono silenciado" : "Micrófono activo"}
+                  </button>
+                  <button
+                    onClick={() => stopSession()}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-red-500/[.08] border border-red-500/25 text-red-400 hover:bg-red-500/[.12] transition-colors"
+                  >
+                    <PhoneOff className="w-4 h-4" /> Terminar conversación
+                  </button>
+                </>
+              )}
+            </div>
+
+            {error && (
+              <div className="mt-4 p-3 rounded-xl bg-red-500/[.06] border border-red-500/20 text-[11px] text-red-400 leading-relaxed">
+                {error}
+              </div>
+            )}
+
+            {statusHint && isActive && (
+              <p className="mt-3 text-[10px] text-gray-500 leading-relaxed text-center">{statusHint}</p>
+            )}
+          </div>
+        </aside>
+
+        <section className="flex-1 min-w-0 flex flex-col rounded-2xl border border-white/[.08] bg-[#0c0c10]/80 backdrop-blur-sm overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-white/[.06] flex items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <MessageSquare className="w-4 h-4 text-[#a5a5ff] shrink-0" />
+              <span className="text-sm font-medium text-gray-200">Transcripción en vivo</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[.03] border border-white/[.08] shrink-0">
+              <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-400 premium-voice-dot-live" : isConnecting ? "bg-amber-400 animate-pulse" : "bg-gray-600"}`} />
+              <span className="text-[10px] text-gray-500">{webrtcLabel}</span>
+            </div>
+          </div>
+
+          <div ref={transcriptRef} className="flex-1 overflow-y-auto p-5 space-y-3 min-h-[320px]">
+            {transcript.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center px-8 py-10">
+                <div className="flex items-end justify-center gap-1 h-12 mb-6">
+                  {[0, 1, 2, 3, 4, 5, 6].map(i => (
+                    <span
+                      key={i}
+                      className="w-1 rounded-full bg-gradient-to-t from-[#5b5bf6] to-[#a5a5ff] premium-voice-wave-bar"
+                      style={{
+                        height: `${14 + (i % 3) * 10}px`,
+                        animationDelay: `${i * 0.12}s`,
+                      }}
+                    />
+                  ))}
+                </div>
+                <p className="text-base font-semibold text-white">La conversación aparecerá aquí</p>
+                <p className="text-sm text-gray-500 mt-2 max-w-sm leading-relaxed">
+                  Pulsa «Iniciar conversación» y habla con {agentName}. Verás la transcripción en tiempo real, palabra por palabra.
+                </p>
+              </div>
+            ) : (
+              transcript.map((line, i) => (
+                <div
+                  key={i}
+                  className={`flex ${line.role === "user" ? "justify-end" : "justify-start"} animate-fade-in`}
+                >
+                  <div className={`max-w-[82%] px-4 py-3 rounded-2xl text-[13px] leading-relaxed ${
+                    line.role === "user"
+                      ? "bg-[#5b5bf6]/15 border border-[#5b5bf6]/25 text-gray-100"
+                      : "bg-white/[.04] border border-white/[.08] text-gray-200"
+                  }`}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 text-gray-500">
+                      {line.role === "user" ? "Tú" : agentName}
+                    </p>
+                    {line.text}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="px-5 py-3 border-t border-white/[.06] flex items-center gap-2 shrink-0 bg-white/[.01]">
+            <Headphones className="w-3.5 h-3.5 text-gray-600 shrink-0" />
+            <p className="text-[11px] text-gray-600 leading-relaxed">
+              Conexión directa por WebRTC. Usa audífonos para mejor calidad de audio.
+            </p>
+          </div>
+        </section>
+      </div>
   );
 }

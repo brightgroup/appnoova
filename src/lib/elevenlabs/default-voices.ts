@@ -33,6 +33,17 @@ export function buildPremiumFirstMessage(agentName: string, companyName: string)
   return `Buenas tardes, le saluda ${agentName} de ${companyName}. ¿Con quién tengo el gusto?`;
 }
 
+/** Subtítulo bajo el nombre en la prueba web premium. */
+export function resolvePremiumVoiceSubtitle(voiceId?: string | null): string {
+  const voice = CURATED_PREMIUM_VOICES.find(v => v.id === voiceId?.trim());
+  if (!voice) return "Voz neuronal · Español (Colombia)";
+  if (voice.region === "english") return "Voz neuronal · Inglés";
+  const region =
+    voice.region === "colombia" ? "Colombia" :
+    voice.region === "mexico" ? "México" : "España";
+  return `Voz neuronal · Español (${region})`;
+}
+
 /**
  * Llamadas salientes por teléfono: el humano contesta con "aló"/"bueno" antes de que hable la IA.
  * Se combina con first_message vacío en outbound-call (ElevenLabs espera al usuario).
