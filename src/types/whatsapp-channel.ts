@@ -9,6 +9,8 @@ export interface WhatsAppChannelRecord {
   twilio_messaging_service_sid: string | null;
   friendly_name: string | null;
   waba_id: string | null;
+  meta_phone_number_id: string | null;
+  twilio_sender_sid: string | null;
   organization_id: string | null;
   twilio_subaccount_sid: string | null;
   twilio_subaccount_auth_token: string | null;

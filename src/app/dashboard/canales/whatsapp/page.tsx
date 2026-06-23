@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MessageCircle, Plus, Clock, FileText } from "lucide-react";
+import { MessageCircle, Plus, Clock, FileText, Link2 } from "lucide-react";
 import {
   btnGhost,
   btnPrimary,
@@ -21,6 +21,10 @@ import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { RequestWhatsAppLineModal } from "@/components/whatsapp/RequestWhatsAppLineModal";
+import {
+  WhatsAppEmbeddedSignupModal,
+  useWhatsAppEmbeddedSignupEnabled
+} from "@/components/whatsapp/WhatsAppEmbeddedSignupModal";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import type { TextAgentListItem } from "@/types/text-agent";
 
@@ -53,6 +57,8 @@ export default function WhatsAppListPage() {
   const [search, setSearch] = useState("");
   const [dbReady, setDbReady] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(false);
+  const embeddedSignupEnabled = useWhatsAppEmbeddedSignupEnabled();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,7 +121,12 @@ export default function WhatsAppListPage() {
           <Link href="/dashboard/canales/whatsapp/plantillas" className={btnGhost}>
             <FileText className="w-4 h-4" /> Plantillas
           </Link>
-          <button onClick={() => setModalOpen(true)} className={`${btnPrimary} py-2`}>
+          {embeddedSignupEnabled && (
+            <button onClick={() => setConnectOpen(true)} className={`${btnPrimary} py-2`}>
+              <Link2 className="w-4 h-4" /> Conectar WhatsApp
+            </button>
+          )}
+          <button onClick={() => setModalOpen(true)} className={embeddedSignupEnabled ? btnGhost : `${btnPrimary} py-2`}>
             <Plus className="w-4 h-4" /> Solicitar línea
           </button>
         </div>
@@ -139,6 +150,11 @@ export default function WhatsAppListPage() {
       <RequestWhatsAppLineModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
+        onSuccess={load}
+      />
+      <WhatsAppEmbeddedSignupModal
+        open={connectOpen}
+        onClose={() => setConnectOpen(false)}
         onSuccess={load}
       />
 
@@ -173,9 +189,19 @@ export default function WhatsAppListPage() {
           <p className="text-sm text-gray-400 mb-2 max-w-md mx-auto">
             {search
               ? "No hay resultados"
-              : "Aún no hay líneas de WhatsApp conectadas. Solicite activación y nuestro equipo registrará su número."}
+              : embeddedSignupEnabled
+                ? "Conecta tu WhatsApp Business con Meta en unos minutos o solicita activación asistida."
+                : "Aún no hay líneas de WhatsApp conectadas. Solicite activación y nuestro equipo registrará su número."}
           </p>
-          {!search && (
+          {!search && embeddedSignupEnabled && (
+            <button
+              onClick={() => setConnectOpen(true)}
+              className={`${btnPrimary} py-2 mt-3`}
+            >
+              <Link2 className="w-4 h-4" /> Conectar WhatsApp
+            </button>
+          )}
+          {!search && !embeddedSignupEnabled && (
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[.04] border border-white/[.08] text-xs text-gray-500">
               <Clock className="w-3.5 h-3.5" />
               Activación asistida por Noova

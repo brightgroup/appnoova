@@ -15,6 +15,8 @@ export function toWhatsAppChannelRecord(raw: Record<string, unknown>): WhatsAppC
       : null,
     friendly_name: raw.friendly_name ? String(raw.friendly_name) : null,
     waba_id: raw.waba_id ? String(raw.waba_id) : null,
+    meta_phone_number_id: raw.meta_phone_number_id ? String(raw.meta_phone_number_id) : null,
+    twilio_sender_sid: raw.twilio_sender_sid ? String(raw.twilio_sender_sid) : null,
     organization_id: raw.organization_id ? String(raw.organization_id) : null,
     twilio_subaccount_sid: raw.twilio_subaccount_sid ? String(raw.twilio_subaccount_sid) : null,
     twilio_subaccount_auth_token: raw.twilio_subaccount_auth_token ? String(raw.twilio_subaccount_auth_token) : null,
