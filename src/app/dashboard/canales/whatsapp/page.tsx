@@ -25,6 +25,7 @@ import {
   WhatsAppEmbeddedSignupModal,
   useWhatsAppEmbeddedSignupEnabled
 } from "@/components/whatsapp/WhatsAppEmbeddedSignupModal";
+import { whatsAppChannelStatusLabel, whatsAppChannelStatusTone } from "@/lib/whatsapp/channel-status";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import type { TextAgentListItem } from "@/types/text-agent";
 
@@ -35,10 +36,21 @@ interface WhatsAppRequest {
   phone_e164: string | null;
 }
 
+function statusBadgeForChannel(ch: WhatsAppChannelRecord) {
+  const tone = whatsAppChannelStatusTone(ch);
+  if (tone === "active") return "bg-emerald-500/15 text-emerald-300";
+  if (tone === "disconnected" || tone === "suspended") return "bg-red-500/15 text-red-300";
+  return "bg-amber-500/15 text-amber-300";
+}
+
 function statusBadge(status: string) {
   if (status === "active" || status === "completed") return "bg-emerald-500/15 text-emerald-300";
   if (status === "suspended" || status === "rejected") return "bg-red-500/15 text-red-300";
   return "bg-amber-500/15 text-amber-300";
+}
+
+function statusTextForChannel(ch: WhatsAppChannelRecord) {
+  return whatsAppChannelStatusLabel(ch);
 }
 
 function statusText(status: string) {
@@ -241,9 +253,9 @@ export default function WhatsAppListPage() {
                 </td>
                 <td className={registryTableCell}>
                   <span
-                    className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${statusBadge(ch.status)}`}
+                    className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${statusBadgeForChannel(ch)}`}
                   >
-                    {statusText(ch.status)}
+                    {statusTextForChannel(ch)}
                   </span>
                 </td>
               </tr>

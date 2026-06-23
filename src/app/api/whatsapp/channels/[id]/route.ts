@@ -66,6 +66,22 @@ export async function PATCH(
     updates.friendly_name = body.friendly_name ? String(body.friendly_name).trim() : null;
   }
 
+  if (body.action === "disconnect") {
+    const now = new Date().toISOString();
+    const priorMeta =
+      existing.metadata && typeof existing.metadata === "object" && !Array.isArray(existing.metadata)
+        ? (existing.metadata as Record<string, unknown>)
+        : {};
+
+    updates.status = "suspended";
+    updates.meta_access_token = null;
+    updates.metadata = {
+      ...priorMeta,
+      disconnected_at: now,
+      disconnected_by: "user"
+    };
+  }
+
   const { data, error } = await db
     .from("whatsapp_channels")
     .update(updates)
