@@ -88,6 +88,15 @@ export function int16ToPcmBase64(samples: Int16Array): string {
   return buf.toString("base64");
 }
 
+/** L16 RTP hacia Telnyx usa PCM big-endian (RFC 3551). */
+export function int16ToTelnyxL16Base64(samples: Int16Array): string {
+  const buf = Buffer.alloc(samples.length * 2);
+  for (let i = 0; i < samples.length; i++) {
+    buf.writeInt16BE(samples[i], i * 2);
+  }
+  return buf.toString("base64");
+}
+
 export function pcmuBase64ToPcm16(base64: string): Int16Array {
   const bytes = Buffer.from(base64, "base64");
   const out = new Int16Array(bytes.length);
@@ -119,7 +128,7 @@ export function geminiOutboundToTelnyx(pcmBase64: string, mimeType?: string): st
   const inputRate = parsePcmRate(mimeType);
   const float32 = pcmBase64ToFloat32(pcmBase64);
   const pcm16k = applyPcmGain(resampleFloat32ToRate(float32, inputRate, TELNYX_OUTBOUND_SAMPLE_RATE));
-  return int16ToPcmBase64(pcm16k);
+  return int16ToTelnyxL16Base64(pcm16k);
 }
 
 /** Silencio L16 (20 ms @ 16 kHz). */

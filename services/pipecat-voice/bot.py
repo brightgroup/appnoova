@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 from google.genai.types import ThinkingConfig
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -204,8 +203,7 @@ async def run_bot(
         logger.info("Telnyx conectado", call_control_id=call_control_id)
         await update_phase(call_control_id, "connected")
         await audio_buffer.start_recording()
-        await asyncio.sleep(0.8)
-        await worker.queue_frames([LLMRunFrame()])
+        # Dejar que el VAD del usuario dispare el primer turno (kickoff ya está en el contexto).
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):

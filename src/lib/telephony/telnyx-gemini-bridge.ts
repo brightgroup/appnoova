@@ -1,7 +1,7 @@
 import type { LiveServerMessage, Session } from "@google/genai";
 import type { WebSocket } from "ws";
 import { connectGeminiLive } from "@/lib/telephony/gemini-live-connect";
-import { buildVoiceOutboundKickoffMessage } from "@/lib/voice-accent-profile";
+import { buildVoiceOutboundKickoffMessage, buildVoiceOutboundRespondKickoffMessage } from "@/lib/voice-accent-profile";
 import { isGoodbyeUtterance } from "@/lib/voice-goodbye-detection";
 import {
   chunkOutboundPayload,
@@ -36,6 +36,7 @@ export class TelnyxGeminiBridge {
   private outboundQueue: string[] = [];
   private outboundTimer: ReturnType<typeof setInterval> | null = null;
   private listenEnableTimer: ReturnType<typeof setTimeout> | null = null;
+  private preSetupInboundChunks: string[] = [];
   private callControlId: string;
 
   constructor(
@@ -79,11 +80,18 @@ export class TelnyxGeminiBridge {
     if (event === "media") {
       const media = msg.media as { track?: string; payload?: string } | undefined;
       const track = media?.track;
-      // Solo audio del usuario (inbound). Evita reenviar eco del agente por outbound track.
-      if (media?.payload && this.isUserInboundTrack(track) && this.canSendUserAudio()) {
-        this.inboundFrames++;
-        const geminiAudio = telnyxInboundToGemini(media.payload);
-        this.gemini?.sendRealtimeInput({
+      if (!media?.payload || !this.isUserInboundTrack(track)) return;
+
+      const geminiAudio = telnyxInboundToGemini(media.payload);
+      this.inboundFrames++;
+
+      if (!this.setupDone || !this.gemini) {
+        this.preSetupInboundChunks.push(geminiAudio);
+        return;
+      }
+
+      if (this.canSendUserAudio()) {
+        this.gemini.sendRealtimeInput({
           audio: { data: geminiAudio, mimeType: "audio/pcm;rate=16000" }
         });
       }
@@ -101,14 +109,15 @@ export class TelnyxGeminiBridge {
   }
 
   private isUserInboundTrack(track?: string): boolean {
-    return !track || track === "inbound";
+    if (!track) return true;
+    const normalized = track.toLowerCase();
+    return normalized === "inbound" || normalized === "inbound_track";
   }
 
   private canSendUserAudio(): boolean {
     return Boolean(
       this.setupDone &&
       this.gemini &&
-      this.listeningEnabled &&
       !this.agentSpeaking &&
       this.outboundQueue.length === 0
     );
@@ -233,13 +242,26 @@ export class TelnyxGeminiBridge {
         status_label: labelForPhase("connected")
       });
 
-      // Escuchar el "aló" del interlocutor desde el inicio (antes solo se activaba tras el primer turno).
+      // Escuchar el "aló" del interlocutor desde el inicio.
       this.listeningEnabled = true;
+
+      const bufferedInbound = this.preSetupInboundChunks.splice(0);
+      const userAlreadySpoke = bufferedInbound.length > 0;
+
+      for (const chunk of bufferedInbound) {
+        this.gemini?.sendRealtimeInput({
+          audio: { data: chunk, mimeType: "audio/pcm;rate=16000" }
+        });
+      }
+
+      const kickoff = userAlreadySpoke
+        ? buildVoiceOutboundRespondKickoffMessage(this.pending.companyName)
+        : buildVoiceOutboundKickoffMessage(this.pending.companyName);
 
       this.gemini?.sendClientContent({
         turns: [{
           role: "user",
-          parts: [{ text: buildVoiceOutboundKickoffMessage(this.pending.companyName) }],
+          parts: [{ text: kickoff }],
         }],
         turnComplete: true
       });

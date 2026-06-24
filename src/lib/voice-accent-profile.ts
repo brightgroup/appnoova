@@ -142,6 +142,12 @@ export function buildVoiceOutboundKickoffMessage(companyName?: string | null): s
   return `[Sistema — llamada conectada] La persona acaba de contestar el teléfono. Permanece en SILENCIO absoluto (sin audio) hasta escuchar su saludo ("aló", "bueno", "dígame", "hola", "sí"). Cuando salude, responde con UNA sola frase breve de presentación (tu nombre y "${empresa}") y sigue el guion de la plantilla. No digas "Mi empresa" ni otro nombre distinto de "${empresa}". No des resumen de la empresa al abrir.`;
 }
 
+/** Cuando ya se escuchó el saludo del interlocutor (p. ej. antes de que Gemini terminara de conectar). */
+export function buildVoiceOutboundRespondKickoffMessage(companyName?: string | null): string {
+  const empresa = companyName?.trim() || "la empresa";
+  return `[Sistema — la persona ya contestó] Acabas de escuchar su saludo al descolgar. Responde AHORA con UNA sola frase breve de presentación (tu nombre y "${empresa}") y sigue el guion. No des resumen de la empresa al abrir.`;
+}
+
 export function buildVoiceKickoffMessage(
   _purposeOrTemplateId?: string | null,
   companyName?: string | null
