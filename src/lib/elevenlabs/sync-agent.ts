@@ -23,14 +23,14 @@ export interface ElevenLabsSyncInput {
   companyContextText?: string;
 }
 
-/** Permite anular first_message en cada llamada SIP (p. ej. esperar el "aló" del cliente). */
+/** Permite anular first_message y prompt en cada llamada (SIP / web). */
 function buildPlatformSettings() {
   return {
     overrides: {
       conversation_config_override: {
         agent: {
           first_message: true,
-          prompt: true,
+          prompt: { prompt: true },
         },
       },
     },
