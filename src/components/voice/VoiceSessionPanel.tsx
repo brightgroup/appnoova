@@ -30,6 +30,8 @@ export interface VoiceSessionPanelProps {
   agentConfig: VoiceAgentFormData;
   /** Texto del contexto de marca asignado al agente (se fusiona con el prompt). */
   companyContext?: string | null;
+  /** Nombre de la empresa del contexto asignado (para presentación en voz). */
+  companyName?: string | null;
   ready?: boolean;
   onEndCall?: () => void;
   onCallSaved?: () => void;
@@ -41,6 +43,7 @@ export function VoiceSessionPanel({
   agentId,
   agentConfig,
   companyContext,
+  companyName,
   ready = true,
   onEndCall,
   onCallSaved,
@@ -74,6 +77,7 @@ export function VoiceSessionPanel({
   const gainNodeRef = useRef<GainNode | null>(null);
   const configRef = useRef(agentConfig);
   const companyContextRef = useRef(companyContext);
+  const companyNameRef = useRef(companyName);
   const nextTimeRef = useRef(0);
   const agentSpeakUntilRef = useRef(0);
   const micToGeminiBlockedRef = useRef(true);
@@ -96,6 +100,7 @@ export function VoiceSessionPanel({
   useEffect(() => { mutedRef.current = muted; }, [muted]);
   useEffect(() => { configRef.current = agentConfig; }, [agentConfig]);
   useEffect(() => { companyContextRef.current = companyContext; }, [companyContext]);
+  useEffect(() => { companyNameRef.current = companyName; }, [companyName]);
 
   useEffect(() => {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: "smooth" });
@@ -225,14 +230,15 @@ export function VoiceSessionPanel({
     if (msg.setupComplete && !setupDoneRef.current) {
       setupDoneRef.current = true;
       setState("listening");
-      setStatusHint(`Conectado · Habla o espera el saludo de ${configRef.current.name?.trim() || "Agente"}`);
+      setStatusHint("Conectado · Di «aló» o saluda para iniciar (la IA espera tu señal)");
 
       sessionStartRef.current = Date.now();
+      micToGeminiBlockedRef.current = false;
 
       sessionRef.current?.sendClientContent({
         turns: [{
           role: "user",
-          parts: [{ text: buildVoiceKickoffMessage(configRef.current.source_template) }],
+          parts: [{ text: buildVoiceKickoffMessage(configRef.current.source_template, companyNameRef.current) }],
         }],
         turnComplete: true
       });
@@ -473,9 +479,10 @@ export function VoiceSessionPanel({
         config: buildGeminiLiveSessionConfig({
           systemInstruction: buildPhoneAgentSystemInstruction(
             cfg.prompt,
-            companyContextRef.current,
+            companyContextRef.current ?? "",
             cfg.name,
-            cfg.source_template
+            cfg.source_template,
+            companyNameRef.current
           ),
           voiceName: cfg.voice_name || "Kore",
           temperature: cfg.temperature,

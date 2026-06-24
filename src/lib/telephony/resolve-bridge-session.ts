@@ -25,6 +25,7 @@ export async function resolveBridgeSession(callControlId: string): Promise<Pendi
     agentName: agent.agentName,
     config: agent.config,
     companyContextText: agent.companyContextText,
+    companyName: agent.companyName,
     preparedAt: Date.now()
   };
 }

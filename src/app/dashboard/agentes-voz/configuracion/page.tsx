@@ -79,6 +79,7 @@ function ConfigContent() {
   const meta = getTemplateMeta(form.source_template);
   const assignedContext = contexts.find(c => c.id === form.company_context_id);
   const companyContextText = assignedContext?.content ?? "";
+  const companyName = assignedContext?.name ?? "";
 
   const loadContexts = useCallback(async () => {
     try {
@@ -462,6 +463,7 @@ function ConfigContent() {
           agentName={form.name}
           agentConfig={form}
           companyContext={companyContextText}
+          companyName={companyName}
           ready={!loading && !!agentId}
           onEndCall={() => setTab("registro")}
           onCallSaved={() => setRegistryRefresh(k => k + 1)}

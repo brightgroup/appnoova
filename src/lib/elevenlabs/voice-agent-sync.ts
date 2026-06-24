@@ -1,21 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveCompanyNameForAgent } from "@/lib/company-context-resolve";
 import { syncElevenLabsAgent } from "@/lib/elevenlabs/sync-agent";
 import type { VoiceAgentFormData } from "@/types/voice-agent";
 
-export async function resolveCompanyNameForAgent(
-  db: SupabaseClient,
-  userId: string,
-  companyContextId?: string | null
-): Promise<string> {
-  if (!companyContextId) return "Mi empresa";
-  const { data } = await db
-    .from("company_contexts")
-    .select("name")
-    .eq("id", companyContextId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  return data?.name?.trim() || "Mi empresa";
-}
+export { resolveCompanyNameForAgent };
 
 export async function syncVoiceAgentToElevenLabs(
   db: SupabaseClient,

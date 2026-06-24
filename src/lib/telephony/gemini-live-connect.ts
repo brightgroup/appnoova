@@ -50,7 +50,8 @@ export async function connectGeminiLive(
           cfg.prompt,
           pending.companyContextText,
           pending.agentName,
-          cfg.source_template
+          cfg.source_template,
+          pending.companyName
         ),
         voiceName: cfg.voice_name || "Kore",
         temperature: cfg.temperature,

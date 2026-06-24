@@ -128,6 +128,27 @@ const PROFILES: Record<string, VoiceAccentProfile> = {
 
 const DEFAULT_PROFILE = PROFILES["lead-qualification"];
 
+/** Reglas de apertura en llamadas salientes (Gemini Live / Telnyx). */
+export const VOICE_OUTBOUND_PICKUP_PROMPT = `
+
+## Apertura en llamada saliente (obligatorio)
+- Tú iniciaste la llamada; la persona acaba de contestar. NO hables hasta que diga "aló", "bueno", "dígame", "hola", "sí" o similar.
+- Cuando responda, saluda en UNA sola frase breve (tu nombre y la empresa) y continúa el protocolo de la plantilla.
+- No des resumen de la empresa, pitch largo ni lista de servicios al abrir. No hables encima de la persona.`;
+
+/** Mensaje de arranque: instruye esperar el "aló" antes de generar audio. */
+export function buildVoiceOutboundKickoffMessage(companyName?: string | null): string {
+  const empresa = companyName?.trim() || "la empresa";
+  return `[Sistema — llamada conectada] La persona acaba de contestar el teléfono. Permanece en SILENCIO absoluto (sin audio) hasta escuchar su saludo ("aló", "bueno", "dígame", "hola", "sí"). Cuando salude, responde con UNA sola frase breve de presentación (tu nombre y "${empresa}") y sigue el guion de la plantilla. No digas "Mi empresa" ni otro nombre distinto de "${empresa}". No des resumen de la empresa al abrir.`;
+}
+
+export function buildVoiceKickoffMessage(
+  _purposeOrTemplateId?: string | null,
+  companyName?: string | null
+): string {
+  return buildVoiceOutboundKickoffMessage(companyName);
+}
+
 export function resolveVoicePurposeId(rawId?: string | null): string {
   if (!rawId?.trim()) return "lead-qualification";
   return resolvePurposeId("voice", rawId);
@@ -148,10 +169,6 @@ export function suggestTemperatureForPurpose(purposeOrTemplateId?: string | null
 
 export function buildVoiceAccentPromptSection(purposeOrTemplateId?: string | null): string {
   return getVoiceAccentProfile(purposeOrTemplateId).promptSection;
-}
-
-export function buildVoiceKickoffMessage(purposeOrTemplateId?: string | null): string {
-  return getVoiceAccentProfile(purposeOrTemplateId).kickoffMessage;
 }
 
 export function suggestVoiceForAgent(

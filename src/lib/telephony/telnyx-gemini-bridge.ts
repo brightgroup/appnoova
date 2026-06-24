@@ -1,7 +1,7 @@
 import type { LiveServerMessage, Session } from "@google/genai";
 import type { WebSocket } from "ws";
 import { connectGeminiLive } from "@/lib/telephony/gemini-live-connect";
-import { buildVoiceKickoffMessage } from "@/lib/voice-accent-profile";
+import { buildVoiceOutboundKickoffMessage } from "@/lib/voice-accent-profile";
 import { isGoodbyeUtterance } from "@/lib/voice-goodbye-detection";
 import {
   chunkOutboundPayload,
@@ -233,10 +233,13 @@ export class TelnyxGeminiBridge {
         status_label: labelForPhase("connected")
       });
 
+      // Escuchar el "aló" del interlocutor desde el inicio (antes solo se activaba tras el primer turno).
+      this.listeningEnabled = true;
+
       this.gemini?.sendClientContent({
         turns: [{
           role: "user",
-          parts: [{ text: buildVoiceKickoffMessage(this.pending.config.source_template) }],
+          parts: [{ text: buildVoiceOutboundKickoffMessage(this.pending.companyName) }],
         }],
         turnComplete: true
       });

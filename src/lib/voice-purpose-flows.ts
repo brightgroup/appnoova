@@ -91,8 +91,9 @@ function buildFollowUpFlow(agentName: string, companyName: string): string {
 }
 
 function buildCustomerServiceFlow(agentName: string, companyName: string): string {
-  return `1. **Saludo de servicio**
-   - Ejemplo: "Buenas tardes, **${companyName}**, le atiende **${agentName}**. ¿Con quién tengo el gusto y en qué le puedo colaborar?"
+  return `1. **Esperar contestación**
+   - Espera a que la persona diga "aló", "bueno" o similar antes de hablar.
+   - Luego saludo de servicio: "Buenas tardes, **${companyName}**, le atiende **${agentName}**. ¿Con quién tengo el gusto y en qué le puedo colaborar?"
 
 2. **Escucha activa**
    - Deja que el cliente explique su situación completa.
@@ -111,8 +112,9 @@ function buildCustomerServiceFlow(agentName: string, companyName: string): strin
 }
 
 function buildMeetingSchedulingFlow(agentName: string, companyName: string): string {
-  return `1. **Saludo y propósito**
-   - Ejemplo: "Buenas tardes, le saluda **${agentName}** de **${companyName}**. Le llamo para coordinar una cita o reunión."
+  return `1. **Esperar contestación**
+   - Espera a que la persona diga "aló", "bueno" o similar antes de hablar.
+   - Luego saludo y propósito: "Buenas tardes, le saluda **${agentName}** de **${companyName}**. Le llamo para coordinar una cita o reunión."
 
 2. **Motivo de la cita**
    - Confirma el objetivo (demo, asesoría, visita, llamada de seguimiento).

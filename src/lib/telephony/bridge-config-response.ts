@@ -35,9 +35,10 @@ export async function getBridgeConfigForPipecat(
         fromMemory.config.prompt,
         fromMemory.companyContextText,
         fromMemory.agentName,
-        fromMemory.config.source_template
+        fromMemory.config.source_template,
+        fromMemory.companyName
       ),
-      kickoff_message: buildVoiceKickoffMessage(fromMemory.config.source_template),
+      kickoff_message: buildVoiceKickoffMessage(fromMemory.config.source_template, fromMemory.companyName),
     };
   }
 
@@ -60,8 +61,9 @@ export async function getBridgeConfigForPipecat(
       agent.config.prompt,
       agent.companyContextText,
       agent.agentName,
-      agent.config.source_template
+      agent.config.source_template,
+      agent.companyName
     ),
-    kickoff_message: buildVoiceKickoffMessage(agent.config.source_template),
+    kickoff_message: buildVoiceKickoffMessage(agent.config.source_template, agent.companyName),
   };
 }

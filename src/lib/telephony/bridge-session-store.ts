@@ -10,6 +10,7 @@ export interface PendingBridgeSession {
   agentName: string;
   config: VoiceAgentFormData;
   companyContextText: string;
+  companyName: string;
   preparedAt: number;
 }
 

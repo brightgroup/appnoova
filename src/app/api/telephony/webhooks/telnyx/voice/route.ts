@@ -120,6 +120,7 @@ async function handleOutboundAnswered(
     agentName: agent.agentName,
     config: agent.config,
     companyContextText: agent.companyContextText,
+    companyName: agent.companyName,
     preparedAt: Date.now()
   };
 
