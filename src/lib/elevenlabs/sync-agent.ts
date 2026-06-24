@@ -1,11 +1,12 @@
 import { getPurposeMeta } from "@/lib/agent-purpose-catalog";
 import { elevenLabsFetch } from "@/lib/elevenlabs/client";
-import { ELEVENLABS_TEMPORAL_PROMPT_BLOCK } from "@/lib/colombia-calendar";
+import {
+  buildElevenLabsAgentSystemPrompt,
+  isOutboundVoicePurpose,
+} from "@/lib/elevenlabs/agent-phone-prompt";
 import {
   DEFAULT_ELEVENLABS_VOICE_ID,
-  PREMIUM_CALL_ENDING_PROMPT,
   PREMIUM_END_CALL_TOOL,
-  PREMIUM_OUTBOUND_PICKUP_PROMPT,
   buildPremiumFirstMessage,
 } from "@/lib/elevenlabs/default-voices";
 import { listCuratedPremiumVoices } from "@/lib/elevenlabs/premium-voices";
@@ -18,10 +19,8 @@ export interface ElevenLabsSyncInput {
   elevenlabsVoiceId?: string | null;
   temperature?: number;
   existingAgentId?: string | null;
-}
-
-function isOutboundVoicePurpose(purposeId: string): boolean {
-  return getPurposeMeta("voice", purposeId).tag === "Outbound";
+  companyName?: string;
+  companyContextText?: string;
 }
 
 /** Permite anular first_message en cada llamada SIP (p. ej. esperar el "aló" del cliente). */
@@ -31,6 +30,7 @@ function buildPlatformSettings() {
       conversation_config_override: {
         agent: {
           first_message: true,
+          prompt: true,
         },
       },
     },
@@ -42,6 +42,13 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
   const temperature = Math.min(1.2, Math.max(0.3, Number(input.temperature) || 0.85));
   const outbound = isOutboundVoicePurpose(input.purposeId);
   const agentName = input.name.trim() || "su asesor";
+  const systemPrompt = buildElevenLabsAgentSystemPrompt({
+    prompt: input.prompt,
+    purposeId: input.purposeId,
+    agentName,
+    companyName,
+    companyContextText: input.companyContextText,
+  });
 
   return {
     agent: {
@@ -53,7 +60,7 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
       // Solo inbound/web: no interrumpir el saludo inicial por ruido ambiente.
       disable_first_message_interruptions: !outbound,
       prompt: {
-        prompt: `${ELEVENLABS_TEMPORAL_PROMPT_BLOCK}\n\n${input.prompt.trim()}${PREMIUM_OUTBOUND_PICKUP_PROMPT}${PREMIUM_CALL_ENDING_PROMPT}`,
+        prompt: systemPrompt,
         llm: ELEVENLABS_DEFAULT_LLM,
         temperature,
         tools: [PREMIUM_END_CALL_TOOL],

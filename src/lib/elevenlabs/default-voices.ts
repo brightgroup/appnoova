@@ -52,8 +52,9 @@ export const PREMIUM_OUTBOUND_PICKUP_PROMPT = `
 
 ## Apertura en llamada saliente (obligatorio)
 - Tú iniciaste la llamada; la persona acaba de contestar. NO hables hasta que diga algo ("aló", "bueno", "dígame", "hola", "sí", etc.).
-- Cuando responda, saluda en UNA sola frase breve y natural (presenta nombre y empresa) y continúa el guion.
-- No repitas el saludo si ya saludaste; no hables encima de la persona.`;
+- Cuando responda, saluda en UNA sola frase breve (tu nombre y el nombre exacto de la empresa) y continúa el guion.
+- No des resumen de la empresa, pitch largo ni lista de servicios al abrir. No hables encima de la persona.
+- No repitas el saludo si ya saludaste.`;
 
 /** Instrucción de cierre — el agente debe usar end_call al despedirse. */
 export const PREMIUM_CALL_ENDING_PROMPT = `

@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { billingBlockedMessage, checkBillingForUser } from "@/lib/billing/meter";
 import { getElevenLabsApiKey } from "@/lib/elevenlabs/config";
 import { resolvePlatformSipConfig } from "@/lib/elevenlabs/sip-config";
+import { buildElevenLabsAgentSystemPrompt } from "@/lib/elevenlabs/agent-phone-prompt";
 import { placeElevenLabsOutboundCall } from "@/lib/elevenlabs/outbound-call";
 import { resolveElevenLabsPhoneLine } from "@/lib/elevenlabs/phone-line";
 import { createPhoneTestCallSession } from "@/lib/telephony/test-call-session";
+import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
 
 /** POST — llamada saliente premium vía ElevenLabs SIP (prueba telefónica). */
@@ -127,10 +129,24 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const loaded = await loadVoiceAgentForCall(voice_agent_id, userId);
+    if (!loaded) {
+      return NextResponse.json({ error: "Agente no encontrado" }, { status: 404 });
+    }
+
+    const systemPromptOverride = buildElevenLabsAgentSystemPrompt({
+      prompt: loaded.config.prompt,
+      purposeId: loaded.config.source_template,
+      agentName: loaded.agentName,
+      companyName: loaded.companyName,
+      companyContextText: loaded.companyContextText,
+    });
+
     const { conversationId } = await placeElevenLabsOutboundCall({
       agentId: agent.elevenlabs_agent_id,
       toE164: test.e164,
       agentPhoneNumberId: line.phoneNumberId,
+      systemPromptOverride,
     });
 
     const fromE164 = line.e164 ?? phone.e164;

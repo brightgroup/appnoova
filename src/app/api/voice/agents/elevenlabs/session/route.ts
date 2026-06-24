@@ -6,9 +6,14 @@ import {
   isQuotaOrBillingError,
   logPremiumInternalIssue,
 } from "@/lib/elevenlabs/disconnect-label";
+import {
+  buildElevenLabsAgentSystemPrompt,
+  isOutboundVoicePurpose,
+} from "@/lib/elevenlabs/agent-phone-prompt";
 import { getElevenLabsApiKey } from "@/lib/elevenlabs/config";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 import { getElevenLabsWebSessionCredentials } from "@/lib/elevenlabs/session-credentials";
+import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
 
 /** GET — credenciales de sesión web (WebRTC) para agente premium del usuario. */
@@ -55,11 +60,25 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const loaded = await loadVoiceAgentForCall(voiceAgentId, userId);
     const creds = await getElevenLabsWebSessionCredentials(agent.elevenlabs_agent_id);
     const temporal = buildColombiaTemporalContext();
+    const outbound =
+      loaded && isOutboundVoicePurpose(loaded.config.source_template);
+    const promptOverride = outbound
+      ? buildElevenLabsAgentSystemPrompt({
+          prompt: loaded.config.prompt,
+          purposeId: loaded.config.source_template,
+          agentName: loaded.agentName,
+          companyName: loaded.companyName,
+          companyContextText: loaded.companyContextText,
+        })
+      : undefined;
+
     return NextResponse.json({
       conversationToken: creds.conversationToken,
       dynamicVariables: temporal.dynamicVariables,
+      ...(promptOverride ? { promptOverride } : {}),
     });
   } catch (e) {
     const internal = e instanceof Error ? e.message : "session_start_failed";

@@ -4,6 +4,7 @@ import type { DisconnectionDetails } from "@elevenlabs/client";
 export interface PremiumWebSessionPayload {
   conversationToken: string;
   dynamicVariables: Record<string, string>;
+  promptOverride?: string;
 }
 
 export function parsePremiumWebSessionPayload(
@@ -18,7 +19,11 @@ export function parsePremiumWebSessionPayload(
     raw && typeof raw === "object" && !Array.isArray(raw)
       ? (raw as Record<string, string>)
       : {};
-  return { conversationToken, dynamicVariables };
+  const promptOverride =
+    typeof data.promptOverride === "string" && data.promptOverride.trim()
+      ? data.promptOverride.trim()
+      : undefined;
+  return { conversationToken, dynamicVariables, promptOverride };
 }
 
 export async function fetchPremiumWebSession(

@@ -37,6 +37,7 @@ export function PremiumVoiceSessionPanel({
   agentId,
   agentConfig,
   companyContext,
+  companyName,
   ready = true,
   onEndCall,
   onCallSaved,
@@ -318,18 +319,22 @@ export function PremiumVoiceSessionPanel({
       const session = await fetchPremiumWebSession(id, headers);
       if (epoch !== sessionEpochRef.current) return;
 
-      // Outbound en teléfono usa first_message vacío; en web restauramos saludo proactivo.
+      const empresa = companyName?.trim() || "Mi empresa";
       const webFirstMessage = isOutboundTemplate
-        ? buildPremiumFirstMessage(agentName, companyContext?.trim() || "Mi empresa")
+        ? buildPremiumFirstMessage(agentName, empresa)
         : undefined;
 
-      // Mismo patrón que el widget ElevenLabs: token WebRTC + variables dinámicas.
+      const agentOverrides = {
+        ...(webFirstMessage ? { firstMessage: webFirstMessage } : {}),
+        ...(session.promptOverride ? { prompt: { prompt: session.promptOverride } } : {}),
+      };
+
       const conversation = await VoiceConversation.startSession({
         conversationToken: session.conversationToken,
         connectionType: "webrtc",
         dynamicVariables: session.dynamicVariables,
-        ...(webFirstMessage
-          ? { overrides: { agent: { firstMessage: webFirstMessage } } }
+        ...(Object.keys(agentOverrides).length > 0
+          ? { overrides: { agent: agentOverrides } }
           : {}),
         onConnect: ({ conversationId }) => {
           if (epoch !== sessionEpochRef.current) return;
@@ -415,7 +420,7 @@ export function PremiumVoiceSessionPanel({
       );
       setState("error");
     }
-  }, [agentName, appendTranscript, checkGoodbyeAndHangup, companyContext, flushPendingUserText, handleDisconnect, isOutboundTemplate, persistSnapshot, startTimer]);
+  }, [agentName, appendTranscript, checkGoodbyeAndHangup, companyName, flushPendingUserText, handleDisconnect, isOutboundTemplate, persistSnapshot, startTimer]);
 
   const stopSession = useCallback(() => {
     if (endingRef.current) return;
