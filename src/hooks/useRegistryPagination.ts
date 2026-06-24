@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-export const REGISTRY_PAGE_SIZES = [10, 25, 50, 100] as const;
+export const REGISTRY_PAGE_SIZES = [25, 50, 100] as const;
 export const REGISTRY_DEFAULT_PAGE_SIZE = 25;
 
 export interface RegistryPaginationOptions {

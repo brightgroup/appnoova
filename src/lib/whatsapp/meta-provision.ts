@@ -6,6 +6,10 @@ import {
 } from "@/lib/meta/oauth";
 import { normalizeWhatsAppE164 } from "@/lib/whatsapp-channel";
 import type { EmbeddedSignupCompleteInput, EmbeddedSignupCompleteResult } from "@/lib/whatsapp/embedded-signup-provision";
+import {
+  buildEmbeddedSignupChannelMetadata,
+  findWhatsAppChannelForProvision
+} from "@/lib/whatsapp/embedded-signup-provision";
 
 function resolvePhoneE164(input: EmbeddedSignupCompleteInput & {
   displayPhoneNumber?: string | null;
@@ -66,35 +70,24 @@ export async function provisionWhatsAppFromEmbeddedSignupMeta(
     if (!agent) throw new Error("Agente de texto no encontrado");
   }
 
-  const { data: byWaba } = await db
-    .from("whatsapp_channels")
-    .select("id")
-    .eq("organization_id", input.organizationId)
-    .eq("waba_id", wabaId)
-    .maybeSingle();
-
-  const { data: byE164 } = byWaba
-    ? { data: null }
-    : await db
-        .from("whatsapp_channels")
-        .select("id")
-        .eq("organization_id", input.organizationId)
-        .eq("e164", e164)
-        .maybeSingle();
-
-  const existingId = byWaba?.id ?? byE164?.id;
-  const friendlyName = input.friendlyName?.trim() || `WhatsApp ${e164}`;
+  const existing = await findWhatsAppChannelForProvision(db, input, e164);
+  const friendlyName =
+    input.friendlyName?.trim()
+    || existing?.friendly_name?.trim()
+    || `WhatsApp ${e164}`;
+  const textAgentId = input.textAgentId ?? existing?.text_agent_id ?? null;
   const now = new Date().toISOString();
-  const metadata = {
+  const metadata = buildEmbeddedSignupChannelMetadata(existing?.metadata, {
     embedded_signup: true,
     provider: "meta",
-    provisioned_at: now
-  };
+    provisioned_at: now,
+    reconnected_at: existing ? now : undefined
+  });
 
   const row = {
     user_id: input.userId,
     organization_id: input.organizationId,
-    text_agent_id: input.textAgentId || null,
+    text_agent_id: textAgentId,
     provider: "meta",
     e164,
     waba_id: wabaId,
@@ -106,11 +99,11 @@ export async function provisionWhatsAppFromEmbeddedSignupMeta(
     updated_at: now
   };
 
-  if (existingId) {
+  if (existing?.id) {
     const { data: updated, error } = await db
       .from("whatsapp_channels")
       .update(row)
-      .eq("id", existingId)
+      .eq("id", existing.id)
       .select("id")
       .single();
     if (error || !updated) throw new Error(error?.message || "Error actualizando canal Meta");

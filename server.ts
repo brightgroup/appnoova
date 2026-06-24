@@ -61,5 +61,14 @@ app.prepare().then(() => {
   server.listen(port, hostname, () => {
     console.log(`> Noova ready on http://${hostname}:${port}`);
     console.log(`> Telnyx media WS: ws://${hostname}:${port}/api/telephony/ws/telnyx-media`);
+    if (hostname === "0.0.0.0") {
+      console.log(`> Local: http://127.0.0.1:${port}`);
+    }
+  }).on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(`> Puerto ${port} en uso. Libéralo con: lsof -ti:${port} | xargs kill -9`);
+      process.exit(1);
+    }
+    throw err;
   });
 });

@@ -216,7 +216,7 @@ export const registryTableEmpty =
   "py-20 text-center text-sm text-gray-400";
 
 export const registryTableFooter =
-  "flex items-center justify-between gap-4 mt-4 text-xs text-gray-400 shrink-0";
+  "flex items-center justify-center w-full pt-4 pb-2 shrink-0";
 
 export const registryRowIcon =
   "text-gray-400 shrink-0";

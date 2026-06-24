@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isMissingTableError } from "@/lib/supabase-table-error";
 import { toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
+import { canDeleteWhatsAppChannel } from "@/lib/whatsapp/channel-status";
 import { getWhatsAppChannelById } from "@/lib/whatsapp-server";
 import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
 
@@ -98,4 +99,40 @@ export async function PATCH(
   }
 
   return NextResponse.json({ channel: toWhatsAppChannelRecord(data!) });
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const userId = await getTextAgentUserIdFromRequest(req);
+  if (!userId) {
+    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const db = textAgentsAdminClient();
+
+  const existing = await getWhatsAppChannelById(db, userId, id);
+  if (!existing) {
+    return NextResponse.json({ error: "Línea no encontrada" }, { status: 404 });
+  }
+
+  if (!canDeleteWhatsAppChannel(existing)) {
+    return NextResponse.json(
+      { error: "Desconecta la línea antes de eliminarla" },
+      { status: 409 }
+    );
+  }
+
+  const { error } = await db.from("whatsapp_channels").delete().eq("id", id).eq("user_id", userId);
+
+  if (error) {
+    if (isMissingTableError(error)) {
+      return NextResponse.json({ error: "Ejecuta 021_whatsapp_channels.sql en Supabase" }, { status: 503 });
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
 }

@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MessageCircle, Plus, Clock, FileText, Link2 } from "lucide-react";
+import { MessageCircle, Plus, Clock, FileText, Link2, MoreVertical, Trash2, Unplug } from "lucide-react";
 import {
   btnGhost,
   btnPrimary,
+  btnIconSm,
   registryTable,
   registryTableHead,
   registryTableHeadRow,
@@ -14,10 +15,13 @@ import {
   registryTableRowClickable,
   registryTableCellFirst,
   registryTableCell,
+  registryTableCellRight,
   registryTableEmpty
 } from "@/lib/brand-ui";
 import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
+import { NoovaAnchoredMenu } from "@/components/ui/NoovaAnchoredMenu";
+import { NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { RequestWhatsAppLineModal } from "@/components/whatsapp/RequestWhatsAppLineModal";
@@ -25,7 +29,17 @@ import {
   WhatsAppEmbeddedSignupModal,
   useWhatsAppEmbeddedSignupEnabled
 } from "@/components/whatsapp/WhatsAppEmbeddedSignupModal";
-import { whatsAppChannelStatusLabel, whatsAppChannelStatusTone } from "@/lib/whatsapp/channel-status";
+import {
+  WhatsAppChannelConfirmModal,
+  type WhatsAppChannelConfirmAction
+} from "@/components/whatsapp/WhatsAppChannelConfirmModal";
+import {
+  canDeleteWhatsAppChannel,
+  canDisconnectWhatsAppChannel,
+  isWhatsAppChannelDisconnected,
+  whatsAppChannelStatusLabel,
+  whatsAppChannelStatusTone
+} from "@/lib/whatsapp/channel-status";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import type { TextAgentListItem } from "@/types/text-agent";
 
@@ -70,6 +84,11 @@ export default function WhatsAppListPage() {
   const [dbReady, setDbReady] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
+  const [reconnectChannel, setReconnectChannel] = useState<WhatsAppChannelRecord | null>(null);
+  const [menuChannelId, setMenuChannelId] = useState<string | null>(null);
+  const [confirmChannel, setConfirmChannel] = useState<WhatsAppChannelRecord | null>(null);
+  const [confirmAction, setConfirmAction] = useState<WhatsAppChannelConfirmAction | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
   const embeddedSignupEnabled = useWhatsAppEmbeddedSignupEnabled();
 
   const load = useCallback(async () => {
@@ -97,6 +116,59 @@ export default function WhatsAppListPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const openConnect = (channel?: WhatsAppChannelRecord | null) => {
+    setReconnectChannel(channel ?? null);
+    setConnectOpen(true);
+  };
+
+  const closeConnect = () => {
+    setConnectOpen(false);
+    setReconnectChannel(null);
+  };
+
+  const openConfirm = (channel: WhatsAppChannelRecord, action: WhatsAppChannelConfirmAction) => {
+    setMenuChannelId(null);
+    setConfirmChannel(channel);
+    setConfirmAction(action);
+  };
+
+  const closeConfirm = () => {
+    if (actionLoading) return;
+    setConfirmChannel(null);
+    setConfirmAction(null);
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmChannel || !confirmAction) return;
+    setActionLoading(true);
+    try {
+      const headers = await getAuthHeaders();
+      if (confirmAction === "disconnect") {
+        const res = await fetch(`/api/whatsapp/channels/${confirmChannel.id}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ action: "disconnect" })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "No se pudo desconectar");
+      } else {
+        const res = await fetch(`/api/whatsapp/channels/${confirmChannel.id}`, {
+          method: "DELETE",
+          headers
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "No se pudo eliminar");
+      }
+      setConfirmChannel(null);
+      setConfirmAction(null);
+      await load();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Error en la operación");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const agentMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -134,7 +206,7 @@ export default function WhatsAppListPage() {
             <FileText className="w-4 h-4" /> Plantillas
           </Link>
           {embeddedSignupEnabled && (
-            <button onClick={() => setConnectOpen(true)} className={`${btnPrimary} py-2`}>
+            <button onClick={() => openConnect()} className={`${btnPrimary} py-2`}>
               <Link2 className="w-4 h-4" /> Conectar WhatsApp
             </button>
           )}
@@ -166,8 +238,17 @@ export default function WhatsAppListPage() {
       />
       <WhatsAppEmbeddedSignupModal
         open={connectOpen}
-        onClose={() => setConnectOpen(false)}
+        onClose={closeConnect}
         onSuccess={load}
+        reconnectChannel={reconnectChannel}
+      />
+
+      <WhatsAppChannelConfirmModal
+        channel={confirmChannel}
+        action={confirmAction}
+        loading={actionLoading}
+        onClose={closeConfirm}
+        onConfirm={() => void handleConfirmAction()}
       />
 
       {!dbReady && (
@@ -207,7 +288,7 @@ export default function WhatsAppListPage() {
           </p>
           {!search && embeddedSignupEnabled && (
             <button
-              onClick={() => setConnectOpen(true)}
+              onClick={() => openConnect()}
               className={`${btnPrimary} py-2 mt-3`}
             >
               <Link2 className="w-4 h-4" /> Conectar WhatsApp
@@ -222,18 +303,23 @@ export default function WhatsAppListPage() {
         </div>
       ) : (
         <div className="mt-4 px-6">
-          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Líneas activas</h3>
-          <table className={`${registryTable} min-w-[720px]`}>
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Líneas</h3>
+          <table className={`${registryTable} min-w-[820px]`}>
           <thead className={registryTableHead}>
             <tr className={registryTableHeadRow}>
               <th className={registryTableHeadCell}>Línea</th>
               <th className={registryTableHeadCell}>Número</th>
               <th className={registryTableHeadCell}>Agente</th>
               <th className={registryTableHeadCell}>Estado</th>
+              <th className={registryTableHeadCell} />
             </tr>
           </thead>
           <tbody>
-            {pageRows.map(ch => (
+            {pageRows.map(ch => {
+              const disconnected = isWhatsAppChannelDisconnected(ch);
+              const showDelete = canDeleteWhatsAppChannel(ch);
+              const showDisconnect = canDisconnectWhatsAppChannel(ch);
+              return (
               <tr
                 key={ch.id}
                 className={registryTableRowClickable}
@@ -258,8 +344,57 @@ export default function WhatsAppListPage() {
                     {statusTextForChannel(ch)}
                   </span>
                 </td>
+                <td className={registryTableCellRight} onClick={e => e.stopPropagation()}>
+                  <NoovaAnchoredMenu
+                    open={menuChannelId === ch.id}
+                    onClose={() => setMenuChannelId(null)}
+                    anchor={
+                      <button
+                        type="button"
+                        className={btnIconSm}
+                        onClick={e => {
+                          e.stopPropagation();
+                          setMenuChannelId(prev => (prev === ch.id ? null : ch.id));
+                        }}
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    }
+                  >
+                    <NoovaListMenuItem onClick={() => router.push(`/dashboard/canales/whatsapp/${ch.id}`)}>
+                      Abrir configuración
+                    </NoovaListMenuItem>
+                    {embeddedSignupEnabled && disconnected && (
+                      <NoovaListMenuItem
+                        onClick={() => {
+                          setMenuChannelId(null);
+                          openConnect(ch);
+                        }}
+                      >
+                        <span className="flex items-center gap-2">
+                          <Link2 className="w-3.5 h-3.5" /> Reconectar
+                        </span>
+                      </NoovaListMenuItem>
+                    )}
+                    {showDisconnect && (
+                      <NoovaListMenuItem onClick={() => openConfirm(ch, "disconnect")}>
+                        <span className="flex items-center gap-2">
+                          <Unplug className="w-3.5 h-3.5" /> Desconectar
+                        </span>
+                      </NoovaListMenuItem>
+                    )}
+                    {showDelete && (
+                      <NoovaListMenuItem danger onClick={() => openConfirm(ch, "delete")}>
+                        <span className="flex items-center gap-2">
+                          <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                        </span>
+                      </NoovaListMenuItem>
+                    )}
+                  </NoovaAnchoredMenu>
+                </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>

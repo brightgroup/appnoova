@@ -2,27 +2,35 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { MessageCircle, Loader2, Save, CheckCircle2, Copy, ExternalLink, Unplug } from "lucide-react";
-import { btnPrimary, btnGhost, textMuted } from "@/lib/brand-ui";
+import { useRouter } from "next/navigation";
+import { MessageCircle, Loader2, Save, CheckCircle2, ExternalLink } from "lucide-react";
+import { btnPrimary, textMuted } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { whatsAppChannelStatusLabel } from "@/lib/whatsapp/channel-status";
+import {
+  WhatsAppEmbeddedSignupModal,
+  useWhatsAppEmbeddedSignupEnabled
+} from "@/components/whatsapp/WhatsAppEmbeddedSignupModal";
+import { WhatsAppChannelLifecycleSection } from "@/components/whatsapp/WhatsAppChannelLifecycleSection";
+import {
+  WhatsAppChannelConfirmModal,
+  type WhatsAppChannelConfirmAction
+} from "@/components/whatsapp/WhatsAppChannelConfirmModal";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import type { TextAgentListItem } from "@/types/text-agent";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
 
-function statusLabel(channel: WhatsAppChannelRecord): string {
-  return whatsAppChannelStatusLabel(channel);
-}
-
 export function WhatsAppChannelConfigPanel({ channelId }: { channelId: string }) {
+  const router = useRouter();
+  const embeddedSignupEnabled = useWhatsAppEmbeddedSignupEnabled();
   const [channel, setChannel] = useState<WhatsAppChannelRecord | null>(null);
   const [agents, setAgents] = useState<TextAgentListItem[]>([]);
-  const [webhookUrl, setWebhookUrl] = useState("");
   const [selectedAgentId, setSelectedAgentId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<WhatsAppChannelConfirmAction | null>(null);
+  const [connectOpen, setConnectOpen] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -30,17 +38,14 @@ export function WhatsAppChannelConfigPanel({ channelId }: { channelId: string })
     setError("");
     try {
       const headers = await getAuthHeaders();
-      const [chRes, agentsRes, listRes] = await Promise.all([
+      const [chRes, agentsRes] = await Promise.all([
         fetch(`/api/whatsapp/channels/${channelId}`, { headers }),
-        fetch("/api/text/agents", { headers }),
-        fetch("/api/whatsapp/channels", { headers })
+        fetch("/api/text/agents", { headers })
       ]);
       const chData = await chRes.json();
       const agentsData = await agentsRes.json();
-      const listData = await listRes.json();
 
       if (agentsRes.ok) setAgents(agentsData.agents ?? []);
-      if (listRes.ok && listData.webhook_url) setWebhookUrl(String(listData.webhook_url));
 
       if (!chRes.ok) {
         setError(chData.error || "No se pudo cargar la línea");
@@ -81,38 +86,41 @@ export function WhatsAppChannelConfigPanel({ channelId }: { channelId: string })
     }
   };
 
-  const handleDisconnect = async () => {
-    if (!channel) return;
-    const ok = window.confirm(
-      "¿Desconectar esta línea en Noova?\n\nNo elimina el número en Meta ni Twilio — solo deja de recibir y enviar mensajes desde Noova. Podrás volver a conectarla con «Conectar WhatsApp»."
-    );
-    if (!ok) return;
-
-    setDisconnecting(true);
+  const runConfirmAction = async () => {
+    if (!channel || !confirmAction) return;
+    setActionLoading(true);
     setError("");
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch(`/api/whatsapp/channels/${channel.id}`, {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({ action: "disconnect" })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "No se pudo desconectar");
+      if (confirmAction === "disconnect") {
+        const res = await fetch(`/api/whatsapp/channels/${channel.id}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ action: "disconnect" })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "No se pudo desconectar");
+          return;
+        }
+        setChannel(data.channel);
+      } else {
+        const res = await fetch(`/api/whatsapp/channels/${channel.id}`, {
+          method: "DELETE",
+          headers
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "No se pudo eliminar");
+          return;
+        }
+        router.push("/dashboard/canales/whatsapp");
         return;
       }
-      setChannel(data.channel);
+      setConfirmAction(null);
     } finally {
-      setDisconnecting(false);
+      setActionLoading(false);
     }
-  };
-
-  const copyWebhook = async () => {
-    if (!webhookUrl) return;
-    await navigator.clipboard.writeText(webhookUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   if (loading) {
@@ -135,38 +143,39 @@ export function WhatsAppChannelConfigPanel({ channelId }: { channelId: string })
   const assignedAgent = agents.find(a => a.id === channel.text_agent_id);
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border border-white/[.10] bg-white/[.02] p-5 space-y-4">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
+    <div className="space-y-5">
+      <WhatsAppEmbeddedSignupModal
+        open={connectOpen}
+        onClose={() => setConnectOpen(false)}
+        onSuccess={load}
+        reconnectChannel={channel}
+      />
+
+      <WhatsAppChannelConfirmModal
+        channel={channel}
+        action={confirmAction}
+        loading={actionLoading}
+        onClose={() => !actionLoading && setConfirmAction(null)}
+        onConfirm={() => void runConfirmAction()}
+      />
+
+      <div className="rounded-xl border border-white/[.10] bg-white/[.02] p-5">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
             <MessageCircle className="w-5 h-5 text-emerald-400" />
           </div>
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">WhatsApp Business</p>
-            <p className="text-2xl font-mono font-bold text-white break-all">{channel.e164}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">WhatsApp Business</p>
+            <p className="text-2xl font-mono font-bold text-white break-all mt-0.5">{channel.e164}</p>
             {channel.friendly_name && (
               <p className="text-sm text-gray-400 mt-1">{channel.friendly_name}</p>
             )}
           </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 text-xs">
-          <div className="rounded-lg border border-white/[.08] bg-white/[.02] px-3 py-2">
-            <p className="text-gray-500 mb-0.5">Estado</p>
-            <p className="text-gray-200">{statusLabel(channel)}</p>
-          </div>
-          <div className="rounded-lg border border-white/[.08] bg-white/[.02] px-3 py-2">
-            <p className="text-gray-500 mb-0.5">Proveedor</p>
-            <p className="text-gray-200 capitalize">{channel.provider === "meta" ? "Meta directo" : channel.provider}</p>
+          <div className="text-right shrink-0">
+            <p className="text-[11px] text-gray-500 uppercase tracking-wide">Estado</p>
+            <p className="text-sm font-medium text-gray-200 mt-0.5">{whatsAppChannelStatusLabel(channel)}</p>
           </div>
         </div>
-
-        {channel.status === "active" && (
-          <p className="text-xs text-amber-400/90 leading-relaxed">
-            «Activo» significa que Noova tiene registrada la conexión. Si eliminaste el número en Twilio o Meta,
-            desconéctala aquí para que el estado coincida.
-          </p>
-        )}
       </div>
 
       <div className="rounded-xl border border-white/[.10] bg-white/[.02] p-5 space-y-4">
@@ -186,9 +195,7 @@ export function WhatsAppChannelConfigPanel({ channelId }: { channelId: string })
           </p>
         </div>
 
-        {error && (
-          <p className="text-sm text-red-400">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-400">{error}</p>}
 
         <div className="flex items-center gap-3">
           <button
@@ -198,7 +205,7 @@ export function WhatsAppChannelConfigPanel({ channelId }: { channelId: string })
             className={`${btnPrimary} disabled:opacity-40`}
           >
             {saving ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Guardando...</>
+              <><Loader2 className="w-4 h-4 animate-spin" /> Guardando…</>
             ) : (
               <><Save className="w-4 h-4" /> Guardar asignación</>
             )}
@@ -211,67 +218,24 @@ export function WhatsAppChannelConfigPanel({ channelId }: { channelId: string })
         </div>
       </div>
 
-      {webhookUrl && channel.provider === "twilio" && (
-        <div className="rounded-xl border border-white/[.10] bg-white/[.02] p-5 space-y-3">
-          <p className="text-xs font-semibold text-gray-300">Webhook Twilio (administrador)</p>
-          <p className="text-xs text-gray-500 leading-relaxed">
-            URL para Twilio Console → WhatsApp sender → &quot;When a message comes in&quot;.
-          </p>
-          <div className="flex gap-2">
-            <code className="flex-1 text-[11px] text-gray-300 bg-black/30 rounded-lg px-3 py-2 break-all">
-              {webhookUrl}
-            </code>
-            <button type="button" onClick={copyWebhook} className={btnGhost}>
-              <Copy className="w-4 h-4" />
-              {copied ? "Copiado" : "Copiar"}
-            </button>
-          </div>
-        </div>
-      )}
+      <WhatsAppChannelLifecycleSection
+        channel={channel}
+        embeddedSignupEnabled={embeddedSignupEnabled}
+        disconnecting={actionLoading && confirmAction === "disconnect"}
+        deleting={actionLoading && confirmAction === "delete"}
+        onDisconnect={() => setConfirmAction("disconnect")}
+        onReconnect={() => setConnectOpen(true)}
+        onDelete={() => setConfirmAction("delete")}
+      />
 
-      {channel.provider === "meta" && (
-        <div className="rounded-xl border border-white/[.10] bg-white/[.02] p-5 space-y-2">
-          <p className="text-xs font-semibold text-gray-300">Webhook Meta</p>
-          <p className="text-xs text-gray-500 leading-relaxed">
-            Configurado en Meta → WhatsApp → Configuración. URL de producción:
-            <code className="block mt-2 text-[11px] text-gray-300 bg-black/30 rounded-lg px-3 py-2 break-all">
-              https://app.noova360.com/api/webhooks/meta/whatsapp
-            </code>
-          </p>
-        </div>
-      )}
-
-      {channel.status === "active" && (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/[.04] p-5">
-          <p className="text-sm font-medium text-red-300 mb-2">Desconectar línea</p>
-          <p className="text-xs text-gray-400 mb-4 leading-relaxed">
-            Marca la línea como desconectada en Noova. Úsalo cuando hayas eliminado el número en Meta/Twilio
-            o quieras migrar a otra integración.
-          </p>
-          <button
-            type="button"
-            onClick={handleDisconnect}
-            disabled={disconnecting}
-            className={`${btnGhost} border border-red-500/30 text-red-300 hover:bg-red-500/10`}
-          >
-            {disconnecting ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Desconectando…</>
-            ) : (
-              <><Unplug className="w-4 h-4" /> Desconectar en Noova</>
-            )}
-          </button>
-        </div>
-      )}
-
-      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[.06] p-4 text-sm text-gray-300">
-        <p className="font-medium text-emerald-300 mb-1">Conversaciones en Inbox</p>
-        <p className="text-xs text-gray-400 leading-relaxed">
-          Los mensajes de WhatsApp aparecen en el Inbox con canal &quot;WhatsApp&quot;.
-          Asigne la conversación a un humano para responder manualmente; si está en modo IA, el agente responde solo.
+      <div className="rounded-xl border border-white/[.08] bg-white/[.02] px-5 py-4 text-sm">
+        <p className="font-medium text-gray-200 mb-1">Inbox</p>
+        <p className="text-xs text-gray-500 leading-relaxed">
+          Los mensajes entrantes aparecen en el Inbox con canal WhatsApp.
         </p>
         <Link
           href="/dashboard/inbox"
-          className="inline-flex items-center gap-1 mt-3 text-xs text-emerald-400 hover:text-emerald-300"
+          className="inline-flex items-center gap-1 mt-2 text-xs text-[#a5a5ff] hover:text-white"
         >
           Ir al Inbox <ExternalLink className="w-3.5 h-3.5" />
         </Link>

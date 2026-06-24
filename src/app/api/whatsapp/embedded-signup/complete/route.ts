@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     text_agent_id?: string;
     friendly_name?: string;
     auth_code?: string;
+    channel_id?: string;
   };
 
   try {
@@ -55,7 +56,8 @@ export async function POST(req: NextRequest) {
       phoneE164: body.phone_e164 ?? null,
       displayPhoneNumber: body.display_phone_number ?? null,
       textAgentId: body.text_agent_id ?? null,
-      friendlyName: body.friendly_name ?? null
+      friendlyName: body.friendly_name ?? null,
+      channelId: body.channel_id ?? null
     };
 
     const result = isMetaDirectWhatsAppEnabled()

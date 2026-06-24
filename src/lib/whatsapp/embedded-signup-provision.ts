@@ -16,6 +16,65 @@ export interface EmbeddedSignupCompleteInput {
   displayPhoneNumber?: string | null;
   textAgentId?: string | null;
   friendlyName?: string | null;
+  /** Reutiliza la misma fila al reconectar una línea desconectada. */
+  channelId?: string | null;
+}
+
+interface ExistingWhatsAppChannelRow {
+  id: string;
+  friendly_name: string | null;
+  text_agent_id: string | null;
+  metadata: Record<string, unknown> | null;
+  provider: string;
+}
+
+export function buildEmbeddedSignupChannelMetadata(
+  priorMeta: Record<string, unknown> | null | undefined,
+  extras: Record<string, unknown>
+): Record<string, unknown> {
+  const next = { ...(priorMeta && typeof priorMeta === "object" ? priorMeta : {}), ...extras };
+  delete next.disconnected_at;
+  delete next.disconnected_by;
+  return next;
+}
+
+export async function findWhatsAppChannelForProvision(
+  db: SupabaseClient,
+  input: EmbeddedSignupCompleteInput,
+  e164: string
+): Promise<ExistingWhatsAppChannelRow | null> {
+  if (input.channelId?.trim()) {
+    const { data, error } = await db
+      .from("whatsapp_channels")
+      .select("id, friendly_name, text_agent_id, metadata, provider")
+      .eq("id", input.channelId.trim())
+      .eq("organization_id", input.organizationId)
+      .maybeSingle();
+
+    if (error || !data) {
+      throw new Error("Línea no encontrada para reconectar");
+    }
+
+    return data as ExistingWhatsAppChannelRow;
+  }
+
+  const { data: byWaba } = await db
+    .from("whatsapp_channels")
+    .select("id, friendly_name, text_agent_id, metadata, provider")
+    .eq("organization_id", input.organizationId)
+    .eq("waba_id", input.wabaId.trim())
+    .maybeSingle();
+
+  if (byWaba) return byWaba as ExistingWhatsAppChannelRow;
+
+  const { data: byE164 } = await db
+    .from("whatsapp_channels")
+    .select("id, friendly_name, text_agent_id, metadata, provider")
+    .eq("organization_id", input.organizationId)
+    .eq("e164", e164)
+    .maybeSingle();
+
+  return byE164 ? (byE164 as ExistingWhatsAppChannelRow) : null;
 }
 
 export interface EmbeddedSignupCompleteResult {
@@ -111,23 +170,7 @@ export async function provisionWhatsAppFromEmbeddedSignup(
 
   const subaccount = await ensureTwilioSubaccountForOrg(db, org as OrgRow);
 
-  const { data: byWaba } = await db
-    .from("whatsapp_channels")
-    .select("id, e164, waba_id")
-    .eq("organization_id", input.organizationId)
-    .eq("waba_id", wabaId)
-    .maybeSingle();
-
-  const { data: byE164 } = byWaba
-    ? { data: null }
-    : await db
-        .from("whatsapp_channels")
-        .select("id, e164, waba_id")
-        .eq("organization_id", input.organizationId)
-        .eq("e164", e164)
-        .maybeSingle();
-
-  const existing = byWaba ?? byE164;
+  const existing = await findWhatsAppChannelForProvision(db, input, e164);
 
   let senderSid: string;
   let senderStatus: string;
@@ -166,21 +209,27 @@ export async function provisionWhatsAppFromEmbeddedSignup(
   }
 
   const channelStatus = senderStatus === "ONLINE" ? "active" : "pending";
-  const friendlyName = input.friendlyName?.trim() || `WhatsApp ${e164}`;
+  const friendlyName =
+    input.friendlyName?.trim()
+    || existing?.friendly_name?.trim()
+    || `WhatsApp ${e164}`;
+  const textAgentId = input.textAgentId ?? existing?.text_agent_id ?? null;
   const now = new Date().toISOString();
-  const metadata = {
+  const metadata = buildEmbeddedSignupChannelMetadata(existing?.metadata, {
     embedded_signup: true,
+    provider: "twilio",
     provisioned_at: now,
+    reconnected_at: existing ? now : undefined,
     sender_status: senderStatus,
     subaccount_reused: subaccount.reused
-  };
+  });
 
   if (existing?.id) {
     const { data: updated, error: updateErr } = await db
       .from("whatsapp_channels")
       .update({
         user_id: input.userId,
-        text_agent_id: input.textAgentId || null,
+        text_agent_id: textAgentId,
         e164,
         waba_id: wabaId,
         meta_phone_number_id: input.phoneNumberId || null,
@@ -215,7 +264,7 @@ export async function provisionWhatsAppFromEmbeddedSignup(
     .insert({
       user_id: input.userId,
       organization_id: input.organizationId,
-      text_agent_id: input.textAgentId || null,
+      text_agent_id: textAgentId,
       provider: "twilio",
       e164,
       waba_id: wabaId,

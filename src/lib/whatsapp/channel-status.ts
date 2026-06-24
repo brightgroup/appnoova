@@ -19,3 +19,14 @@ export function whatsAppChannelStatusTone(
   if (channel.status === "suspended") return "suspended";
   return "pending";
 }
+
+/** Solo se puede eliminar tras desconectar (o si nunca estuvo activa). */
+export function canDeleteWhatsAppChannel(channel: Pick<WhatsAppChannelRecord, "status" | "metadata">): boolean {
+  if (channel.status === "active") return false;
+  if (channel.status === "pending") return true;
+  return isWhatsAppChannelDisconnected(channel as WhatsAppChannelRecord);
+}
+
+export function canDisconnectWhatsAppChannel(channel: Pick<WhatsAppChannelRecord, "status">): boolean {
+  return channel.status === "active";
+}

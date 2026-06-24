@@ -5,13 +5,15 @@ import Script from "next/script";
 import { X, Loader2, MessageCircle, AlertCircle, Link2 } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { accentFocus, btnPrimary, btnGhost } from "@/lib/brand-ui";
-import type { TextAgentListItem } from "@/types/text-agent";
 import type { MetaEmbeddedSignupPublicConfig } from "@/lib/meta/embedded-signup-config";
+import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 
 interface WhatsAppEmbeddedSignupModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  /** Reconecta la misma fila (mismo id, agente y nombre). */
+  reconnectChannel?: Pick<WhatsAppChannelRecord, "id" | "e164" | "friendly_name" | "provider"> | null;
 }
 
 interface EmbeddedSignupSession {
@@ -64,30 +66,36 @@ function parseEmbeddedSignupMessage(event: MessageEvent): EmbeddedSignupSession 
   }
 }
 
+function needsManualPhone(session: EmbeddedSignupSession): boolean {
+  return session.event === "FINISH_ONLY_WABA" && !session.displayPhoneNumber;
+}
+
 export function WhatsAppEmbeddedSignupModal({
   open,
   onClose,
-  onSuccess
+  onSuccess,
+  reconnectChannel = null
 }: WhatsAppEmbeddedSignupModalProps) {
   const [config, setConfig] = useState<MetaEmbeddedSignupPublicConfig | null>(null);
   const [sdkReady, setSdkReady] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [agents, setAgents] = useState<TextAgentListItem[]>([]);
-  const [form, setForm] = useState({
-    friendly_name: "",
-    text_agent_id: "",
-    phone_e164: ""
-  });
+  const [fallbackPhoneE164, setFallbackPhoneE164] = useState("");
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [pendingSession, setPendingSession] = useState<EmbeddedSignupSession | null>(null);
   const pendingSessionRef = useRef<EmbeddedSignupSession | null>(null);
   const authCodeRef = useRef<string | null>(null);
+  const fallbackPhoneRef = useRef("");
+
+  useEffect(() => {
+    fallbackPhoneRef.current = fallbackPhoneE164;
+  }, [fallbackPhoneE164]);
 
   useEffect(() => {
     if (!open) return;
     setError("");
     setStatus("");
+    setFallbackPhoneE164("");
     setPendingSession(null);
     pendingSessionRef.current = null;
     authCodeRef.current = null;
@@ -98,20 +106,12 @@ export function WhatsAppEmbeddedSignupModal({
       .catch(() =>
         setConfig({ enabled: false, provider: "twilio", appId: null, configId: null, solutionId: null })
       );
-
-    getAuthHeaders()
-      .then(headers => fetch("/api/text/agents", { headers }))
-      .then(res => res.json())
-      .then(data => {
-        if (data.agents) setAgents(data.agents);
-      })
-      .catch(console.error);
   }, [open]);
 
   const completeSignup = useCallback(
-    async (session: EmbeddedSignupSession) => {
+    async (session: EmbeddedSignupSession, phoneE164?: string) => {
       setLoading(true);
-      setStatus(config?.provider === "meta" ? "Vinculando con Meta Cloud API…" : "Registrando número en Twilio…");
+      setStatus("Vinculando WhatsApp…");
       setError("");
 
       try {
@@ -123,10 +123,9 @@ export function WhatsAppEmbeddedSignupModal({
             waba_id: session.wabaId,
             phone_number_id: session.phoneNumberId,
             display_phone_number: session.displayPhoneNumber,
-            phone_e164: form.phone_e164.trim() || undefined,
+            phone_e164: phoneE164?.trim() || undefined,
             auth_code: authCodeRef.current || undefined,
-            text_agent_id: form.text_agent_id || undefined,
-            friendly_name: form.friendly_name.trim() || undefined
+            channel_id: reconnectChannel?.id
           })
         });
 
@@ -149,7 +148,7 @@ export function WhatsAppEmbeddedSignupModal({
         setPendingSession(null);
       }
     },
-    [form.friendly_name, form.phone_e164, form.text_agent_id, onClose, onSuccess, config?.provider]
+    [onClose, onSuccess, config?.provider, reconnectChannel?.id]
   );
 
   useEffect(() => {
@@ -176,18 +175,18 @@ export function WhatsAppEmbeddedSignupModal({
       if (session.event === "FINISH" || session.event === "FINISH_ONLY_WABA") {
         pendingSessionRef.current = session;
         setPendingSession(session);
-        if (session.event === "FINISH_ONLY_WABA" && !session.displayPhoneNumber && !form.phone_e164.trim()) {
+        if (needsManualPhone(session) && !fallbackPhoneRef.current.trim()) {
           setLoading(false);
-          setStatus("WABA vinculada — indica el número E.164 y pulsa «Completar vinculación»");
+          setStatus("WABA vinculada — indica el número en formato +573001234567");
           return;
         }
-        void completeSignup(session);
+        void completeSignup(session, fallbackPhoneRef.current);
       }
     };
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [open, config?.enabled, completeSignup, form.phone_e164]);
+  }, [open, config?.enabled, completeSignup]);
 
   const initFacebookSdk = useCallback(() => {
     if (!config?.appId || !window.FB) return;
@@ -223,6 +222,8 @@ export function WhatsAppEmbeddedSignupModal({
     setError("");
     setStatus("Abriendo registro de Meta…");
     setLoading(true);
+    setPendingSession(null);
+    pendingSessionRef.current = null;
 
     window.FB.login(
       (response: { authResponse?: { code?: string } }) => {
@@ -248,12 +249,17 @@ export function WhatsAppEmbeddedSignupModal({
   const completePending = () => {
     const session = pendingSessionRef.current;
     if (!session) return;
-    void completeSignup(session);
+    if (needsManualPhone(session) && !fallbackPhoneE164.trim()) {
+      setError("Indica el número en formato internacional, por ejemplo +573001234567");
+      return;
+    }
+    void completeSignup(session, fallbackPhoneE164);
   };
 
   if (!open) return null;
 
   const canConnect = Boolean(config?.enabled && sdkReady);
+  const showFallbackPhone = pendingSession != null && needsManualPhone(pendingSession);
 
   return (
     <>
@@ -270,7 +276,9 @@ export function WhatsAppEmbeddedSignupModal({
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/[.08]">
             <div className="flex items-center gap-2">
               <Link2 className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-lg font-bold text-white">Conectar WhatsApp</h2>
+              <h2 className="text-lg font-bold text-white">
+                {reconnectChannel ? "Reconectar WhatsApp" : "Conectar WhatsApp"}
+              </h2>
             </div>
             <button onClick={onClose} className="p-1 text-gray-500 hover:text-white transition-colors">
               <X className="w-5 h-5" />
@@ -278,10 +286,22 @@ export function WhatsAppEmbeddedSignupModal({
           </div>
 
           <div className="p-6 space-y-4">
-            <p className="text-sm text-gray-400">
-              Vincula tu cuenta de WhatsApp Business con Meta. El flujo es el mismo que usan plataformas
-              como Dapta: eliges tu portfolio, WABA y número sin salir de Noova.
-            </p>
+            {!showFallbackPhone && (
+              <p className="text-sm text-gray-400">
+                {reconnectChannel ? (
+                  <>
+                    Vas a reconectar{" "}
+                    <span className="font-mono text-gray-200">{reconnectChannel.e164}</span>
+                    {reconnectChannel.friendly_name ? ` (${reconnectChannel.friendly_name})` : ""}.
+                    Se conservan el agente y el nombre de la línea.
+                  </>
+                ) : (
+                  <>
+                    Vincula tu cuenta de WhatsApp Business: portfolio, cuenta y número en un solo flujo.
+                  </>
+                )}
+              </p>
+            )}
 
             {error && (
               <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex gap-2">
@@ -296,66 +316,51 @@ export function WhatsAppEmbeddedSignupModal({
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Nombre de la línea</label>
-              <input
-                type="text"
-                value={form.friendly_name}
-                onChange={e => setForm(f => ({ ...f, friendly_name: e.target.value }))}
-                placeholder="Ej. Ventas WhatsApp"
-                className={`w-full px-3 py-2 rounded-lg bg-white/[.04] border border-white/[.08] text-white text-sm ${accentFocus}`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Agente de texto (opcional)</label>
-              <select
-                value={form.text_agent_id}
-                onChange={e => setForm(f => ({ ...f, text_agent_id: e.target.value }))}
-                className={`w-full px-3 py-2 rounded-lg bg-white/[.04] border border-white/[.08] text-white text-sm ${accentFocus}`}
-              >
-                <option value="">Sin asignar aún</option>
-                {agents.map(a => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                Número E.164 (solo si Meta no lo envía)
-              </label>
-              <input
-                type="text"
-                value={form.phone_e164}
-                onChange={e => setForm(f => ({ ...f, phone_e164: e.target.value }))}
-                placeholder="+573001234567"
-                className={`w-full px-3 py-2 rounded-lg bg-white/[.04] border border-white/[.08] text-white text-sm font-mono ${accentFocus}`}
-              />
-            </div>
+            {showFallbackPhone && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                  Número de WhatsApp
+                </label>
+                <input
+                  type="text"
+                  value={fallbackPhoneE164}
+                  onChange={e => setFallbackPhoneE164(e.target.value)}
+                  placeholder="+573001234567"
+                  autoFocus
+                  className={`w-full px-3 py-2 rounded-lg bg-white/[.04] border border-white/[.08] text-white text-sm font-mono ${accentFocus}`}
+                />
+                <p className="text-xs text-gray-500 mt-1.5">
+                  Meta vinculó la cuenta pero no envió el número. Indícalo aquí para completar.
+                </p>
+              </div>
+            )}
 
             <div className="flex flex-col gap-2 pt-2">
-              <button
-                type="button"
-                disabled={loading || !canConnect}
-                onClick={launchEmbeddedSignup}
-                className={`${btnPrimary} w-full justify-center py-2.5 disabled:opacity-50`}
-              >
-                {loading ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Conectando…</>
-                ) : (
-                  <><MessageCircle className="w-4 h-4" /> Continuar con Meta</>
-                )}
-              </button>
-
-              {pendingSession && (
+              {showFallbackPhone ? (
                 <button
                   type="button"
                   disabled={loading}
                   onClick={completePending}
-                  className={`${btnGhost} w-full justify-center py-2`}
+                  className={`${btnPrimary} w-full justify-center py-2.5 disabled:opacity-50`}
                 >
-                  Completar vinculación
+                  {loading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Completando…</>
+                  ) : (
+                    "Completar vinculación"
+                  )}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={loading || !canConnect}
+                  onClick={launchEmbeddedSignup}
+                  className={`${btnPrimary} w-full justify-center py-2.5 disabled:opacity-50`}
+                >
+                  {loading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Conectando…</>
+                  ) : (
+                    <><MessageCircle className="w-4 h-4" /> {reconnectChannel ? "Reconectar" : "Continuar"}</>
+                  )}
                 </button>
               )}
 
