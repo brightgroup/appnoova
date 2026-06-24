@@ -85,8 +85,9 @@ function parseEmbeddedSignupMessage(event: MessageEvent): EmbeddedSignupSession 
   }
 }
 
-function needsManualPhone(session: EmbeddedSignupSession): boolean {
-  return session.event === "FINISH_ONLY_WABA" && !session.displayPhoneNumber;
+function needsManualPhone(session: EmbeddedSignupSession, hasKnownPhone: boolean): boolean {
+  if (hasKnownPhone) return false;
+  return !session.phoneNumberId && !session.displayPhoneNumber;
 }
 
 export function WhatsAppEmbeddedSignupModal({
@@ -115,7 +116,7 @@ export function WhatsAppEmbeddedSignupModal({
     if (!open) return;
     setError("");
     setStatus("");
-    setFallbackPhoneE164("");
+    setFallbackPhoneE164(reconnectChannel?.e164 ?? "");
     setPendingSession(null);
     pendingSessionRef.current = null;
     authCodeRef.current = null;
@@ -152,7 +153,7 @@ export function WhatsAppEmbeddedSignupModal({
             waba_id: session.wabaId,
             phone_number_id: session.phoneNumberId,
             display_phone_number: session.displayPhoneNumber,
-            phone_e164: phoneE164?.trim() || undefined,
+            phone_e164: phoneE164?.trim() || reconnectChannel?.e164 || undefined,
             auth_code: code,
             channel_id: reconnectChannel?.id
           })
@@ -189,7 +190,7 @@ export function WhatsAppEmbeddedSignupModal({
       const code = authCodeRef.current?.trim();
       if (!session?.wabaId || !code) return;
 
-      if (needsManualPhone(session) && !phoneE164?.trim() && !fallbackPhoneRef.current.trim()) {
+      if (needsManualPhone(session, Boolean(reconnectChannel?.e164)) && !phoneE164?.trim() && !fallbackPhoneRef.current.trim()) {
         setLoading(false);
         setStatus("WABA vinculada — indica el número en formato +573001234567");
         return;
@@ -198,7 +199,7 @@ export function WhatsAppEmbeddedSignupModal({
       finalizeStartedRef.current = true;
       void completeSignup(session, phoneE164 ?? fallbackPhoneRef.current, code);
     },
-    [completeSignup]
+    [completeSignup, reconnectChannel?.e164]
   );
 
   useEffect(() => {
@@ -316,7 +317,7 @@ export function WhatsAppEmbeddedSignupModal({
   const completePending = () => {
     const session = pendingSessionRef.current;
     if (!session) return;
-    if (needsManualPhone(session) && !fallbackPhoneE164.trim()) {
+    if (needsManualPhone(session, Boolean(reconnectChannel?.e164)) && !fallbackPhoneE164.trim()) {
       setError("Indica el número en formato internacional, por ejemplo +573001234567");
       return;
     }
@@ -326,7 +327,7 @@ export function WhatsAppEmbeddedSignupModal({
   if (!open) return null;
 
   const canConnect = Boolean(config?.enabled && sdkReady);
-  const showFallbackPhone = pendingSession != null && needsManualPhone(pendingSession);
+  const showFallbackPhone = pendingSession != null && needsManualPhone(pendingSession, Boolean(reconnectChannel?.e164));
 
   return (
     <>

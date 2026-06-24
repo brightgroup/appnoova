@@ -49,6 +49,44 @@ export async function subscribeMetaAppToWaba(wabaId: string, accessToken: string
   }
 }
 
+export interface MetaWabaPhoneNumber {
+  id: string;
+  e164: string;
+  displayPhoneNumber: string | null;
+}
+
+/** Lista números del WABA (fallback cuando Embedded Signup no envía display_phone_number). */
+export async function fetchMetaWabaPhoneNumbers(
+  wabaId: string,
+  accessToken: string
+): Promise<MetaWabaPhoneNumber[]> {
+  const res = await fetch(
+    `${metaGraphBaseUrl()}/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+
+  const json = (await res.json().catch(() => ({}))) as {
+    data?: Array<{ id?: string; display_phone_number?: string }>;
+    error?: { message?: string };
+  };
+
+  if (!res.ok) {
+    throw new Error(json.error?.message || `Meta WABA phone_numbers error ${res.status}`);
+  }
+
+  const rows: MetaWabaPhoneNumber[] = [];
+  for (const row of json.data ?? []) {
+    const id = row.id?.trim();
+    const display = row.display_phone_number?.trim() || null;
+    if (!id) continue;
+    const e164 = display ? normalizeWhatsAppE164(display) : "";
+    if (!e164) continue;
+    rows.push({ id, e164, displayPhoneNumber: display });
+  }
+
+  return rows;
+}
+
 /** Obtiene display_phone_number y valida phone_number_id. */
 export async function fetchMetaPhoneNumberDetails(
   phoneNumberId: string,
