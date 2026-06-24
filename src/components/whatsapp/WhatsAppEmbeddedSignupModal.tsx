@@ -36,7 +36,14 @@ declare global {
 const FB_SDK_VERSION = "v22.0";
 
 function parseEmbeddedSignupMessage(event: MessageEvent): EmbeddedSignupSession | null {
-  if (!event.origin.endsWith("facebook.com")) return null;
+  const origin = event.origin;
+  if (
+    !origin.endsWith("facebook.com")
+    && origin !== "https://www.facebook.com"
+    && origin !== "https://web.facebook.com"
+  ) {
+    return null;
+  }
   try {
     const data = JSON.parse(String(event.data)) as {
       type?: string;
@@ -45,9 +52,21 @@ function parseEmbeddedSignupMessage(event: MessageEvent): EmbeddedSignupSession 
     };
     if (data.type !== "WA_EMBEDDED_SIGNUP") return null;
 
+    const eventName = data.event ?? "";
+    const finishEvents = new Set([
+      "FINISH",
+      "FINISH_ONLY_WABA",
+      "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING",
+      "FINISH_OBO_MIGRATION",
+      "FINISH_GRANT_ONLY_API_ACCESS"
+    ]);
+    if (!finishEvents.has(eventName) && eventName !== "CANCEL" && eventName !== "ERROR") {
+      return null;
+    }
+
     const payload = data.data ?? {};
     const wabaId = payload.waba_id?.trim();
-    if (!wabaId) return null;
+    if (!wabaId && eventName !== "CANCEL" && eventName !== "ERROR") return null;
 
     const displayPhoneNumber =
       payload.display_phone_number?.trim()
@@ -56,10 +75,10 @@ function parseEmbeddedSignupMessage(event: MessageEvent): EmbeddedSignupSession 
       || undefined;
 
     return {
-      wabaId,
+      wabaId: wabaId || "",
       phoneNumberId: payload.phone_number_id?.trim() || undefined,
       displayPhoneNumber,
-      event: data.event ?? "FINISH"
+      event: eventName
     };
   } catch {
     return null;
@@ -85,6 +104,7 @@ export function WhatsAppEmbeddedSignupModal({
   const [pendingSession, setPendingSession] = useState<EmbeddedSignupSession | null>(null);
   const pendingSessionRef = useRef<EmbeddedSignupSession | null>(null);
   const authCodeRef = useRef<string | null>(null);
+  const finalizeStartedRef = useRef(false);
   const fallbackPhoneRef = useRef("");
 
   useEffect(() => {
@@ -99,6 +119,7 @@ export function WhatsAppEmbeddedSignupModal({
     setPendingSession(null);
     pendingSessionRef.current = null;
     authCodeRef.current = null;
+    finalizeStartedRef.current = false;
 
     fetch("/api/whatsapp/embedded-signup/config")
       .then(res => res.json())
@@ -109,7 +130,15 @@ export function WhatsAppEmbeddedSignupModal({
   }, [open]);
 
   const completeSignup = useCallback(
-    async (session: EmbeddedSignupSession, phoneE164?: string) => {
+    async (session: EmbeddedSignupSession, phoneE164?: string, authCode?: string) => {
+      const code = authCode?.trim() || authCodeRef.current?.trim();
+      if (!code) {
+        setError("No se recibió el código de autorización de Meta. Cierra el popup e inténtalo de nuevo.");
+        setStatus("");
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setStatus("Vinculando WhatsApp…");
       setError("");
@@ -124,7 +153,7 @@ export function WhatsAppEmbeddedSignupModal({
             phone_number_id: session.phoneNumberId,
             display_phone_number: session.displayPhoneNumber,
             phone_e164: phoneE164?.trim() || undefined,
-            auth_code: authCodeRef.current || undefined,
+            auth_code: code,
             channel_id: reconnectChannel?.id
           })
         });
@@ -142,13 +171,34 @@ export function WhatsAppEmbeddedSignupModal({
       } catch (err) {
         setError(err instanceof Error ? err.message : "Error desconocido");
         setStatus("");
+        finalizeStartedRef.current = false;
       } finally {
         setLoading(false);
         pendingSessionRef.current = null;
         setPendingSession(null);
       }
     },
-    [onClose, onSuccess, config?.provider, reconnectChannel?.id]
+    [onClose, onSuccess, reconnectChannel?.id]
+  );
+
+  const tryFinalizeSignup = useCallback(
+    (phoneE164?: string) => {
+      if (finalizeStartedRef.current) return;
+
+      const session = pendingSessionRef.current;
+      const code = authCodeRef.current?.trim();
+      if (!session?.wabaId || !code) return;
+
+      if (needsManualPhone(session) && !phoneE164?.trim() && !fallbackPhoneRef.current.trim()) {
+        setLoading(false);
+        setStatus("WABA vinculada — indica el número en formato +573001234567");
+        return;
+      }
+
+      finalizeStartedRef.current = true;
+      void completeSignup(session, phoneE164 ?? fallbackPhoneRef.current, code);
+    },
+    [completeSignup]
   );
 
   useEffect(() => {
@@ -172,21 +222,17 @@ export function WhatsAppEmbeddedSignupModal({
         return;
       }
 
-      if (session.event === "FINISH" || session.event === "FINISH_ONLY_WABA") {
+      if (session.event === "FINISH" || session.event === "FINISH_ONLY_WABA" || session.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING" || session.event === "FINISH_OBO_MIGRATION" || session.event === "FINISH_GRANT_ONLY_API_ACCESS") {
         pendingSessionRef.current = session;
         setPendingSession(session);
-        if (needsManualPhone(session) && !fallbackPhoneRef.current.trim()) {
-          setLoading(false);
-          setStatus("WABA vinculada — indica el número en formato +573001234567");
-          return;
-        }
-        void completeSignup(session, fallbackPhoneRef.current);
+        setStatus(authCodeRef.current ? "Vinculando WhatsApp…" : "Cuenta vinculada en Meta — confirmando…");
+        tryFinalizeSignup();
       }
     };
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [open, config?.enabled, completeSignup]);
+  }, [open, config?.enabled, tryFinalizeSignup]);
 
   const initFacebookSdk = useCallback(() => {
     if (!config?.appId || !window.FB) return;
@@ -224,11 +270,32 @@ export function WhatsAppEmbeddedSignupModal({
     setLoading(true);
     setPendingSession(null);
     pendingSessionRef.current = null;
+    authCodeRef.current = null;
+    finalizeStartedRef.current = false;
 
     window.FB.login(
-      (response: { authResponse?: { code?: string } }) => {
-        if (response.authResponse?.code) {
-          authCodeRef.current = response.authResponse.code;
+      (response: { authResponse?: { code?: string }; status?: string }) => {
+        const code = response.authResponse?.code?.trim();
+        if (code) {
+          authCodeRef.current = code;
+          setStatus(pendingSessionRef.current ? "Vinculando WhatsApp…" : "Código recibido — esperando datos de la cuenta…");
+          tryFinalizeSignup();
+          return;
+        }
+
+        if (pendingSessionRef.current) {
+          setLoading(false);
+          setError(
+            "Meta vinculó la cuenta pero no devolvió el código OAuth. Cierra sesión de Facebook en el navegador e inténtalo de nuevo."
+          );
+          setStatus("");
+          return;
+        }
+
+        if (response.status === "not_authorized" || !response.authResponse) {
+          setLoading(false);
+          setStatus("");
+          setError("Registro cancelado en Meta");
         }
       },
       {
@@ -253,7 +320,7 @@ export function WhatsAppEmbeddedSignupModal({
       setError("Indica el número en formato internacional, por ejemplo +573001234567");
       return;
     }
-    void completeSignup(session, fallbackPhoneE164);
+    void completeSignup(session, fallbackPhoneE164, authCodeRef.current ?? undefined);
   };
 
   if (!open) return null;
