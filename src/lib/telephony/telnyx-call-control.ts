@@ -1,4 +1,4 @@
-import { telephonyUsePipecat } from "@/lib/telephony/app-url";
+import { pipecatMediaStreamWsUrl, telephonyBridgeMode, telnyxMediaStreamWsUrl, telnyxStreamUrl } from "@/lib/telephony/app-url";
 
 function apiKey(): string {
   const key = process.env.TELNYX_API_KEY?.trim();
@@ -112,7 +112,7 @@ export async function telnyxHangup(callControlId: string): Promise<void> {
 }
 
 export async function telnyxStartMediaStream(callControlId: string, streamUrl: string): Promise<void> {
-  const pipecat = telephonyUsePipecat();
+  const pipecat = telephonyBridgeMode() === "pipecat";
 
   // Pipecat TelnyxFrameSerializer solo soporta PCMU/PCMA (8 kHz), no L16.
   const json = pipecat

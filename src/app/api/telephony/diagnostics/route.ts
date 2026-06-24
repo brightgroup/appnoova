@@ -6,7 +6,6 @@ import {
   getAppBaseUrl,
   pipecatMediaStreamWsUrl,
   telephonyBridgeMode,
-  telephonyUsePipecat,
   telnyxMediaStreamWsUrl,
   telnyxStreamUrl
 } from "@/lib/telephony/app-url";
@@ -63,7 +62,6 @@ export async function GET() {
   return NextResponse.json({
     app_url: getAppBaseUrl(),
     bridge_mode: bridgeMode,
-    pipecat_enabled: telephonyUsePipecat(),
     media_stream_ws: telnyxStreamUrl(),
     media_stream_ws_diy: telnyxMediaStreamWsUrl(),
     media_stream_ws_pipecat: pipecatMediaStreamWsUrl(),

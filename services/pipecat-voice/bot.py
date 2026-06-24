@@ -205,7 +205,9 @@ async def run_bot(
         logger.info("Telnyx conectado", call_control_id=call_control_id)
         await update_phase(call_control_id, "connected")
         await audio_buffer.start_recording()
-        # Dejar que el VAD del usuario dispare el primer turno (kickoff ya está en el contexto).
+        # Arranque de sesión Gemini Live (necesario para que el pipeline produzca audio).
+        await asyncio.sleep(0.8)
+        await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):

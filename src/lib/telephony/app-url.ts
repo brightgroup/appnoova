@@ -29,25 +29,17 @@ export function telnyxMediaStreamWsUrl(): string {
   return `${wsBase}/api/telephony/ws/telnyx-media`;
 }
 
-/** WebSocket Pipecat self-hosted (solo si TELEPHONY_USE_PIPECAT=true). */
+/** WebSocket Pipecat self-hosted (prioridad si PIPECAT_WS_URL está definido). */
 export function pipecatMediaStreamWsUrl(): string | null {
   const url = process.env.PIPECAT_WS_URL?.trim();
   return url || null;
 }
 
-/** Pipecat requiere opt-in explícito; por defecto usa el bridge DIY en server.ts. */
-export function telephonyUsePipecat(): boolean {
-  return process.env.TELEPHONY_USE_PIPECAT === "true" && Boolean(pipecatMediaStreamWsUrl());
-}
-
-/** URL que Telnyx usa en streaming_start. */
+/** URL que Telnyx usa en streaming_start. Pipecat primero; DIY solo si no hay PIPECAT_WS_URL. */
 export function telnyxStreamUrl(): string {
-  if (telephonyUsePipecat()) {
-    return pipecatMediaStreamWsUrl()!;
-  }
-  return telnyxMediaStreamWsUrl();
+  return pipecatMediaStreamWsUrl() ?? telnyxMediaStreamWsUrl();
 }
 
 export function telephonyBridgeMode(): "pipecat" | "diy" {
-  return telephonyUsePipecat() ? "pipecat" : "diy";
+  return pipecatMediaStreamWsUrl() ? "pipecat" : "diy";
 }
