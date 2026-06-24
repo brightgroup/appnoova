@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI, type LiveServerMessage } from "@google/genai";
+import { buildGeminiLiveSessionConfig } from "@/lib/gemini-live-config";
 import { getVoiceGoogleApiKey } from "@/lib/google-ai";
 import {
   getAppBaseUrl,
   pipecatMediaStreamWsUrl,
   telephonyBridgeMode,
+  telephonyUsePipecat,
   telnyxMediaStreamWsUrl,
   telnyxStreamUrl
 } from "@/lib/telephony/app-url";
@@ -22,9 +24,13 @@ async function probeGeminiLive(): Promise<{ ok: boolean; ms?: number; error?: st
     const ai = new GoogleGenAI({ apiKey });
     void ai.live.connect({
       model: DEFAULT_LIVE_MODEL,
-      config: { responseModalities: [Modality.AUDIO] },
+      config: buildGeminiLiveSessionConfig({
+        systemInstruction: "Responde brevemente en español.",
+        voiceName: "Kore",
+        temperature: 1.0,
+      }),
       callbacks: {
-        onmessage: msg => {
+        onmessage: (msg: LiveServerMessage) => {
           if (msg.setupComplete) {
             clearTimeout(timer);
             resolve({ ok: true, ms: Date.now() - started });
@@ -57,6 +63,7 @@ export async function GET() {
   return NextResponse.json({
     app_url: getAppBaseUrl(),
     bridge_mode: bridgeMode,
+    pipecat_enabled: telephonyUsePipecat(),
     media_stream_ws: telnyxStreamUrl(),
     media_stream_ws_diy: telnyxMediaStreamWsUrl(),
     media_stream_ws_pipecat: pipecatMediaStreamWsUrl(),

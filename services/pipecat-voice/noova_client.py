@@ -36,6 +36,7 @@ async def fetch_bridge_config(call_control_id: str) -> dict[str, Any]:
             "voice_name": data.get("voice_name") or "Aoede",
             "temperature": float(data.get("temperature") or 1.0),
             "system_instruction": data.get("system_instruction") or "",
+            "kickoff_message": data.get("kickoff_message") or "",
         }
 
 

@@ -29,10 +29,10 @@ function linearToUlaw(sample: number): number {
   return ~(sign | (exponent << 4) | mantissa) & 0xff;
 }
 
-export const TELNYX_OUTBOUND_CODEC = "L16" as const;
-export const TELNYX_OUTBOUND_SAMPLE_RATE = 16000;
-/** 20 ms @ 16 kHz L16 mono = 640 bytes */
-export const TELNYX_OUTBOUND_FRAME_BYTES = 640;
+export const TELNYX_OUTBOUND_CODEC = "PCMU" as const;
+export const TELNYX_OUTBOUND_SAMPLE_RATE = 8000;
+/** 20 ms @ 8 kHz PCMU mono = 160 bytes */
+export const TELNYX_OUTBOUND_FRAME_BYTES = 160;
 
 export function parsePcmRate(mimeType?: string): number {
   const m = mimeType?.match(/rate=(\d+)/);
@@ -88,13 +88,20 @@ export function int16ToPcmBase64(samples: Int16Array): string {
   return buf.toString("base64");
 }
 
-/** L16 RTP hacia Telnyx usa PCM big-endian (RFC 3551). */
-export function int16ToTelnyxL16Base64(samples: Int16Array): string {
-  const buf = Buffer.alloc(samples.length * 2);
+function int16ToPcmuBytes(samples: Int16Array): Buffer {
+  const out = Buffer.alloc(samples.length);
   for (let i = 0; i < samples.length; i++) {
-    buf.writeInt16BE(samples[i], i * 2);
+    out[i] = linearToUlaw(samples[i]);
   }
-  return buf.toString("base64");
+  return out;
+}
+
+function downsample16kTo8k(input: Int16Array): Int16Array {
+  const out = new Int16Array(Math.floor(input.length / 2));
+  for (let i = 0; i < out.length; i++) {
+    out[i] = input[i * 2];
+  }
+  return out;
 }
 
 export function pcmuBase64ToPcm16(base64: string): Int16Array {
@@ -123,17 +130,18 @@ export function telnyxInboundToGemini(pcmuPayload: string): string {
   return int16ToPcmBase64(pcm16k);
 }
 
-/** Gemini PCM → L16 16 kHz para Telnyx bidirectional RTP. */
+/** Gemini PCM → PCMU 8 kHz para Telnyx bidirectional RTP. */
 export function geminiOutboundToTelnyx(pcmBase64: string, mimeType?: string): string {
   const inputRate = parsePcmRate(mimeType);
   const float32 = pcmBase64ToFloat32(pcmBase64);
-  const pcm16k = applyPcmGain(resampleFloat32ToRate(float32, inputRate, TELNYX_OUTBOUND_SAMPLE_RATE));
-  return int16ToTelnyxL16Base64(pcm16k);
+  const pcm16k = applyPcmGain(resampleFloat32ToRate(float32, inputRate, 16000));
+  const pcm8k = downsample16kTo8k(pcm16k);
+  return int16ToPcmuBytes(pcm8k).toString("base64");
 }
 
-/** Silencio L16 (20 ms @ 16 kHz). */
+/** Silencio PCMU (20 ms @ 8 kHz, μ-law idle = 0xFF). */
 export function telnyxSilencePayload20ms(): string {
-  return Buffer.alloc(TELNYX_OUTBOUND_FRAME_BYTES, 0).toString("base64");
+  return Buffer.alloc(TELNYX_OUTBOUND_FRAME_BYTES, 0xff).toString("base64");
 }
 
 /** Divide payload en frames de ~20 ms para Telnyx. */

@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from google.genai.types import ThinkingConfig
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -72,6 +73,7 @@ async def run_bot(
     hangup_scheduled = False
     hangup_task: asyncio.Task | None = None
     finalized = False
+    user_turn_count = 0
     recorded_pcm = b""
     audio_ready = asyncio.Event()
 
@@ -216,8 +218,10 @@ async def run_bot(
 
     @user_aggregator.event_handler("on_user_turn_stopped")
     async def on_user_turn_stopped(aggregator, strategy, message: UserTurnStoppedMessage):
+        nonlocal user_turn_count
         if not message.content:
             return
+        user_turn_count += 1
         transcript.append(
             {
                 "role": "user",
@@ -227,6 +231,8 @@ async def run_bot(
         )
         logger.info(f"user: {message.content}")
         await update_phase(call_control_id, "connected")
+        if user_turn_count == 1:
+            await worker.queue_frames([LLMRunFrame()])
         check_goodbye("user", message.content)
 
     @assistant_aggregator.event_handler("on_assistant_turn_stopped")

@@ -2,6 +2,7 @@
 export function getVoiceGoogleApiKey(): string {
   return (
     process.env.GOOGLE_AI_KEY?.trim() ||
+    process.env.GOOGLE_API_KEY?.trim() ||
     process.env.NEXT_PUBLIC_GOOGLE_AI_KEY?.trim() ||
     ""
   );
