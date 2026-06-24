@@ -33,7 +33,7 @@ Elegir la que suene más joven y con chispa para el rol; ninguna suena “colomb
 
 - Prompt paisa: `src/lib/voice-accent-profile.ts`
 - Connect config: `src/lib/gemini-live-config.ts`
-- Pipecat: `services/pipecat-voice/bot.py` (`context_window_compression`)
+- Pipecat: `services/pipecat-voice/bot.py` (`inference_on_context_initialization=False`, `realtime_service_mode=True`, kickoff en silencio hasta el «aló»)
 
 ## Lo que no existe en native audio
 

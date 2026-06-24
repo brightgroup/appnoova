@@ -44,6 +44,15 @@ DEFAULT_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025"
 HANGUP_DELAY_AGENT_SEC = 2.2
 HANGUP_DELAY_USER_SEC = 2.8
 
+# Alineado con buildVoiceOutboundKickoffMessage (src/lib/voice-accent-profile.ts)
+DEFAULT_SILENT_KICKOFF = (
+    "[Sistema — llamada conectada] La persona acaba de contestar el teléfono. "
+    "Permanece en SILENCIO absoluto (sin audio) hasta escuchar su saludo "
+    '("aló", "bueno", "dígame", "hola", "sí"). Cuando salude, responde con UNA sola '
+    "frase breve de presentación (tu nombre y la empresa) y sigue el guion. "
+    'No digas "Mi empresa". No des resumen de la empresa al abrir.'
+)
+
 
 def _google_api_key() -> str:
     key = (
@@ -87,8 +96,11 @@ async def run_bot(
         voice=voice,
     )
 
+    # inference_on_context_initialization=False: conecta Gemini y siembra el kickoff
+    # sin generar audio hasta que el usuario hable (esperar el "aló").
     llm = GeminiLiveLLMService(
         api_key=_google_api_key(),
+        inference_on_context_initialization=False,
         settings=GeminiLiveLLMService.Settings(
             model=model,
             voice=voice,
@@ -99,10 +111,7 @@ async def run_bot(
         ),
     )
 
-    kickoff = agent_config.get("kickoff_message") or (
-        "La llamada acaba de conectarse. Saluda con UNA sola frase breve "
-        "en español colombiano paisa y luego espera en silencio a que el usuario hable."
-    )
+    kickoff = (agent_config.get("kickoff_message") or "").strip() or DEFAULT_SILENT_KICKOFF
 
     context = LLMContext(
         [
@@ -114,6 +123,7 @@ async def run_bot(
     )
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
+        realtime_service_mode=True,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(),
         ),
@@ -205,9 +215,8 @@ async def run_bot(
         logger.info("Telnyx conectado", call_control_id=call_control_id)
         await update_phase(call_control_id, "connected")
         await audio_buffer.start_recording()
-        # Arranque de sesión Gemini Live (necesario para que el pipeline produzca audio).
-        await asyncio.sleep(0.8)
-        await worker.queue_frames([LLMRunFrame()])
+        # La sesión Gemini se abre con StartFrame; el primer turno lo dispara el VAD
+        # del usuario (aló) vía LLMRunFrame en on_user_turn_stopped.
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
