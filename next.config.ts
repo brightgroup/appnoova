@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   // Dev usa .next-dev (npm run dev) para no pisar el build de producción (.next).
   distDir: process.env.NEXT_DIST_DIR || ".next",
   reactStrictMode: true,
+  // Gemini Live + ws en rutas API: evitar bundle roto (t.mask is not a function en Docker).
+  serverExternalPackages: ["@google/genai", "ws", "bufferutil", "utf-8-validate"],
   webpack: (config, { dev }) => {
     if (dev) {
       // Evita EMFILE en macOS cuando hay muchos archivos bajo watch.

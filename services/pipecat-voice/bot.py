@@ -53,7 +53,7 @@ def _google_api_key() -> str:
         or ""
     ).strip()
     if not key:
-        raise RuntimeError("Falta GOOGLE_API_KEY / GOOGLE_AI_KEY")
+        raise RuntimeError("Falta GOOGLE_API_KEY / GOOGLE_AI_KEY en el servicio Pipecat")
     return key
 
 

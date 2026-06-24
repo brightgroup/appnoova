@@ -54,10 +54,25 @@ async function probeGeminiLive(): Promise<{ ok: boolean; ms?: number; error?: st
   });
 }
 
+async function probePipecatReachable(): Promise<{ ok: boolean; status?: number; error?: string }> {
+  const url = pipecatMediaStreamWsUrl();
+  if (!url) return { ok: false, error: "no_pipecat_url" };
+  const httpUrl = url.replace(/^wss:/, "https:").replace(/^ws:/, "http:").replace(/\/ws\/?$/, "/");
+  try {
+    const res = await fetch(httpUrl, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(5000) });
+    // 307/404/200 = el host responde; solo importa que no sea timeout/DNS.
+    if (res.status >= 200 && res.status < 500) return { ok: true, status: res.status };
+    return { ok: false, status: res.status, error: `http_${res.status}` };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "unreachable" };
+  }
+}
+
 /** GET — diagnóstico telefonía (sin secretos). */
 export async function GET() {
   const telnyx = telnyxConfigStatus();
   const geminiLive = await probeGeminiLive();
+  const pipecatReach = await probePipecatReachable();
   const bridgeMode = telephonyBridgeMode();
   return NextResponse.json({
     app_url: getAppBaseUrl(),
@@ -65,6 +80,9 @@ export async function GET() {
     media_stream_ws: telnyxStreamUrl(),
     media_stream_ws_diy: telnyxMediaStreamWsUrl(),
     media_stream_ws_pipecat: pipecatMediaStreamWsUrl(),
+    pipecat_reachable: pipecatReach.ok,
+    pipecat_reachable_status: pipecatReach.status,
+    pipecat_reachable_error: pipecatReach.error,
     pipecat_internal_secret: Boolean(getPipecatInternalSecret()),
     telnyx_configured: telnyx.configured,
     telnyx_has_connection: telnyx.has_connection,
@@ -72,6 +90,16 @@ export async function GET() {
     gemini_live_ok: geminiLive.ok,
     gemini_live_ms: geminiLive.ms,
     gemini_live_error: geminiLive.error,
+    gemini_live_scope:
+      bridgeMode === "pipecat"
+        ? "nodejs_sdk_probe_only — Gemini en llamadas Google corre en el servicio Pipecat (Python), no en esta app"
+        : "nodejs_diy_bridge",
+    pipecat_env_checklist: [
+      "GOOGLE_API_KEY o GOOGLE_AI_KEY en el servicio Pipecat (voice.*), no solo en app.noova360.com",
+      "PIPECAT_INTERNAL_SECRET igual en app y Pipecat",
+      "NOOVA_APP_URL=https://app.noova360.com en Pipecat",
+      "Redeploy del servicio Pipecat tras cambios en bot.py",
+    ],
     server_mode: bridgeMode === "pipecat" ? "pipecat_self_hosted" : "custom_ws_server",
     start_command: bridgeMode === "pipecat"
       ? "Noova: npm start | Pipecat: python services/pipecat-voice/bot.py"
