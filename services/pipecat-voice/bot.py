@@ -230,21 +230,27 @@ async def run_bot(
     @user_aggregator.event_handler("on_user_turn_stopped")
     async def on_user_turn_stopped(aggregator, strategy, message: UserTurnStoppedMessage):
         nonlocal user_turn_count
-        if not message.content:
-            return
         user_turn_count += 1
-        transcript.append(
-            {
-                "role": "user",
-                "text": message.content,
-                "time_sec": max(0, int(time.time() - session_start)),
-            }
-        )
-        logger.info(f"user: {message.content}")
+        text = (message.content or "").strip()
+        if text:
+            transcript.append(
+                {
+                    "role": "user",
+                    "text": text,
+                    "time_sec": max(0, int(time.time() - session_start)),
+                }
+            )
+            logger.info(f"user: {text}")
+            check_goodbye("user", text)
+        else:
+            logger.info(
+                "Turno de usuario detectado (sin texto aún)",
+                call_control_id=call_control_id,
+            )
+
         await update_phase(call_control_id, "connected")
-        if user_turn_count == 1:
-            await worker.queue_frames([LLMRunFrame()])
-        check_goodbye("user", message.content)
+        # Disparar Gemini aunque la transcripción llegue vacía (p. ej. solo dijo «aló»).
+        await worker.queue_frames([LLMRunFrame()])
 
     @assistant_aggregator.event_handler("on_assistant_turn_stopped")
     async def on_assistant_turn_stopped(aggregator, message: AssistantTurnStoppedMessage):
@@ -278,7 +284,15 @@ async def bot(runner_args: RunnerArguments):
         to_number=call_data.get("to"),
     )
 
-    agent_config = await fetch_bridge_config(call_control_id)
+    try:
+        agent_config = await fetch_bridge_config(call_control_id)
+    except Exception as e:
+        logger.error(
+            "No se pudo cargar bridge-config",
+            call_control_id=call_control_id,
+            error=str(e),
+        )
+        raise
 
     serializer = TelnyxFrameSerializer(
         stream_id=call_data["stream_id"],

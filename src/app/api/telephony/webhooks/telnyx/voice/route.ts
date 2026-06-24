@@ -220,7 +220,7 @@ export async function POST(req: NextRequest) {
             console.error("[telnyx:voice] finalize hangup (delayed) error:", e);
           }
         })();
-      }, 4000);
+      }, 10_000);
     } else if (!isOutbound(direction)) {
       try {
         await finalizeInboundTelnyxCall(callId, payload);

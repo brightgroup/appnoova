@@ -51,7 +51,9 @@ export async function finalizePhoneTestCall(input: {
     transcript: input.transcript,
     callsCount: agent.callsCount,
     statusLabel: durationSec > 0 || input.transcript.length > 0
-      ? "Ended - Llamada exitosa"
+      ? input.transcript.length > 0
+        ? "Ended - Llamada exitosa"
+        : "Ended - Conectada sin transcripción"
       : "Ended - Sin conexión",
     metadata: {
       source: "phone_test",
