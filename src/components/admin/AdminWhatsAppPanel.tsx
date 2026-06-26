@@ -201,6 +201,25 @@ export function AdminWhatsAppPanel() {
     if (res.ok) load();
   };
 
+  const configureWebhook = async (id: string) => {
+    setSaving(id);
+    setError("");
+    try {
+      const res = await authFetch("/api/admin/whatsapp/channels", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "configure_webhook" })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo configurar el webhook");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al configurar webhook");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const copyWebhook = async () => {
     await navigator.clipboard.writeText(webhookUrl);
     setCopied(true);
@@ -328,9 +347,19 @@ export function AdminWhatsAppPanel() {
                           </td>
                           <td className={registryTableCell}>{ch.status}</td>
                           <td className={registryTableCell}>
-                            <button type="button" onClick={() => toggleActive(ch.id, ch.status)} className={btnGhost}>
-                              {ch.status === "active" ? "Desactivar" : "Activar"}
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={() => toggleActive(ch.id, ch.status)} className={btnGhost}>
+                                {ch.status === "active" ? "Desactivar" : "Activar"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => configureWebhook(ch.id)}
+                                className={btnGhost}
+                                disabled={saving === ch.id}
+                              >
+                                {saving === ch.id ? "…" : "Webhook"}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );

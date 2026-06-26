@@ -823,22 +823,30 @@ function TextThread({
   onMediaPlaybackStart?: () => void;
   onMediaPlaybackEnd?: () => void;
 }) {
+  const [dateLabel, setDateLabel] = useState("");
+
+  useEffect(() => {
+    setDateLabel(
+      isToday(createdAt)
+        ? "Hoy"
+        : new Date(createdAt).toLocaleDateString("es-CO", {
+            weekday: "long",
+            day: "numeric",
+            month: "long"
+          })
+    );
+  }, [createdAt]);
+
   if (messages.length === 0) {
     return <p className="py-10 text-center text-sm text-white/35">Sin mensajes en esta conversación.</p>;
   }
-
-  const dateLabel = isToday(createdAt) ? "Hoy" : new Date(createdAt).toLocaleDateString("es-CO", {
-    weekday: "long",
-    day: "numeric",
-    month: "long"
-  });
 
   return (
     <div className="mx-auto max-w-3xl space-y-1">
       <div className="mb-8 flex items-center gap-4">
         <div className="h-px flex-1 bg-white/[.06]" />
-        <span className="text-xs font-medium uppercase tracking-widest text-white/25">
-          {dateLabel}
+        <span className="text-xs font-medium uppercase tracking-widest text-white/25" suppressHydrationWarning>
+          {dateLabel || "…"}
         </span>
         <div className="h-px flex-1 bg-white/[.06]" />
       </div>

@@ -3,19 +3,18 @@ import { isMissingTableError } from "@/lib/supabase-table-error";
 import { toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
 import { twilioWhatsAppWebhookUrl } from "@/lib/telephony/app-url";
 import { isTwilioWhatsAppConfigured } from "@/lib/whatsapp/twilio-whatsapp";
-import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
+import { textAgentsAdminClient } from "@/lib/text-agents-server";
+import { getOrgContextFromRequest } from "@/lib/org-server";
 
 export async function GET(req: NextRequest) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const orgCtx = await getOrgContextFromRequest(req);
+  if (orgCtx instanceof NextResponse) return orgCtx;
 
   const db = textAgentsAdminClient();
   const { data, error } = await db
     .from("whatsapp_channels")
     .select("*")
-    .eq("user_id", userId)
+    .eq("organization_id", orgCtx.organizationId)
     .order("created_at", { ascending: false });
 
   if (error) {

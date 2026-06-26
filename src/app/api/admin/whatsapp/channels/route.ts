@@ -130,6 +130,61 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Canal no encontrado" }, { status: 404 });
   }
 
+  if (body.action === "configure_webhook") {
+    let subSid = String(before.twilio_subaccount_sid ?? "").trim();
+    let subToken = String(before.twilio_subaccount_auth_token ?? "").trim();
+
+    if ((!subSid || !subToken) && before.organization_id) {
+      const { data: org } = await db
+        .from("organizations")
+        .select("twilio_subaccount_sid, twilio_subaccount_auth_token")
+        .eq("id", before.organization_id)
+        .maybeSingle();
+      subSid = subSid || String(org?.twilio_subaccount_sid ?? "").trim();
+      subToken = subToken || String(org?.twilio_subaccount_auth_token ?? "").trim();
+    }
+
+    if (!subSid || !subToken) {
+      return NextResponse.json({ error: "La línea no tiene subcuenta Twilio vinculada" }, { status: 400 });
+    }
+
+    try {
+      const webhook = await configureTwilioWhatsAppSenderWebhook({
+        e164: String(before.e164),
+        accountSid: subSid,
+        authToken: subToken
+      });
+
+      const channelUpdates: Record<string, unknown> = {
+        twilio_subaccount_sid: subSid,
+        twilio_subaccount_auth_token: subToken,
+        twilio_sender_sid: webhook.senderSid,
+        updated_at: new Date().toISOString()
+      };
+      if (before.status !== "active") channelUpdates.status = "active";
+
+      const { data: updated, error: updateErr } = await db
+        .from("whatsapp_channels")
+        .update(channelUpdates)
+        .eq("id", channelId)
+        .select("*")
+        .maybeSingle();
+
+      if (updateErr || !updated) {
+        return NextResponse.json({ error: updateErr?.message || "Error actualizando canal" }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        channel: toWhatsAppChannelRecord(updated),
+        webhook_configured: webhook
+      });
+    } catch (err) {
+      return NextResponse.json({
+        error: err instanceof Error ? err.message : "No se pudo configurar webhook en Twilio"
+      }, { status: 500 });
+    }
+  }
+
   const { data, error } = await db
     .from("whatsapp_channels")
     .update(updates)
@@ -146,8 +201,18 @@ export async function PATCH(req: NextRequest) {
 
   const activating =
     updates.status === "active" && String(before.status) !== "active";
-  const subSid = String(data.twilio_subaccount_sid ?? "").trim();
-  const subToken = String(data.twilio_subaccount_auth_token ?? "").trim();
+  let subSid = String(data.twilio_subaccount_sid ?? "").trim();
+  let subToken = String(data.twilio_subaccount_auth_token ?? "").trim();
+
+  if ((!subSid || !subToken) && data.organization_id) {
+    const { data: org } = await db
+      .from("organizations")
+      .select("twilio_subaccount_sid, twilio_subaccount_auth_token")
+      .eq("id", data.organization_id)
+      .maybeSingle();
+    subSid = subSid || String(org?.twilio_subaccount_sid ?? "").trim();
+    subToken = subToken || String(org?.twilio_subaccount_auth_token ?? "").trim();
+  }
 
   if (activating && subSid && subToken) {
     try {
@@ -156,8 +221,19 @@ export async function PATCH(req: NextRequest) {
         accountSid: subSid,
         authToken: subToken
       });
+      const { data: withSender } = await db
+        .from("whatsapp_channels")
+        .update({
+          twilio_subaccount_sid: subSid,
+          twilio_subaccount_auth_token: subToken,
+          twilio_sender_sid: webhook.senderSid,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", channelId)
+        .select("*")
+        .maybeSingle();
       return NextResponse.json({
-        channel: toWhatsAppChannelRecord(data),
+        channel: toWhatsAppChannelRecord(withSender ?? data),
         webhook_configured: webhook
       });
     } catch (err) {

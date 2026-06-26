@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Monitor } from "lucide-react";
+import { Monitor } from "lucide-react";
 import { NoovaLogo } from "@/components/brand/NoovaLogo";
 import { DESKTOP_MEDIA_QUERY, DESKTOP_MIN_WIDTH_PX } from "@/lib/desktop-viewport";
 
@@ -35,25 +35,20 @@ function DesktopOnlyMessage() {
 }
 
 export function DesktopOnlyGate({ children }: { children: React.ReactNode }) {
-  const [desktop, setDesktop] = useState<boolean | null>(null);
+  // Asumir escritorio en SSR para que el HTML inicial coincida con la hidratación.
+  const [desktop, setDesktop] = useState(true);
+  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia(DESKTOP_MEDIA_QUERY);
     const sync = () => setDesktop(mq.matches);
     sync();
+    setChecked(true);
     mq.addEventListener("change", sync);
     return () => mq.removeEventListener("change", sync);
   }, []);
 
-  if (desktop === null) {
-    return (
-      <div className="login-page-bg flex min-h-screen items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-[#a5a5ff]" aria-label="Cargando" />
-      </div>
-    );
-  }
-
-  if (!desktop) {
+  if (checked && !desktop) {
     return <DesktopOnlyMessage />;
   }
 

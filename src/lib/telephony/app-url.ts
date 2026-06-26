@@ -6,6 +6,13 @@ export function getAppBaseUrl(): string {
   return "http://127.0.0.1:8000";
 }
 
+/** Base URL para webhooks entrantes (Twilio, Meta). Prioriza NOOVA_WEBHOOK_BASE_URL. */
+export function getWebhookBaseUrl(): string {
+  const explicit = process.env.NOOVA_WEBHOOK_BASE_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, "");
+  return getAppBaseUrl();
+}
+
 export function twilioVoiceWebhookUrl(): string {
   return `${getAppBaseUrl()}/api/telephony/webhooks/twilio/voice`;
 }
@@ -15,11 +22,11 @@ export function twilioStatusWebhookUrl(): string {
 }
 
 export function twilioWhatsAppWebhookUrl(): string {
-  return `${getAppBaseUrl()}/api/telephony/webhooks/twilio/whatsapp`;
+  return `${getWebhookBaseUrl()}/api/telephony/webhooks/twilio/whatsapp`;
 }
 
 export function twilioWhatsAppStatusWebhookUrl(): string {
-  return `${getAppBaseUrl()}/api/telephony/webhooks/twilio/whatsapp/status`;
+  return `${getWebhookBaseUrl()}/api/telephony/webhooks/twilio/whatsapp/status`;
 }
 
 /** WebSocket DIY (Node server.ts) — fallback si no hay Pipecat. */
