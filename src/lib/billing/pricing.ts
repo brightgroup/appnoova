@@ -1,76 +1,93 @@
 /**
  * Precios y costos de facturación.
- * Créditos = pesos colombianos (1 crédito = $1 COP).
- * Fuente comercial: docs/PRICING.md
+ * Créditos anclados en USD (1 crédito = credit_usd_value USD).
+ * COP/TRM solo referencia visual en admin.
  */
 
-/** TRM de referencia USD → COP (para reportes de costo/margen). */
-export const TRM_COP = 4200;
+import {
+  DEFAULT_CREDIT_COST,
+  DEFAULT_PROVIDER_RATES,
+  DEFAULT_TRM_COP,
+} from "@/lib/billing/pricing-defaults";
+import { getPricingConfig } from "@/lib/billing/pricing-config";
+import { creditsFromUsdPrice } from "@/lib/billing/credit-usd";
+import type { UsageEventType, VoiceBillingProvider } from "@/lib/billing/pricing-types";
 
-/** Tipos de evento facturable. */
-export type UsageEventType =
-  | "ori"
-  | "milink"
-  | "widget"
-  | "text_test"
-  | "whatsapp_ai"
-  | "whatsapp_manual"
-  | "voice"
-  | "voice_premium"
-  | "doc_scan"
-  | "form_fill"
-  | "quote";
+export type { UsageEventType, VoiceBillingProvider } from "@/lib/billing/pricing-types";
 
-/**
- * Créditos (COP) que se le cobran al cliente por cada acción.
- * Para "voice" el valor es por minuto.
- */
-export const CREDIT_COST: Record<UsageEventType, number> = {
-  ori: 10,
-  milink: 20,
-  widget: 20,
-  text_test: 10,
-  whatsapp_ai: 60,
-  whatsapp_manual: 30,
-  voice: 900, // por minuto — Gemini Live (estándar)
-  voice_premium: 1200, // por minuto — ElevenLabs Agents
-  doc_scan: 90,
-  form_fill: 50,
-  quote: 70
-};
+export { getCreditUsdValue, creditsFromUsdPrice, usdPriceFromCredits, usdToCopReference, creditsToCopReference } from "@/lib/billing/credit-usd";
 
-export const VOICE_CREDITS_PER_MINUTE = CREDIT_COST.voice;
-export const VOICE_PREMIUM_CREDITS_PER_MINUTE = CREDIT_COST.voice_premium;
+/** TRM activa — solo referencia COP en admin. */
+export function getTrmCop(): number {
+  return getPricingConfig().trmCop ?? DEFAULT_TRM_COP;
+}
 
-/** Costo real ElevenLabs Agents + Telnyx (USD/min, estimado). */
-export const VOICE_PREMIUM_USD_PER_MINUTE = 0.12;
+/** @deprecated Usar getTrmCop() */
+export const TRM_COP = DEFAULT_TRM_COP;
 
-/** Precios reales de Gemini (USD por millón de tokens). */
+export function getUnitPriceUsd(eventType: UsageEventType): number {
+  return getPricingConfig().unitPriceUsd[eventType] ?? 0;
+}
+
+/** Créditos por tipo de evento (calculados desde price_usd). */
+export function getCreditCost(): Record<UsageEventType, number> {
+  const config = getPricingConfig();
+  const out = { ...DEFAULT_CREDIT_COST };
+  for (const key of Object.keys(out) as UsageEventType[]) {
+    const price = config.unitPriceUsd[key];
+    if (price > 0) out[key] = creditsFromUsdPrice(price);
+  }
+  return out;
+}
+
+/** @deprecated Usar getCreditCost() */
+export const CREDIT_COST: Record<UsageEventType, number> = DEFAULT_CREDIT_COST;
+
+export function getTwilioWaUsdPerMsg(): number {
+  return getPricingConfig().providerRates.twilio_wa_per_msg ?? DEFAULT_PROVIDER_RATES.twilio_wa_per_msg;
+}
+
+export function getVoiceUsdPerMinute(provider: VoiceBillingProvider = "google"): number {
+  const rates = getPricingConfig().providerRates;
+  return provider === "elevenlabs"
+    ? rates.voice_premium_per_min ?? DEFAULT_PROVIDER_RATES.voice_premium_per_min
+    : rates.voice_standard_per_min ?? DEFAULT_PROVIDER_RATES.voice_standard_per_min;
+}
+
+/** @deprecated */
+export const TWILIO_WA_USD_PER_MSG = DEFAULT_PROVIDER_RATES.twilio_wa_per_msg;
+/** @deprecated */
+export const VOICE_USD_PER_MINUTE = DEFAULT_PROVIDER_RATES.voice_standard_per_min;
+/** @deprecated */
+export const VOICE_PREMIUM_USD_PER_MINUTE = DEFAULT_PROVIDER_RATES.voice_premium_per_min;
+
 interface GeminiModelPrice {
   inputPerM: number;
   outputPerM: number;
 }
 
-const GEMINI_PRICES: Record<string, GeminiModelPrice> = {
-  "gemini-2.5-flash": { inputPerM: 0.3, outputPerM: 2.5 },
-  "gemini-2.5-pro": { inputPerM: 1.25, outputPerM: 10.0 }
-};
-
-const DEFAULT_GEMINI_PRICE: GeminiModelPrice = GEMINI_PRICES["gemini-2.5-flash"];
-
-/** Costo real Twilio por mensaje WhatsApp (entrante o saliente), USD. */
-export const TWILIO_WA_USD_PER_MSG = 0.005;
-
-/** Costo real de voz por minuto (Telnyx + Gemini Live), USD. */
-export const VOICE_USD_PER_MINUTE = 0.05;
-
-function geminiPriceFor(model?: string | null): GeminiModelPrice {
-  if (!model) return DEFAULT_GEMINI_PRICE;
-  const key = Object.keys(GEMINI_PRICES).find((m) => model.startsWith(m));
-  return key ? GEMINI_PRICES[key] : DEFAULT_GEMINI_PRICE;
+function geminiPricesFromConfig(): Record<string, GeminiModelPrice> {
+  const r = getPricingConfig().providerRates;
+  return {
+    "gemini-2.5-flash": {
+      inputPerM: r.gemini_flash_input_per_m ?? DEFAULT_PROVIDER_RATES.gemini_flash_input_per_m,
+      outputPerM: r.gemini_flash_output_per_m ?? DEFAULT_PROVIDER_RATES.gemini_flash_output_per_m,
+    },
+    "gemini-2.5-pro": {
+      inputPerM: r.gemini_pro_input_per_m ?? DEFAULT_PROVIDER_RATES.gemini_pro_input_per_m,
+      outputPerM: r.gemini_pro_output_per_m ?? DEFAULT_PROVIDER_RATES.gemini_pro_output_per_m,
+    },
+  };
 }
 
-/** Costo real (USD) de una generación de Gemini según tokens. */
+function geminiPriceFor(model?: string | null): GeminiModelPrice {
+  const prices = geminiPricesFromConfig();
+  const fallback = prices["gemini-2.5-flash"];
+  if (!model) return fallback;
+  const key = Object.keys(prices).find((m) => model.startsWith(m));
+  return key ? prices[key] : fallback;
+}
+
 export function geminiCostUsd(
   model: string | null | undefined,
   promptTokens: number,
@@ -82,24 +99,23 @@ export function geminiCostUsd(
   return input + output;
 }
 
-/** USD → COP redondeado a 2 decimales. */
+/** Convierte USD a COP usando TRM de referencia (solo visualización / legacy). */
 export function usdToCop(usd: number): number {
-  return Math.round(usd * TRM_COP * 100) / 100;
+  return Math.round(usd * getTrmCop() * 100) / 100;
 }
 
-/** Créditos a cobrar para un evento. quantity aplica a eventos por unidad (ej: minutos de voz). */
 export function creditsForEvent(eventType: UsageEventType, quantity = 1): number {
-  const unit = CREDIT_COST[eventType] ?? 0;
-  return Math.max(0, Math.round(unit * quantity));
+  const priceUsd = getUnitPriceUsd(eventType);
+  if (priceUsd > 0) return creditsFromUsdPrice(priceUsd, quantity);
+  const legacyCop = DEFAULT_CREDIT_COST[eventType] ?? 0;
+  if (legacyCop <= 0) return 0;
+  return creditsFromUsdPrice(legacyCop / getTrmCop(), quantity);
 }
 
-/** Minutos facturables de voz: mínimo 1 minuto si hubo conexión. */
 export function voiceBillableMinutes(durationSec: number): number {
   if (durationSec <= 0) return 0;
   return Math.max(1, Math.ceil(durationSec / 60));
 }
-
-export type VoiceBillingProvider = "google" | "elevenlabs";
 
 export function creditsForVoiceDuration(
   durationSec: number,
@@ -108,3 +124,14 @@ export function creditsForVoiceDuration(
   const eventType = provider === "elevenlabs" ? "voice_premium" : "voice";
   return creditsForEvent(eventType, voiceBillableMinutes(durationSec));
 }
+
+/** Créditos por minuto de voz (para UI). */
+export function voiceCreditsPerMinute(provider: VoiceBillingProvider = "google"): number {
+  const eventType = provider === "elevenlabs" ? "voice_premium" : "voice";
+  return creditsForEvent(eventType, 1);
+}
+
+/** @deprecated Usar voiceCreditsPerMinute() o catálogo de precios. */
+export const VOICE_CREDITS_PER_MINUTE = creditsForEvent("voice", 1);
+/** @deprecated Usar voiceCreditsPerMinute("elevenlabs") o catálogo de precios. */
+export const VOICE_PREMIUM_CREDITS_PER_MINUTE = creditsForEvent("voice_premium", 1);

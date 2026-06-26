@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/admin-server";
 import { adminClient } from "@/lib/voice-agents-server";
-import { TRM_COP } from "@/lib/billing/pricing";
+import { refreshPricingConfig } from "@/lib/billing/pricing-config";
+import { getTrmCop } from "@/lib/billing/pricing";
 
 interface OverviewRow {
   organization_id: string;
@@ -18,6 +19,7 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const db = adminClient();
+  await refreshPricingConfig(db);
 
   const [orgsRes, subsRes, walletsRes, overviewRes, plansRes] = await Promise.all([
     db.from("organizations").select("id, name, slug, status, owner_user_id").order("created_at", { ascending: false }),
@@ -36,6 +38,7 @@ export async function GET(req: NextRequest) {
   const ownerMap = new Map((ownersRes.data ?? []).map((p) => [p.id, p]));
   const subMap = new Map((subsRes.data ?? []).map((s) => [s.organization_id, s]));
   const walletMap = new Map((walletsRes.data ?? []).map((w) => [w.organization_id, w]));
+  const planMap = new Map((plansRes.data ?? []).map((p) => [p.id, p]));
   const overviewMap = new Map(
     ((overviewRes.data ?? []) as OverviewRow[]).map((r) => [r.organization_id, r])
   );
@@ -53,8 +56,11 @@ export async function GET(req: NextRequest) {
     const ov = overviewMap.get(o.id);
     const owner = ownerMap.get(o.owner_user_id);
 
-    const priceUsd = Number(sub?.price_usd ?? 0);
-    const revenueCop = Math.round(priceUsd * TRM_COP);
+    const plan = sub?.plan_id ? planMap.get(sub.plan_id) : undefined;
+    const priceUsd = sub?.custom_label
+      ? Number(sub?.price_usd ?? plan?.price_usd ?? 0)
+      : Number(plan?.price_usd ?? sub?.price_usd ?? 0);
+    const revenueCop = Math.round(priceUsd * getTrmCop());
     const costCop = Number(ov?.cost_cop ?? 0);
     const included = Number(wallet?.included_credits ?? 0) + Number(wallet?.topup_credits ?? 0);
     const used = Number(wallet?.used_credits ?? 0);

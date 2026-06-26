@@ -7,13 +7,15 @@ import {
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { AdminOrgModal, type AdminOrgFormValues } from "@/components/admin/AdminOrgModal";
+import { AdminPageToolbar } from "@/components/admin/AdminPageToolbar";
+import { AdminStatusBadge } from "@/components/admin/admin-table-styles";
 import { NoovaAnchoredMenu } from "@/components/ui/NoovaAnchoredMenu";
 import { NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 import {
-  adminRegistryPage, registryToolbar, adminRegistryContent,
+  adminRegistryPage, adminRegistryContent,
   registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
   registryTableRow, registryTableCell, registryTableCellFirst, registryTableCellMuted,
-  registryTableLoading, registryTableEmpty, textMuted, btnPrimary
+  registryTableLoading, registryTableEmpty, btnPrimary
 } from "@/lib/brand-ui";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
@@ -31,13 +33,6 @@ interface OrgRow {
   is_protected?: boolean;
   owner: { email: string; full_name: string | null } | null;
 }
-
-const STATUS_BADGE: Record<string, { label: string; color: string }> = {
-  active:    { label: "Activa",      color: "bg-green-500/20 text-green-400 border-green-500/30" },
-  suspended: { label: "Suspendida",  color: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
-  disabled:  { label: "Desactivada", color: "bg-red-500/20 text-red-400 border-red-500/30" },
-  invited:   { label: "Invitada",    color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
-};
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -141,25 +136,23 @@ export default function AdminOrganizationsPage() {
 
   return (
     <div className={adminRegistryPage}>
-      <div className={`${registryToolbar} flex items-center justify-between gap-4`}>
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Building2 className="w-5 h-5 text-[#5b5bf6]" />
-            <h1 className="text-xl font-bold tracking-tight">Organizaciones</h1>
-          </div>
-          <p className={`text-xs ${textMuted}`}>{orgs.length} cuentas en la plataforma</p>
-        </div>
-        <button type="button" onClick={() => setModal({ mode: "create" })} className={`${btnPrimary} flex items-center gap-2 shrink-0`}>
-          <Plus className="w-4 h-4" /> Crear organización
-        </button>
-      </div>
+      <AdminPageToolbar
+        icon={Building2}
+        title="Organizaciones"
+        subtitle={`${orgs.length} cuentas en la plataforma`}
+        search={search}
+        onSearchChange={setSearch}
+        onRefresh={fetchOrgs}
+        refreshing={loading}
+        action={
+          <button type="button" onClick={() => setModal({ mode: "create" })} className={`${btnPrimary} flex items-center gap-2 shrink-0`}>
+            <Plus className="w-4 h-4" /> Crear organización
+          </button>
+        }
+      />
 
       <div className={adminRegistryContent}>
         <RegistryTableLayout
-          search={search}
-          onSearchChange={setSearch}
-          onRefresh={fetchOrgs}
-          refreshing={loading}
           error={error || undefined}
           footer={filtered.length > 0 ? (
             <RegistryTablePagination
@@ -194,7 +187,6 @@ export default function AdminOrganizationsPage() {
               </thead>
               <tbody>
                 {pageRows.map((o) => {
-                  const badge = STATUS_BADGE[o.status] ?? STATUS_BADGE.active;
                   const protected_ = o.is_protected;
                   return (
                     <tr key={o.id} className={registryTableRow}>
@@ -215,7 +207,7 @@ export default function AdminOrganizationsPage() {
                       </td>
                       <td className={registryTableCellMuted}>{o.plan}</td>
                       <td className={registryTableCell}>
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs border ${badge.color}`}>{badge.label}</span>
+                        <AdminStatusBadge status={o.status} />
                       </td>
                       <td className={registryTableCellMuted}>{formatDate(o.created_at)}</td>
                       <td className={registryTableCell}>

@@ -70,7 +70,7 @@ export const PLATFORM_HELP_ARTICLES: PlatformHelpArticle[] = [
     body: `1. **Facturación** — pestaña **Resumen**: créditos disponibles y consumo.
 2. **Uso detallado** — desglose por canal (voz, WhatsApp, ORI, etc.).
 3. **Planes** — plan actual y opciones.
-4. 1 crédito ≈ $1 COP en consumo unificado.`,
+4. Los créditos están anclados en USD (valor fijo por crédito). La TRM solo sirve como referencia en COP.`,
   },
   {
     id: "crm-contactos",

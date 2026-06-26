@@ -16,7 +16,7 @@ import {
 } from "@/lib/brand-ui";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
-import { VOICE_CREDITS_PER_MINUTE } from "@/lib/billing/pricing";
+import { usePricingCatalog } from "@/hooks/usePricingCatalog";
 import type { PlanPromoDisplay } from "@/lib/billing/plan-promo";
 import {
   BILLING_CHART_CATEGORIES,
@@ -166,6 +166,8 @@ export default function FacturacionPage() {
 
   const [hoverBar, setHoverBar] = useState<DailyPoint | null>(null);
   const [chartRange, setChartRange] = useState<ChartRangeId>("30");
+  const { catalog: pricingCatalog } = usePricingCatalog();
+  const voiceCreditsPerMin = pricingCatalog?.voice_standard_per_min ?? 870;
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -361,7 +363,7 @@ export default function FacturacionPage() {
                   <div className="col-span-2 bg-gradient-to-br from-[#5b5bf6]/15 to-[#7070f8]/5 border border-[#5b5bf6]/20 rounded-xl p-4">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[10px] text-[#a5a5ff]/80 font-semibold uppercase tracking-wider">Créditos disponibles</p>
-                      <span title="1 crédito = $1 COP · saldo unificado para todos los servicios">
+                      <span title="1 crédito equivale a un valor fijo en USD · el saldo es unificado para todos los servicios">
                         <HelpCircle className="w-3 h-3 text-[#5b5bf6]/50 cursor-help" />
                       </span>
                     </div>
@@ -718,10 +720,10 @@ export default function FacturacionPage() {
                   {plans.map(p => {
                     const isActive  = p.id === sub?.plan_id;
                     const copy      = PLAN_COPY[p.id] ?? { tagline: "", features: [], ideal: "" };
-                    const callsEst  = p.monthly_credits > 0 ? Math.floor(p.monthly_credits / VOICE_CREDITS_PER_MINUTE) : 0;
+                    const callsEst  = p.monthly_credits > 0 ? Math.floor(p.monthly_credits / voiceCreditsPerMin) : 0;
                     const displayPrice = isActive && planPromo ? planPromo.price_usd : p.price_usd;
                     const displayCredits = isActive ? planMonthlyCredits : p.monthly_credits;
-                    const callsEstActive = displayCredits > 0 ? Math.floor(displayCredits / VOICE_CREDITS_PER_MINUTE) : callsEst;
+                    const callsEstActive = displayCredits > 0 ? Math.floor(displayCredits / voiceCreditsPerMin) : callsEst;
 
                     return (
                       <div
@@ -829,7 +831,7 @@ export default function FacturacionPage() {
                                 <Phone className="w-2.5 h-2.5" /> Aprox. en llamadas de voz
                               </p>
                               <p className="text-sm font-bold text-white">{fmtN(callsEstActive)} min/mes</p>
-                              <p className="text-[9px] text-gray-600">a {VOICE_CREDITS_PER_MINUTE} créditos / minuto</p>
+                              <p className="text-[9px] text-gray-600">a {voiceCreditsPerMin} créditos / minuto</p>
                             </div>
                           </div>
                         )}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOrgContextFromRequest } from "@/lib/org-server";
 import { adminClient } from "@/lib/voice-agents-server";
+import { refreshPricingConfig } from "@/lib/billing/pricing-config";
 import {
   BILLING_CHART_CATEGORIES,
   chartKeyForEvent,
@@ -47,6 +48,7 @@ export async function GET(req: NextRequest) {
   const db = adminClient();
   const orgId = ctx.organizationId;
 
+  await refreshPricingConfig(db);
   await db.rpc("billing_sync_wallet", { p_org: orgId });
 
   const chartFrom = new Date(Date.now() - CHART_HISTORY_DAYS * 86_400_000).toISOString();
@@ -74,8 +76,14 @@ export async function GET(req: NextRequest) {
   ]);
 
   const wallet = walletRes.data;
-  const plans = plansRes.data ?? [];
+  const allPlans = plansRes.data ?? [];
   const subscription = subRes.data;
+  const currentPlanId = subscription?.plan_id;
+  const plans = allPlans.filter(
+    (p) =>
+      p.is_active !== false &&
+      (p.is_public === true || p.is_system === true || p.id === currentPlanId)
+  );
   const events = (eventsRes.data ?? []) as UsageEventRow[];
 
   const catalogPlan = plans.find((p) => p.id === subscription?.plan_id);

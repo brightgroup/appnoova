@@ -3,149 +3,95 @@
 import { useMemo, useState } from "react";
 import { Check, ArrowRight, Info } from "lucide-react";
 import LeadCaptureButton from "@/components/landing/LeadCaptureButton";
+import { usePricingCatalog, type PricingCatalog } from "@/hooks/usePricingCatalog";
 
 type UsageMode = "text" | "voice";
 type TextEstimate = "mix" | "whatsapp";
 
-const AVG_TEXT_MSG_CREDITS = 30;
-const WA_IA_CREDITS = 60;
-const VOICE_MIN_CREDITS = 900;
+const WA_IA_CREDITS_FALLBACK = 60;
+const VOICE_MIN_CREDITS_FALLBACK = 870;
 
-const FREE_PLAN = {
-  id: "explorador",
-  name: "Explorador",
+function unitCredits(catalog: PricingCatalog | null, eventType: string, fallback: number): number {
+  return catalog?.unit_prices.find((u) => u.event_type === eventType)?.credits ?? fallback;
+}
+
+type PlanMeta = {
+  id: string;
+  subtitle: string;
+  priceSuffix: string;
+  featuresTail: readonly string[];
+  cta: string;
+  source: string;
+  planInterest: string;
+};
+
+const FREE_PLAN_META = {
   subtitle: "Prueba sin compromiso · 14 días",
   priceLabel: "Gratis",
   priceSuffix: "Sin tarjeta de crédito",
-  credits: 15_000,
-  features: [
-    "15.000 créditos para probar la plataforma",
+  featuresTail: [
     "Agente entrenado, Mi Link e inbox",
     "1 agente de texto",
-    "Ideal antes de elegir plan de pago"
+    "Ideal antes de elegir plan de pago",
   ],
   cta: "Comenzar gratis",
   source: "plan_explorador",
-  planInterest: "explorador"
+  planInterest: "explorador",
 };
 
-const PAID_PLANS_INSURANCE = [
+const PAID_PLAN_META_INSURANCE = [
   {
     id: "esencial",
-    name: "Esencial",
     subtitle: "Corredor independiente",
-    priceLabel: "$82",
     priceSuffix: "USD / mes",
-    credits: 350_000,
-    voiceCap: 388,
-    features: [
-      "350.000 créditos / mes",
+    featuresTail: [
       "Hasta 5 usuarios",
       "CRM, contactos y leads con ia",
       "Agentes de texto, Mi Link e inbox",
       "WhatsApp con ia (según consumo)",
-      "Soporte por chat y correo"
+      "Soporte por chat y correo",
     ],
     cta: "Empezar con Esencial",
     source: "plan_esencial",
-    planInterest: "esencial"
+    planInterest: "esencial",
   },
   {
     id: "crecimiento",
-    name: "Crecimiento",
     subtitle: "Agencia en expansión",
-    priceLabel: "$345",
     priceSuffix: "USD / mes",
-    credits: 1_500_000,
-    voiceCap: 1_666,
-    features: [
-      "1.500.000 créditos / mes",
+    featuresTail: [
       "Hasta 15 usuarios",
       "Misma plataforma: CRM, inbox y agentes ia",
       "WhatsApp con ia (según consumo)",
       "Soporte prioritario",
-      "Onboarding WhatsApp sin costo adicional"
+      "Onboarding WhatsApp sin costo adicional",
     ],
     cta: "Empezar con Crecimiento",
     source: "plan_crecimiento",
-    planInterest: "crecimiento"
+    planInterest: "crecimiento",
   },
   {
     id: "escala",
-    name: "Escala",
     subtitle: "Operación de alto volumen",
-    priceLabel: "$815",
     priceSuffix: "USD / mes",
-    credits: 3_800_000,
-    voiceCap: 4_222,
-    features: [
-      "3.800.000 créditos / mes",
+    featuresTail: [
       "Usuarios ilimitados",
       "Misma plataforma: CRM, inbox y agentes ia",
       "WhatsApp con ia (según consumo)",
       "Soporte dedicado",
-      "Onboarding WhatsApp sin costo adicional"
+      "Onboarding WhatsApp sin costo adicional",
     ],
     cta: "Empezar con Escala",
     source: "plan_escala",
-    planInterest: "escala"
-  }
-] as const;
-
-const PAID_PLANS_GENERIC = [
-  {
-    ...PAID_PLANS_INSURANCE[0],
-    subtitle: "Equipos pequeños",
-    features: [
-      "350.000 créditos / mes",
-      "Hasta 5 usuarios",
-      "CRM, contactos y leads con ia",
-      "Agentes de texto, Mi Link e inbox",
-      "WhatsApp con ia (según consumo)",
-      "Soporte por chat y correo"
-    ]
+    planInterest: "escala",
   },
-  {
-    ...PAID_PLANS_INSURANCE[1],
-    subtitle: "Pymes en expansión",
-    features: [
-      "1.500.000 créditos / mes",
-      "Hasta 15 usuarios",
-      "Misma plataforma: CRM, inbox y agentes ia",
-      "WhatsApp con ia (según consumo)",
-      "Soporte prioritario",
-      "Onboarding WhatsApp sin costo adicional"
-    ]
-  },
-  {
-    ...PAID_PLANS_INSURANCE[2],
-    subtitle: "Operación de alto volumen",
-    features: [
-      "3.800.000 créditos / mes",
-      "Usuarios ilimitados",
-      "Misma plataforma: CRM, inbox y agentes ia",
-      "WhatsApp con ia (según consumo)",
-      "Soporte dedicado",
-      "Onboarding WhatsApp sin costo adicional"
-    ]
-  }
-] as const;
+] as const satisfies readonly PlanMeta[];
 
-const EXTRA_USAGE_INSURANCE = [
-  { label: "WhatsApp manual (inbox)", price: "$30" },
-  { label: "Llenado de formatos", price: "$50" },
-  { label: "Escaneo de documento (póliza PDF)", price: "$90" },
-  { label: "Generación de cotización", price: "$70" },
-  { label: "Agente de voz (por minuto)", price: "$900" }
-];
-
-const EXTRA_USAGE_GENERIC = [
-  { label: "WhatsApp manual (inbox)", price: "$30" },
-  { label: "Llenado de formularios", price: "$50" },
-  { label: "Procesamiento de documentos", price: "$90" },
-  { label: "Cotización asistida por ia", price: "$70" },
-  { label: "Agente de voz (por minuto)", price: "$900" }
-];
+const PAID_PLAN_META_GENERIC: readonly PlanMeta[] = [
+  { ...PAID_PLAN_META_INSURANCE[0], subtitle: "Equipos pequeños" },
+  { ...PAID_PLAN_META_INSURANCE[1], subtitle: "Pymes en expansión" },
+  { ...PAID_PLAN_META_INSURANCE[2], subtitle: "Operación de alto volumen" },
+] as const satisfies readonly PlanMeta[];
 
 const ENTERPRISE_PLAN = {
   id: "corporativo",
@@ -168,12 +114,42 @@ function formatVolume(n: number): string {
   return n.toLocaleString("es-CO");
 }
 
-function textCreditsPerMsg(estimate: TextEstimate): number {
-  return estimate === "whatsapp" ? WA_IA_CREDITS : AVG_TEXT_MSG_CREDITS;
+function textCreditsPerMsg(estimate: TextEstimate, waCredits: number, avgMix: number): number {
+  return estimate === "whatsapp" ? waCredits : avgMix;
 }
 
-function textCapFromCredits(credits: number, estimate: TextEstimate): number {
-  return Math.floor(credits / textCreditsPerMsg(estimate));
+function textCapFromCredits(
+  credits: number,
+  estimate: TextEstimate,
+  waCredits: number,
+  avgMix: number
+): number {
+  return Math.floor(credits / textCreditsPerMsg(estimate, waCredits, avgMix));
+}
+
+function buildPaidPlans(
+  catalog: PricingCatalog | null,
+  metaList: readonly PlanMeta[],
+  voiceStdCredits: number
+): PaidPlan[] {
+  return metaList.map((meta) => {
+    const fromDb = catalog?.plans.find((p) => p.id === meta.id);
+    const credits = fromDb?.monthly_credits ?? 0;
+    const priceUsd = fromDb?.price_usd ?? 0;
+    return {
+      id: meta.id,
+      name: fromDb?.name ?? meta.id,
+      subtitle: meta.subtitle,
+      priceLabel: `$${priceUsd}`,
+      priceSuffix: meta.priceSuffix,
+      credits,
+      voiceCap: voiceStdCredits > 0 ? Math.floor(credits / voiceStdCredits) : 0,
+      features: [`${formatVolume(credits)} créditos / mes`, ...meta.featuresTail],
+      cta: meta.cta,
+      source: meta.source,
+      planInterest: meta.planInterest,
+    };
+  });
 }
 
 type PaidPlan = {
@@ -195,18 +171,18 @@ function recommendPaidIndex(
   paidPlans: readonly PaidPlan[],
   mode: UsageMode,
   textEstimate: TextEstimate,
-  volume: number
+  volume: number,
+  waCredits: number,
+  avgMix: number
 ): number {
   if (mode === "voice") {
-    const caps = paidPlans.map(p => p.voiceCap);
+    const caps = paidPlans.map((p) => p.voiceCap);
     if (volume <= caps[0]) return 0;
     if (volume <= caps[1]) return 1;
     if (volume <= caps[2]) return 2;
     return 3;
   }
-  const caps = paidPlans.map(p =>
-    textCapFromCredits(p.credits, textEstimate)
-  );
+  const caps = paidPlans.map((p) => textCapFromCredits(p.credits, textEstimate, waCredits, avgMix));
   if (volume <= caps[0]) return 0;
   if (volume <= caps[1]) return 1;
   if (volume <= caps[2]) return 2;
@@ -248,10 +224,58 @@ export default function PricingSection({
   const [mode, setMode] = useState<UsageMode>("text");
   const [textEstimate, setTextEstimate] = useState<TextEstimate>("mix");
   const [volume, setVolume] = useState(8000);
+  const { catalog } = usePricingCatalog();
 
-  const paidPlans = variant === "insurance" ? PAID_PLANS_INSURANCE : PAID_PLANS_GENERIC;
-  const extraUsageRows =
-    variant === "insurance" ? EXTRA_USAGE_INSURANCE : EXTRA_USAGE_GENERIC;
+  const oriCredits = unitCredits(catalog, "ori", 10);
+  const milinkCredits = unitCredits(catalog, "milink", 20);
+  const waIaCredits = unitCredits(catalog, "whatsapp_ai", WA_IA_CREDITS_FALLBACK);
+  const waManualCredits = unitCredits(catalog, "whatsapp_manual", 30);
+  const formCredits = unitCredits(catalog, "form_fill", 50);
+  const docCredits = unitCredits(catalog, "doc_scan", 90);
+  const quoteCredits = unitCredits(catalog, "quote", 70);
+  const voiceStdCredits = catalog?.voice_standard_per_min ?? VOICE_MIN_CREDITS_FALLBACK;
+  const avgMixCredits = Math.round((oriCredits + milinkCredits + waIaCredits) / 3);
+
+  const paidPlanMeta = variant === "insurance" ? PAID_PLAN_META_INSURANCE : PAID_PLAN_META_GENERIC;
+  const paidPlans = useMemo(
+    () => buildPaidPlans(catalog, paidPlanMeta, voiceStdCredits),
+    [catalog, paidPlanMeta, voiceStdCredits]
+  );
+
+  const freePlan = useMemo(() => {
+    const fromDb = catalog?.plans.find((p) => p.id === "explorador");
+    const credits = fromDb?.monthly_credits ?? 14_562;
+    return {
+      id: "explorador",
+      name: fromDb?.name ?? "Explorador",
+      credits,
+      features: [
+        `${formatVolume(credits)} créditos para probar la plataforma`,
+        ...FREE_PLAN_META.featuresTail,
+      ],
+      ...FREE_PLAN_META,
+    };
+  }, [catalog]);
+
+  const extraUsageRows = useMemo(() => {
+    const voiceLabel = `${formatVolume(voiceStdCredits)} créditos`;
+    if (variant === "insurance") {
+      return [
+        { label: "WhatsApp manual (inbox)", price: `${waManualCredits} créditos` },
+        { label: "Llenado de formatos", price: `${formCredits} créditos` },
+        { label: "Escaneo de documento (póliza PDF)", price: `${docCredits} créditos` },
+        { label: "Generación de cotización", price: `${quoteCredits} créditos` },
+        { label: "Agente de voz (por minuto)", price: voiceLabel },
+      ];
+    }
+    return [
+      { label: "WhatsApp manual (inbox)", price: `${waManualCredits} créditos` },
+      { label: "Llenado de formularios", price: `${formCredits} créditos` },
+      { label: "Procesamiento de documentos", price: `${docCredits} créditos` },
+      { label: "Cotización asistida por ia", price: `${quoteCredits} créditos` },
+      { label: "Agente de voz (por minuto)", price: voiceLabel },
+    ];
+  }, [variant, waManualCredits, formCredits, docCredits, quoteCredits, voiceStdCredits]);
   const extraUsageIntro =
     variant === "insurance"
       ? "Formularios, documentos, cotizaciones y voz usan el mismo saldo de créditos."
@@ -261,8 +285,8 @@ export default function PricingSection({
   const sliderMax = 65000;
 
   const recommendedIdx = useMemo(
-    () => recommendPaidIndex(paidPlans, mode, textEstimate, volume),
-    [paidPlans, mode, textEstimate, volume]
+    () => recommendPaidIndex(paidPlans, mode, textEstimate, volume, waIaCredits, avgMixCredits),
+    [paidPlans, mode, textEstimate, volume, waIaCredits, avgMixCredits]
   );
 
   const volumeLabel =
@@ -275,25 +299,23 @@ export default function PricingSection({
   const estimateHint =
     mode === "text"
       ? textEstimate === "whatsapp"
-        ? "Cada respuesta ia en WhatsApp consume 60 créditos ($60)"
-        : "Promedio ~$30/msg: mezcla agente interno ($10), Mi Link ($20) y WhatsApp ($60)"
+        ? `Cada respuesta ia en WhatsApp consume ${formatVolume(waIaCredits)} créditos`
+        : `Promedio ~${avgMixCredits} cr/mensaje: ORI (${oriCredits}), Mi Link (${milinkCredits}), WhatsApp ia (${waIaCredits})`
       : null;
 
   const channelRates = [
-    { channel: "Agente interno (copiloto)", credits: 10, price: "$10", highlight: false },
-    { channel: "Mi Link (chat web)", credits: 20, price: "$20", highlight: false },
+    { channel: "Agente interno (copiloto)", credits: oriCredits, highlight: false },
+    { channel: "Mi Link (chat web)", credits: milinkCredits, highlight: false },
     {
       channel: "WhatsApp con respuesta ia",
-      credits: WA_IA_CREDITS,
-      price: "$60",
-      highlight: textEstimate === "whatsapp"
+      credits: waIaCredits,
+      highlight: textEstimate === "whatsapp",
     },
     {
       channel: "Promedio mix típico",
-      credits: AVG_TEXT_MSG_CREDITS,
-      price: "~$30",
-      highlight: textEstimate === "mix"
-    }
+      credits: avgMixCredits,
+      highlight: textEstimate === "mix",
+    },
   ];
 
   return (
@@ -308,10 +330,10 @@ export default function PricingSection({
         </h2>
         <p className="text-gray-400 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
           Estime su volumen mensual. Por defecto usamos un{" "}
-          <strong className="text-white">promedio de ~$30 por mensaje</strong> (agente
+          <strong className="text-white">promedio de ~{avgMixCredits} créditos por mensaje</strong> (agente
           interno, Mi Link y WhatsApp). Puede simular{" "}
           <strong className="text-white">solo WhatsApp</strong> para ver el escenario más
-          exigente. Un crédito = $1 peso colombiano.
+          exigente. Los créditos están anclados en USD; la TRM es solo referencia en pesos.
         </p>
       </div>
 
@@ -354,7 +376,7 @@ export default function PricingSection({
                     : "text-gray-400 hover:text-white"
                 }`}
               >
-                Mix típico (~$30)
+                Mix típico (~{avgMixCredits} cr)
               </button>
               <button
                 type="button"
@@ -365,7 +387,7 @@ export default function PricingSection({
                     : "text-gray-400 hover:text-white"
                 }`}
               >
-                Solo WhatsApp ($60)
+                Solo WhatsApp ({waIaCredits} cr)
               </button>
             </div>
           )}
@@ -402,26 +424,26 @@ export default function PricingSection({
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="flex-1">
             <p className="text-xs font-medium text-[#a5a5ff] uppercase tracking-wide mb-1">
-              {FREE_PLAN.subtitle}
+              {freePlan.subtitle}
             </p>
-            <h3 className="text-2xl font-bold mb-2">{FREE_PLAN.name}</h3>
+            <h3 className="text-2xl font-bold mb-2">{freePlan.name}</h3>
             <p className="text-sm text-gray-400 mb-4">
               <span className="text-3xl font-extrabold text-white mr-2">
-                {FREE_PLAN.priceLabel}
+                {freePlan.priceLabel}
               </span>
-              {FREE_PLAN.priceSuffix}
+              {freePlan.priceSuffix}
               <span className="mx-2 text-gray-600">·</span>
               <span className="text-white font-medium">
-                {formatVolume(FREE_PLAN.credits)} créditos
+                {formatVolume(freePlan.credits)} créditos
               </span>
               <span className="text-gray-500">
                 {" "}
-                (~{formatVolume(textCapFromCredits(FREE_PLAN.credits, textEstimate))}{" "}
+                (~{formatVolume(textCapFromCredits(freePlan.credits, textEstimate, waIaCredits, avgMixCredits))}{" "}
                 {textEstimate === "whatsapp" ? "resp. WA" : "msgs promedio"})
               </span>
             </p>
             <ul className="grid sm:grid-cols-2 gap-2">
-              {FREE_PLAN.features.map(f => (
+              {freePlan.features.map((f) => (
                 <li key={f} className="flex gap-2 text-sm text-gray-300">
                   <Check className="w-4 h-4 text-[#5b5bf6] flex-shrink-0 mt-0.5" />
                   {f}
@@ -431,12 +453,12 @@ export default function PricingSection({
           </div>
           <LeadCaptureButton
             intent={{
-              source: FREE_PLAN.source,
-              planInterest: FREE_PLAN.planInterest
+              source: freePlan.source,
+              planInterest: freePlan.planInterest,
             }}
             className="inline-flex items-center justify-center gap-2 shrink-0 px-8 py-3.5 rounded-lg text-sm font-semibold border border-white/[.15] text-white hover:bg-white/[.05] transition-all"
           >
-            {FREE_PLAN.cta}
+            {freePlan.cta}
             <ArrowRight className="w-4 h-4" />
           </LeadCaptureButton>
         </div>
@@ -446,7 +468,7 @@ export default function PricingSection({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
         {paidPlans.map((plan, idx) => {
           const isRecommended = recommendedIdx === idx;
-          const textCap = textCapFromCredits(plan.credits, textEstimate);
+          const textCap = textCapFromCredits(plan.credits, textEstimate, waIaCredits, avgMixCredits);
           const capLabel =
             mode === "text"
               ? textEstimate === "whatsapp"
@@ -574,8 +596,8 @@ export default function PricingSection({
             </h3>
             <p className="text-xs text-gray-400 leading-relaxed">
               {textEstimate === "whatsapp"
-                ? "Modo solo WhatsApp: cada respuesta con ia cuesta $60. El agente interno y Mi Link consumen menos si los combina."
-                : "El simulador usa ~$30/msg (mix típico). WhatsApp con ia cuesta $60 — use el botón «Solo WhatsApp» para planificar ese escenario."}
+                ? `Modo solo WhatsApp: cada respuesta con ia cuesta ${formatVolume(waIaCredits)} créditos. ORI y Mi Link consumen menos si los combina.`
+                : `El simulador usa ~${avgMixCredits} cr/mensaje (mix típico). WhatsApp con ia cuesta ${waIaCredits} cr — use «Solo WhatsApp» para ese escenario.`}
             </p>
           </div>
         </div>
@@ -590,8 +612,8 @@ export default function PricingSection({
               }`}
             >
               <p className="text-xs text-gray-400 mb-1">{row.channel}</p>
-              <p className="text-lg font-bold text-white">{row.price}</p>
-              <p className="text-xs text-gray-500">{row.credits} créditos</p>
+              <p className="text-lg font-bold text-white">{formatVolume(row.credits)}</p>
+              <p className="text-xs text-gray-500">créditos</p>
             </div>
           ))}
         </div>

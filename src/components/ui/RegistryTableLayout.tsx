@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Search, RefreshCw } from "lucide-react";
 import {
-  btnIcon, inputSearch, registryPanel, registrySearchRow,
+  inputSearch, registryPanel,
   registryTableWrap, registryTableFooter
 } from "@/lib/brand-ui";
 
@@ -35,7 +35,7 @@ export function RegistryTableLayout({
   footer,
   children
 }: RegistryTableLayoutProps) {
-  const showSearchRow = onSearchChange !== undefined || onRefresh || action;
+  const showSearchRow = onSearchChange !== undefined || action;
   const [inputValue, setInputValue] = useState(search ?? "");
 
   useEffect(() => {
@@ -55,25 +55,30 @@ export function RegistryTableLayout({
       {alerts}
       {filters && <div className="mb-4">{filters}</div>}
       {showSearchRow && (
-        <div className={registrySearchRow}>
+        <div className="flex items-center gap-3 mb-4">
           {onSearchChange !== undefined && (
-            <div className="relative flex-1 max-w-xl">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <div className="relative flex-1 min-w-0 max-w-xl">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
               <input
                 type="text"
                 placeholder={searchPlaceholder}
                 value={inputValue}
                 onChange={e => setInputValue(e.target.value)}
-                className={inputSearch}
+                className={`${inputSearch} ${onRefresh ? "pr-10" : ""}`}
               />
+              {onRefresh ? (
+                <button
+                  type="button"
+                  onClick={onRefresh}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/[.08] transition-colors"
+                  title="Actualizar"
+                >
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                </button>
+              ) : null}
             </div>
           )}
-          {onRefresh && (
-            <button onClick={onRefresh} className={btnIcon} title="Actualizar">
-              <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-            </button>
-          )}
-          {action}
+          {action ? <div className="ml-auto shrink-0">{action}</div> : null}
         </div>
       )}
       {error && (

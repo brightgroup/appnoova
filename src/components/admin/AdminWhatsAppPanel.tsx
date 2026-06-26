@@ -1,15 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  ChevronLeft, Copy, Loader2, MessageCircle, Plus, Clock, FileText
+  Copy, Loader2, MessageCircle, Plus, Clock, FileText
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { authFetch } from "@/lib/telephony-api";
+import { AdminPageToolbar } from "@/components/admin/AdminPageToolbar";
 import {
-  btnPrimary, btnGhost, adminRegistryPage, registryToolbar, adminRegistryContent,
+  btnPrimary, btnGhost, adminRegistryPage, adminRegistryContent,
   btnFilterGroup, btnFilterActive, btnFilterIdle, registryTable,
   registryTableHead, registryTableHeadRow, registryTableHeadCell,
   registryTableCell, registryTableRow, textMuted
@@ -233,28 +233,25 @@ export function AdminWhatsAppPanel() {
 
   return (
     <div className={adminRegistryPage}>
-      <div className={registryToolbar}>
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Link href="/admin" className="p-1.5 hover:bg-white/[.08] rounded-lg text-gray-400">
-              <ChevronLeft className="w-5 h-5" />
-            </Link>
-            <div>
-              <h1 className="text-xl font-bold">WhatsApp (Twilio)</h1>
-              <p className={`${textMuted} text-xs mt-0.5`}>Líneas, webhooks y aprobaciones Meta</p>
-            </div>
-          </div>
-          {tab === "lines" && (
-            <button type="button" onClick={() => document.getElementById("wa-register-form")?.scrollIntoView({ behavior: "smooth" })} className={btnPrimary}>
+      <AdminPageToolbar
+        icon={MessageCircle}
+        backHref="/admin"
+        title="WhatsApp (Twilio)"
+        subtitle="Líneas, webhooks y aprobaciones Meta"
+        onRefresh={load}
+        refreshing={loading}
+        action={
+          tab === "lines" ? (
+            <button
+              type="button"
+              onClick={() => document.getElementById("wa-register-form")?.scrollIntoView({ behavior: "smooth" })}
+              className={`${btnPrimary} flex items-center gap-2 shrink-0`}
+            >
               <Plus className="w-4 h-4" /> Registrar línea
             </button>
-          )}
-          {tab === "approvals" && (
-            <button type="button" onClick={load} className={btnGhost}>
-              Actualizar
-            </button>
-          )}
-        </div>
+          ) : undefined
+        }
+      >
         <div className={`${btnFilterGroup} mt-4`}>
           <button type="button" onClick={() => setTab("lines")} className={tab === "lines" ? btnFilterActive : btnFilterIdle}>
             Líneas
@@ -276,7 +273,7 @@ export function AdminWhatsAppPanel() {
             )}
           </button>
         </div>
-      </div>
+      </AdminPageToolbar>
 
       <div className={adminRegistryContent}>
         {loading ? (
@@ -301,8 +298,6 @@ export function AdminWhatsAppPanel() {
             )}
 
             <RegistryTableLayout
-              onRefresh={load}
-              refreshing={loading}
               footer={channels.length > 0 ? (
                 <RegistryTablePagination
                   total={channelsPagination.total}
@@ -422,8 +417,6 @@ export function AdminWhatsAppPanel() {
                 </button>
               </div>
             }
-            onRefresh={load}
-            refreshing={loading}
             footer={templates.length > 0 ? (
               <RegistryTablePagination
                 total={templatesPagination.total}
@@ -485,7 +478,7 @@ export function AdminWhatsAppPanel() {
             )}
           </RegistryTableLayout>
         ) : (
-          <RegistryTableLayout onRefresh={load} refreshing={loading}>
+          <RegistryTableLayout>
             {requests.length === 0 ? (
               <p className="text-sm text-gray-500 py-10 text-center">No hay solicitudes pendientes.</p>
             ) : (

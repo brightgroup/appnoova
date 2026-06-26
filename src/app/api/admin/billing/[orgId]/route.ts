@@ -63,7 +63,7 @@ export async function GET(
   });
 }
 
-/** PATCH — cambiar plan, precio/créditos custom (descuentos), estado, notas */
+/** PATCH — cambiar plan, estado, notas (precio/créditos siempre desde catálogo plans) */
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ orgId: string }> }
@@ -76,21 +76,19 @@ export async function PATCH(
 
   const body = (await req.json()) as {
     plan_id?: string | null;
-    price_usd?: number | null;
-    monthly_credits?: number | null;
     status?: string | null;
-    notes?: string | null;
-    custom_label?: string | null;
+    notes?: string;
+    custom_label?: string;
   };
 
   const { error } = await db.rpc("billing_admin_update_subscription", {
     p_org:             orgId,
     p_plan_id:         body.plan_id         ?? null,
-    p_price_usd:       body.price_usd       ?? null,
-    p_monthly_credits: body.monthly_credits ?? null,
+    p_price_usd:       null,
+    p_monthly_credits: null,
     p_status:          body.status          ?? null,
-    p_notes:           body.notes           ?? null,
-    p_custom_label:    body.custom_label    ?? null,
+    p_notes:           body.notes !== undefined ? body.notes : null,
+    p_custom_label:    body.custom_label !== undefined ? body.custom_label : null,
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

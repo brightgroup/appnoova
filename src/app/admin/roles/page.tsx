@@ -9,8 +9,8 @@ import {
   countActivePermissions,
 } from "@/types/rbac";
 import {
-  adminRegistryPage, registryToolbar, adminRegistryContent,
-  registryTableLoading, registryTableEmpty, textMuted, btnPrimary,
+  adminRegistryPage, adminRegistryContent,
+  registryTableLoading, registryTableEmpty, btnPrimary,
   registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
   registryTableRow, registryTableCell
 } from "@/lib/brand-ui";
@@ -18,6 +18,7 @@ import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { RoleEditorModal, type RoleEditorValues } from "@/components/admin/RoleEditorModal";
+import { AdminPageToolbar } from "@/components/admin/AdminPageToolbar";
 
 interface RoleRow {
   id: string;
@@ -101,21 +102,19 @@ export default function AdminRolesPage() {
 
   return (
     <div className={adminRegistryPage}>
-      <div className={`${registryToolbar} flex items-center justify-between gap-4`}>
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Shield className="w-5 h-5 text-[#5b5bf6]" />
-            <h1 className="text-xl font-bold tracking-tight">Roles de organización</h1>
-          </div>
-          <p className={`text-xs ${textMuted}`}>
-            Configura qué puede hacer cada tipo de usuario dentro del dashboard (sin acceso a /admin)
-          </p>
-        </div>
-        <button type="button" onClick={openCreate} className={`${btnPrimary} flex items-center gap-2 shrink-0`}>
-          <Plus className="w-4 h-4" />
-          Crear rol
-        </button>
-      </div>
+      <AdminPageToolbar
+        icon={Shield}
+        title="Roles de organización"
+        subtitle="Permisos por módulo dentro del dashboard (sin acceso a /admin)"
+        onRefresh={fetchRoles}
+        refreshing={loading}
+        action={
+          <button type="button" onClick={openCreate} className={`${btnPrimary} flex items-center gap-2 shrink-0`}>
+            <Plus className="w-4 h-4" />
+            Crear rol
+          </button>
+        }
+      />
 
       <div className={`${adminRegistryContent} space-y-4`}>
         <div className="p-4 rounded-xl bg-[#5b5bf6]/10 border border-[#5b5bf6]/25">
@@ -131,7 +130,7 @@ export default function AdminRolesPage() {
           </div>
         </div>
 
-        <RegistryTableLayout onRefresh={fetchRoles} refreshing={loading} error={error || undefined}
+        <RegistryTableLayout error={error || undefined}
           footer={roles.length > 0 ? (
             <RegistryTablePagination
               total={pagination.total}

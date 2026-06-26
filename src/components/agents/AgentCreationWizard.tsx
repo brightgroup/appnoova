@@ -19,6 +19,7 @@ import {
   suggestVoiceForPurpose,
 } from "@/lib/voice-accent-profile";
 import { DEFAULT_ELEVENLABS_VOICE_ID } from "@/lib/elevenlabs/default-voices";
+import { usePricingCatalog } from "@/hooks/usePricingCatalog";
 import { VOICE_CREDITS_PER_MINUTE, VOICE_PREMIUM_CREDITS_PER_MINUTE } from "@/lib/billing/pricing";
 import type { CompanyContext } from "@/types/company-context";
 import type { VoiceProvider } from "@/types/voice-agent";
@@ -77,6 +78,9 @@ export function AgentCreationWizard({
   const [elevenlabsVoiceId, setElevenlabsVoiceId] = useState(DEFAULT_ELEVENLABS_VOICE_ID);
   const [elevenlabsVoices, setElevenlabsVoices] = useState<{ id: string; label: string }[]>([]);
   const [loadingElVoices, setLoadingElVoices] = useState(false);
+  const { catalog: pricingCatalog } = usePricingCatalog();
+  const voiceStdCredits = pricingCatalog?.voice_standard_per_min ?? VOICE_CREDITS_PER_MINUTE;
+  const voicePremCredits = pricingCatalog?.voice_premium_per_min ?? VOICE_PREMIUM_CREDITS_PER_MINUTE;
 
   const reset = useCallback(() => {
     setStep("agent");
@@ -380,7 +384,7 @@ export function AgentCreationWizard({
                       }`}
                     >
                       <p className="text-xs font-semibold text-white">Estándar</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5">{VOICE_CREDITS_PER_MINUTE} cr/min</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">{voiceStdCredits} cr/min</p>
                     </button>
                     <button
                       type="button"
@@ -392,7 +396,7 @@ export function AgentCreationWizard({
                       }`}
                     >
                       <p className="text-xs font-semibold text-white">Premium</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5">{VOICE_PREMIUM_CREDITS_PER_MINUTE} cr/min</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">{voicePremCredits} cr/min</p>
                     </button>
                   </div>
                 </div>

@@ -14,6 +14,7 @@ import { normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
 import { GEMINI_VOICES, VOICE_MODELS, LLM_MODELS } from "@/lib/voice-agent-options";
 import { DEFAULT_ELEVENLABS_VOICE_ID, ELEVENLABS_DEFAULT_VOICES } from "@/lib/elevenlabs/default-voices";
 import { VOICE_CREDITS_PER_MINUTE, VOICE_PREMIUM_CREDITS_PER_MINUTE } from "@/lib/billing/pricing";
+import { usePricingCatalog } from "@/hooks/usePricingCatalog";
 import type { VoiceAgentFormData, VoiceAgentRecord } from "@/types/voice-agent";
 import type { CompanyContext } from "@/types/company-context";
 import { AgentTestPanel } from "@/components/voice/AgentTestPanel";
@@ -73,6 +74,9 @@ function ConfigContent() {
   const [contexts, setContexts] = useState<CompanyContext[]>([]);
   const [registryRefresh, setRegistryRefresh] = useState(0);
   const [elevenlabsVoices, setElevenlabsVoices] = useState<{ id: string; label: string }[]>([]);
+  const { catalog: pricingCatalog } = usePricingCatalog();
+  const voiceStdCredits = pricingCatalog?.voice_standard_per_min ?? VOICE_CREDITS_PER_MINUTE;
+  const voicePremCredits = pricingCatalog?.voice_premium_per_min ?? VOICE_PREMIUM_CREDITS_PER_MINUTE;
 
   const isPremium = form.voice_provider === "elevenlabs";
 
@@ -215,7 +219,7 @@ function ConfigContent() {
             <h1 className="text-lg font-bold truncate">{form.name}</h1>
             <p className="text-xs text-gray-400">
               Plantilla: {meta.tag} · {meta.description}
-              {isPremium ? ` · Premium (${VOICE_PREMIUM_CREDITS_PER_MINUTE} cr/min)` : ` · Estándar (${VOICE_CREDITS_PER_MINUTE} cr/min)`}
+              {isPremium ? ` · Premium (${voicePremCredits} cr/min)` : ` · Estándar (${voiceStdCredits} cr/min)`}
               {!saved && " · Sin guardar aún"}
             </p>
           </div>

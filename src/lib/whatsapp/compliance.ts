@@ -4,24 +4,44 @@ import {
 } from "@/lib/whatsapp/session-window";
 import type { TextChatMessage } from "@/types/text-agent-conversation";
 
-/** Palabras clave de baja reconocidas por Meta (es/en). */
-const OPT_OUT_KEYWORDS = new Set([
+/** Mensaje completo = baja (estándar Meta / sin ambigüedad). */
+const EXACT_OPT_OUT = new Set([
   "STOP",
   "UNSUBSCRIBE",
-  "CANCEL",
-  "CANCELAR",
-  "BAJA",
-  "DAR DE BAJA",
-  "NO MAS",
-  "NOMAS",
-  "ELIMINAR",
-  "QUITAR",
   "OPT OUT",
   "OPTOUT",
-  "ARRET",
-  "DETENER",
-  "PARAR"
+  "BAJA",
+  "DAR DE BAJA"
 ]);
+
+/**
+ * Frases explícitas de baja del canal WhatsApp.
+ * Evita falsos positivos ("cancelar mi pedido", "no más productos", etc.).
+ */
+const OPT_OUT_PHRASES = [
+  "NO ME ESCRIBAN",
+  "NO ME ESCRIBAS",
+  "NO ME CONTACTEN",
+  "NO ME CONTACTES",
+  "NO QUIERO MAS MENSAJES",
+  "NO QUIERO RECIBIR MENSAJES",
+  "NO QUIERO MENSAJES",
+  "NO MAS MENSAJES",
+  "NO MAS WHATSAPP",
+  "DEJAR DE ENVIAR",
+  "DEJEN DE ESCRIBIR",
+  "DEJA DE ESCRIBIR",
+  "DEJEN DE ENVIARME",
+  "DEJAR DE ENVIARME",
+  "DARME DE BAJA",
+  "DARSE DE BAJA",
+  "BAJA DE WHATSAPP",
+  "CANCELAR SUSCRIPCION",
+  "CANCELAR SUBSCRIPTION",
+  "SACAME DE LA LISTA",
+  "SACARME DE LA LISTA",
+  "SACAME DEL LISTADO"
+];
 
 export const WHATSAPP_OPT_OUT_CONFIRMATION =
   "Entendido. Has sido dado de baja y no recibirás más mensajes por este canal. Si deseas reactivar, escríbenos de nuevo.";
@@ -37,20 +57,25 @@ function normalizeOptOutText(text: string): string {
     .trim();
 }
 
-/** Detecta solicitud explícita de baja (mensaje dedicado o keyword aislada). */
+function trimOptOutCourtesy(text: string): string {
+  return text
+    .replace(/^(POR FAVOR|PLEASE|PLIS|PLS)\s+/, "")
+    .replace(/\s+(POR FAVOR|PLEASE|GRACIAS|THANKS)$/, "")
+    .trim();
+}
+
+/** Detecta solicitud explícita de baja (palabra dedicada o frase inequívoca). */
 export function detectWhatsAppOptOut(text: string): boolean {
   const normalized = normalizeOptOutText(text);
   if (!normalized) return false;
-  if (OPT_OUT_KEYWORDS.has(normalized)) return true;
-  for (const kw of OPT_OUT_KEYWORDS) {
-    if (normalized === kw) return true;
+
+  const exact = trimOptOutCourtesy(normalized);
+  if (EXACT_OPT_OUT.has(exact)) return true;
+
+  for (const phrase of OPT_OUT_PHRASES) {
+    if (normalized.includes(phrase)) return true;
   }
-  // "por favor cancelar" etc. — solo frases cortas con keyword
-  if (normalized.length <= 40) {
-    for (const kw of OPT_OUT_KEYWORDS) {
-      if (normalized.includes(kw)) return true;
-    }
-  }
+
   return false;
 }
 

@@ -1,15 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  Plus, ChevronLeft, Settings, AlertCircle, CheckCircle2, Clock
+  Plus, Settings, AlertCircle, CheckCircle2, Clock, Phone
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { authFetch } from "@/lib/telephony-api";
+import { AdminPageToolbar } from "@/components/admin/AdminPageToolbar";
 import {
-  btnPrimary, adminRegistryPage, registryToolbar, adminRegistryContent, textMuted,
+  btnPrimary, adminRegistryPage, adminRegistryContent,
   btnFilterGroup, btnFilterActive, btnFilterIdle
 } from "@/lib/brand-ui";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
@@ -206,39 +206,34 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
   return (
     <>
       <div className={adminRegistryPage}>
-        <div className={registryToolbar}>
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href="/admin" className="p-1.5 hover:bg-white/[.06] rounded-lg text-gray-400 hover:text-white shrink-0">
-              <ChevronLeft className="w-5 h-5" />
-            </Link>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">Líneas telefónicas</h1>
-              <p className={`text-xs ${textMuted} mt-0.5`}>Superadmin · Telnyx · solicitudes de clientes</p>
-            </div>
-          </div>
-        </div>
+        <AdminPageToolbar
+          icon={Phone}
+          backHref="/admin"
+          title="Líneas telefónicas"
+          subtitle="Superadmin · Telnyx · solicitudes de clientes"
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder={tab === "lines" ? "Buscar" : "Buscar solicitud..."}
+          onRefresh={load}
+          refreshing={loading}
+          action={
+            <button
+              onClick={() => {
+                setBuyUserId(preselectedUserId ?? null);
+                setAttendRequestId(null);
+                setShowBuy(true);
+              }}
+              disabled={!config?.configured}
+              className={`${btnPrimary} flex items-center gap-2 shrink-0 disabled:opacity-40`}
+            >
+              <Plus className="w-4 h-4" /> Comprar línea
+            </button>
+          }
+        />
 
         <div className={adminRegistryContent}>
           <RegistryTableLayout
-            search={search}
-            onSearchChange={setSearch}
-            searchPlaceholder={tab === "lines" ? "Buscar" : "Buscar solicitud..."}
-            onRefresh={load}
-            refreshing={loading}
             error={error || undefined}
-            action={
-              <button
-                onClick={() => {
-                  setBuyUserId(preselectedUserId ?? null);
-                  setAttendRequestId(null);
-                  setShowBuy(true);
-                }}
-                disabled={!config?.configured}
-                className={`${btnPrimary} disabled:opacity-40`}
-              >
-                <Plus className="w-4 h-4" /> Comprar línea
-              </button>
-            }
             alerts={<>
           {pendingCount > 0 && (
             <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border border-amber-500/25 bg-amber-500/[.06] text-xs text-amber-200">

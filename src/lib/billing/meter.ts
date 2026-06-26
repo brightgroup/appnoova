@@ -1,12 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ensurePricingConfig } from "@/lib/billing/pricing-config";
 import {
   creditsForEvent,
   geminiCostUsd,
   usdToCop,
   voiceBillableMinutes,
-  TWILIO_WA_USD_PER_MSG,
-  VOICE_USD_PER_MINUTE,
-  VOICE_PREMIUM_USD_PER_MINUTE,
+  getTwilioWaUsdPerMsg,
+  getVoiceUsdPerMinute,
   creditsForVoiceDuration,
   type UsageEventType,
   type VoiceBillingProvider,
@@ -142,6 +142,8 @@ export interface RecordUsageResult {
  * Pensado para llamarse después de la acción; debe envolverse en try/catch por el caller.
  */
 export async function recordUsage(input: RecordUsageInput): Promise<RecordUsageResult> {
+  await ensurePricingConfig(input.db);
+
   const quantity = input.quantity ?? 1;
   const credits =
     input.creditsOverride != null
@@ -159,14 +161,12 @@ export async function recordUsage(input: RecordUsageInput): Promise<RecordUsageR
       );
     }
     if (input.twilioMessages) {
-      providerCostUsd += input.twilioMessages * TWILIO_WA_USD_PER_MSG;
+      providerCostUsd += input.twilioMessages * getTwilioWaUsdPerMsg();
     }
     if (input.voiceMinutes) {
-      const rate =
-        input.eventType === "voice_premium"
-          ? VOICE_PREMIUM_USD_PER_MINUTE
-          : VOICE_USD_PER_MINUTE;
-      providerCostUsd += input.voiceMinutes * rate;
+      const voiceProvider: VoiceBillingProvider =
+        input.eventType === "voice_premium" ? "elevenlabs" : "google";
+      providerCostUsd += input.voiceMinutes * getVoiceUsdPerMinute(voiceProvider);
     }
   }
 

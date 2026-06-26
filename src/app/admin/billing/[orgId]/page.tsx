@@ -1,15 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import {
-  ChevronLeft, RefreshCw, Save, CheckCircle2, PlusCircle,
+  RefreshCw, Save, CheckCircle2, PlusCircle,
   Settings2, StickyNote, ChevronDown, ChevronUp, TrendingUp,
   DollarSign, Wallet, Receipt, Activity, AlertCircle
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
+import { AdminPageToolbar } from "@/components/admin/AdminPageToolbar";
+import { AdminStatusBadge } from "@/components/admin/admin-table-styles";
 import {
-  adminRegistryPage, registryToolbar, textMuted,
+  adminRegistryPage, textMuted,
   registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
   registryTableRow, registryTableCell, registryTableCellFirst,
   registryTableEmpty, btnPrimary
@@ -56,13 +58,6 @@ const STATUS_OPTIONS = [
   { value: "canceled",  label: "Cancelado" },
 ];
 
-const INVOICE_BADGE: Record<string, string> = {
-  pending: "bg-amber-500/15 text-amber-300",
-  paid:    "bg-green-500/15 text-green-300",
-  overdue: "bg-red-500/15 text-red-300",
-  void:    "bg-gray-500/15 text-gray-400",
-};
-
 const EVENT_LABELS: Record<string, string> = {
   ori: "ORI", milink: "Mi Link", widget: "Widget", text_test: "Prueba",
   whatsapp_ai: "WhatsApp IA", whatsapp_manual: "WhatsApp", voice: "Voz",
@@ -83,7 +78,6 @@ const labelCls = "block text-xs text-gray-400 mb-1.5 font-medium";
 
 export default function AdminBillingDetailPage() {
   const { orgId } = useParams<{ orgId: string }>();
-  const router    = useRouter();
 
   const [detail,  setDetail]  = useState<DetailData | null>(null);
   const [row,     setRow]     = useState<Row | null>(null);
@@ -97,7 +91,7 @@ export default function AdminBillingDetailPage() {
   const [showNotes, setShowNotes] = useState(false);
 
   const [subForm, setSubForm] = useState({
-    plan_id: "explorador", price_usd: "", monthly_credits: "",
+    plan_id: "explorador",
     status: "active", notes: "", custom_label: "",
   });
   const [topupForm, setTopupForm] = useState({ credits: "", reason: "" });
@@ -117,8 +111,6 @@ export default function AdminBillingDetailPage() {
       const sub = detailJson.subscription;
       setSubForm({
         plan_id:         sub?.plan_id        ?? "explorador",
-        price_usd:       sub?.price_usd      != null ? String(sub.price_usd)      : "",
-        monthly_credits: sub?.monthly_credits != null ? String(sub.monthly_credits) : "",
         status:          sub?.status         ?? "active",
         notes:           sub?.notes          ?? "",
         custom_label:    sub?.custom_label   ?? "",
@@ -135,28 +127,16 @@ export default function AdminBillingDetailPage() {
   useEffect(() => { void load(); }, [load]);
 
   const handlePlanChange = (planId: string) => {
-    const p = plans.find(pl => pl.id === planId);
-    setSubForm(f => ({
-      ...f,
-      plan_id:         planId,
-      price_usd:       f.price_usd       || (p ? String(p.price_usd)       : ""),
-      monthly_credits: f.monthly_credits || (p ? String(p.monthly_credits) : ""),
-    }));
+    setSubForm((f) => ({ ...f, plan_id: planId }));
   };
 
   const saveSubscription = useCallback(async () => {
     setSaving(true); setSaveMsg("");
-    const selectedPlan = plans.find(p => p.id === subForm.plan_id);
-    const priceNum   = subForm.price_usd       ? parseFloat(subForm.price_usd)     : null;
-    const creditsNum = subForm.monthly_credits ? parseInt(subForm.monthly_credits) : null;
-
     const body = {
-      plan_id:         subForm.plan_id       || null,
-      status:          subForm.status        || null,
-      notes:           subForm.notes         || null,
-      custom_label:    subForm.custom_label  || null,
-      price_usd:       (priceNum   != null && priceNum   !== selectedPlan?.price_usd)   ? priceNum   : null,
-      monthly_credits: (creditsNum != null && creditsNum !== selectedPlan?.monthly_credits) ? creditsNum : null,
+      plan_id:      subForm.plan_id || null,
+      status:       subForm.status  || null,
+      notes:        subForm.notes.trim(),
+      custom_label: subForm.custom_label.trim(),
     };
 
     const res  = await authFetch(`/api/admin/billing/${orgId}`, {
@@ -168,7 +148,7 @@ export default function AdminBillingDetailPage() {
     if (!res.ok) setSaveMsg("Error: " + (json.error ?? "desconocido"));
     else { setSaveMsg("Guardado correctamente"); await load(); }
     setSaving(false);
-  }, [orgId, subForm, plans, load]);
+  }, [orgId, subForm, load]);
 
   const applyTopup = useCallback(async () => {
     if (!topupForm.credits) return;
@@ -196,6 +176,8 @@ export default function AdminBillingDetailPage() {
   }, [load]);
 
   const selectedPlan = plans.find(p => p.id === subForm.plan_id);
+  const activePlanId = detail?.subscription?.plan_id ?? subForm.plan_id;
+  const activePlan = plans.find(p => p.id === activePlanId);
   const wallet       = detail?.wallet;
   const included     = Number(wallet?.included_credits ?? 0);
   const used         = Number(wallet?.used_credits ?? 0);
@@ -207,33 +189,11 @@ export default function AdminBillingDetailPage() {
 
   return (
     <div className={adminRegistryPage}>
-
-      {/* Toolbar */}
-      <div className={registryToolbar}>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/admin/billing")}
-            className="p-1.5 hover:bg-white/[.06] rounded-lg transition-colors text-gray-400 hover:text-white"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Facturación</span>
-              <span className="text-xs text-gray-600">/</span>
-              <h1 className="text-sm font-bold text-white">
-                {loading ? "Cargando…" : (detail?.organization?.name ?? orgId)}
-              </h1>
-            </div>
-            {detail?.organization && (
-              <p className={`text-xs ${textMuted} mt-0.5`}>{row?.owner_email ?? detail.organization.slug}</p>
-            )}
-          </div>
-          <button onClick={load} className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/[.06]">
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
-        </div>
-      </div>
+      <AdminPageToolbar
+        backHref="/admin/billing"
+        title={loading ? "Cargando…" : (detail?.organization?.name ?? orgId)}
+        subtitle={detail?.organization ? (row?.owner_email ?? detail.organization.slug) : "Facturación"}
+      />
 
       {loading ? (
         <div className="flex items-center justify-center py-32 text-gray-400">
@@ -253,7 +213,9 @@ export default function AdminBillingDetailPage() {
                     <DollarSign className="w-3 h-3" /> Le facturo
                   </p>
                   <p className="text-lg font-bold">{cop(row.revenue_cop)}</p>
-                  <p className={`text-xs ${textMuted} mt-0.5`}>${row.price_usd} USD/mes</p>
+                  <p className={`text-xs ${textMuted} mt-0.5`}>
+                    {activePlan?.name ?? row.plan_id ?? "—"} · ${activePlan?.price_usd ?? row.price_usd} USD/mes
+                  </p>
                 </div>
                 <div className="rounded-xl border border-white/[.08] bg-white/[.02] p-4">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
@@ -343,9 +305,7 @@ export default function AdminBillingDetailPage() {
                           <p className="text-[10px] text-gray-500">{cop(inv.amount_cop)} COP</p>
                         </td>
                         <td className={registryTableCell}>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${INVOICE_BADGE[inv.status] ?? INVOICE_BADGE.pending}`}>
-                            {inv.status}
-                          </span>
+                          <AdminStatusBadge status={inv.status} variant="invoice" />
                         </td>
                         <td className={registryTableCell}>
                           {(inv.status === "pending" || inv.status === "overdue") && (
@@ -415,35 +375,20 @@ export default function AdminBillingDetailPage() {
                   </select>
                 </div>
 
-                {/* Precio custom */}
-                <div>
-                  <label className={labelCls}>
-                    Precio USD/mes
-                    {selectedPlan && <span className="text-gray-600 font-normal ml-1">(estándar: ${selectedPlan.price_usd})</span>}
-                  </label>
-                  <input
-                    type="number" step="0.01" min="0"
-                    placeholder={selectedPlan ? String(selectedPlan.price_usd) : "0"}
-                    value={subForm.price_usd}
-                    onChange={e => setSubForm(f => ({ ...f, price_usd: e.target.value }))}
-                    className={inputCls}
-                  />
-                </div>
-
-                {/* Créditos custom */}
-                <div>
-                  <label className={labelCls}>
-                    Créditos/mes
-                    {selectedPlan && <span className="text-gray-600 font-normal ml-1">(estándar: {num(selectedPlan.monthly_credits)})</span>}
-                  </label>
-                  <input
-                    type="number" min="0"
-                    placeholder={selectedPlan ? String(selectedPlan.monthly_credits) : "0"}
-                    value={subForm.monthly_credits}
-                    onChange={e => setSubForm(f => ({ ...f, monthly_credits: e.target.value }))}
-                    className={inputCls}
-                  />
-                </div>
+                {/* Resumen del plan (solo lectura — se sincroniza desde catálogo) */}
+                {selectedPlan && (
+                  <div className="rounded-lg border border-white/[.08] bg-white/[.02] px-3 py-3 space-y-1.5">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wide">Incluye al activar</p>
+                    <p className="text-sm text-white font-medium">
+                      ${selectedPlan.price_usd > 0 ? selectedPlan.price_usd : "0"} USD/mes
+                      <span className="text-gray-500 font-normal mx-2">·</span>
+                      {num(selectedPlan.monthly_credits)} créditos/mes
+                    </p>
+                    <p className="text-[10px] text-gray-600">
+                      Precio y créditos se toman del catálogo en Admin → Pricing → Paquetes.
+                    </p>
+                  </div>
+                )}
 
                 {/* Etiqueta */}
                 <div>
@@ -489,15 +434,13 @@ export default function AdminBillingDetailPage() {
                 className={`${btnPrimary} w-full justify-center mt-4`}
               >
                 {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {saving ? "Guardando…" : "Guardar y activar"}
+                {saving ? "Guardando…" : "Asignar plan y sincronizar"}
               </button>
 
               {selectedPlan && (
                 <p className="text-[10px] text-gray-600 text-center mt-2">
-                  {selectedPlan.name} estándar: ${selectedPlan.price_usd}/mes · {num(selectedPlan.monthly_credits)} cr
-                  {subForm.price_usd && parseFloat(subForm.price_usd) !== selectedPlan.price_usd && (
-                    <span className="text-[#a5a5ff] ml-1">→ personalizado: ${subForm.price_usd}</span>
-                  )}
+                  Activo ahora: {activePlan?.name ?? activePlanId}
+                  {activePlan && ` · $${activePlan.price_usd}/mes · ${num(activePlan.monthly_credits)} cr`}
                 </p>
               )}
             </div>
