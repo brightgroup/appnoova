@@ -125,7 +125,7 @@ function DailyStackedChart({
   onHoverDay,
 }: {
   days: BillingChartDay[];
-  activeCategories: typeof BILLING_CHART_CATEGORIES;
+  activeCategories: (typeof BILLING_CHART_CATEGORIES)[number][];
   scaleMax: number;
   ticks: number[];
   valueLabel: string;
