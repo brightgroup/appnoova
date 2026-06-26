@@ -4,17 +4,16 @@ import { normalizeTextAgentForm } from "@/lib/text-agent-form";
 import { toTextAgentListItem, toTextAgentRecord } from "@/lib/text-agent-record";
 import { insertTextAgentRow, updateTextAgentRow } from "@/lib/text-agents-db";
 import { isMissingTableError } from "@/lib/supabase-table-error";
-import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
+import { textAgentsAdminClient } from "@/lib/text-agents-server";
+import { getOrgContextFromRequest } from "@/lib/org-server";
 
 function dbNotReady() {
   return NextResponse.json({ agents: [], dbReady: false });
 }
 
 export async function GET(req: NextRequest) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const orgCtx = await getOrgContextFromRequest(req);
+  if (orgCtx instanceof NextResponse) return orgCtx;
 
   const agentId = req.nextUrl.searchParams.get("id");
   const sourceTemplateParam =
@@ -27,7 +26,7 @@ export async function GET(req: NextRequest) {
       .from("text_agents")
       .select("*")
       .eq("id", agentId)
-      .eq("user_id", userId)
+      .eq("organization_id", orgCtx.organizationId)
       .maybeSingle();
 
     if (error) {
@@ -61,7 +60,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await db
     .from("text_agents")
     .select("*")
-    .eq("user_id", userId)
+    .eq("organization_id", orgCtx.organizationId)
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -76,10 +75,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const orgCtx = await getOrgContextFromRequest(req);
+  if (orgCtx instanceof NextResponse) return orgCtx;
 
   const body = await req.json();
   const sourceTemplate = resolveBaseTextTemplateId(
@@ -104,7 +101,7 @@ export async function POST(req: NextRequest) {
     const { count } = await db
       .from("text_agents")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", userId);
+      .eq("organization_id", orgCtx.organizationId);
     const n = (count ?? 0) + 1;
     if (n > 1 && agentName === defaults.name) {
       agentName = `${defaults.name} (${n})`;
@@ -112,7 +109,8 @@ export async function POST(req: NextRequest) {
   }
 
   const row = {
-    user_id: userId,
+    user_id: orgCtx.userId,
+    organization_id: orgCtx.organizationId,
     source_template: sourceTemplate,
     template_id: sourceTemplate,
     name: agentName,
@@ -127,11 +125,11 @@ export async function POST(req: NextRequest) {
   };
 
   if (body.id) {
-    let { data, error } = await updateTextAgentRow(db, row, body.id, userId);
+    let { data, error } = await updateTextAgentRow(db, row, body.id, orgCtx.organizationId);
 
     if (error?.message?.includes("company_context_id") || error?.message?.includes("data_table_id")) {
       const { company_context_id: _c, data_table_id: _d, ...rest } = row;
-      ({ data, error } = await updateTextAgentRow(db, rest, body.id, userId));
+      ({ data, error } = await updateTextAgentRow(db, rest, body.id, orgCtx.organizationId));
     }
 
     if (error) {
@@ -169,10 +167,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const orgCtx = await getOrgContextFromRequest(req);
+  if (orgCtx instanceof NextResponse) return orgCtx;
 
   const agentId = req.nextUrl.searchParams.get("id");
   if (!agentId) {
@@ -185,7 +181,7 @@ export async function DELETE(req: NextRequest) {
     .from("text_agents")
     .select("id")
     .eq("id", agentId)
-    .eq("user_id", userId)
+    .eq("organization_id", orgCtx.organizationId)
     .maybeSingle();
 
   if (fetchErr) {
@@ -199,7 +195,7 @@ export async function DELETE(req: NextRequest) {
     .from("text_agents")
     .delete()
     .eq("id", agentId)
-    .eq("user_id", userId);
+    .eq("organization_id", orgCtx.organizationId);
 
   if (deleteErr) {
     return NextResponse.json({ error: deleteErr.message }, { status: 500 });

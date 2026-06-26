@@ -107,7 +107,7 @@ export async function provisionWhatsAppFromEmbeddedSignupMeta(
       .from("text_agents")
       .select("id")
       .eq("id", input.textAgentId)
-      .eq("user_id", input.userId)
+      .eq("organization_id", input.organizationId)
       .maybeSingle();
     if (!agent) throw new Error("Agente de texto no encontrado");
   }

@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       .from("text_agents")
       .select("id")
       .eq("id", text_agent_id)
-      .eq("user_id", orgCtx.userId) // Temporalmente user_id hasta que text_agents tenga organization_id
+      .eq("organization_id", orgCtx.organizationId)
       .maybeSingle();
     
     if (!agent) {

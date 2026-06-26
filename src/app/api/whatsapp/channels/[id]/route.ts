@@ -3,20 +3,19 @@ import { isMissingTableError } from "@/lib/supabase-table-error";
 import { toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
 import { canDeleteWhatsAppChannel } from "@/lib/whatsapp/channel-status";
 import { getWhatsAppChannelById } from "@/lib/whatsapp-server";
-import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
+import { textAgentsAdminClient } from "@/lib/text-agents-server";
+import { getOrgContextFromRequest } from "@/lib/org-server";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const orgCtx = await getOrgContextFromRequest(req);
+  if (orgCtx instanceof NextResponse) return orgCtx;
 
   const { id } = await params;
   const db = textAgentsAdminClient();
-  const channel = await getWhatsAppChannelById(db, userId, id);
+  const channel = await getWhatsAppChannelById(db, orgCtx.organizationId, id);
 
   if (!channel) {
     return NextResponse.json({ error: "Línea no encontrada" }, { status: 404 });
@@ -29,16 +28,14 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const orgCtx = await getOrgContextFromRequest(req);
+  if (orgCtx instanceof NextResponse) return orgCtx;
 
   const { id } = await params;
   const body = await req.json();
   const db = textAgentsAdminClient();
 
-  const existing = await getWhatsAppChannelById(db, userId, id);
+  const existing = await getWhatsAppChannelById(db, orgCtx.organizationId, id);
   if (!existing) {
     return NextResponse.json({ error: "Línea no encontrada" }, { status: 404 });
   }
@@ -54,7 +51,7 @@ export async function PATCH(
         .from("text_agents")
         .select("id")
         .eq("id", agentId)
-        .eq("user_id", userId)
+        .eq("organization_id", orgCtx.organizationId)
         .maybeSingle();
       if (!agent) {
         return NextResponse.json({ error: "Agente de texto no encontrado" }, { status: 400 });
@@ -87,7 +84,7 @@ export async function PATCH(
     .from("whatsapp_channels")
     .update(updates)
     .eq("id", id)
-    .eq("user_id", userId)
+    .eq("organization_id", orgCtx.organizationId)
     .select("*")
     .maybeSingle();
 
@@ -105,15 +102,13 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const orgCtx = await getOrgContextFromRequest(req);
+  if (orgCtx instanceof NextResponse) return orgCtx;
 
   const { id } = await params;
   const db = textAgentsAdminClient();
 
-  const existing = await getWhatsAppChannelById(db, userId, id);
+  const existing = await getWhatsAppChannelById(db, orgCtx.organizationId, id);
   if (!existing) {
     return NextResponse.json({ error: "Línea no encontrada" }, { status: 404 });
   }
@@ -125,7 +120,7 @@ export async function DELETE(
     );
   }
 
-  const { error } = await db.from("whatsapp_channels").delete().eq("id", id).eq("user_id", userId);
+  const { error } = await db.from("whatsapp_channels").delete().eq("id", id).eq("organization_id", orgCtx.organizationId);
 
   if (error) {
     if (isMissingTableError(error)) {

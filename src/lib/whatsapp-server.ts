@@ -50,14 +50,14 @@ export async function getWhatsAppChannelByMetaPhoneNumberId(
 
 export async function getWhatsAppChannelById(
   db: SupabaseClient,
-  userId: string,
+  organizationId: string,
   channelId: string
 ): Promise<WhatsAppChannelRecord | null> {
   const { data, error } = await db
     .from("whatsapp_channels")
     .select("*")
     .eq("id", channelId)
-    .eq("user_id", userId)
+    .eq("organization_id", organizationId)
     .maybeSingle();
 
   if (error || !data) return null;

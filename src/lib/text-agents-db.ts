@@ -26,7 +26,7 @@ export async function updateTextAgentRow(
   db: SupabaseClient,
   row: AgentRow,
   id: string,
-  userId: string
+  organizationId: string
 ) {
   const payload: AgentRow = { ...row };
   delete payload.template_id;
@@ -35,7 +35,7 @@ export async function updateTextAgentRow(
     .from("text_agents")
     .update(payload)
     .eq("id", id)
-    .eq("user_id", userId)
+    .eq("organization_id", organizationId)
     .select()
     .single();
 }

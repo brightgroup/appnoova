@@ -6,6 +6,7 @@ import { normalizeWhatsAppE164, toWhatsAppChannelRecord } from "@/lib/whatsapp-c
 import { twilioWhatsAppWebhookUrl } from "@/lib/telephony/app-url";
 import { isTwilioWhatsAppConfigured } from "@/lib/whatsapp/twilio-whatsapp";
 import { configureTwilioWhatsAppSenderWebhook } from "@/lib/whatsapp/twilio-senders";
+import { resolveOrgIdForUser } from "@/lib/billing/meter";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
@@ -52,16 +53,17 @@ export async function POST(req: NextRequest) {
   }
 
   const db = adminClient();
+  const organizationId = await resolveOrgIdForUser(db, userId);
 
   if (textAgentId) {
     const { data: agent } = await db
       .from("text_agents")
       .select("id")
       .eq("id", textAgentId)
-      .eq("user_id", userId)
+      .eq("organization_id", organizationId)
       .maybeSingle();
     if (!agent) {
-      return NextResponse.json({ error: "Agente de texto no pertenece al usuario" }, { status: 400 });
+      return NextResponse.json({ error: "Agente de texto no pertenece a la organización del usuario" }, { status: 400 });
     }
   }
 
@@ -69,6 +71,7 @@ export async function POST(req: NextRequest) {
     .from("whatsapp_channels")
     .insert({
       user_id: userId,
+      organization_id: organizationId,
       text_agent_id: textAgentId,
       e164,
       friendly_name: friendlyName ?? `WhatsApp ${e164}`,

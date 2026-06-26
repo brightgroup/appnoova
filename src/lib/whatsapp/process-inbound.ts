@@ -173,12 +173,13 @@ export async function processTwilioWhatsAppInbound(
   const userMediaType: TextChatMessage["media_type"] =
     inboundContent.primaryMediaType ?? (inbound.media.length ? "document" : "text");
   const userMediaLabel = inboundContent.mediaLabel;
+  const orgId = await resolveChannelOrgId(db, channel);
 
   const { data: agent, error: agentErr } = await db
     .from("text_agents")
     .select("*")
     .eq("id", channel.text_agent_id)
-    .eq("user_id", channel.user_id)
+    .eq("organization_id", orgId)
     .maybeSingle();
 
   if (agentErr || !agent) {
@@ -186,7 +187,6 @@ export async function processTwilioWhatsAppInbound(
   }
 
   const model = String(agent.llm_model || "gemini-2.5-flash");
-  const orgId = await resolveChannelOrgId(db, channel);
   const contactLabel = buildWhatsAppContactLabel(inbound.profileName, inbound.fromE164);
   const existing = await findWhatsAppConversation(
     db,
