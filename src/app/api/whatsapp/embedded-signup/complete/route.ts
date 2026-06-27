@@ -3,8 +3,8 @@ import { adminClient } from "@/lib/voice-agents-server";
 import { getOrgContextFromRequest } from "@/lib/org-server";
 import { assertEmbeddedSignupConfigured } from "@/lib/meta/embedded-signup-config";
 import { provisionWhatsAppFromEmbeddedSignup } from "@/lib/whatsapp/embedded-signup-provision";
+import { useTwilioWhatsAppProvisioning } from "@/lib/meta/embedded-signup-config";
 import {
-  isMetaDirectWhatsAppEnabled,
   provisionWhatsAppFromEmbeddedSignupMeta
 } from "@/lib/whatsapp/meta-provision";
 import { toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
@@ -60,13 +60,13 @@ export async function POST(req: NextRequest) {
       channelId: body.channel_id ?? null
     };
 
-    const result = isMetaDirectWhatsAppEnabled()
-      ? await provisionWhatsAppFromEmbeddedSignupMeta(db, {
+    const result = useTwilioWhatsAppProvisioning()
+      ? await provisionWhatsAppFromEmbeddedSignup(db, input)
+      : await provisionWhatsAppFromEmbeddedSignupMeta(db, {
           ...input,
           authCode: body.auth_code ?? null,
           displayPhoneNumber: body.display_phone_number ?? null
-        })
-      : await provisionWhatsAppFromEmbeddedSignup(db, input);
+        });
 
     const { data: channelRow } = await db
       .from("whatsapp_channels")

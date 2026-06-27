@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Script from "next/script";
-import { X, Loader2, MessageCircle, AlertCircle, Link2 } from "lucide-react";
+import { X, Loader2, MessageCircle, AlertCircle, Link2, ChevronRight } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { accentFocus, btnPrimary, btnGhost } from "@/lib/brand-ui";
 import type { MetaEmbeddedSignupPublicConfig } from "@/lib/meta/embedded-signup-config";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
+import type { TextAgentListItem } from "@/types/text-agent";
 
 interface WhatsAppEmbeddedSignupModalProps {
   open: boolean;
@@ -22,6 +23,8 @@ interface EmbeddedSignupSession {
   displayPhoneNumber?: string;
   event: string;
 }
+
+type WizardStep = "setup" | "connect";
 
 declare global {
   interface Window {
@@ -99,6 +102,10 @@ export function WhatsAppEmbeddedSignupModal({
   const [config, setConfig] = useState<MetaEmbeddedSignupPublicConfig | null>(null);
   const [sdkReady, setSdkReady] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<WizardStep>("setup");
+  const [agents, setAgents] = useState<TextAgentListItem[]>([]);
+  const [friendlyName, setFriendlyName] = useState("");
+  const [textAgentId, setTextAgentId] = useState("");
   const [fallbackPhoneE164, setFallbackPhoneE164] = useState("");
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
@@ -107,41 +114,55 @@ export function WhatsAppEmbeddedSignupModal({
   const authCodeRef = useRef<string | null>(null);
   const finalizeStartedRef = useRef(false);
   const fallbackPhoneRef = useRef("");
+  const setupRef = useRef({ friendlyName: "", textAgentId: "" });
 
   useEffect(() => {
     fallbackPhoneRef.current = fallbackPhoneE164;
   }, [fallbackPhoneE164]);
 
   useEffect(() => {
+    setupRef.current = { friendlyName, textAgentId };
+  }, [friendlyName, textAgentId]);
+
+  useEffect(() => {
     if (!open) return;
     setError("");
     setStatus("");
+    setStep(reconnectChannel ? "connect" : "setup");
+    setFriendlyName(reconnectChannel?.friendly_name ?? "");
+    setTextAgentId("");
     setFallbackPhoneE164(reconnectChannel?.e164 ?? "");
     setPendingSession(null);
     pendingSessionRef.current = null;
     authCodeRef.current = null;
     finalizeStartedRef.current = false;
 
-    fetch("/api/whatsapp/embedded-signup/config")
-      .then(res => res.json())
-      .then(data => setConfig(data))
-      .catch(() =>
-        setConfig({ enabled: false, provider: "twilio", appId: null, configId: null, solutionId: null })
-      );
-  }, [open]);
+    void Promise.all([
+      fetch("/api/whatsapp/embedded-signup/config").then(res => res.json()),
+      getAuthHeaders()
+        .then(headers => fetch("/api/text/agents", { headers }))
+        .then(res => res.json())
+        .catch(() => ({ agents: [] }))
+    ]).then(([cfg, agentsData]) => {
+      setConfig(cfg);
+      setAgents(agentsData.agents ?? []);
+    }).catch(() =>
+      setConfig({ enabled: false, provider: "twilio", appId: null, configId: null, solutionId: null })
+    );
+  }, [open, reconnectChannel]);
 
   const completeSignup = useCallback(
     async (session: EmbeddedSignupSession, phoneE164?: string, authCode?: string) => {
       const code = authCode?.trim() || authCodeRef.current?.trim();
       if (!code) {
-        setError("No se recibió el código de autorización de Meta. Cierra el popup e inténtalo de nuevo.");
+        setError("No se completó la verificación. Cierra el popup e inténtalo de nuevo.");
         setStatus("");
         setLoading(false);
         return;
       }
 
       setLoading(true);
-      setStatus("Vinculando WhatsApp…");
+      setStatus("Configurando tu línea en Noova…");
       setError("");
 
       try {
@@ -155,20 +176,22 @@ export function WhatsAppEmbeddedSignupModal({
             display_phone_number: session.displayPhoneNumber,
             phone_e164: phoneE164?.trim() || reconnectChannel?.e164 || undefined,
             auth_code: code,
-            channel_id: reconnectChannel?.id
+            channel_id: reconnectChannel?.id,
+            friendly_name: setupRef.current.friendlyName.trim() || reconnectChannel?.friendly_name || undefined,
+            text_agent_id: setupRef.current.textAgentId || undefined,
           })
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Error al vincular WhatsApp");
+        if (!res.ok) throw new Error(data.error || "Error al conectar WhatsApp");
 
-        setStatus(
-          data.result?.channelStatus === "active"
-            ? "WhatsApp conectado correctamente"
-            : "Vinculación iniciada — el número puede tardar unos minutos en activarse"
-        );
+        if (data.result?.channelStatus === "active") {
+          setStatus("¡WhatsApp conectado! Ya puedes recibir mensajes en Noova.");
+        } else {
+          setStatus("Línea registrada — activando mensajería (puede tardar 1–2 minutos)…");
+        }
         onSuccess();
-        setTimeout(() => onClose(), 1200);
+        setTimeout(() => onClose(), 1400);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Error desconocido");
         setStatus("");
@@ -179,7 +202,7 @@ export function WhatsAppEmbeddedSignupModal({
         setPendingSession(null);
       }
     },
-    [onClose, onSuccess, reconnectChannel?.id]
+    [onClose, onSuccess, reconnectChannel?.e164, reconnectChannel?.friendly_name, reconnectChannel?.id]
   );
 
   const tryFinalizeSignup = useCallback(
@@ -192,7 +215,7 @@ export function WhatsAppEmbeddedSignupModal({
 
       if (needsManualPhone(session, Boolean(reconnectChannel?.e164)) && !phoneE164?.trim() && !fallbackPhoneRef.current.trim()) {
         setLoading(false);
-        setStatus("WABA vinculada — indica el número en formato +573001234567");
+        setStatus("Cuenta verificada — indica el número en formato +573001234567");
         return;
       }
 
@@ -212,21 +235,21 @@ export function WhatsAppEmbeddedSignupModal({
       if (session.event === "CANCEL") {
         setLoading(false);
         setStatus("");
-        setError("Registro cancelado en Meta");
+        setError("Conexión cancelada");
         return;
       }
 
       if (session.event === "ERROR") {
         setLoading(false);
         setStatus("");
-        setError("Error durante el registro en Meta");
+        setError("No se pudo completar la verificación de WhatsApp");
         return;
       }
 
       if (session.event === "FINISH" || session.event === "FINISH_ONLY_WABA" || session.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING" || session.event === "FINISH_OBO_MIGRATION" || session.event === "FINISH_GRANT_ONLY_API_ACCESS") {
         pendingSessionRef.current = session;
         setPendingSession(session);
-        setStatus(authCodeRef.current ? "Vinculando WhatsApp…" : "Cuenta vinculada en Meta — confirmando…");
+        setStatus(authCodeRef.current ? "Configurando tu línea en Noova…" : "Cuenta verificada — finalizando…");
         tryFinalizeSignup();
       }
     };
@@ -254,20 +277,20 @@ export function WhatsAppEmbeddedSignupModal({
 
   const launchEmbeddedSignup = () => {
     if (!config?.appId || !config.configId) {
-      setError("Vinculación automática no configurada — contacta a soporte");
+      setError("Conexión automática no disponible — contacta a soporte Noova");
       return;
     }
     if (config.provider === "twilio" && !config.solutionId) {
-      setError("Falta TWILIO_WHATSAPP_SOLUTION_ID — esperando respuesta de Twilio");
+      setError("WhatsApp aún no está habilitado en esta instancia — contacta a soporte");
       return;
     }
     if (!window.FB || !sdkReady) {
-      setError("Cargando SDK de Meta… inténtalo de nuevo en unos segundos");
+      setError("Preparando verificación… inténtalo de nuevo en unos segundos");
       return;
     }
 
     setError("");
-    setStatus("Abriendo registro de Meta…");
+    setStatus("Abriendo verificación de WhatsApp Business…");
     setLoading(true);
     setPendingSession(null);
     pendingSessionRef.current = null;
@@ -279,7 +302,7 @@ export function WhatsAppEmbeddedSignupModal({
         const code = response.authResponse?.code?.trim();
         if (code) {
           authCodeRef.current = code;
-          setStatus(pendingSessionRef.current ? "Vinculando WhatsApp…" : "Código recibido — esperando datos de la cuenta…");
+          setStatus(pendingSessionRef.current ? "Configurando tu línea en Noova…" : "Verificación recibida — conectando…");
           tryFinalizeSignup();
           return;
         }
@@ -287,7 +310,7 @@ export function WhatsAppEmbeddedSignupModal({
         if (pendingSessionRef.current) {
           setLoading(false);
           setError(
-            "Meta vinculó la cuenta pero no devolvió el código OAuth. Cierra sesión de Facebook en el navegador e inténtalo de nuevo."
+            "La cuenta se verificó pero faltó confirmar permisos. Cierra sesión de Facebook en el navegador e inténtalo de nuevo."
           );
           setStatus("");
           return;
@@ -296,7 +319,7 @@ export function WhatsAppEmbeddedSignupModal({
         if (response.status === "not_authorized" || !response.authResponse) {
           setLoading(false);
           setStatus("");
-          setError("Registro cancelado en Meta");
+          setError("Conexión cancelada");
         }
       },
       {
@@ -354,18 +377,54 @@ export function WhatsAppEmbeddedSignupModal({
           </div>
 
           <div className="p-6 space-y-4">
-            {!showFallbackPhone && (
+            {!reconnectChannel && step === "setup" && !showFallbackPhone && (
+              <>
+                <p className="text-sm text-gray-400">
+                  Configura tu línea en Noova. La mensajería se activa automáticamente — no necesitas pagar nada aparte en Meta.
+                </p>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                    Nombre de la línea
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej: Ventas, Soporte…"
+                    value={friendlyName}
+                    onChange={e => setFriendlyName(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-lg bg-white/[.04] border border-white/[.08] text-white text-sm ${accentFocus}`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                    Agente de texto (opcional)
+                  </label>
+                  <select
+                    value={textAgentId}
+                    onChange={e => setTextAgentId(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-lg bg-white/[.04] border border-white/[.08] text-white text-sm ${accentFocus}`}
+                  >
+                    <option value="">Asignar después</option>
+                    {agents.map(a => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {(step === "connect" || reconnectChannel) && !showFallbackPhone && (
               <p className="text-sm text-gray-400">
                 {reconnectChannel ? (
                   <>
-                    Vas a reconectar{" "}
+                    Reconecta{" "}
                     <span className="font-mono text-gray-200">{reconnectChannel.e164}</span>
                     {reconnectChannel.friendly_name ? ` (${reconnectChannel.friendly_name})` : ""}.
-                    Se conservan el agente y el nombre de la línea.
                   </>
                 ) : (
                   <>
-                    Vincula tu cuenta de WhatsApp Business: portfolio, cuenta y número en un solo flujo.
+                    Verifica tu cuenta de WhatsApp Business. Solo confirma portfolio, cuenta y número — Noova configura el resto.
                   </>
                 )}
               </p>
@@ -398,7 +457,7 @@ export function WhatsAppEmbeddedSignupModal({
                   className={`w-full px-3 py-2 rounded-lg bg-white/[.04] border border-white/[.08] text-white text-sm font-mono ${accentFocus}`}
                 />
                 <p className="text-xs text-gray-500 mt-1.5">
-                  Meta vinculó la cuenta pero no envió el número. Indícalo aquí para completar.
+                  Indica el número que acabas de verificar para completar la conexión.
                 </p>
               </div>
             )}
@@ -414,8 +473,17 @@ export function WhatsAppEmbeddedSignupModal({
                   {loading ? (
                     <><Loader2 className="w-4 h-4 animate-spin" /> Completando…</>
                   ) : (
-                    "Completar vinculación"
+                    "Completar conexión"
                   )}
+                </button>
+              ) : step === "setup" && !reconnectChannel ? (
+                <button
+                  type="button"
+                  disabled={!friendlyName.trim()}
+                  onClick={() => setStep("connect")}
+                  className={`${btnPrimary} w-full justify-center py-2.5 disabled:opacity-50`}
+                >
+                  Continuar <ChevronRight className="w-4 h-4" />
                 </button>
               ) : (
                 <button
@@ -427,8 +495,18 @@ export function WhatsAppEmbeddedSignupModal({
                   {loading ? (
                     <><Loader2 className="w-4 h-4 animate-spin" /> Conectando…</>
                   ) : (
-                    <><MessageCircle className="w-4 h-4" /> {reconnectChannel ? "Reconectar" : "Continuar"}</>
+                    <><MessageCircle className="w-4 h-4" /> {reconnectChannel ? "Reconectar" : "Verificar WhatsApp Business"}</>
                   )}
+                </button>
+              )}
+
+              {step === "connect" && !reconnectChannel && !showFallbackPhone && (
+                <button
+                  type="button"
+                  onClick={() => setStep("setup")}
+                  className={`${btnGhost} w-full justify-center py-2 text-sm`}
+                >
+                  Volver
                 </button>
               )}
 
@@ -439,7 +517,7 @@ export function WhatsAppEmbeddedSignupModal({
 
             {!config?.enabled && (
               <p className="text-xs text-amber-400/90 text-center">
-                Vinculación automática pendiente de configuración en el servidor.
+                Conexión automática pendiente de configuración en el servidor.
               </p>
             )}
           </div>

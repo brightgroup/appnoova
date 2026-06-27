@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MessageCircle, Plus, Clock, FileText, Link2, MoreVertical, Trash2, Unplug } from "lucide-react";
+import { MessageCircle, Plus, FileText, Link2, MoreVertical, Trash2, Unplug } from "lucide-react";
 import {
   btnGhost,
   btnPrimary,
@@ -193,7 +193,7 @@ export default function WhatsAppListPage() {
   return (
     <ChannelListPage
       title="WhatsApp"
-      description="Líneas WhatsApp Business conectadas. Asigne un agente de texto a cada línea."
+      description="Conecta tu WhatsApp Business en minutos. Noova configura mensajería, inbox e IA automáticamente."
       loading={loading}
       search={search}
       onSearchChange={setSearch}
@@ -205,14 +205,15 @@ export default function WhatsAppListPage() {
           <Link href="/dashboard/canales/whatsapp/plantillas" className={btnGhost}>
             <FileText className="w-4 h-4" /> Plantillas
           </Link>
-          {embeddedSignupEnabled && (
+          {embeddedSignupEnabled ? (
             <button onClick={() => openConnect()} className={`${btnPrimary} py-2`}>
               <Link2 className="w-4 h-4" /> Conectar WhatsApp
             </button>
+          ) : (
+            <button onClick={() => setModalOpen(true)} className={`${btnPrimary} py-2`}>
+              <Plus className="w-4 h-4" /> Solicitar línea
+            </button>
           )}
-          <button onClick={() => setModalOpen(true)} className={embeddedSignupEnabled ? btnGhost : `${btnPrimary} py-2`}>
-            <Plus className="w-4 h-4" /> Solicitar línea
-          </button>
         </div>
       }
       footer={
@@ -283,22 +284,24 @@ export default function WhatsAppListPage() {
             {search
               ? "No hay resultados"
               : embeddedSignupEnabled
-                ? "Conecta tu WhatsApp Business con Meta en unos minutos o solicita activación asistida."
-                : "Aún no hay líneas de WhatsApp conectadas. Solicite activación y nuestro equipo registrará su número."}
+                ? "Conecta tu número de WhatsApp Business en unos minutos. Todo queda listo dentro de Noova."
+                : "Solicita activación y nuestro equipo conectará tu línea."}
           </p>
           {!search && embeddedSignupEnabled && (
-            <button
-              onClick={() => openConnect()}
-              className={`${btnPrimary} py-2 mt-3`}
-            >
-              <Link2 className="w-4 h-4" /> Conectar WhatsApp
-            </button>
-          )}
-          {!search && !embeddedSignupEnabled && (
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[.04] border border-white/[.08] text-xs text-gray-500">
-              <Clock className="w-3.5 h-3.5" />
-              Activación asistida por Noova
-            </div>
+            <>
+              <button
+                onClick={() => openConnect()}
+                className={`${btnPrimary} py-2 mt-3`}
+              >
+                <Link2 className="w-4 h-4" /> Conectar WhatsApp
+              </button>
+              <p className="text-xs text-gray-600 mt-4">
+                ¿Necesitas ayuda manual?{" "}
+                <button type="button" onClick={() => setModalOpen(true)} className="text-[#a5a5ff] hover:underline">
+                  Solicitar activación asistida
+                </button>
+              </p>
+            </>
           )}
         </div>
       ) : (

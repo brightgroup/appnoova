@@ -11,7 +11,13 @@ export interface MetaEmbeddedSignupPublicConfig {
 }
 
 export function getWhatsAppOnboardingProvider(): WhatsAppOnboardingProvider {
-  return process.env.WHATSAPP_DEFAULT_PROVIDER?.trim().toLowerCase() === "meta" ? "meta" : "twilio";
+  const raw = process.env.WHATSAPP_DEFAULT_PROVIDER?.trim().toLowerCase();
+  return raw === "meta" ? "meta" : "twilio";
+}
+
+/** Embedded Signup siempre provisiona vía Twilio salvo override explícito meta. */
+export function useTwilioWhatsAppProvisioning(): boolean {
+  return getWhatsAppOnboardingProvider() !== "meta";
 }
 
 export function getMetaEmbeddedSignupPublicConfig(): MetaEmbeddedSignupPublicConfig {

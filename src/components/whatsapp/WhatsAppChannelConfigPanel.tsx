@@ -63,6 +63,33 @@ export function WhatsAppChannelConfigPanel({ channelId }: { channelId: string })
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    if (!channel || channel.status !== "pending") return;
+    let cancelled = false;
+
+    const sync = async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/whatsapp/channels/${channelId}/sync`, {
+          method: "POST",
+          headers,
+        });
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (data.channel) setChannel(data.channel);
+      } catch {
+        /* ignore polling errors */
+      }
+    };
+
+    void sync();
+    const timer = window.setInterval(() => void sync(), 8000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [channel?.status, channelId]);
+
   const handleSave = async () => {
     if (!channel) return;
     setSaving(true);
@@ -176,6 +203,12 @@ export function WhatsAppChannelConfigPanel({ channelId }: { channelId: string })
             <p className="text-sm font-medium text-gray-200 mt-0.5">{whatsAppChannelStatusLabel(channel)}</p>
           </div>
         </div>
+        {channel.status === "pending" && (
+          <div className="mt-4 pt-4 border-t border-white/[.08] flex items-center gap-2 text-xs text-amber-200/90">
+            <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+            Activando mensajería… Noova configura tu línea automáticamente (1–2 min).
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border border-white/[.10] bg-white/[.02] p-5 space-y-4">
