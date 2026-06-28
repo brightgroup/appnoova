@@ -33,6 +33,7 @@ import {
   recordUsageSafe,
   resolveOrgIdForUser
 } from "@/lib/billing/meter";
+import { resolveTextAgentForChannel } from "@/lib/text-agent-resolve";
 import type { TwilioWhatsAppMediaItem } from "@/lib/whatsapp/twilio-media";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import { WHATSAPP_CONVERSATION_CHANNEL, toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
@@ -175,19 +176,10 @@ export async function processTwilioWhatsAppInbound(
   const userMediaLabel = inboundContent.mediaLabel;
   const orgId = await resolveChannelOrgId(db, channel);
 
-  let agentQuery = db
-    .from("text_agents")
-    .select("*")
-    .eq("id", channel.text_agent_id);
-  if (orgId) {
-    agentQuery = agentQuery.eq("organization_id", orgId);
-  } else {
-    agentQuery = agentQuery.eq("user_id", channel.user_id);
-  }
-  const { data: agent, error: agentErr } = await agentQuery.maybeSingle();
+  const { agent, error: agentErr } = await resolveTextAgentForChannel(db, channel);
 
   if (agentErr || !agent) {
-    return { ok: false, error: "Agente de texto no encontrado" };
+    return { ok: false, error: agentErr ?? "Agente de texto no encontrado" };
   }
 
   const model = String(agent.llm_model || "gemini-2.5-flash");
