@@ -279,7 +279,12 @@ async def run_bot(
 async def bot(runner_args: RunnerArguments):
     """Punto de entrada compatible con pipecat.runner.run."""
     _, call_data = await parse_telephony_websocket(runner_args.websocket)
-    call_control_id = call_data["call_control_id"]
+    # Pipecat ≥ 1.3.x mapea el call_control_id de Telnyx a la clave "call_id"
+    # (formato v3:... — es el mismo ID que usa Telnyx Call Control API)
+    call_control_id = call_data.get("call_id") or call_data.get("call_control_id") or ""
+    if not call_control_id:
+        logger.error("No se encontró call_control_id en call_data", keys=list(call_data.keys()))
+        return
 
     logger.info(
         "Llamada Telnyx",
