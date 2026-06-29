@@ -135,26 +135,28 @@ async function probePipecatWebSocket(): Promise<{
 
     ws.on("open", () => {
       opened = true;
+      // Enviar ambos mensajes sin delay — igual que haría Telnyx en producción.
+      // El delay de 150ms anterior causaba cierres falsos (cierre llegaba antes del "start").
       ws.send(JSON.stringify({ event: "connected", protocol: "Call Control", version: "1.0.0" }));
-      setTimeout(() => {
-        ws.send(JSON.stringify({
-          event: "start",
-          sequence_number: "1",
-          start: {
-            call_control_id: "__diag_probe__",
-            stream_id: "__probe_stream__",
-            account_sid: "test",
-            call_sid: "test",
-            media_format: { encoding: "audio/x-mulaw", sample_rate: 8000, channels: 1 },
-          },
-        }));
-      }, 150);
+      ws.send(JSON.stringify({
+        event: "start",
+        sequence_number: "1",
+        start: {
+          call_control_id: "__diag_probe__",
+          stream_id: "__probe_stream__",
+          account_sid: "test",
+          call_sid: "test",
+          media_format: { encoding: "audio/x-mulaw", sample_rate: 8000, channels: 1 },
+        },
+      }));
     });
 
     ws.on("close", (code: number) => {
       const ms = Date.now() - start;
-      // > 600ms = el bot llegó a hacer la llamada HTTP a Noova (env vars OK)
-      resolve({ connected: opened, close_code: code, close_ms: ms, env_vars_likely_ok: ms > 600 });
+      // Lógica (sin delay en el envío de mensajes):
+      //   < 350ms: el bot crasheó antes de hacer el HTTP call → env vars faltantes
+      //   > 350ms: hizo el HTTP call a Noova (ida + vuelta ≈ 300ms mínimo) → env vars OK
+      resolve({ connected: opened, close_code: code, close_ms: ms, env_vars_likely_ok: ms > 350 });
     });
 
     ws.on("error", (e: Error) => {
@@ -238,8 +240,8 @@ export async function GET() {
       diagnosis: pipecatWs.connected === false
         ? "❌ No conecta — revisar que Pipecat esté corriendo y que PIPECAT_WS_URL sea correcto"
         : pipecatWs.env_vars_likely_ok === false
-          ? `❌ Bot se cayó en ${pipecatWs.close_ms}ms — NOOVA_APP_URL o PIPECAT_INTERNAL_SECRET no están configurados en el servicio Pipecat (Coolify)`
-          : `✅ Bot funcionando — cerró en ${pipecatWs.close_ms}ms (esperado: call_control_id de prueba no existe)`,
+          ? `❌ Bot se cayó en ${pipecatWs.close_ms}ms (< 350ms) — PIPECAT_INTERNAL_SECRET o NOOVA_APP_URL no están en el contenedor Pipecat. Verifica en Coolify → noova-pipecat-voice → Environment Variables y haz redeploy.`
+          : `✅ Bot funcionando — cerró en ${pipecatWs.close_ms}ms (esperado: call_control_id de prueba retorna 404)`,
     } : null,
     telnyx_configured: telnyx.configured,
     telnyx_has_connection: telnyx.has_connection,
