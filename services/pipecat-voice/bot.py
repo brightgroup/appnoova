@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from google.genai.types import ThinkingConfig
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
@@ -129,7 +130,13 @@ async def run_bot(
         context,
         realtime_service_mode=True,
         user_params=LLMUserAggregatorParams(
-            vad_analyzer=SileroVADAnalyzer(),
+            # min_silence_duration_ms: tiempo de silencio antes de cerrar el turno del usuario.
+            # Default Silero ~700ms → reducimos a 400ms para que "aló" dispare Gemini más rápido.
+            # min_speech_duration_ms: tiempo mínimo de voz para que cuente como turno (evita ruido).
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(
+                min_silence_duration_ms=400,
+                min_speech_duration_ms=100,
+            )),
         ),
     )
 
