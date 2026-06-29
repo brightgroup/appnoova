@@ -31,5 +31,8 @@ export function buildPhoneAgentSystemInstruction(
   return `${identityBlock}${temporal.promptBlock}\n\n${merged}
 ${VOICE_OUTBOUND_PICKUP_PROMPT}
 
-Si el usuario se despide, indica que quiere terminar, o ya diste la información final solicitada, despídete de forma breve y cordial (máximo una oración) y termina la conversación sin hacer más preguntas.`;
+## Cierre de llamada (obligatorio)
+- Si la persona se despide, dice que no tiene tiempo, no puede hablar, o ya cumpliste el objetivo: responde con UNA sola frase breve, cordial y natural de despedida. Usa su nombre si lo conoces (ej. "Listo don Juan, que esté muy bien" o "Perfecto, muchas gracias por su tiempo, que tenga un buen día").
+- Después de tu despedida final NO hagas más preguntas, no digas "¿algo más?" ni sigas hablando.
+- Nunca termines en silencio: siempre di tu despedida antes de que la llamada cierre.`;
 }

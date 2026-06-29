@@ -36,14 +36,14 @@ from pipecat.transports.websocket.fastapi import (
 from pipecat.workers.runner import WorkerRunner
 
 from audio_recorder import pcm_to_wav_bytes
-from goodbye import is_goodbye_utterance
+from goodbye import is_agent_goodbye_utterance
 from noova_client import fetch_bridge_config, finalize_call, telnyx_hangup, update_phase
 
 load_dotenv(override=True)
 
 DEFAULT_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025"
-HANGUP_DELAY_AGENT_SEC = 2.2
-HANGUP_DELAY_USER_SEC = 2.8
+# Espera a que Gemini termine de hablar la despedida antes de colgar.
+HANGUP_DELAY_AGENT_SEC = 2.8
 
 # Alineado con buildVoiceOutboundRespondKickoffMessage (src/lib/voice-accent-profile.ts)
 # El agente habla PRIMERO al conectar (inference_on_context_initialization=True):
@@ -197,7 +197,7 @@ async def run_bot(
             audio_base64=audio_b64,
         )
 
-    async def schedule_hangup(role: str) -> None:
+    async def schedule_hangup() -> None:
         nonlocal hangup_scheduled, hangup_task
         if hangup_scheduled or finalized:
             return
@@ -205,21 +205,20 @@ async def run_bot(
             return
 
         hangup_scheduled = True
-        delay = HANGUP_DELAY_AGENT_SEC if role == "agent" else HANGUP_DELAY_USER_SEC
-        logger.info(f"Despedida detectada ({role}) — colgando en {delay}s")
+        logger.info(f"Despedida del agente detectada — colgando en {HANGUP_DELAY_AGENT_SEC}s")
 
         async def _hangup_after_delay() -> None:
-            await asyncio.sleep(delay)
+            await asyncio.sleep(HANGUP_DELAY_AGENT_SEC)
             await update_phase(call_control_id, "ended")
             await telnyx_hangup(call_control_id)
 
         hangup_task = asyncio.create_task(_hangup_after_delay())
 
-    def check_goodbye(role: str, text: str) -> None:
+    def check_agent_goodbye(text: str) -> None:
         if hangup_scheduled or finalized or len(transcript) < 2:
             return
-        if is_goodbye_utterance(text):
-            asyncio.create_task(schedule_hangup(role))
+        if is_agent_goodbye_utterance(text):
+            asyncio.create_task(schedule_hangup())
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
@@ -252,7 +251,6 @@ async def run_bot(
                 }
             )
             logger.info(f"user: {text}")
-            check_goodbye("user", text)
         else:
             logger.info(
                 "Turno de usuario detectado (sin texto aún)",
@@ -276,7 +274,7 @@ async def run_bot(
         )
         logger.info(f"agent: {message.content}")
         await update_phase(call_control_id, "speaking")
-        check_goodbye("agent", message.content)
+        check_agent_goodbye(message.content)
 
     runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
     await runner.add_workers(worker)
