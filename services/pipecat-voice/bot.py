@@ -45,13 +45,13 @@ DEFAULT_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025"
 HANGUP_DELAY_AGENT_SEC = 2.2
 HANGUP_DELAY_USER_SEC = 2.8
 
-# Alineado con buildVoiceOutboundKickoffMessage (src/lib/voice-accent-profile.ts)
-DEFAULT_SILENT_KICKOFF = (
-    "[Sistema — llamada conectada] La persona acaba de contestar el teléfono. "
-    "Permanece en SILENCIO absoluto (sin audio) hasta escuchar su saludo "
-    '("aló", "bueno", "dígame", "hola", "sí"). Cuando salude, responde con UNA sola '
-    "frase breve de presentación (tu nombre y la empresa) y sigue el guion. "
-    'No digas "Mi empresa". No des resumen de la empresa al abrir.'
+# Alineado con buildVoiceOutboundRespondKickoffMessage (src/lib/voice-accent-profile.ts)
+# El agente habla PRIMERO al conectar (inference_on_context_initialization=True):
+# elimina la latencia de esperar "aló" (~5-10s extra).
+DEFAULT_RESPOND_KICKOFF = (
+    "[Sistema — la persona ya contestó] Acabas de escuchar su saludo al descolgar. "
+    "Responde AHORA con UNA sola frase breve de presentación (tu nombre y la empresa) "
+    "y sigue el guion. No des resumen de la empresa al abrir."
 )
 
 
@@ -101,11 +101,11 @@ async def run_bot(
         voice=voice,
     )
 
-    # inference_on_context_initialization=False: conecta Gemini y siembra el kickoff
-    # sin generar audio hasta que el usuario hable (esperar el "aló").
+    # inference_on_context_initialization=True: Gemini genera el saludo inicial
+    # en cuanto la sesión arranca — el agente habla primero, igual que ElevenLabs.
     llm = GeminiLiveLLMService(
         api_key=_google_api_key(agent_config.get("google_api_key", "")),
-        inference_on_context_initialization=False,
+        inference_on_context_initialization=True,
         settings=GeminiLiveLLMService.Settings(
             model=model,
             voice=voice,
@@ -116,7 +116,7 @@ async def run_bot(
         ),
     )
 
-    kickoff = (agent_config.get("kickoff_message") or "").strip() or DEFAULT_SILENT_KICKOFF
+    kickoff = (agent_config.get("kickoff_message") or "").strip() or DEFAULT_RESPOND_KICKOFF
 
     context = LLMContext(
         [

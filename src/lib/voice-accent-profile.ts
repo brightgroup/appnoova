@@ -152,7 +152,10 @@ export function buildVoiceKickoffMessage(
   _purposeOrTemplateId?: string | null,
   companyName?: string | null
 ): string {
-  return buildVoiceOutboundKickoffMessage(companyName);
+  // Para llamadas vía Pipecat (teléfono real) el agente habla primero — igual que ElevenLabs.
+  // La persona YA contestó cuando Pipecat conecta, así que el agente debe saludar de inmediato
+  // en lugar de esperar a escuchar "aló" (eso suma 5-10s de latencia innecesaria).
+  return buildVoiceOutboundRespondKickoffMessage(companyName);
 }
 
 export function resolveVoicePurposeId(rawId?: string | null): string {
