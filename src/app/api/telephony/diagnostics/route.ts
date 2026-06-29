@@ -153,10 +153,12 @@ async function probePipecatWebSocket(): Promise<{
 
     ws.on("close", (code: number) => {
       const ms = Date.now() - start;
-      // Lógica (sin delay en el envío de mensajes):
-      //   < 350ms: el bot crasheó antes de hacer el HTTP call → env vars faltantes
-      //   > 350ms: hizo el HTTP call a Noova (ida + vuelta ≈ 300ms mínimo) → env vars OK
-      resolve({ connected: opened, close_code: code, close_ms: ms, env_vars_likely_ok: ms > 350 });
+      // Lógica de timing (sin delay previo en envío de mensajes):
+      //   < 80ms:  crash antes del HTTP call → env vars faltantes (crash síncrono < 5ms + TLS ~30ms mismo servidor)
+      //   > 80ms:  hizo el HTTP call a Noova → env vars OK (TLS ~30ms + HTTP call ~100-200ms mismo servidor)
+      // Nota: en el mismo servidor la llamada HTTP tarda ~150ms (TLS + request/response),
+      //       NO 300ms como sería cross-internet.
+      resolve({ connected: opened, close_code: code, close_ms: ms, env_vars_likely_ok: ms > 80 });
     });
 
     ws.on("error", (e: Error) => {
@@ -240,8 +242,8 @@ export async function GET() {
       diagnosis: pipecatWs.connected === false
         ? "❌ No conecta — revisar que Pipecat esté corriendo y que PIPECAT_WS_URL sea correcto"
         : pipecatWs.env_vars_likely_ok === false
-          ? `❌ Bot se cayó en ${pipecatWs.close_ms}ms (< 350ms) — PIPECAT_INTERNAL_SECRET o NOOVA_APP_URL no están en el contenedor Pipecat. Verifica en Coolify → noova-pipecat-voice → Environment Variables y haz redeploy.`
-          : `✅ Bot funcionando — cerró en ${pipecatWs.close_ms}ms (esperado: call_control_id de prueba retorna 404)`,
+          ? `❌ Bot crasheó en ${pipecatWs.close_ms}ms sin llamar a Noova — PIPECAT_INTERNAL_SECRET o NOOVA_APP_URL no están en el contenedor. Coolify → noova-pipecat-voice → Environment Variables → Redeploy.`
+          : `✅ Bot OK — llamó a Noova (${pipecatWs.close_ms}ms). Para llamadas reales revisa logs de Pipecat en Coolify si el agente no habla.`,
     } : null,
     telnyx_configured: telnyx.configured,
     telnyx_has_connection: telnyx.has_connection,
