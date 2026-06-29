@@ -60,6 +60,9 @@ export async function POST(req: NextRequest) {
       channelId: body.channel_id ?? null
     };
 
+    // useTwilioWhatsAppProvisioning es una función de config, no un hook React —
+    // el nombre empieza con "use" por convención pero no usa estado ni efectos.
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const result = useTwilioWhatsAppProvisioning()
       ? await provisionWhatsAppFromEmbeddedSignup(db, input)
       : await provisionWhatsAppFromEmbeddedSignupMeta(db, {

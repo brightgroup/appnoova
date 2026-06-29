@@ -12,8 +12,7 @@ import {
 import { getPipecatInternalSecret } from "@/lib/telephony/pipecat-auth";
 import { telnyxConfigStatus } from "@/lib/telephony/telnyx-provider";
 import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const WS = require("ws") as typeof import("ws").WebSocket;
+import WS from "ws";
 
 async function probeGeminiLive(): Promise<{ ok: boolean; ms?: number; error?: string }> {
   const apiKey = getVoiceGoogleApiKey();
