@@ -1,10 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Mic, MicOff, PhoneOff, Loader2, Sparkles } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Loader2, RefreshCw, MessageSquare, Headphones } from "lucide-react";
 import { GoogleGenAI, type Session, type LiveServerMessage } from "@google/genai";
-import { getTemplateMeta } from "@/lib/voice-agent-templates";
-import { agentAvatarGradient, agentAvatarStyle } from "@/lib/voice-agent-display";
 import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
 import { buildGeminiLiveSessionConfig } from "@/lib/gemini-live-config";
 import { buildPhoneAgentSystemInstruction } from "@/lib/telephony/phone-agent-instruction";
@@ -12,8 +10,9 @@ import { buildVoiceKickoffMessage } from "@/lib/voice-accent-profile";
 import { parsePcmRate, pcmBase64ToFloat32, resampleTo16kPcm } from "@/lib/voice-session-audio";
 import { getAuthHeaders, getAuthToken } from "@/lib/voice-agents-api";
 import { encodeWav, mergePcmBuffers, downsamplePcm } from "@/lib/call-recording";
-import { blobToBase64, btnPrimary } from "@/lib/brand-ui";
+import { blobToBase64, btnGhost } from "@/lib/brand-ui";
 import { isGoodbyeUtterance } from "@/lib/voice-goodbye-detection";
+import { PremiumVoiceAvatar } from "@/components/voice/PremiumVoiceAvatar";
 import type { VoiceAgentFormData } from "@/types/voice-agent";
 
 type SessionState = "idle" | "connecting" | "listening" | "thinking" | "speaking" | "error";
@@ -49,10 +48,6 @@ export function VoiceSessionPanel({
   onCallSaved,
   onCallStatusChange
 }: VoiceSessionPanelProps) {
-  const meta = getTemplateMeta(sourceTemplate);
-  const accent = agentConfig.color || meta.color;
-  const avatarGradient = agentAvatarGradient(agentConfig.color || meta.color);
-  const avatarStyle = agentAvatarStyle(agentConfig.color || meta.color);
   const agentName = agentConfig.name?.trim() || "Agente";
   const agentInitial = agentName.charAt(0).toUpperCase() || "A";
 
@@ -514,72 +509,105 @@ export function VoiceSessionPanel({
 
   useEffect(() => () => cleanupResources(), [cleanupResources]);
 
+  const voiceSubtitle = `Voz ${agentConfig.voice_name || "Kore"} · Español`;
+
+  const avatarMode =
+    state === "speaking" ? "speaking" :
+    state === "listening" || state === "thinking" ? "listening" :
+    isConnecting ? "connecting" : "idle";
+
   const statusLabel =
-    state === "idle" ? "Lista para iniciar" :
+    state === "idle" ? "Lista para conversar" :
     state === "connecting" ? (statusHint || "Conectando...") :
-    state === "listening" ? "Escuchando" :
-    state === "thinking" ? "Procesando" :
-    state === "speaking" ? "Hablando" : "Error";
+    state === "listening" ? "En línea · Escuchando" :
+    state === "thinking" ? "En línea · Procesando" :
+    state === "speaking" ? "En línea · Hablando" :
+    state === "error" ? "Error de conexión" : "Desconectado";
+
+  const geminiLabel =
+    isActive ? "Gemini Live · Conectado" :
+    isConnecting ? "Gemini Live · Conectando" :
+    state === "error" ? "Gemini Live · Error" : "Gemini Live · Listo";
+
+  const statusDotClass =
+    isActive ? "bg-emerald-400 premium-voice-dot-live" :
+    isConnecting ? "bg-amber-400 animate-pulse" :
+    state === "error" ? "bg-red-400" : "bg-emerald-400/70";
 
   return (
     <div className="flex-1 flex min-h-0 p-4 gap-4 overflow-hidden">
-      <aside className="w-[300px] shrink-0 flex flex-col gap-3">
-        <div className="flex-1 rounded-2xl border border-white/[.10] bg-noova-surface p-5 flex flex-col min-h-[420px]">
-          <div className="flex flex-col items-center text-center pb-5 border-b border-white/[.06]">
-            <div className="relative mb-3">
-              {(state === "speaking" || state === "listening") && (
-                <div
-                  className="absolute -inset-2 rounded-full opacity-70 blur-xl animate-pulse"
-                  style={{ background: avatarGradient }}
-                />
-              )}
-              <div
-                className="relative w-[80px] h-[80px] rounded-full flex items-center justify-center border-2 border-white/35 ring-1 ring-white/15"
-                style={avatarStyle}
-              >
-                <span className="text-[32px] font-bold text-white leading-none select-none drop-shadow-sm">
-                  {agentInitial}
-                </span>
-              </div>
+      <aside className="w-[min(100%,320px)] shrink-0 flex flex-col">
+        <div className="flex-1 rounded-2xl border border-white/[.08] bg-[#0c0c10]/80 backdrop-blur-sm p-6 flex flex-col min-h-[440px]">
+          <div className="flex flex-col items-center text-center flex-1">
+            <PremiumVoiceAvatar
+              initial={agentInitial}
+              mode={avatarMode}
+            />
+
+            <h2 className="mt-5 text-xl font-bold text-white tracking-tight">{agentName}</h2>
+            <p className="mt-1 text-xs text-gray-500">{voiceSubtitle}</p>
+
+            <div className="mt-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#5b5bf6]/10 border border-[#5b5bf6]/25">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a5ff]">
+                Gemini Live
+              </span>
             </div>
-            <p className="text-sm font-semibold text-white tracking-tight">{agentName}</p>
-            <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[.04] border border-white/[.08]">
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                isActive ? "bg-[#5b5bf6] animate-pulse" :
-                isConnecting ? "bg-amber-400 animate-pulse" :
-                state === "error" ? "bg-red-400" : "bg-gray-500"
-              }`} />
+
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[.03] border border-white/[.08]">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${statusDotClass}`} />
               <span className="text-[11px] text-gray-400">{statusLabel}</span>
             </div>
-            {isActive && statusHint && (
-              <p className="text-[10px] text-gray-400 mt-2 max-w-[200px] leading-relaxed">{statusHint}</p>
+
+            {isActive && duration > 0 && (
+              <p className="text-2xl font-semibold text-white tabular-nums mt-4 tracking-tight">
+                {String(Math.floor(duration / 60)).padStart(2, "0")}:{String(duration % 60).padStart(2, "0")}
+              </p>
             )}
           </div>
 
-          <div className="pt-5 space-y-2.5 flex-1">
-            {!isActive && !isConnecting ? (
-              <button
-                onClick={startSession}
-                disabled={!ready}
-                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold ${btnPrimary} disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#5b5bf6]`}
-              >
-                <span className={`flex items-center justify-center w-8 h-8 rounded-full bg-white/20`}>
-                  <Mic className="w-4 h-4" />
-                </span>
-                Iniciar sesión
-              </button>
+          <div className="mt-auto pt-6 space-y-2.5">
+            {state === "idle" || state === "error" ? (
+              <>
+                <button
+                  onClick={startSession}
+                  disabled={!ready}
+                  className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#5b5bf6] to-[#7c6cf6] hover:from-[#6b6bf7] hover:to-[#8b7cf7] shadow-[0_8px_32px_rgba(91,91,246,0.35)] transition-all disabled:opacity-45 disabled:shadow-none"
+                >
+                  {state === "error" ? (
+                    <><RefreshCw className="w-4 h-4" /> Reintentar</>
+                  ) : (
+                    <><Mic className="w-4 h-4" /> Iniciar conversación</>
+                  )}
+                </button>
+                {state === "idle" && (
+                  <p className="text-[11px] text-gray-600 text-center leading-relaxed px-1">
+                    Permite el micrófono cuando el navegador lo solicite.
+                  </p>
+                )}
+                {state === "error" && (
+                  <button
+                    onClick={() => { setError(""); setState("idle"); }}
+                    className={`w-full ${btnGhost} text-xs`}
+                  >
+                    Cerrar
+                  </button>
+                )}
+              </>
             ) : isConnecting ? (
-              <button disabled className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold text-gray-400 border border-white/[.08] bg-white/[.03] cursor-not-allowed">
-                <Loader2 className="w-4 h-4 animate-spin" /> Conectando...
+              <button
+                disabled
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm text-gray-400 border border-white/[.08] bg-white/[.02] cursor-not-allowed"
+              >
+                <Loader2 className="w-4 h-4 animate-spin" /> {statusHint || "Conectando..."}
               </button>
             ) : (
               <>
                 <button
                   onClick={() => setMuted(m => !m)}
-                  className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all border ${
+                  className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
                     muted
                       ? "bg-red-500/[.08] border-red-500/25 text-red-400"
-                      : "bg-white/[.03] border-white/[.08] text-gray-300 hover:text-white hover:bg-white/[.06]"
+                      : "bg-white/[.03] border-white/[.08] text-gray-300 hover:bg-white/[.05]"
                   }`}
                 >
                   {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -587,76 +615,72 @@ export function VoiceSessionPanel({
                 </button>
                 <button
                   onClick={() => stopSession(true)}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-red-500/[.08] border border-red-500/25 text-red-400 hover:bg-red-500/15 transition-all"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-red-500/[.08] border border-red-500/25 text-red-400 hover:bg-red-500/[.12] transition-colors"
                 >
-                  <PhoneOff className="w-4 h-4" /> Terminar sesión
+                  <PhoneOff className="w-4 h-4" /> Terminar conversación
                 </button>
               </>
             )}
           </div>
 
           {error && (
-            <div className="mt-3 p-3 rounded-xl bg-red-500/[.06] border border-red-500/20 text-[11px] text-red-400 leading-relaxed">
+            <div className="mt-4 p-3 rounded-xl bg-red-500/[.06] border border-red-500/20 text-[11px] text-red-400 leading-relaxed">
               {error}
             </div>
           )}
-        </div>
 
-        <div className="rounded-xl border border-white/[.10] bg-noova-surface px-4 py-3">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Motor de voz</p>
-          <p className="text-[11px] text-gray-300 font-mono truncate" title={agentConfig.model || DEFAULT_LIVE_MODEL}>
-            {agentConfig.model || DEFAULT_LIVE_MODEL}
-          </p>
-          <p className="text-[10px] text-gray-400 mt-1.5">Voz {agentConfig.voice_name} · Español</p>
+          {statusHint && isActive && (
+            <p className="mt-3 text-[10px] text-gray-500 leading-relaxed text-center">{statusHint}</p>
+          )}
         </div>
       </aside>
 
-      <section className="flex-1 min-w-0 flex flex-col rounded-2xl border border-white/[.10] bg-noova-surface overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-white/[.06] flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-[#5b5bf6]/80" />
-            <span className="text-xs font-semibold text-gray-300 tracking-wide">Transcripción en vivo</span>
+      <section className="flex-1 min-w-0 flex flex-col rounded-2xl border border-white/[.08] bg-[#0c0c10]/80 backdrop-blur-sm overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-white/[.06] flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <MessageSquare className="w-4 h-4 text-[#a5a5ff] shrink-0" />
+            <span className="text-sm font-medium text-gray-200">Transcripción en vivo</span>
           </div>
-          {transcript.length > 0 && (
-            <span className="text-[10px] text-gray-400 tabular-nums">{transcript.length} mensajes</span>
-          )}
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[.03] border border-white/[.08] shrink-0">
+            <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-400 premium-voice-dot-live" : isConnecting ? "bg-amber-400 animate-pulse" : "bg-gray-600"}`} />
+            <span className="text-[10px] text-gray-500">{geminiLabel}</span>
+          </div>
         </div>
 
-        <div
-          ref={transcriptRef}
-          className="flex-1 overflow-y-auto p-5 space-y-3 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(91,91,246,.06),transparent)] min-h-[360px]"
-        >
+        <div ref={transcriptRef} className="flex-1 overflow-y-auto p-5 space-y-3 min-h-[320px]">
           {transcript.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full min-h-[280px] text-center px-6">
-              <div className="w-14 h-14 rounded-2xl border border-white/[.08] bg-white/[.02] flex items-center justify-center mb-4">
-                <div className="flex gap-1 items-end h-5">
-                  {[0, 1, 2, 3, 4].map(i => (
-                    <div
-                      key={i}
-                      className={`w-1 rounded-full bg-gradient-to-t ${accent} opacity-40`}
-                      style={{ height: `${10 + (i % 3) * 6}px` }}
-                    />
-                  ))}
-                </div>
+            <div className="flex flex-col items-center justify-center h-full text-center px-8 py-10">
+              <div className="flex items-end justify-center gap-1 h-12 mb-6">
+                {[0, 1, 2, 3, 4, 5, 6].map(i => (
+                  <span
+                    key={i}
+                    className="w-1 rounded-full bg-gradient-to-t from-[#5b5bf6] to-[#a5a5ff] premium-voice-wave-bar"
+                    style={{
+                      height: `${14 + (i % 3) * 10}px`,
+                      animationDelay: `${i * 0.12}s`,
+                    }}
+                  />
+                ))}
               </div>
-              <p className="text-sm text-gray-300 font-medium">Sin conversación aún</p>
-              <p className="text-xs text-gray-400 mt-1.5 max-w-xs leading-relaxed">
+              <p className="text-base font-semibold text-white">La conversación aparecerá aquí</p>
+              <p className="text-sm text-gray-500 mt-2 max-w-sm leading-relaxed">
                 {isActive
                   ? `${agentName} saludará primero. Luego habla con naturalidad.`
-                  : "Inicia la sesión para probar tu agente con la configuración actual."}
+                  : `Pulsa «Iniciar conversación» y habla con ${agentName}. Verás la transcripción en tiempo real.`}
               </p>
             </div>
           ) : (
             transcript.map((line, i) => (
-              <div key={i} className={`flex ${line.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div
+                key={i}
+                className={`flex ${line.role === "user" ? "justify-end" : "justify-start"} animate-fade-in`}
+              >
                 <div className={`max-w-[82%] px-4 py-3 rounded-2xl text-[13px] leading-relaxed ${
                   line.role === "user"
-                    ? "bg-[#5b5bf6]/15 border border-[#5b5bf6]/20 text-gray-100 rounded-br-md"
-                    : "bg-white/[.03] border border-white/[.07] text-gray-200 rounded-bl-md"
+                    ? "bg-[#5b5bf6]/15 border border-[#5b5bf6]/25 text-gray-100"
+                    : "bg-white/[.04] border border-white/[.08] text-gray-200"
                 }`}>
-                  <p className={`text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${
-                    line.role === "user" ? "text-[#5b5bf6]/90" : "text-gray-500"
-                  }`}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 text-gray-500">
                     {line.role === "user" ? "Tú" : agentName}
                   </p>
                   {line.text}
@@ -666,8 +690,8 @@ export function VoiceSessionPanel({
           )}
 
           {state === "thinking" && (
-            <div className="flex justify-start">
-              <div className="px-4 py-3 rounded-2xl rounded-bl-md bg-white/[.03] border border-white/[.07]">
+            <div className="flex justify-start animate-fade-in">
+              <div className="px-4 py-3 rounded-2xl bg-white/[.04] border border-white/[.08]">
                 <div className="flex gap-1 items-center h-4">
                   {[0, 150, 300].map(delay => (
                     <div
@@ -680,6 +704,13 @@ export function VoiceSessionPanel({
               </div>
             </div>
           )}
+        </div>
+
+        <div className="px-5 py-3 border-t border-white/[.06] flex items-center gap-2 shrink-0 bg-white/[.01]">
+          <Headphones className="w-3.5 h-3.5 text-gray-600 shrink-0" />
+          <p className="text-[11px] text-gray-600 leading-relaxed">
+            Conexión directa con Gemini Live. Usa audífonos para mejor calidad de audio.
+          </p>
         </div>
       </section>
     </div>
