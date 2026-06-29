@@ -28,7 +28,7 @@ async def fetch_bridge_config(call_control_id: str) -> dict[str, Any]:
         )
         res.raise_for_status()
         data = res.json()
-        return {
+        config = {
             "call_control_id": data.get("call_control_id", call_control_id),
             "call_record_id": data.get("call_record_id", ""),
             "agent_name": data.get("agent_name", "Agente"),
@@ -38,6 +38,11 @@ async def fetch_bridge_config(call_control_id: str) -> dict[str, Any]:
             "system_instruction": data.get("system_instruction") or "",
             "kickoff_message": data.get("kickoff_message") or "",
         }
+        # La app Noova propaga su GOOGLE_API_KEY para que Pipecat no necesite una propia.
+        google_api_key = (data.get("google_api_key") or "").strip()
+        if google_api_key:
+            config["google_api_key"] = google_api_key
+        return config
 
 
 async def update_phase(call_control_id: str, phase: str) -> None:

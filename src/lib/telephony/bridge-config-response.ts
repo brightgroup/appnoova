@@ -6,6 +6,7 @@ import { getPhoneTestCallSession } from "@/lib/telephony/test-call-session";
 import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
 import { geminiLiveTemperature } from "@/lib/gemini-live-config";
 import { geminiTemperature } from "@/lib/voice-agent-audio";
+import { getVoiceGoogleApiKey } from "@/lib/google-ai";
 
 export interface BridgeConfigResponse {
   call_control_id: string;
@@ -16,6 +17,8 @@ export interface BridgeConfigResponse {
   temperature: number;
   system_instruction: string;
   kickoff_message: string;
+  /** Propagada al servicio Pipecat para que no necesite GOOGLE_API_KEY propio. */
+  google_api_key?: string;
 }
 
 /** Config del agente para Pipecat (memoria primero, BD como respaldo). */
@@ -39,6 +42,7 @@ export async function getBridgeConfigForPipecat(
         fromMemory.companyName
       ),
       kickoff_message: buildVoiceKickoffMessage(fromMemory.config.source_template, fromMemory.companyName),
+      google_api_key: getVoiceGoogleApiKey() || undefined,
     };
   }
 
@@ -65,5 +69,6 @@ export async function getBridgeConfigForPipecat(
       agent.companyName
     ),
     kickoff_message: buildVoiceKickoffMessage(agent.config.source_template, agent.companyName),
+    google_api_key: getVoiceGoogleApiKey() || undefined,
   };
 }

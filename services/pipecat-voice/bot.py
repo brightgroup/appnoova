@@ -54,15 +54,19 @@ DEFAULT_SILENT_KICKOFF = (
 )
 
 
-def _google_api_key() -> str:
+def _google_api_key(config_key: str = "") -> str:
+    """Resuelve la API key de Google: config del bridge → env del servicio."""
     key = (
-        os.getenv("GOOGLE_API_KEY")
-        or os.getenv("GOOGLE_AI_KEY")
-        or os.getenv("NEXT_PUBLIC_GOOGLE_AI_KEY")
-        or ""
-    ).strip()
+        config_key.strip()
+        or os.getenv("GOOGLE_API_KEY", "").strip()
+        or os.getenv("GOOGLE_AI_KEY", "").strip()
+        or os.getenv("NEXT_PUBLIC_GOOGLE_AI_KEY", "").strip()
+    )
     if not key:
-        raise RuntimeError("Falta GOOGLE_API_KEY / GOOGLE_AI_KEY en el servicio Pipecat")
+        raise RuntimeError(
+            "Falta GOOGLE_API_KEY: configúrala en el servicio Pipecat (Coolify → Variables) "
+            "o asegúrate de que NEXT_PUBLIC_GOOGLE_AI_KEY esté en la app Noova."
+        )
     return key
 
 
@@ -99,7 +103,7 @@ async def run_bot(
     # inference_on_context_initialization=False: conecta Gemini y siembra el kickoff
     # sin generar audio hasta que el usuario hable (esperar el "aló").
     llm = GeminiLiveLLMService(
-        api_key=_google_api_key(),
+        api_key=_google_api_key(agent_config.get("google_api_key", "")),
         inference_on_context_initialization=False,
         settings=GeminiLiveLLMService.Settings(
             model=model,

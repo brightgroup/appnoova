@@ -114,26 +114,20 @@ export async function telnyxHangup(callControlId: string): Promise<void> {
 export async function telnyxStartMediaStream(callControlId: string, streamUrl: string): Promise<void> {
   const pipecat = telephonyBridgeMode() === "pipecat";
 
-  // Pipecat TelnyxFrameSerializer solo soporta PCMU/PCMA (8 kHz), no L16.
-  const json = pipecat
-    ? {
-        stream_url: streamUrl,
-        // Solo voz del usuario hacia Pipecat (evita eco del track outbound).
-        stream_track: "inbound_track",
-        stream_codec: "PCMU",
-        stream_bidirectional_mode: "rtp",
-        stream_bidirectional_codec: "PCMU",
-        // "opposite" no reproduce audio en el celular en llamadas salientes.
-        stream_bidirectional_target_legs: "both"
-      }
-    : {
-        stream_url: streamUrl,
-        stream_track: "both_tracks",
-        stream_codec: "PCMU",
-        stream_bidirectional_mode: "rtp",
-        stream_bidirectional_codec: "PCMU",
-        stream_bidirectional_target_legs: "both"
-      };
+  // Ambos modos (Pipecat y DIY) usan inbound_track para que Telnyx solo envíe la voz
+  // del usuario al bridge. El audio del agente vuelve por el canal bidireccional del WS.
+  // Con both_tracks, Telnyx también mandaría el echo del outbound, duplicando tráfico
+  // y potencialmente confundiendo el VAD de Gemini con la voz del propio agente.
+  void pipecat;
+  const json = {
+    stream_url: streamUrl,
+    stream_track: "inbound_track",
+    stream_codec: "PCMU",
+    stream_bidirectional_mode: "rtp",
+    stream_bidirectional_codec: "PCMU",
+    // "opposite" no reproduce audio en el celular en llamadas salientes.
+    stream_bidirectional_target_legs: "both"
+  };
 
   await telnyxJson(`/calls/${callControlId}/actions/streaming_start`, {
     method: "POST",

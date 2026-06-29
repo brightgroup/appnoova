@@ -110,6 +110,13 @@ async function handleOutboundAnswered(
     return;
   }
 
+  // ElevenLabs usa SIP directo (no Pipecat ni DIY bridge). Saltar aquí evita
+  // que el webhook intente arrancar un segundo stream de audio para esas llamadas.
+  if (agent.config.voice_provider === "elevenlabs") {
+    console.info("[telnyx:voice] agente ElevenLabs — bridge omitido (voz via SIP)", { callId });
+    return;
+  }
+
   const pendingSession = {
     callControlId: callId,
     callRecordId: session.id,
