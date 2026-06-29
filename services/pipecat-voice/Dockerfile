@@ -20,5 +20,6 @@ RUN pip install --no-cache-dir \
     "google-genai>=1.0.0"
 
 EXPOSE 8765
+EXPOSE 8766
 
 CMD ["python", "bot.py", "--host", "0.0.0.0", "--port", "8765"]

@@ -324,7 +324,52 @@ async def bot(runner_args: RunnerArguments):
     )
 
 
+def _start_health_server() -> None:
+    """
+    Servidor HTTP mínimo en el mismo puerto 8765 + 1 = 8766 para health checks.
+    Reporta si las variables de entorno críticas están configuradas.
+    Corre en hilo daemon para no bloquear el proceso principal.
+    """
+    import json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class _Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path.startswith("/health"):
+                body = json.dumps({
+                    "status": "ok",
+                    "env_vars": {
+                        "NOOVA_APP_URL": bool(os.getenv("NOOVA_APP_URL")),
+                        "PIPECAT_INTERNAL_SECRET": bool(os.getenv("PIPECAT_INTERNAL_SECRET")),
+                        "GOOGLE_API_KEY": bool(os.getenv("GOOGLE_API_KEY")),
+                        "TELNYX_API_KEY": bool(os.getenv("TELNYX_API_KEY")),
+                    },
+                    "noova_app_url_value": (os.getenv("NOOVA_APP_URL") or "")[:50] or "(no configurado)",
+                }).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+        def log_message(self, fmt, *args):
+            pass  # silenciar logs HTTP de salud
+
+    health_port = int(os.getenv("HEALTH_PORT", "8766"))
+    try:
+        server = HTTPServer(("0.0.0.0", health_port), _Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        logger.info(f"Health server corriendo en :{health_port}/health")
+    except Exception as e:
+        logger.warning(f"No se pudo iniciar health server en :{health_port}: {e}")
+
+
 if __name__ == "__main__":
     from pipecat.runner.run import main
 
+    _start_health_server()
     main()
