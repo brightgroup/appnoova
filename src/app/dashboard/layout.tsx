@@ -14,6 +14,7 @@ import { CANALES_NAV } from "@/lib/canales-nav";
 import { AGENTES_VOZ_NAV } from "@/lib/agentes-voz-nav";
 import { AGENTES_TEXTO_NAV } from "@/lib/agentes-texto-nav";
 import { CRM_NAV } from "@/lib/crm-nav";
+import { CAMPAIGNS_NAV } from "@/lib/campaigns-nav";
 import { DesktopOnlyGate } from "@/components/layout/DesktopOnlyGate";
 import type { LucideIcon } from "lucide-react";
 
@@ -303,21 +304,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* Campañas */}
-          <button 
-            className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all ${
-              sidebarOpen ? "hover:text-white hover:bg-white/[.08]" : "hover:text-white"
-            }`}
-            title="Campañas"
-          >
-            {sidebarOpen ? (
-              <>
-                <Target className="w-5 h-5 flex-shrink-0 mr-3" />
-                <span className="flex-1 text-left">Campañas</span>
-              </>
-            ) : (
-              <Target className="w-5 h-5 flex-shrink-0" />
+          <div>
+            <button
+              onClick={() => toggleMenu("campaigns")}
+              className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-gray-300 ${
+                sidebarOpen ? "hover:text-white hover:bg-white/[.08]" : "hover:text-white"
+              } ${
+                expandedMenu === "campaigns" && sidebarOpen ? "text-white bg-white/[.08]" : ""
+              }`}
+              title="Campañas"
+            >
+              {sidebarOpen ? (
+                <>
+                  <Target className="w-5 h-5 flex-shrink-0 mr-3" />
+                  <span className="flex-1 text-left">Campañas</span>
+                  <ChevronRight className={`w-4 h-4 transition-transform ml-2 ${expandedMenu === "campaigns" ? "rotate-90" : ""}`} />
+                </>
+              ) : (
+                <Target className="w-5 h-5 flex-shrink-0" />
+              )}
+            </button>
+            {sidebarOpen && expandedMenu === "campaigns" && (
+              <SidebarSubMenu pathname={pathname} items={CAMPAIGNS_NAV} />
             )}
-          </button>
+          </div>
 
           {/* ORI (Copiloto) */}
           <Link
