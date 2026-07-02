@@ -29,6 +29,7 @@ interface OrgRow {
   slug: string;
   status: AccountStatus;
   plan: string;
+  plan_name?: string;
   created_at: string;
   member_count: number;
   is_protected?: boolean;
@@ -116,9 +117,9 @@ export default function AdminOrganizationsPage() {
         body: JSON.stringify({
           name: values.name,
           slug: values.slug || undefined,
-          plan: values.plan,
           status: values.status,
           hide_noova_logo: values.hide_noova_logo,
+          ...(values.plan !== modal.org.plan ? { plan: values.plan } : {}),
         }),
       });
       if (res.ok) {
@@ -215,7 +216,7 @@ export default function AdminOrganizationsPage() {
                           <Users className="w-3.5 h-3.5" /> {o.member_count}
                         </span>
                       </td>
-                      <td className={registryTableCellMuted}>{o.plan}</td>
+                      <td className={registryTableCellMuted}>{o.plan_name ?? o.plan}</td>
                       <td className={registryTableCell}>
                         <AdminStatusBadge status={o.status} />
                       </td>

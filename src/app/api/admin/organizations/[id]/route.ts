@@ -4,10 +4,10 @@ import { deleteOrganizationCompletely } from "@/lib/admin-provisioning";
 import { adminClient } from "@/lib/voice-agents-server";
 import { uniqueOrgSlug } from "@/lib/admin-utils";
 import { mergeOrgBrandingSettings } from "@/lib/org-branding";
+import { isActivePlanId } from "@/lib/org-plans";
 import type { AccountStatus } from "@/types/rbac";
 
 const VALID_STATUS = new Set<AccountStatus>(["active", "invited", "suspended", "disabled"]);
-const PLANS = new Set(["explorador", "basico", "esencial", "crecimiento", "escala"]);
 
 /** PATCH — editar organización (nombre, slug, plan, estado) */
 export async function PATCH(
@@ -43,8 +43,12 @@ export async function PATCH(
     updates.slug = await uniqueOrgSlug(db, body.slug.trim(), id);
   }
 
-  if (typeof body.plan === "string" && PLANS.has(body.plan)) {
-    updates.plan = body.plan;
+  if (typeof body.plan === "string" && body.plan.trim()) {
+    const planId = body.plan.trim();
+    if (!(await isActivePlanId(db, planId))) {
+      return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
+    }
+    updates.plan = planId;
   }
 
   if (typeof body.status === "string" && body.status && VALID_STATUS.has(body.status)) {

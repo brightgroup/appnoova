@@ -5,6 +5,8 @@ import { X, Building2, Pencil, Copy, Check } from "lucide-react";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import { btnPrimary, btnGhost } from "@/lib/brand-ui";
 import { getAgencyAccessLoginUrl } from "@/lib/agency-access-url";
+import { formatOrgPlanLabel, type OrgPlanOption } from "@/lib/org-plans";
+import { authFetch } from "@/lib/telephony-api";
 import type { AccountStatus } from "@/types/rbac";
 
 export type OwnerMode = "new" | "existing";
@@ -31,7 +33,7 @@ interface AdminOrgModalProps {
   onSubmit: (values: AdminOrgFormValues) => void;
 }
 
-const PLAN_OPTIONS = [
+const FALLBACK_PLAN_OPTIONS = [
   { value: "explorador", label: "Explorador · Prueba 14 días · 1 usuario · 15.000 cr" },
   { value: "basico", label: "Básico · $50/mes · 1 usuario · 166.667 cr · solo admin" },
   { value: "esencial", label: "Esencial · $82/mes · 5 usuarios · 350.000 cr" },
@@ -63,8 +65,26 @@ export function AdminOrgModal({
   const [ownerPassword, setOwnerPassword] = useState("");
   const [hideNoovaLogo, setHideNoovaLogo] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [planOptions, setPlanOptions] = useState<{ value: string; label: string }[]>(FALLBACK_PLAN_OPTIONS);
 
   const agencyAccessUrl = getAgencyAccessLoginUrl();
+
+  useEffect(() => {
+    if (!open) return;
+    authFetch("/api/admin/pricing/plans")
+      .then(res => res.json())
+      .then(json => {
+        const plans = (json.plans ?? []) as OrgPlanOption[];
+        if (!plans.length) return;
+        const options = plans.map(p => ({ value: p.id, label: formatOrgPlanLabel(p) }));
+        const selected = initial?.plan;
+        if (selected && !options.some(o => o.value === selected)) {
+          options.unshift({ value: selected, label: `${selected} (plan actual)` });
+        }
+        setPlanOptions(options);
+      })
+      .catch(() => setPlanOptions(FALLBACK_PLAN_OPTIONS));
+  }, [open, initial?.plan]);
 
   useEffect(() => {
     if (open) {
@@ -139,7 +159,7 @@ export function AdminOrgModal({
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1.5">Plan</label>
-            <NoovaSelect value={plan} onChange={setPlan} options={PLAN_OPTIONS} allowEmpty={false} />
+            <NoovaSelect value={plan} onChange={setPlan} options={planOptions} allowEmpty={false} />
           </div>
 
           {!isEdit && (

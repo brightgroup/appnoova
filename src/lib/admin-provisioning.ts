@@ -98,7 +98,10 @@ export async function bootstrapOrganization(
   const name = input.name.trim();
   const plan = input.plan?.trim() || "explorador";
   if (!name) throw new Error("Nombre de organización requerido");
-  if (!VALID_PLANS.has(plan)) throw new Error("Plan inválido");
+  if (!VALID_PLANS.has(plan)) {
+    const { data: row } = await db.from("plans").select("id").eq("id", plan).eq("is_active", true).maybeSingle();
+    if (!row) throw new Error("Plan inválido");
+  }
 
   const slug = input.slug
     ? await uniqueOrgSlug(db, input.slug)

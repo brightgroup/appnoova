@@ -6,8 +6,7 @@ import {
   createAuthUser,
   resolveUserIdByEmail,
 } from "@/lib/admin-provisioning";
-
-const PLANS = new Set(["explorador", "basico", "esencial", "crecimiento", "escala"]);
+import { isActivePlanId } from "@/lib/org-plans";
 
 /** GET — organizaciones con owner y conteo de miembros */
 export async function GET(req: NextRequest) {
@@ -24,15 +23,22 @@ export async function GET(req: NextRequest) {
 
   const rows = orgs ?? [];
   const ownerIds = [...new Set(rows.map(o => o.owner_user_id))];
+  const orgIds = rows.map(o => o.id);
 
-  const [ownersRes, membersRes] = await Promise.all([
+  const [ownersRes, membersRes, subsRes, plansRes] = await Promise.all([
     ownerIds.length
       ? db.from("profiles").select("id, email, full_name, is_protected").in("id", ownerIds)
       : Promise.resolve({ data: [] }),
     db.from("organization_members").select("organization_id, status"),
+    orgIds.length
+      ? db.from("organization_subscriptions").select("organization_id, plan_id").in("organization_id", orgIds)
+      : Promise.resolve({ data: [] }),
+    db.from("plans").select("id, name"),
   ]);
 
   const ownerMap = new Map((ownersRes.data ?? []).map(p => [p.id, p]));
+  const subPlanMap = new Map((subsRes.data ?? []).map(s => [s.organization_id, s.plan_id]));
+  const planNameMap = new Map((plansRes.data ?? []).map(p => [p.id, p.name]));
   const memberCounts = new Map<string, number>();
   for (const m of membersRes.data ?? []) {
     if (m.status !== "active") continue;
@@ -40,12 +46,17 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    organizations: rows.map(o => ({
-      ...o,
-      owner: ownerMap.get(o.owner_user_id) ?? null,
-      member_count: memberCounts.get(o.id) ?? 0,
-      is_protected: ownerMap.get(o.owner_user_id)?.is_protected === true,
-    })),
+    organizations: rows.map(o => {
+      const effectivePlan = subPlanMap.get(o.id) ?? o.plan;
+      return {
+        ...o,
+        plan: effectivePlan,
+        plan_name: planNameMap.get(effectivePlan) ?? effectivePlan,
+        owner: ownerMap.get(o.owner_user_id) ?? null,
+        member_count: memberCounts.get(o.id) ?? 0,
+        is_protected: ownerMap.get(o.owner_user_id)?.is_protected === true,
+      };
+    }),
   });
 }
 
@@ -62,11 +73,11 @@ export async function POST(req: NextRequest) {
   if (!name) {
     return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
   }
-  if (!PLANS.has(plan)) {
-    return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
-  }
 
   const db = adminClient();
+  if (!(await isActivePlanId(db, plan))) {
+    return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
+  }
   let ownerId = body.owner_user_id as string | undefined;
   let temporaryPassword: string | undefined;
   let ownerEmail = (body.owner_email as string | undefined)?.trim().toLowerCase() ?? "";
