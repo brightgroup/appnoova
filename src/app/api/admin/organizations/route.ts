@@ -7,7 +7,7 @@ import {
   resolveUserIdByEmail,
 } from "@/lib/admin-provisioning";
 
-const PLANS = new Set(["explorador", "esencial", "crecimiento", "escala"]);
+const PLANS = new Set(["explorador", "basico", "esencial", "crecimiento", "escala"]);
 
 /** GET — organizaciones con owner y conteo de miembros */
 export async function GET(req: NextRequest) {

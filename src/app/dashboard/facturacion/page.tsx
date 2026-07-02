@@ -121,6 +121,16 @@ const PLAN_COPY: Record<string, { tagline: string; features: string[]; ideal: st
     features: ["ORI, Mi Link e inbox", "1 agente de texto", "Soporte por email"],
     ideal: "Para explorar antes de comprometerte",
   },
+  basico: {
+    tagline: "Plan individual · todas las funciones",
+    features: [
+      "166.667 créditos/mes",
+      "1 usuario",
+      "WhatsApp, widget, Mi Link, ORI, CRM y voz",
+      "Asignado por tu asesor Noova",
+    ],
+    ideal: "Operación individual con volumen moderado",
+  },
   esencial: {
     tagline: "Equipo pequeño, volumen moderado",
     features: ["350.000 créditos/mes", "Hasta 5 usuarios", "CRM e inbox con ia", "WhatsApp incluido", "Soporte por email"],

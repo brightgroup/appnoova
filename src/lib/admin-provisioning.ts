@@ -4,7 +4,7 @@ import { isSuperAdminEmail } from "@/lib/rbac-constants";
 
 export type OrgMemberRoleSlug = "owner" | "org_admin" | "manager" | "advisor" | "viewer";
 
-const VALID_PLANS = new Set(["explorador", "esencial", "crecimiento", "escala"]);
+const VALID_PLANS = new Set(["explorador", "basico", "esencial", "crecimiento", "escala"]);
 const VALID_MEMBER_ROLES = new Set<OrgMemberRoleSlug>([
   "owner",
   "org_admin",

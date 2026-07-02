@@ -6,7 +6,7 @@ import { uniqueOrgSlug } from "@/lib/admin-utils";
 import type { AccountStatus } from "@/types/rbac";
 
 const VALID_STATUS = new Set<AccountStatus>(["active", "invited", "suspended", "disabled"]);
-const PLANS = new Set(["explorador", "esencial", "crecimiento", "escala"]);
+const PLANS = new Set(["explorador", "basico", "esencial", "crecimiento", "escala"]);
 
 /** PATCH — editar organización (nombre, slug, plan, estado) */
 export async function PATCH(
