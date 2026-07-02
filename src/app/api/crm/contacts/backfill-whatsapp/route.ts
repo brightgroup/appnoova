@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backfillCrmContactsFromWhatsAppInbox } from "@/lib/crm-contact-backfill";
-import { getTextAgentUserIdFromRequest, textAgentsAdminClient } from "@/lib/text-agents-server";
+import { textAgentsAdminClient } from "@/lib/text-agents-server";
+import { getCrmUserId } from "@/lib/crm-auth";
 import { isMissingTableError } from "@/lib/supabase-table-error";
 
 /** Crea/actualiza contactos CRM desde todas las conversaciones WhatsApp del inbox. */
 export async function POST(req: NextRequest) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(req, "edit");
+  if (userId instanceof NextResponse) return userId;
 
   const db = textAgentsAdminClient();
 

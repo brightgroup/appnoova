@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrgContextFromRequest, getOrgPermissionLevel, hasOrgPermission } from "@/lib/org-server";
+import {
+  getOrgContextFromRequest,
+  getAllOrgPermissions,
+  hasOrgPermission,
+} from "@/lib/org-server";
+import { buildPermissionFlags } from "@/lib/org-permissions";
+import { parseOrgBranding } from "@/lib/org-branding";
 import { adminClient } from "@/lib/voice-agents-server";
 
 /** GET — organización activa, membresía y permisos del usuario */
@@ -8,18 +14,24 @@ export async function GET(req: NextRequest) {
   if (ctx instanceof NextResponse) return ctx;
 
   const db = adminClient();
-  const orgUsersLevel = await getOrgPermissionLevel(ctx.userId, ctx.organizationId, "org_users");
+  const permissions = await getAllOrgPermissions(ctx.userId, ctx.organizationId);
+  const orgUsersLevel = permissions.org_users;
 
   const { data: org } = await db
     .from("organizations")
-    .select("id, name, slug, plan, status")
+    .select("id, name, slug, plan, status, settings")
     .eq("id", ctx.organizationId)
     .single();
+
+  const branding = parseOrgBranding(org?.settings);
 
   return NextResponse.json({
     organization: org,
     membership: ctx.membership,
-    permissions: {
+    permissions,
+    flags: buildPermissionFlags(permissions),
+    branding,
+    permissions_legacy: {
       org_users: orgUsersLevel,
       can_view_team: hasOrgPermission(orgUsersLevel, "view"),
       can_manage_team: hasOrgPermission(orgUsersLevel, "edit"),

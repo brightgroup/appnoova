@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/voice-agents-server";
-import { getOrgContextFromRequest } from "@/lib/org-server";
+import { requireOrgModule } from "@/lib/module-auth";
 import { normalizeRowData } from "@/lib/data-tables/columns";
 import { rowLimitError } from "@/lib/data-tables/validate-import";
 import type { DataTableColumn, DataTableRowRecord } from "@/types/data-table";
@@ -22,7 +22,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await getOrgContextFromRequest(req);
+  const ctx = await requireOrgModule(req, "campaigns", "edit");
   if (ctx instanceof NextResponse) return ctx;
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
@@ -76,7 +76,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await getOrgContextFromRequest(req);
+  const ctx = await requireOrgModule(req, "campaigns", "edit");
   if (ctx instanceof NextResponse) return ctx;
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
@@ -118,7 +118,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await getOrgContextFromRequest(req);
+  const ctx = await requireOrgModule(req, "campaigns", "edit");
   if (ctx instanceof NextResponse) return ctx;
   const { id } = await params;
   const rowId = req.nextUrl.searchParams.get("row_id");

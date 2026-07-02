@@ -18,6 +18,8 @@ import { CAMPAIGNS_NAV } from "@/lib/campaigns-nav";
 import { sidebarIconBase, sidebarNeonIcon } from "@/lib/sidebar-neon";
 import { DesktopOnlyGate } from "@/components/layout/DesktopOnlyGate";
 import { SidebarAccountMenu } from "@/components/layout/SidebarAccountMenu";
+import { OrgPermissionsProvider, useOrgPermissions } from "@/components/layout/OrgPermissionsProvider";
+import { DashboardRouteGuard } from "@/components/layout/DashboardRouteGuard";
 import type { LucideIcon } from "lucide-react";
 
 function formatCreditsShort(n: number): string {
@@ -71,6 +73,14 @@ function SidebarSubMenu({
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <OrgPermissionsProvider enabled>
+      <DashboardLayoutShell>{children}</DashboardLayoutShell>
+    </OrgPermissionsProvider>
+  );
+}
+
+function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
@@ -89,9 +99,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   } | null>(null);
   const router = useRouter();
   const pathname = usePathname();
+  const { flags: permFlags, branding } = useOrgPermissions();
+
+  const textoNavItems = AGENTES_TEXTO_NAV.filter((item) =>
+    item.href.includes("/inbox") ? permFlags.can_view_inbox : permFlags.can_view_text_agents
+  );
+  const showTextoSection = textoNavItems.length > 0;
+  const showVozSection = permFlags.can_view_voice_agents;
+  const showCanalesSection = permFlags.can_view_channels;
+  const showCrmSection = permFlags.can_view_crm;
+  const showCampaignsSection = permFlags.can_view_campaigns;
+  const showContextsSection = permFlags.can_view_contexts;
+  const showTablesSection = permFlags.can_view_campaigns;
 
   useEffect(() => {
     if (!checked) return;
+    if (!permFlags.can_view_billing) {
+      setBilling(null);
+      return;
+    }
     let cancelled = false;
     authFetch("/api/billing/me")
       .then((res) => (res.ok ? res.json() : null))
@@ -114,7 +140,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       })
       .catch(() => { /* silencioso */ });
     return () => { cancelled = true; };
-  }, [checked, pathname]);
+  }, [checked, pathname, permFlags.can_view_billing]);
 
   useEffect(() => {
     if (pathname.startsWith("/dashboard/agentes-voz")) {
@@ -196,9 +222,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Logo */}
         <div className={`p-4 border-b border-white/[.08] flex items-center ${sidebarOpen ? "justify-between" : "justify-center"}`}>
           {sidebarOpen && (
-            <Link href="/dashboard" className="flex-shrink-0">
-              <NoovaLogo width={176} height={40} priority variant="sidebar" />
-            </Link>
+            branding.hide_noova_logo ? (
+              <Link href="/dashboard" className="flex-shrink-0">
+                <span className="text-lg font-semibold text-white tracking-tight">Dashboard</span>
+              </Link>
+            ) : (
+              <Link href="/dashboard" className="flex-shrink-0">
+                <NoovaLogo width={176} height={40} priority variant="sidebar" />
+              </Link>
+            )
           )}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -232,6 +264,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {sidebarOpen && <div className="h-px bg-white/[.08] my-2" />}
 
           {/* Agentes de Voz */}
+          {showVozSection && (
           <div>
             <button
               onClick={() => toggleMenu("voz")}
@@ -256,8 +289,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <SidebarSubMenu pathname={pathname} items={AGENTES_VOZ_NAV} />
             )}
           </div>
+          )}
 
           {/* Agentes de Texto */}
+          {showTextoSection && (
           <div>
             <button
               onClick={() => toggleMenu("texto")}
@@ -279,11 +314,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
             </button>
             {sidebarOpen && expandedMenu === "texto" && (
-              <SidebarSubMenu pathname={pathname} items={AGENTES_TEXTO_NAV} />
+              <SidebarSubMenu pathname={pathname} items={textoNavItems} />
             )}
           </div>
+          )}
 
           {/* Canales */}
+          {showCanalesSection && (
           <div>
             <button
               onClick={() => toggleMenu("canales")}
@@ -308,8 +345,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <SidebarSubMenu pathname={pathname} items={CANALES_NAV} />
             )}
           </div>
+          )}
 
           {/* CRM */}
+          {showCrmSection && (
           <div>
             <button
               onClick={() => toggleMenu("crm")}
@@ -334,8 +373,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <SidebarSubMenu pathname={pathname} items={CRM_NAV} />
             )}
           </div>
+          )}
 
           {/* Campañas */}
+          {showCampaignsSection && (
           <div>
             <button
               onClick={() => toggleMenu("campaigns")}
@@ -360,6 +401,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <SidebarSubMenu pathname={pathname} items={CAMPAIGNS_NAV} />
             )}
           </div>
+          )}
 
           {/* ORI (Copiloto) */}
           <Link
@@ -387,6 +429,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {sidebarOpen && <div className="h-px bg-white/[.08] my-2" />}
 
           {/* Contextos de marca */}
+          {showContextsSection && (
           <Link
             href="/dashboard/contextos"
             className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
@@ -405,8 +448,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Building2 className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.contexts}`} />
             )}
           </Link>
+          )}
 
           {/* Tablas de datos */}
+          {showTablesSection && (
           <Link
             href="/dashboard/tablas"
             className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
@@ -425,12 +470,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Database className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.tables}`} />
             )}
           </Link>
+          )}
         </nav>
 
         {/* Footer - Plan & Logout */}
         <div className={`${sidebarOpen ? "p-3 space-y-3" : "p-3 space-y-3"} border-t border-white/[.08]`}>
           {/* Plan Card */}
-          {sidebarOpen && (() => {
+          {sidebarOpen && permFlags.can_view_billing && (() => {
             const pct   = billing?.usedPct ?? 0;
             const st    = billing?.status ?? "active";
             const badge =
@@ -500,6 +546,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               name={profileName}
               email={profileEmail}
               compact={!sidebarOpen}
+              showBilling={permFlags.can_view_billing}
+              showTeam={permFlags.can_view_team}
             />
             <button
               onClick={logout}
@@ -530,7 +578,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             Cargando...
           </div>
         )}
-        {children}
+        <DashboardRouteGuard>
+          {children}
+        </DashboardRouteGuard>
       </div>
     </div>
     </DesktopOnlyGate>

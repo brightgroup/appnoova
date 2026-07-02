@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTextAgentUserIdFromRequest, textAgentsAdminClient } from "@/lib/text-agents-server";
+import { textAgentsAdminClient } from "@/lib/text-agents-server";
+import { getCrmUserId } from "@/lib/crm-auth";
 import { toCrmLead } from "@/lib/crm-record";
 import { buildLeadRowFromBody, validateLeadPatch } from "@/lib/crm-lead-payload";
 import type { CrmLeadOutcome, CrmMotivoPerdida } from "@/types/crm";
@@ -7,8 +8,8 @@ import type { CrmLeadOutcome, CrmMotivoPerdida } from "@/types/crm";
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, ctx: Ctx) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(req, "view");
+  if (userId instanceof NextResponse) return userId;
 
   const { id } = await ctx.params;
   const db = textAgentsAdminClient();
@@ -25,8 +26,8 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 }
 
 export async function PATCH(req: NextRequest, ctx: Ctx) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(req, "edit");
+  if (userId instanceof NextResponse) return userId;
 
   const { id } = await ctx.params;
   const body = await req.json();
@@ -94,8 +95,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 }
 
 export async function DELETE(req: NextRequest, ctx: Ctx) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(req, "edit");
+  if (userId instanceof NextResponse) return userId;
 
   const { id } = await ctx.params;
   const db = textAgentsAdminClient();

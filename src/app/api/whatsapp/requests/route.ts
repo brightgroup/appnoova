@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/voice-agents-server";
-import { getOrgContextFromRequest } from "@/lib/org-server";
+import { requireOrgModule } from "@/lib/module-auth";
 import { notifyAdminsWhatsAppRequest } from "@/lib/email/notify-whatsapp-request";
 
 /** GET — solicitudes de WhatsApp del usuario autenticado. */
 export async function GET(req: NextRequest) {
-  const orgCtx = await getOrgContextFromRequest(req);
+  const orgCtx = await requireOrgModule(req, "channels", "view");
   if (orgCtx instanceof NextResponse) return orgCtx;
 
   const db = adminClient();
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
 /** POST — crear una nueva solicitud de línea WhatsApp. */
 export async function POST(req: NextRequest) {
-  const orgCtx = await getOrgContextFromRequest(req);
+  const orgCtx = await requireOrgModule(req, "channels", "edit");
   if (orgCtx instanceof NextResponse) return orgCtx;
 
   let body: {

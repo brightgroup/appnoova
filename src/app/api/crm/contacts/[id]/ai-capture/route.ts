@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { TextChatMessage } from "@/types/text-agent-conversation";
-import { getTextAgentUserIdFromRequest, textAgentsAdminClient } from "@/lib/text-agents-server";
+import { textAgentsAdminClient } from "@/lib/text-agents-server";
+import { getCrmUserId } from "@/lib/crm-auth";
 import {
   documentProvenanceEntry,
   extractContactFieldsFromConversation,
@@ -18,8 +19,8 @@ function normalizeMessages(raw: unknown): TextChatMessage[] {
 }
 
 export async function GET(_req: NextRequest, ctx: Ctx) {
-  const userId = await getTextAgentUserIdFromRequest(_req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(_req, "view");
+  if (userId instanceof NextResponse) return userId;
 
   const { id } = await ctx.params;
   const db = textAgentsAdminClient();
@@ -58,8 +59,8 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
 }
 
 export async function POST(req: NextRequest, ctx: Ctx) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(req, "edit");
+  if (userId instanceof NextResponse) return userId;
 
   const { id } = await ctx.params;
   const body = await req.json();

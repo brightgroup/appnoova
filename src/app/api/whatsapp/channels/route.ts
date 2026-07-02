@@ -4,10 +4,10 @@ import { toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
 import { twilioWhatsAppWebhookUrl } from "@/lib/telephony/app-url";
 import { isTwilioWhatsAppConfigured } from "@/lib/whatsapp/twilio-whatsapp";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
-import { getOrgContextFromRequest } from "@/lib/org-server";
+import { requireOrgModule } from "@/lib/module-auth";
 
 export async function GET(req: NextRequest) {
-  const orgCtx = await getOrgContextFromRequest(req);
+  const orgCtx = await requireOrgModule(req, "channels", "view");
   if (orgCtx instanceof NextResponse) return orgCtx;
 
   const db = textAgentsAdminClient();

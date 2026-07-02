@@ -3,8 +3,10 @@ import { persistHumanReply } from "@/lib/text-conversation-persist";
 import { sendWhatsAppOutboundForConversation } from "@/lib/whatsapp/process-inbound";
 import { toTextConversationRecord } from "@/lib/text-conversation-record";
 import { isMissingTableError } from "@/lib/supabase-table-error";
-import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
+import { textAgentsAdminClient } from "@/lib/text-agents-server";
 import { getAuthUserFromRequest, userDisplayName } from "@/lib/voice-agents-server";
+import { requireOrgModule } from "@/lib/module-auth";
+import { conversationBelongsToOrg } from "@/lib/inbox-org-scope";
 import { WHATSAPP_CONVERSATION_CHANNEL } from "@/lib/whatsapp-channel";
 import {
   canSendWhatsAppSessionMessage,
@@ -16,11 +18,11 @@ import { enrichCrmLeadForConversationId } from "@/lib/crm-lead-enrich";
 import { enrichCrmContactFromWhatsAppConversation } from "@/lib/crm-contact-enrich";
 
 export async function POST(req: NextRequest) {
+  const orgCtx = await requireOrgModule(req, "inbox", "edit");
+  if (orgCtx instanceof NextResponse) return orgCtx;
+
   const user = await getAuthUserFromRequest(req);
-  const userId = user?.id ?? (await getTextAgentUserIdFromRequest(req));
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const actorUserId = user?.id ?? orgCtx.userId;
 
   const body = await req.json();
   const conversationId = String(body.conversation_id ?? "");
@@ -34,11 +36,15 @@ export async function POST(req: NextRequest) {
   }
 
   const db = textAgentsAdminClient();
+  const belongs = await conversationBelongsToOrg(db, conversationId, orgCtx.organizationId);
+  if (!belongs) {
+    return NextResponse.json({ error: "Conversación no encontrada" }, { status: 404 });
+  }
+
   const { data: existing, error: fetchErr } = await db
     .from("text_agent_conversations")
     .select("*")
     .eq("id", conversationId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (fetchErr) {
@@ -79,9 +85,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const ownerUserId = String(existing.user_id ?? actorUserId);
+
   const result = await persistHumanReply({
     db,
-    userId,
+    userId: ownerUserId,
     conversationId,
     content,
     assignedTo
@@ -91,7 +99,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: result.error ?? "No se pudo enviar" }, { status: 500 });
   }
 
-  const waSend = await sendWhatsAppOutboundForConversation(db, userId, conversationId, content);
+  const waSend = await sendWhatsAppOutboundForConversation(db, ownerUserId, conversationId, content);
   if (!waSend.ok) {
     return NextResponse.json(
       {
@@ -105,18 +113,18 @@ export async function POST(req: NextRequest) {
   const { data: linkedContact } = await db
     .from("crm_contacts")
     .select("id")
-    .eq("user_id", userId)
+    .eq("user_id", ownerUserId)
     .eq("inbox_conversation_id", conversationId)
     .maybeSingle();
 
   if (linkedContact?.id) {
     void enrichCrmContactFromWhatsAppConversation(
       db,
-      userId,
+      ownerUserId,
       String(linkedContact.id),
       conversationId
     ).catch(err => console.error("[inbox/reply] contact enrich:", err));
-    void enrichCrmLeadForConversationId(db, userId, conversationId).catch(err =>
+    void enrichCrmLeadForConversationId(db, ownerUserId, conversationId).catch(err =>
       console.error("[inbox/reply] lead enrich:", err)
     );
   }
@@ -125,7 +133,7 @@ export async function POST(req: NextRequest) {
     .from("text_agent_conversations")
     .select("*")
     .eq("id", conversationId)
-    .eq("user_id", userId)
+    .eq("user_id", ownerUserId)
     .maybeSingle();
 
   if (reloadErr || !updated) {
@@ -135,7 +143,7 @@ export async function POST(req: NextRequest) {
   const record = toTextConversationRecord(updated);
   const messages =
     record.channel === WHATSAPP_CONVERSATION_CHANNEL
-      ? await signWhatsAppMessageMedia(db, userId, record.messages)
+      ? await signWhatsAppMessageMedia(db, ownerUserId, record.messages)
       : record.messages;
 
   return NextResponse.json({ conversation: { ...record, messages } });

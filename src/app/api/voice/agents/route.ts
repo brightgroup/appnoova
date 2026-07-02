@@ -5,7 +5,8 @@ import { toVoiceAgentListItem, toVoiceAgentRecord } from "@/lib/voice-agent-reco
 import { insertVoiceAgentRow, updateVoiceAgentRow } from "@/lib/voice-agents-db";
 import { deleteElevenLabsAgent } from "@/lib/elevenlabs/sync-agent";
 import { syncVoiceAgentToElevenLabs } from "@/lib/elevenlabs/voice-agent-sync";
-import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
+import { adminClient } from "@/lib/voice-agents-server";
+import { requireOrgModule } from "@/lib/module-auth";
 
 function dbNotReady() {
   return NextResponse.json({ agents: [], dbReady: false });
@@ -20,10 +21,9 @@ function dbNotReady() {
  *   → solo defaults de plantilla en código (sin leer BD)
  */
 export async function GET(req: NextRequest) {
-  const userId = await getUserIdFromRequest(req);
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const orgCtx = await requireOrgModule(req, "voice_agents", "view");
+  if (orgCtx instanceof NextResponse) return orgCtx;
+  const userId = orgCtx.userId;
 
   const agentId = req.nextUrl.searchParams.get("id");
   const sourceTemplateParam =
@@ -98,10 +98,9 @@ export async function GET(req: NextRequest) {
 
 /** POST — crea instancia del usuario (precargada desde plantilla en código) o actualiza por id */
 export async function POST(req: NextRequest) {
-  const userId = await getUserIdFromRequest(req);
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const orgCtx = await requireOrgModule(req, "voice_agents", "edit");
+  if (orgCtx instanceof NextResponse) return orgCtx;
+  const userId = orgCtx.userId;
 
   const body = await req.json();
   const sourceTemplate = resolveBaseTemplateId(
@@ -247,10 +246,9 @@ export async function POST(req: NextRequest) {
 
 /** DELETE /api/voice/agents?id= — elimina agente del usuario (cascade en llamadas) */
 export async function DELETE(req: NextRequest) {
-  const userId = await getUserIdFromRequest(req);
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const orgCtx = await requireOrgModule(req, "voice_agents", "manage");
+  if (orgCtx instanceof NextResponse) return orgCtx;
+  const userId = orgCtx.userId;
 
   const agentId = req.nextUrl.searchParams.get("id");
   if (!agentId) {

@@ -17,18 +17,28 @@ interface SidebarAccountMenuProps {
   name?: string;
   email?: string;
   compact?: boolean;
+  showBilling?: boolean;
+  showTeam?: boolean;
 }
 
 export function SidebarAccountMenu({
   name,
   email,
   compact = false,
+  showBilling = true,
+  showTeam = true,
 }: SidebarAccountMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
-  const accountActive = MENU_ITEMS.some(
+  const visibleItems = MENU_ITEMS.filter(({ href }) => {
+    if (href === "/dashboard/facturacion") return showBilling;
+    if (href === "/dashboard/equipo") return showTeam;
+    return true;
+  });
+
+  const accountActive = visibleItems.some(
     ({ href }) => pathname === href || pathname.startsWith(`${href}/`)
   );
 
@@ -64,7 +74,7 @@ export function SidebarAccountMenu({
               )}
             </div>
           )}
-          {MENU_ITEMS.map(({ href, label, icon: Icon }) => {
+          {visibleItems.map(({ href, label, icon: Icon }) => {
             const active =
               pathname === href || pathname.startsWith(`${href}/`);
             return (

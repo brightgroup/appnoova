@@ -105,7 +105,7 @@ export default function AdminRolesPage() {
       <AdminPageToolbar
         icon={Shield}
         title="Roles de organización"
-        subtitle="Permisos por módulo dentro del dashboard (sin acceso a /admin)"
+        subtitle="Configura qué ve y hace cada rol en el dashboard. Los cambios se aplican a todas las organizaciones."
         onRefresh={fetchRoles}
         refreshing={loading}
         action={
@@ -124,7 +124,8 @@ export default function AdminRolesPage() {
               <p className="text-sm font-semibold text-white">Superadministrador</p>
               <p className="text-xs text-gray-400 mt-1">
                 Solo <strong className="text-gray-300">admin@noova360.com</strong> accede a /admin y tiene control total.
-                Este rol no se configura ni se puede suspender.
+                Edita aquí Asesor, Administrador, etc.: facturación, inbox, agentes, CRM y más.
+                Al guardar, se sincroniza con todos los clientes; luego asignas el rol en cada org desde Equipo.
               </p>
             </div>
           </div>

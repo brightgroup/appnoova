@@ -17,6 +17,8 @@ export interface AdminOrgFormValues {
   owner_email: string;
   owner_full_name: string;
   owner_password: string;
+  /** Dashboard sin logo Noova (solo título «Dashboard»). */
+  hide_noova_logo: boolean;
 }
 
 interface AdminOrgModalProps {
@@ -58,6 +60,7 @@ export function AdminOrgModal({
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerFullName, setOwnerFullName] = useState("");
   const [ownerPassword, setOwnerPassword] = useState("");
+  const [hideNoovaLogo, setHideNoovaLogo] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -69,6 +72,7 @@ export function AdminOrgModal({
       setOwnerEmail(initial?.owner_email ?? "");
       setOwnerFullName(initial?.owner_full_name ?? "");
       setOwnerPassword("");
+      setHideNoovaLogo(initial?.hide_noova_logo === true);
     }
   }, [open, initial]);
 
@@ -206,6 +210,23 @@ export function AdminOrgModal({
           {protectedOrg && (
             <p className="text-xs text-amber-400/90">Organización del superadministrador — no se puede suspender ni eliminar.</p>
           )}
+
+          <div className="rounded-xl border border-white/[.08] bg-[#0d0e14]/80 p-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hideNoovaLogo}
+                onChange={e => setHideNoovaLogo(e.target.checked)}
+                className="mt-0.5 rounded border-white/20 bg-[#12131a] text-[#5b5bf6] focus:ring-[#5b5bf6]/40"
+              />
+              <span>
+                <span className="block text-sm font-medium text-white">Cliente agencia (sin logo Noova)</span>
+                <span className="block text-xs text-gray-500 mt-1 leading-relaxed">
+                  En el dashboard de esta organización se oculta el logo Noova y se muestra solo el título «Dashboard».
+                </span>
+              </span>
+            </label>
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-white/[.08] sticky bottom-0 bg-[#12131a]">
@@ -223,6 +244,7 @@ export function AdminOrgModal({
                 owner_email: ownerEmail.trim(),
                 owner_full_name: ownerFullName.trim(),
                 owner_password: ownerPassword.trim(),
+                hide_noova_logo: hideNoovaLogo,
               })
             }
             className={btnPrimary}

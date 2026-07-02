@@ -3,6 +3,7 @@ import { requireSuperAdmin, isProtectedUser } from "@/lib/admin-server";
 import { deleteOrganizationCompletely } from "@/lib/admin-provisioning";
 import { adminClient } from "@/lib/voice-agents-server";
 import { uniqueOrgSlug } from "@/lib/admin-utils";
+import { mergeOrgBrandingSettings } from "@/lib/org-branding";
 import type { AccountStatus } from "@/types/rbac";
 
 const VALID_STATUS = new Set<AccountStatus>(["active", "invited", "suspended", "disabled"]);
@@ -20,7 +21,7 @@ export async function PATCH(
   const body = await req.json().catch(() => ({}));
   const db = adminClient();
 
-  const { data: org } = await db.from("organizations").select("owner_user_id").eq("id", id).maybeSingle();
+  const { data: org } = await db.from("organizations").select("owner_user_id, settings").eq("id", id).maybeSingle();
   if (!org) return NextResponse.json({ error: "Organización no encontrada" }, { status: 404 });
 
   const isProtectedOrg = await isProtectedUser(org.owner_user_id);
@@ -46,7 +47,7 @@ export async function PATCH(
     updates.plan = body.plan;
   }
 
-  if (body.status && VALID_STATUS.has(body.status)) {
+  if (typeof body.status === "string" && body.status && VALID_STATUS.has(body.status)) {
     updates.status = body.status;
     if (body.status === "suspended" || body.status === "disabled") {
       await db
@@ -59,6 +60,12 @@ export async function PATCH(
         .update({ status: "active", updated_at: new Date().toISOString() })
         .eq("organization_id", id);
     }
+  }
+
+  if (typeof body.hide_noova_logo === "boolean") {
+    updates.settings = mergeOrgBrandingSettings(org.settings, {
+      hide_noova_logo: body.hide_noova_logo,
+    });
   }
 
   if (Object.keys(updates).length <= 1) {

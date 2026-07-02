@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/voice-agents-server";
-import { getOrgContextFromRequest } from "@/lib/org-server";
+import { requireOrgModule } from "@/lib/module-auth";
 import { toAudienceTableRecord } from "@/lib/campaigns/record";
 
 /** GET — tablas de audiencia de la organización */
 export async function GET(req: NextRequest) {
-  const ctx = await getOrgContextFromRequest(req);
+  const ctx = await requireOrgModule(req, "campaigns", "view");
   if (ctx instanceof NextResponse) return ctx;
 
   const db = adminClient();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
+import { adminClient } from "@/lib/voice-agents-server";
+import { requireOrgModule } from "@/lib/module-auth";
 import type { CompanyContext } from "@/types/company-context";
 
 function toRecord(raw: Record<string, unknown>): CompanyContext {
@@ -27,10 +28,9 @@ async function clearOtherDefaults(db: ReturnType<typeof adminClient>, userId: st
  * GET /api/company-contexts?default=1 → contexto por defecto
  */
 export async function GET(req: NextRequest) {
-  const userId = await getUserIdFromRequest(req);
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const orgCtx = await requireOrgModule(req, "company_context", "view");
+  if (orgCtx instanceof NextResponse) return orgCtx;
+  const userId = orgCtx.userId;
 
   const db = adminClient();
   const id = req.nextUrl.searchParams.get("id");
@@ -100,10 +100,9 @@ export async function GET(req: NextRequest) {
 
 /** POST — crear o actualizar contexto */
 export async function POST(req: NextRequest) {
-  const userId = await getUserIdFromRequest(req);
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const orgCtx = await requireOrgModule(req, "company_context", "edit");
+  if (orgCtx instanceof NextResponse) return orgCtx;
+  const userId = orgCtx.userId;
 
   const body = await req.json();
   const db = adminClient();
@@ -164,10 +163,9 @@ export async function POST(req: NextRequest) {
 
 /** DELETE /api/company-contexts?id= */
 export async function DELETE(req: NextRequest) {
-  const userId = await getUserIdFromRequest(req);
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const orgCtx = await requireOrgModule(req, "company_context", "manage");
+  if (orgCtx instanceof NextResponse) return orgCtx;
+  const userId = orgCtx.userId;
 
   const id = req.nextUrl.searchParams.get("id");
   if (!id) {

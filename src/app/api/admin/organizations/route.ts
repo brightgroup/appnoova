@@ -114,6 +114,7 @@ export async function POST(req: NextRequest) {
       slug: body.slug ? String(body.slug) : undefined,
       ownerUserId: ownerId,
       plan,
+      hideNoovaLogo: body.hide_noova_logo === true,
     });
 
     return NextResponse.json(

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrgContextFromRequest } from "@/lib/org-server";
+import { requireOrgModule } from "@/lib/module-auth";
 import { getWhatsAppChannelById } from "@/lib/whatsapp-server";
 import { syncTwilioWhatsAppChannel } from "@/lib/whatsapp/twilio-channel-sync";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
@@ -9,7 +9,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const orgCtx = await getOrgContextFromRequest(req);
+  const orgCtx = await requireOrgModule(req, "channels", "edit");
   if (orgCtx instanceof NextResponse) return orgCtx;
 
   const { id } = await params;

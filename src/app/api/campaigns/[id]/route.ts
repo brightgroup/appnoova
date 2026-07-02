@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/voice-agents-server";
-import { getOrgContextFromRequest } from "@/lib/org-server";
+import { requireOrgModule } from "@/lib/module-auth";
 import { toVoiceCampaignRecord } from "@/lib/campaigns/record";
 import type {
   CampaignFieldMapping,
@@ -24,7 +24,7 @@ async function loadCampaign(id: string, organizationId: string, userId: string) 
 }
 
 export async function GET(_req: NextRequest, ctx: RouteCtx) {
-  const auth = await getOrgContextFromRequest(_req);
+  const auth = await requireOrgModule(_req, "campaigns", "view");
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await ctx.params;
@@ -38,7 +38,7 @@ export async function GET(_req: NextRequest, ctx: RouteCtx) {
 }
 
 export async function PATCH(req: NextRequest, ctx: RouteCtx) {
-  const auth = await getOrgContextFromRequest(req);
+  const auth = await requireOrgModule(req, "campaigns", "edit");
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await ctx.params;
@@ -85,7 +85,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
 }
 
 export async function DELETE(_req: NextRequest, ctx: RouteCtx) {
-  const auth = await getOrgContextFromRequest(_req);
+  const auth = await requireOrgModule(_req, "campaigns", "edit");
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await ctx.params;

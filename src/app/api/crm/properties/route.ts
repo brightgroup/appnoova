@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTextAgentUserIdFromRequest, textAgentsAdminClient } from "@/lib/text-agents-server";
+import { textAgentsAdminClient } from "@/lib/text-agents-server";
+import { getCrmUserId } from "@/lib/crm-auth";
 import { isMissingTableError } from "@/lib/supabase-table-error";
 import { slugifyPropertyKey, toCrmPropertyDefinition } from "@/lib/crm-record";
 import { getCrmProperties } from "@/lib/crm-server";
@@ -11,8 +12,8 @@ function parseEntity(raw: string | null): CrmPropertyEntity | null {
 }
 
 export async function GET(req: NextRequest) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(req, "view");
+  if (userId instanceof NextResponse) return userId;
 
   const entityType = parseEntity(req.nextUrl.searchParams.get("entity"));
   if (!entityType) return NextResponse.json({ error: "entity requerido (contact|lead)" }, { status: 400 });
@@ -31,8 +32,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(req, "edit");
+  if (userId instanceof NextResponse) return userId;
 
   const body = await req.json();
   const entityType = parseEntity(String(body.entity_type ?? ""));
@@ -71,8 +72,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(req, "edit");
+  if (userId instanceof NextResponse) return userId;
 
   const body = await req.json();
   const entityType = parseEntity(String(body.entity_type ?? ""));

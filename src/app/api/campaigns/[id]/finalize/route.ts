@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/voice-agents-server";
-import { getOrgContextFromRequest } from "@/lib/org-server";
+import { requireOrgModule } from "@/lib/module-auth";
 import { applyAudienceMapping } from "@/lib/campaigns/apply-mapping";
 import { toVoiceCampaignRecord } from "@/lib/campaigns/record";
 import type { CampaignFieldMapping, CampaignTriggerRule } from "@/types/voice-campaign";
@@ -8,7 +8,7 @@ import type { CampaignFieldMapping, CampaignTriggerRule } from "@/types/voice-ca
 type RouteCtx = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, ctx: RouteCtx) {
-  const auth = await getOrgContextFromRequest(req);
+  const auth = await requireOrgModule(req, "campaigns", "edit");
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await ctx.params;

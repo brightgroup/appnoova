@@ -4,13 +4,13 @@ import { toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
 import { canDeleteWhatsAppChannel } from "@/lib/whatsapp/channel-status";
 import { getWhatsAppChannelById } from "@/lib/whatsapp-server";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
-import { getOrgContextFromRequest } from "@/lib/org-server";
+import { requireOrgModule } from "@/lib/module-auth";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const orgCtx = await getOrgContextFromRequest(req);
+  const orgCtx = await requireOrgModule(req, "channels", "view");
   if (orgCtx instanceof NextResponse) return orgCtx;
 
   const { id } = await params;
@@ -28,7 +28,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const orgCtx = await getOrgContextFromRequest(req);
+  const orgCtx = await requireOrgModule(req, "channels", "edit");
   if (orgCtx instanceof NextResponse) return orgCtx;
 
   const { id } = await params;
@@ -102,7 +102,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const orgCtx = await getOrgContextFromRequest(req);
+  const orgCtx = await requireOrgModule(req, "channels", "edit");
   if (orgCtx instanceof NextResponse) return orgCtx;
 
   const { id } = await params;

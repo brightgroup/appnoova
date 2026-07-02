@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
+import { textAgentsAdminClient } from "@/lib/text-agents-server";
 import { getAuthUserFromRequest, userDisplayName } from "@/lib/voice-agents-server";
+import { requireOrgModule } from "@/lib/module-auth";
+import { conversationBelongsToOrg } from "@/lib/inbox-org-scope";
 import { sendWhatsAppTemplateForConversation } from "@/lib/whatsapp/send-template";
 import { toTextConversationRecord } from "@/lib/text-conversation-record";
 import { signWhatsAppMessageMedia } from "@/lib/whatsapp/media-storage";
 import { WHATSAPP_CONVERSATION_CHANNEL } from "@/lib/whatsapp-channel";
 
 export async function POST(req: NextRequest) {
+  const orgCtx = await requireOrgModule(req, "inbox", "edit");
+  if (orgCtx instanceof NextResponse) return orgCtx;
+
   const user = await getAuthUserFromRequest(req);
-  const userId = user?.id ?? (await getTextAgentUserIdFromRequest(req));
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const actorUserId = user?.id ?? orgCtx.userId;
 
   const body = await req.json();
   const conversationId = String(body.conversation_id ?? "").trim();
@@ -25,11 +27,23 @@ export async function POST(req: NextRequest) {
   }
 
   const db = textAgentsAdminClient();
+  const belongs = await conversationBelongsToOrg(db, conversationId, orgCtx.organizationId);
+  if (!belongs) {
+    return NextResponse.json({ error: "Conversación no encontrada" }, { status: 404 });
+  }
+
   const assignedTo = user ? userDisplayName(user) : "Usuario";
+
+  const { data: existing } = await db
+    .from("text_agent_conversations")
+    .select("user_id")
+    .eq("id", conversationId)
+    .maybeSingle();
+  const ownerUserId = String(existing?.user_id ?? actorUserId);
 
   const result = await sendWhatsAppTemplateForConversation({
     db,
-    userId,
+    userId: ownerUserId,
     conversationId,
     templateId,
     variableValues,
@@ -47,7 +61,6 @@ export async function POST(req: NextRequest) {
     .from("text_agent_conversations")
     .select("*")
     .eq("id", conversationId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (!updated) return NextResponse.json({ ok: true });
@@ -55,7 +68,7 @@ export async function POST(req: NextRequest) {
   const record = toTextConversationRecord(updated);
   const messages =
     record.channel === WHATSAPP_CONVERSATION_CHANNEL
-      ? await signWhatsAppMessageMedia(db, userId, record.messages)
+      ? await signWhatsAppMessageMedia(db, ownerUserId, record.messages)
       : record.messages;
 
   return NextResponse.json({ ok: true, conversation: { ...record, messages } });

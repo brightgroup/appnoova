@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
-import type { AccountStatus, PermissionLevel } from "@/types/rbac";
-import { PERMISSION_LEVEL_RANK } from "@/types/rbac";
+import type { AccountStatus, OrgPermissionModuleKey, PermissionLevel } from "@/types/rbac";
+import { ORG_PERMISSION_MODULE_KEYS, PERMISSION_LEVEL_RANK } from "@/types/rbac";
+import { emptyOrgPermissions, type OrgPermissionsMap } from "@/lib/org-permissions";
 
 export interface OrgMembership {
   id: string;
@@ -96,6 +97,24 @@ export async function getOrgPermissionLevel(
 
 export function hasOrgPermission(level: PermissionLevel, min: PermissionLevel): boolean {
   return PERMISSION_LEVEL_RANK[level] >= PERMISSION_LEVEL_RANK[min];
+}
+
+export async function getAllOrgPermissions(
+  userId: string,
+  organizationId: string
+): Promise<OrgPermissionsMap> {
+  const levels = await Promise.all(
+    ORG_PERMISSION_MODULE_KEYS.map(async (module) => ({
+      module,
+      level: await getOrgPermissionLevel(userId, organizationId, module),
+    }))
+  );
+
+  const permissions = emptyOrgPermissions();
+  for (const { module, level } of levels) {
+    permissions[module as OrgPermissionModuleKey] = level;
+  }
+  return permissions;
 }
 
 export async function getOrgContextFromRequest(

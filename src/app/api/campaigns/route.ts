@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/voice-agents-server";
-import { getOrgContextFromRequest } from "@/lib/org-server";
+import { requireOrgModule } from "@/lib/module-auth";
 import {
   defaultFieldMapping,
   defaultScheduleConfig,
@@ -9,7 +9,7 @@ import {
 } from "@/lib/campaigns/record";
 
 export async function GET(req: NextRequest) {
-  const ctx = await getOrgContextFromRequest(req);
+  const ctx = await requireOrgModule(req, "campaigns", "view");
   if (ctx instanceof NextResponse) return ctx;
 
   const db = adminClient();
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const ctx = await getOrgContextFromRequest(req);
+  const ctx = await requireOrgModule(req, "campaigns", "edit");
   if (ctx instanceof NextResponse) return ctx;
 
   let body: { name?: string; goal?: string; voice_agent_id?: string };

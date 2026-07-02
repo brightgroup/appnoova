@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/voice-agents-server";
-import { getOrgContextFromRequest } from "@/lib/org-server";
+import { requireOrgModule } from "@/lib/module-auth";
 import { parseExcelBuffer } from "@/lib/data-tables/parse-excel";
 import { validateDataTableImport } from "@/lib/data-tables/validate-import";
 import type { DataTableColumn, DataTableRecord, DataTableRowRecord } from "@/types/data-table";
@@ -47,7 +47,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await getOrgContextFromRequest(req);
+  const ctx = await requireOrgModule(req, "campaigns", "view");
   if (ctx instanceof NextResponse) return ctx;
   const { id } = await params;
 
@@ -86,7 +86,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await getOrgContextFromRequest(req);
+  const ctx = await requireOrgModule(req, "campaigns", "edit");
   if (ctx instanceof NextResponse) return ctx;
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
@@ -114,7 +114,7 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await getOrgContextFromRequest(_req);
+  const ctx = await requireOrgModule(_req, "campaigns", "edit");
   if (ctx instanceof NextResponse) return ctx;
   const { id } = await params;
 
@@ -136,7 +136,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await getOrgContextFromRequest(req);
+  const ctx = await requireOrgModule(req, "campaigns", "edit");
   if (ctx instanceof NextResponse) return ctx;
   const { id } = await params;
 

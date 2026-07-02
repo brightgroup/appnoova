@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTextAgentUserIdFromRequest, textAgentsAdminClient } from "@/lib/text-agents-server";
+import { textAgentsAdminClient } from "@/lib/text-agents-server";
+import { getCrmUserId } from "@/lib/crm-auth";
 import { getTenantLabels } from "@/lib/crm-labels";
 import type { CrmTenantLabelKey } from "@/types/crm";
 
 export async function GET(req: NextRequest) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(req, "view");
+  if (userId instanceof NextResponse) return userId;
 
   const db = textAgentsAdminClient();
   const labels = await getTenantLabels(db, userId);
@@ -13,8 +14,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(req, "edit");
+  if (userId instanceof NextResponse) return userId;
 
   const body = await req.json();
   const labelsIn = body.labels as Record<string, string> | undefined;

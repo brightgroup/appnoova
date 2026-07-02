@@ -8,7 +8,7 @@ import {
 } from "@/lib/inbox-utils";
 import { isMissingColumnError, isMissingTableError } from "@/lib/supabase-table-error";
 import { toTextConversationRecord } from "@/lib/text-conversation-record";
-import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
+import { textAgentsAdminClient } from "@/lib/text-agents-server";
 import { getAuthUserFromRequest, userDisplayName } from "@/lib/voice-agents-server";
 import type { InboxDetail, InboxFilter } from "@/types/inbox";
 import { WHATSAPP_CONVERSATION_CHANNEL } from "@/lib/whatsapp-channel";
@@ -21,42 +21,52 @@ import {
   whatsAppSessionExpiresAt
 } from "@/lib/whatsapp/session-window";
 import { signWhatsAppMessageMedia } from "@/lib/whatsapp/media-storage";
+import { requireOrgModule } from "@/lib/module-auth";
+import {
+  conversationBelongsToOrg,
+  getOrgTextAgentIds,
+  loadOrgTextAgentNames
+} from "@/lib/inbox-org-scope";
 
 function parseFilter(raw: string | null): InboxFilter {
   if (raw === "mine" || raw === "unassigned") return raw;
   return "all";
 }
 
-async function loadTextAgentNames(
-  db: ReturnType<typeof textAgentsAdminClient>,
-  userId: string
-): Promise<Record<string, string>> {
-  const { data } = await db.from("text_agents").select("id, name").eq("user_id", userId);
-  const names: Record<string, string> = {};
-  for (const row of data ?? []) {
-    names[String(row.id)] = String(row.name ?? "Agente");
-  }
-  return names;
-}
-
 export async function GET(req: NextRequest) {
-  const user = await getAuthUserFromRequest(req);
-  const userId = user?.id ?? null;
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const orgCtx = await requireOrgModule(req, "inbox", "view");
+  if (orgCtx instanceof NextResponse) return orgCtx;
 
+  const user = await getAuthUserFromRequest(req);
+  const userId = user?.id ?? orgCtx.userId;
   const db = textAgentsAdminClient();
   const id = req.nextUrl.searchParams.get("id");
   const filter = parseFilter(req.nextUrl.searchParams.get("filter"));
   const currentUserName = user ? userDisplayName(user) : "Usuario";
+  const agentIds = await getOrgTextAgentIds(db, orgCtx.organizationId);
+
+  if (!agentIds.length) {
+    if (id) {
+      return NextResponse.json({ error: "Conversación no encontrada" }, { status: 404 });
+    }
+    return NextResponse.json({
+      items: [],
+      current_user_name: currentUserName,
+      dbReady: true
+    });
+  }
 
   if (id) {
+    const belongs = await conversationBelongsToOrg(db, id, orgCtx.organizationId);
+    if (!belongs) {
+      return NextResponse.json({ error: "Conversación no encontrada" }, { status: 404 });
+    }
+
     const { data, error } = await db
       .from("text_agent_conversations")
       .select("*")
       .eq("id", id)
-      .eq("user_id", userId)
+      .in("text_agent_id", agentIds)
       .maybeSingle();
 
     if (error) {
@@ -66,11 +76,12 @@ export async function GET(req: NextRequest) {
     if (!data) return NextResponse.json({ error: "Conversación no encontrada" }, { status: 404 });
 
     const record = toTextConversationRecord(data);
-    const textNames = await loadTextAgentNames(db, userId);
+    const textNames = await loadOrgTextAgentNames(db, orgCtx.organizationId);
     const isWhatsApp = record.channel === WHATSAPP_CONVERSATION_CHANNEL;
     const waMeta = readWhatsAppMeta(record.metadata, record.messages);
+    const mediaOwnerId = String(data.user_id ?? userId);
     const messagesWithMedia = isWhatsApp
-      ? await signWhatsAppMessageMedia(db, userId, record.messages)
+      ? await signWhatsAppMessageMedia(db, mediaOwnerId, record.messages)
       : record.messages;
     const detail: InboxDetail = {
       kind: "text",
@@ -107,7 +118,7 @@ export async function GET(req: NextRequest) {
       .from("text_agent_conversations")
       .update({ unread_count: 0 })
       .eq("id", id)
-      .eq("user_id", userId);
+      .in("text_agent_id", agentIds);
 
     return NextResponse.json({
       detail: { ...detail, unread_count: 0 },
@@ -116,7 +127,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const textNames = await loadTextAgentNames(db, userId);
+  const textNames = await loadOrgTextAgentNames(db, orgCtx.organizationId);
 
   const listSelectWithHandoff =
     "id, text_agent_id, channel, contact_label, messages_count, status, assigned_to, handoff_mode, unread_count, messages, summary, created_at, updated_at";
@@ -126,7 +137,7 @@ export async function GET(req: NextRequest) {
   const textResPrimary = await db
     .from("text_agent_conversations")
     .select(listSelectWithHandoff)
-    .eq("user_id", userId)
+    .in("text_agent_id", agentIds)
     .order("updated_at", { ascending: false })
     .limit(200);
 
@@ -135,7 +146,7 @@ export async function GET(req: NextRequest) {
       ? await db
           .from("text_agent_conversations")
           .select(listSelectLegacy)
-          .eq("user_id", userId)
+          .in("text_agent_id", agentIds)
           .order("updated_at", { ascending: false })
           .limit(200)
       : textResPrimary;
@@ -158,8 +169,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const orgCtx = await requireOrgModule(req, "inbox", "edit");
+  if (orgCtx instanceof NextResponse) return orgCtx;
+
   const user = await getAuthUserFromRequest(req);
-  const userId = user?.id ?? null;
+  const userId = user?.id ?? orgCtx.userId;
   if (!userId) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
@@ -170,8 +184,13 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "conversation_id requerido" }, { status: 400 });
   }
 
-  const assignTo = body.assign_to as string | null | undefined;
   const db = textAgentsAdminClient();
+  const belongs = await conversationBelongsToOrg(db, conversationId, orgCtx.organizationId);
+  if (!belongs) {
+    return NextResponse.json({ error: "Conversación no encontrada" }, { status: 404 });
+  }
+
+  const assignTo = body.assign_to as string | null | undefined;
   const currentUserName = user ? userDisplayName(user) : "Usuario";
 
   let assignedTo: string | null = null;
@@ -192,6 +211,7 @@ export async function PATCH(req: NextRequest) {
     statusLabel = "Atendido por humano";
   }
 
+  const agentIds = await getOrgTextAgentIds(db, orgCtx.organizationId);
   const { data, error } = await db
     .from("text_agent_conversations")
     .update({
@@ -201,7 +221,7 @@ export async function PATCH(req: NextRequest) {
       updated_at: new Date().toISOString()
     })
     .eq("id", conversationId)
-    .eq("user_id", userId)
+    .in("text_agent_id", agentIds)
     .select("*")
     .maybeSingle();
 

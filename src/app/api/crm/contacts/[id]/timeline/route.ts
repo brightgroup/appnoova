@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTextAgentUserIdFromRequest, textAgentsAdminClient } from "@/lib/text-agents-server";
+import { textAgentsAdminClient } from "@/lib/text-agents-server";
+import { getCrmUserId } from "@/lib/crm-auth";
 import {
   buildContactTimeline,
   mergeTimelineDaySummaries,
@@ -17,8 +18,8 @@ function normalizeMessages(raw: unknown): TextChatMessage[] {
 }
 
 export async function GET(req: NextRequest, ctx: Ctx) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(req, "view");
+  if (userId instanceof NextResponse) return userId;
 
   const { id } = await ctx.params;
   const db = textAgentsAdminClient();

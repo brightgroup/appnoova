@@ -21,6 +21,7 @@ import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import type { AccountStatus } from "@/types/rbac";
+import { parseOrgBranding } from "@/lib/org-branding";
 
 interface OrgRow {
   id: string;
@@ -31,6 +32,7 @@ interface OrgRow {
   created_at: string;
   member_count: number;
   is_protected?: boolean;
+  settings?: Record<string, unknown>;
   owner: { email: string; full_name: string | null } | null;
 }
 
@@ -95,6 +97,7 @@ export default function AdminOrganizationsPage() {
           owner_email: values.owner_email,
           owner_full_name: values.owner_full_name || undefined,
           owner_password: values.owner_password || undefined,
+          hide_noova_logo: values.hide_noova_logo,
         }),
       });
       const json = await res.json();
@@ -115,6 +118,7 @@ export default function AdminOrganizationsPage() {
           slug: values.slug || undefined,
           plan: values.plan,
           status: values.status,
+          hide_noova_logo: values.hide_noova_logo,
         }),
       });
       if (res.ok) {
@@ -188,12 +192,18 @@ export default function AdminOrganizationsPage() {
               <tbody>
                 {pageRows.map((o) => {
                   const protected_ = o.is_protected;
+                  const whiteLabel = parseOrgBranding(o.settings).hide_noova_logo;
                   return (
                     <tr key={o.id} className={registryTableRow}>
                       <td className={registryTableCellFirst}>
-                        <p className="text-sm font-medium text-white flex items-center gap-1.5">
+                        <p className="text-sm font-medium text-white flex items-center gap-1.5 flex-wrap">
                           {o.name}
                           {protected_ && <Shield className="w-3.5 h-3.5 text-[#5b5bf6]" aria-label="Protegida" />}
+                          {whiteLabel && (
+                            <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-white/[.08] text-gray-400">
+                              Sin logo
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs text-gray-600 font-mono">{o.slug}</p>
                       </td>
@@ -268,6 +278,7 @@ export default function AdminOrganizationsPage() {
           plan: modal.org.plan,
           status: modal.org.status,
           is_protected: modal.org.is_protected,
+          hide_noova_logo: parseOrgBranding(modal.org.settings).hide_noova_logo,
         } : undefined}
         saving={saving}
         onClose={() => setModal(null)}

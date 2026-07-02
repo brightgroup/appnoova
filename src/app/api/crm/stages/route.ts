@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTextAgentUserIdFromRequest, textAgentsAdminClient } from "@/lib/text-agents-server";
+import { textAgentsAdminClient } from "@/lib/text-agents-server";
+import { getCrmUserId } from "@/lib/crm-auth";
 import { isMissingTableError } from "@/lib/supabase-table-error";
 import { slugifyStageName, toCrmStage } from "@/lib/crm-record";
 import { getCrmStages } from "@/lib/crm-server";
 
 export async function GET(req: NextRequest) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(req, "view");
+  if (userId instanceof NextResponse) return userId;
 
   try {
     const db = textAgentsAdminClient();
@@ -20,8 +21,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(req, "edit");
+  if (userId instanceof NextResponse) return userId;
 
   const body = await req.json();
   const stagesIn = Array.isArray(body.stages) ? body.stages : [];

@@ -5,14 +5,14 @@ import { toTextAgentListItem, toTextAgentRecord } from "@/lib/text-agent-record"
 import { insertTextAgentRow, updateTextAgentRow } from "@/lib/text-agents-db";
 import { isMissingTableError } from "@/lib/supabase-table-error";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
-import { getOrgContextFromRequest } from "@/lib/org-server";
+import { requireOrgModule } from "@/lib/module-auth";
 
 function dbNotReady() {
   return NextResponse.json({ agents: [], dbReady: false });
 }
 
 export async function GET(req: NextRequest) {
-  const orgCtx = await getOrgContextFromRequest(req);
+  const orgCtx = await requireOrgModule(req, "text_agents", "view");
   if (orgCtx instanceof NextResponse) return orgCtx;
 
   const agentId = req.nextUrl.searchParams.get("id");
@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const orgCtx = await getOrgContextFromRequest(req);
+  const orgCtx = await requireOrgModule(req, "text_agents", "edit");
   if (orgCtx instanceof NextResponse) return orgCtx;
 
   const body = await req.json();
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const orgCtx = await getOrgContextFromRequest(req);
+  const orgCtx = await requireOrgModule(req, "text_agents", "manage");
   if (orgCtx instanceof NextResponse) return orgCtx;
 
   const agentId = req.nextUrl.searchParams.get("id");

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrgContextFromRequest } from "@/lib/org-server";
+import { requireOrgModule } from "@/lib/module-auth";
 import { parseExcelBuffer } from "@/lib/data-tables/parse-excel";
 import { validateDataTableImport } from "@/lib/data-tables/validate-import";
 
 /** POST — vista previa de importación Excel (sin guardar) */
 export async function POST(req: NextRequest) {
-  const ctx = await getOrgContextFromRequest(req);
+  const ctx = await requireOrgModule(req, "campaigns", "edit");
   if (ctx instanceof NextResponse) return ctx;
 
   const form = await req.formData();

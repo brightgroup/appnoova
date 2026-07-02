@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTextAgentUserIdFromRequest, textAgentsAdminClient } from "@/lib/text-agents-server";
+import { textAgentsAdminClient } from "@/lib/text-agents-server";
+import { getCrmUserId } from "@/lib/crm-auth";
 import { generateOriQuote, type CrmQuoteRecord } from "@/lib/crm-ai-extract";
 import { getDefaultCompanyContextContent } from "@/lib/company-context";
 import { getTenantLabels } from "@/lib/crm-labels";
@@ -8,8 +9,8 @@ import { toCrmContact } from "@/lib/crm-record";
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, ctx: Ctx) {
-  const userId = await getTextAgentUserIdFromRequest(_req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(_req, "view");
+  if (userId instanceof NextResponse) return userId;
 
   const { id } = await ctx.params;
   const db = textAgentsAdminClient();
@@ -22,8 +23,8 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
 }
 
 export async function POST(_req: NextRequest, ctx: Ctx) {
-  const userId = await getTextAgentUserIdFromRequest(_req);
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const userId = await getCrmUserId(_req, "edit");
+  if (userId instanceof NextResponse) return userId;
 
   const { id } = await ctx.params;
   const db = textAgentsAdminClient();
