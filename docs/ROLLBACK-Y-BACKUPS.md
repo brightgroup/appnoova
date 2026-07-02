@@ -43,7 +43,7 @@ Hard refresh en el navegador: **Cmd + Shift + R**.
 
 ## 2. Backup de Supabase (desde ya)
 
-### Automático en tu Mac (recomendado)
+### Manual (cuando quieras)
 
 ```bash
 npm run backup:db
@@ -53,7 +53,21 @@ npm run backup:db
 - Requiere `SUPABASE_DB_PASSWORD` en `.env.local`
 - **No se sube a GitHub** (contiene datos de clientes)
 
-**Frecuencia sugerida:** antes de cada migración SQL y al menos 1 vez por semana.
+### Automático en tu Mac (LaunchAgent, 03:30 diario)
+
+Instalar o reinstalar:
+
+```bash
+chmod +x scripts/run-backup-daily.sh
+cp scripts/com.appnoova.backup-db.plist ~/Library/LaunchAgents/
+launchctl unload ~/Library/LaunchAgents/com.appnoova.backup-db.plist 2>/dev/null || true
+launchctl load ~/Library/LaunchAgents/com.appnoova.backup-db.plist
+launchctl list | grep appnoova.backup
+```
+
+- Log: `backups/backup.log`
+- Retiene backups `.sql` de los últimos **30 días** (borra los más viejos)
+- La Mac debe estar encendida a las 03:30 (si está apagada, corre al despertar si `RunAtLoad` no aplica — para eso usa también backup manual antes de migraciones)
 
 ### Manual desde Supabase Dashboard
 

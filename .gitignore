@@ -35,4 +35,5 @@ next-env.d.ts
 *.zip
 backups/*.sql
 backups/*.dump
+backups/*.log
 !backups/.gitkeep
