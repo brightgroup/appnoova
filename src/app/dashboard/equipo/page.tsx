@@ -95,8 +95,8 @@ export default function EquipoPage() {
     }
 
     setOrgName(me.organization?.name ?? "");
-    setCanManage(me.permissions?.can_manage_team ?? false);
-    setCanAdmin(me.permissions?.can_admin_team ?? false);
+    setCanManage(me.flags?.can_manage_team ?? me.permissions_legacy?.can_manage_team ?? false);
+    setCanAdmin(me.flags?.can_admin_team ?? me.permissions_legacy?.can_admin_team ?? false);
 
     const [membersRes, rolesRes] = await Promise.all([
       authFetch("/api/org/members"),
