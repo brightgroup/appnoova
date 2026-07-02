@@ -19,6 +19,7 @@ import {
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
+import { useOrgPermissions } from "@/components/layout/OrgPermissionsProvider";
 import { ORG_SYSTEM_ROLE_LABELS, type OrgSystemRoleSlug } from "@/types/rbac";
 
 interface MemberRow {
@@ -60,43 +61,25 @@ function formatDate(iso: string) {
 }
 
 export default function EquipoPage() {
+  const { flags, orgName: permOrgName, loading: permLoading, can } = useOrgPermissions();
+  const canManage = flags.can_manage_team;
+  const canAdmin = flags.can_admin_team;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [invites, setInvites] = useState<InviteRow[]>([]);
   const [roles, setRoles] = useState<RoleOption[]>([]);
-  const [orgName, setOrgName] = useState("");
-  const [canManage, setCanManage] = useState(false);
-  const [canAdmin, setCanAdmin] = useState(false);
   const [seatLimit, setSeatLimit] = useState<{ used: number; max: number | null; remaining: number | null } | null>(null);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [roleMenuId, setRoleMenuId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [forbidden, setForbidden] = useState(false);
+  const forbidden = !permLoading && !can("org_users", "view");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    setForbidden(false);
-
-    const meRes = await authFetch("/api/org/me");
-    if (meRes.status === 403 || meRes.status === 404) {
-      setForbidden(true);
-      setLoading(false);
-      return;
-    }
-    const me = await meRes.json();
-    if (!meRes.ok) {
-      setError(me.error ?? "Error al cargar");
-      setLoading(false);
-      return;
-    }
-
-    setOrgName(me.organization?.name ?? "");
-    setCanManage(me.flags?.can_manage_team ?? me.permissions_legacy?.can_manage_team ?? false);
-    setCanAdmin(me.flags?.can_admin_team ?? me.permissions_legacy?.can_admin_team ?? false);
 
     const [membersRes, rolesRes] = await Promise.all([
       authFetch("/api/org/members"),
@@ -207,6 +190,17 @@ export default function EquipoPage() {
   const pagination = useRegistryPagination(filtered.length, search);
   const pageRows = pagination.pageRows(filtered);
   const seatsFull = seatLimit?.remaining === 0;
+  const orgName = permOrgName;
+
+  if (permLoading) {
+    return (
+      <div className={registryPage}>
+        <div className={registryTableLoading}>
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando equipo…
+        </div>
+      </div>
+    );
+  }
 
   if (forbidden) {
     return (
