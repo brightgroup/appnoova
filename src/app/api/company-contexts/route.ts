@@ -16,21 +16,25 @@ function toRecord(raw: Record<string, unknown>): CompanyContext {
   };
 }
 
-async function clearOtherDefaults(db: ReturnType<typeof adminClient>, userId: string, exceptId?: string) {
-  let q = db.from("company_contexts").update({ is_default: false }).eq("user_id", userId);
+async function clearOtherDefaults(
+  db: ReturnType<typeof adminClient>,
+  organizationId: string,
+  exceptId?: string
+) {
+  let q = db.from("company_contexts").update({ is_default: false }).eq("organization_id", organizationId);
   if (exceptId) q = q.neq("id", exceptId);
   await q;
 }
 
 /**
- * GET /api/company-contexts → lista del usuario
+ * GET /api/company-contexts → lista de la organización
  * GET /api/company-contexts?id= → uno
  * GET /api/company-contexts?default=1 → contexto por defecto
  */
 export async function GET(req: NextRequest) {
   const orgCtx = await requireOrgModule(req, "company_context", "view");
   if (orgCtx instanceof NextResponse) return orgCtx;
-  const userId = orgCtx.userId;
+  const orgId = orgCtx.organizationId;
 
   const db = adminClient();
   const id = req.nextUrl.searchParams.get("id");
@@ -41,7 +45,7 @@ export async function GET(req: NextRequest) {
       .from("company_contexts")
       .select("*")
       .eq("id", id)
-      .eq("user_id", userId)
+      .eq("organization_id", orgId)
       .maybeSingle();
 
     if (error) {
@@ -61,7 +65,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await db
       .from("company_contexts")
       .select("*")
-      .eq("user_id", userId)
+      .eq("organization_id", orgId)
       .eq("is_default", true)
       .maybeSingle();
 
@@ -81,7 +85,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await db
     .from("company_contexts")
     .select("*")
-    .eq("user_id", userId)
+    .eq("organization_id", orgId)
     .order("is_default", { ascending: false })
     .order("updated_at", { ascending: false });
 
@@ -103,6 +107,7 @@ export async function POST(req: NextRequest) {
   const orgCtx = await requireOrgModule(req, "company_context", "edit");
   if (orgCtx instanceof NextResponse) return orgCtx;
   const userId = orgCtx.userId;
+  const orgId = orgCtx.organizationId;
 
   const body = await req.json();
   const db = adminClient();
@@ -110,6 +115,7 @@ export async function POST(req: NextRequest) {
 
   const row = {
     user_id: userId,
+    organization_id: orgId,
     name: String(body.name ?? "").trim() || "Mi marca",
     content: String(body.content ?? ""),
     website_url: String(body.website_url ?? "").trim(),
@@ -118,7 +124,7 @@ export async function POST(req: NextRequest) {
   };
 
   if (body.is_default) {
-    await clearOtherDefaults(db, userId, body.id);
+    await clearOtherDefaults(db, orgId, body.id);
   }
 
   if (body.id) {
@@ -126,7 +132,7 @@ export async function POST(req: NextRequest) {
       .from("company_contexts")
       .update(row)
       .eq("id", body.id)
-      .eq("user_id", userId)
+      .eq("organization_id", orgId)
       .select()
       .single();
 
@@ -140,7 +146,7 @@ export async function POST(req: NextRequest) {
   const { count } = await db
     .from("company_contexts")
     .select("id", { count: "exact", head: true })
-    .eq("user_id", userId);
+    .eq("organization_id", orgId);
 
   const isFirst = (count ?? 0) === 0;
 
@@ -155,7 +161,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (row.is_default || isFirst) {
-    await clearOtherDefaults(db, userId, data.id);
+    await clearOtherDefaults(db, orgId, data.id);
   }
 
   return NextResponse.json({ context: toRecord(data), created: true });
@@ -165,7 +171,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const orgCtx = await requireOrgModule(req, "company_context", "manage");
   if (orgCtx instanceof NextResponse) return orgCtx;
-  const userId = orgCtx.userId;
+  const orgId = orgCtx.organizationId;
 
   const id = req.nextUrl.searchParams.get("id");
   if (!id) {
@@ -177,7 +183,7 @@ export async function DELETE(req: NextRequest) {
     .from("company_contexts")
     .delete()
     .eq("id", id)
-    .eq("user_id", userId);
+    .eq("organization_id", orgId);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

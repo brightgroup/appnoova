@@ -14,16 +14,16 @@ function dbNotReady() {
 
 /**
  * GET /api/voice/agents
- *   → lista de agentes del usuario autenticado (multitenant)
+ *   → lista de agentes de la organización
  * GET /api/voice/agents?id=
- *   → un agente del usuario
+ *   → un agente de la organización
  * GET /api/voice/agents?source_template=lead-qualification
  *   → solo defaults de plantilla en código (sin leer BD)
  */
 export async function GET(req: NextRequest) {
   const orgCtx = await requireOrgModule(req, "voice_agents", "view");
   if (orgCtx instanceof NextResponse) return orgCtx;
-  const userId = orgCtx.userId;
+  const orgId = orgCtx.organizationId;
 
   const agentId = req.nextUrl.searchParams.get("id");
   const sourceTemplateParam =
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       .from("voice_agents")
       .select("*")
       .eq("id", agentId)
-      .eq("user_id", userId)
+      .eq("organization_id", orgId)
       .maybeSingle();
 
     if (error) {
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await db
     .from("voice_agents")
     .select("*")
-    .eq("user_id", userId)
+    .eq("organization_id", orgId)
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -101,6 +101,7 @@ export async function POST(req: NextRequest) {
   const orgCtx = await requireOrgModule(req, "voice_agents", "edit");
   if (orgCtx instanceof NextResponse) return orgCtx;
   const userId = orgCtx.userId;
+  const orgId = orgCtx.organizationId;
 
   const body = await req.json();
   const sourceTemplate = resolveBaseTemplateId(
@@ -125,7 +126,7 @@ export async function POST(req: NextRequest) {
     const { count } = await db
       .from("voice_agents")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", userId);
+      .eq("organization_id", orgId);
     const n = (count ?? 0) + 1;
     if (n > 1 && agentName === defaults.name) {
       agentName = `${defaults.name} (${n})`;
@@ -134,6 +135,7 @@ export async function POST(req: NextRequest) {
 
   const row = {
     user_id: userId,
+    organization_id: orgId,
     source_template: sourceTemplate,
     template_id: sourceTemplate,
     name: agentName,
@@ -155,7 +157,7 @@ export async function POST(req: NextRequest) {
       .from("voice_agents")
       .select("voice_provider, elevenlabs_agent_id")
       .eq("id", body.id)
-      .eq("user_id", userId)
+      .eq("organization_id", orgId)
       .maybeSingle();
 
     if (existingErr) {
@@ -198,12 +200,12 @@ export async function POST(req: NextRequest) {
       db,
       { ...row, voice_provider: lockedProvider, ...elevenlabsFields },
       body.id,
-      userId
+      orgId
     );
 
     if (error?.message?.includes("company_context_id")) {
       const { company_context_id: _c, ...rest } = row;
-      ({ data, error } = await updateVoiceAgentRow(db, rest, body.id, userId));
+      ({ data, error } = await updateVoiceAgentRow(db, rest, body.id, orgId));
     }
 
     if (error) {
@@ -244,11 +246,11 @@ export async function POST(req: NextRequest) {
   });
 }
 
-/** DELETE /api/voice/agents?id= — elimina agente del usuario (cascade en llamadas) */
+/** DELETE /api/voice/agents?id= — elimina agente de la organización */
 export async function DELETE(req: NextRequest) {
   const orgCtx = await requireOrgModule(req, "voice_agents", "manage");
   if (orgCtx instanceof NextResponse) return orgCtx;
-  const userId = orgCtx.userId;
+  const orgId = orgCtx.organizationId;
 
   const agentId = req.nextUrl.searchParams.get("id");
   if (!agentId) {
@@ -261,7 +263,7 @@ export async function DELETE(req: NextRequest) {
     .from("voice_agents")
     .select("id, elevenlabs_agent_id, voice_provider")
     .eq("id", agentId)
-    .eq("user_id", userId)
+    .eq("organization_id", orgId)
     .maybeSingle();
 
   if (fetchErr) {
@@ -275,7 +277,7 @@ export async function DELETE(req: NextRequest) {
     .from("voice_agents")
     .delete()
     .eq("id", agentId)
-    .eq("user_id", userId);
+    .eq("organization_id", orgId);
 
   if (deleteErr) {
     return NextResponse.json({ error: deleteErr.message }, { status: 500 });

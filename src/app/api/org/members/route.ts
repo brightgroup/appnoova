@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOrgContextFromRequest, getOrgRoleById } from "@/lib/org-server";
 import { adminClient } from "@/lib/voice-agents-server";
-import { createAuthUser } from "@/lib/admin-provisioning";
+import { createAuthUser, updateOrgMemberProfile } from "@/lib/admin-provisioning";
 import { getAgencyAccessLoginUrl } from "@/lib/agency-access-url";
 import { assertOrgHasAvailableSeat, getOrgSeatSnapshot } from "@/lib/org-seats";
 import { canAssignOrgRole } from "@/lib/org-member-roles";
@@ -257,6 +257,8 @@ export async function PATCH(req: NextRequest) {
   const memberId = body.member_id as string | undefined;
   const roleId = body.role_id as string | undefined;
   const status = body.status as AccountStatus | undefined;
+  const fullName = (body.full_name as string | undefined)?.trim();
+  const password = (body.password as string | undefined)?.trim();
 
   const minLevel = status && status !== "active" ? "manage" : "edit";
   const ctx = await getOrgContextFromRequest(req, { module: "org_users", minLevel });
@@ -306,6 +308,22 @@ export async function PATCH(req: NextRequest) {
   }
 
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  let profileUpdated = false;
+
+  if (fullName !== undefined || password) {
+    try {
+      await updateOrgMemberProfile(db, target.user_id, {
+        fullName: fullName || undefined,
+        password: password || undefined,
+      });
+      profileUpdated = Boolean(fullName || password);
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Error al actualizar perfil" },
+        { status: 400 }
+      );
+    }
+  }
 
   if (roleId) {
     const role = await getOrgRoleById(db, ctx.organizationId, roleId);
@@ -328,8 +346,12 @@ export async function PATCH(req: NextRequest) {
     updates.status = status;
   }
 
-  if (Object.keys(updates).length <= 1) {
+  if (Object.keys(updates).length <= 1 && !profileUpdated) {
     return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
+  }
+
+  if (Object.keys(updates).length <= 1) {
+    return NextResponse.json({ ok: true, member_id: memberId });
   }
 
   const { data, error } = await db

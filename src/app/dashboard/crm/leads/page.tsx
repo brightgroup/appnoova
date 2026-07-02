@@ -20,6 +20,7 @@ import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { CrmLeadsKanban } from "@/components/crm/CrmLeadsKanban";
+import { useModuleWriteAccess } from "@/components/layout/DashboardRouteGuard";
 import type { CrmLead, CrmLeadFilter, CrmLeadsView, CrmPipelineStage } from "@/types/crm";
 
 function outcomeBadge(outcome: CrmLead["outcome"]) {
@@ -30,6 +31,7 @@ function outcomeBadge(outcome: CrmLead["outcome"]) {
 
 export default function CrmLeadsPage() {
   const router = useRouter();
+  const { canWrite } = useModuleWriteAccess("crm", "edit");
   const [leads, setLeads] = useState<CrmLead[]>([]);
   const [stages, setStages] = useState<CrmPipelineStage[]>([]);
   const [view, setView] = useState<CrmLeadsView>("kanban");
@@ -130,9 +132,11 @@ export default function CrmLeadsPage() {
               <Link href="/dashboard/crm/configuracion" className={btnGhost}>
                 <Settings className="w-4 h-4" />
               </Link>
-              <Link href="/dashboard/crm/leads/nuevo" className={btnPrimary}>
-                <Plus className="w-4 h-4" /> Nuevo lead
-              </Link>
+              {canWrite && (
+                <Link href="/dashboard/crm/leads/nuevo" className={btnPrimary}>
+                  <Plus className="w-4 h-4" /> Nuevo lead
+                </Link>
+              )}
             </div>
           }
           footer={!loading && view === "list" && filteredLeads.length > 0 ? (

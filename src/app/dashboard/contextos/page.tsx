@@ -4,11 +4,15 @@ import { useState, useEffect, useCallback } from "react";
 import { Building2, Plus, Save, Loader2, Trash2, Star, Sparkles, Globe } from "lucide-react";
 import { btnPrimary } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
+import { useModuleWriteAccess } from "@/components/layout/DashboardRouteGuard";
 import type { CompanyContext } from "@/types/company-context";
 
 const emptyForm = { name: "", content: "", website_url: "", is_default: false };
 
 export default function ContextosPage() {
+  const { canWrite } = useModuleWriteAccess("company_context", "edit");
+  const { canWrite: canDelete } = useModuleWriteAccess("company_context", "manage");
+  const readOnly = !canWrite;
   const [contexts, setContexts] = useState<CompanyContext[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -148,7 +152,8 @@ export default function ContextosPage() {
         </div>
         <button
           onClick={handleNew}
-          className={`${btnPrimary} text-sm`}
+          disabled={readOnly}
+          className={`${btnPrimary} text-sm disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           <Plus className="w-4 h-4" /> Nueva marca
         </button>
@@ -204,6 +209,7 @@ export default function ContextosPage() {
                 <input
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  disabled={readOnly}
                   className={inputCls}
                   placeholder="Ej. Mi Empresa, Marca comercial"
                 />
@@ -217,23 +223,26 @@ export default function ContextosPage() {
                       type="url"
                       value={form.website_url}
                       onChange={e => setForm(f => ({ ...f, website_url: e.target.value }))}
+                      disabled={readOnly}
                       className={`${inputCls} pl-10`}
                       placeholder="https://tucorreduria.com"
                     />
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleGenerateFromUrl}
-                    disabled={generating || !form.website_url.trim()}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5b5bf6] hover:bg-[#7070f8] text-sm font-semibold whitespace-nowrap disabled:opacity-40 shrink-0 text-white"
-                  >
-                    {generating ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-4 h-4" />
-                    )}
-                    {generating ? "Leyendo..." : "Generar contexto"}
-                  </button>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={handleGenerateFromUrl}
+                      disabled={generating || !form.website_url.trim()}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5b5bf6] hover:bg-[#7070f8] text-sm font-semibold whitespace-nowrap disabled:opacity-40 shrink-0 text-white"
+                    >
+                      {generating ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-4 h-4" />
+                      )}
+                      {generating ? "Leyendo..." : "Generar contexto"}
+                    </button>
+                  )}
                 </div>
                 <p className="mt-2 text-[11px] text-gray-500 leading-relaxed">
                   Genera un contexto listo para agentes (Voice Agent Context) con productos, casos de uso, tono y frases de marca.
@@ -244,40 +253,45 @@ export default function ContextosPage() {
                 <textarea
                   value={form.content}
                   onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
+                  readOnly={readOnly}
                   rows={14}
                   className={`${inputCls} font-mono text-sm leading-relaxed resize-y min-h-[280px]`}
                   placeholder={`Ejemplo:\n- Empresa ABC, Bogotá\n- Productos: servicios, planes o catálogo principal\n- Horario: lun–vie 8am–6pm\n- Tono: profesional y cercano`}
                 />
               </Field>
 
-              <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.is_default}
-                  onChange={e => setForm(f => ({ ...f, is_default: e.target.checked }))}
-                  className="rounded border-white/20"
-                />
-                Usar como contexto por defecto (Ori y agentes sin marca asignada)
-              </label>
+              {!readOnly && (
+                <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.is_default}
+                    onChange={e => setForm(f => ({ ...f, is_default: e.target.checked }))}
+                    className="rounded border-white/20"
+                  />
+                  Usar como contexto por defecto (Ori y agentes sin marca asignada)
+                </label>
+              )}
 
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  onClick={handleSave}
-                  disabled={saving || !dbReady}
-                  className={`${btnPrimary} disabled:opacity-50`}
-                >
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  Guardar
-                </button>
-                {selectedId && (
+              {!readOnly && (
+                <div className="flex items-center gap-3 pt-2">
                   <button
-                    onClick={() => handleDelete(selectedId)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-red-400 hover:bg-red-500/10"
+                    onClick={handleSave}
+                    disabled={saving || !dbReady}
+                    className={`${btnPrimary} disabled:opacity-50`}
                   >
-                    <Trash2 className="w-4 h-4" /> Eliminar
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    Guardar
                   </button>
-                )}
-              </div>
+                  {selectedId && canDelete && (
+                    <button
+                      onClick={() => handleDelete(selectedId)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-red-400 hover:bg-red-500/10"
+                    >
+                      <Trash2 className="w-4 h-4" /> Eliminar
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">

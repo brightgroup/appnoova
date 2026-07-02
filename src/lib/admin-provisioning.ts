@@ -80,6 +80,28 @@ export async function createAuthUser(
   };
 }
 
+export async function updateOrgMemberProfile(
+  db: Db,
+  userId: string,
+  input: { fullName?: string; password?: string }
+) {
+  const fullName = input.fullName?.trim();
+  const password = input.password?.trim();
+
+  if (fullName) {
+    await db.from("profiles").update({ full_name: fullName, updated_at: new Date().toISOString() }).eq("id", userId);
+    await db.from("users").update({ nombre: fullName }).eq("id", userId);
+    await db.auth.admin.updateUserById(userId, {
+      user_metadata: { full_name: fullName },
+    });
+  }
+
+  if (password) {
+    const { error } = await db.auth.admin.updateUserById(userId, { password });
+    if (error) throw new Error(error.message);
+  }
+}
+
 export async function resolveUserIdByEmail(db: Db, email: string): Promise<string | null> {
   const { data } = await db.from("profiles").select("id").ilike("email", email.trim().toLowerCase()).maybeSingle();
   return data?.id ?? null;

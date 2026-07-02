@@ -56,7 +56,7 @@ export async function updateVoiceAgentRow(
   db: SupabaseClient,
   row: AgentRow,
   id: string,
-  userId: string
+  organizationId: string
 ) {
   await detectVoiceAgentsSchema(db);
 
@@ -70,7 +70,7 @@ export async function updateVoiceAgentRow(
     .from("voice_agents")
     .update(payload)
     .eq("id", id)
-    .eq("user_id", userId)
+    .eq("organization_id", organizationId)
     .select()
     .single();
 
@@ -79,7 +79,7 @@ export async function updateVoiceAgentRow(
       .from("voice_agents")
       .update(stripSourceTemplate(row))
       .eq("id", id)
-      .eq("user_id", userId)
+      .eq("organization_id", organizationId)
       .select()
       .single();
   }

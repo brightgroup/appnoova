@@ -5,6 +5,7 @@ import { Plus, MoreVertical, ChevronLeft, Mic, PhoneCall, Loader2, Trash2, Refre
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
+import { useModuleWriteAccess } from "@/components/layout/DashboardRouteGuard";
 import {
   btnPrimary, btnIcon, btnIconSm, registryPage, registryContent, registryRowIcon,
   registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
@@ -30,6 +31,8 @@ import type { VoiceAgentListItem } from "@/types/voice-agent";
 export default function AgentesVozPage() {
   const router = useRouter();
   const pathname = usePathname();
+  const { canWrite } = useModuleWriteAccess("voice_agents", "edit");
+  const { canWrite: canDelete } = useModuleWriteAccess("voice_agents", "manage");
   const [searchTerm, setSearchTerm] = useState("");
   const [agents, setAgents] = useState<VoiceAgentListItem[]>([]);
   const [loadingAgents, setLoadingAgents] = useState(true);
@@ -159,9 +162,11 @@ export default function AgentesVozPage() {
           onRefresh={loadAgents}
           refreshing={loadingAgents}
           action={
-            <button onClick={() => setShowWizard(true)} className={btnPrimary}>
-              <Plus className="w-4 h-4" /> Nuevo agente
-            </button>
+            canWrite ? (
+              <button onClick={() => setShowWizard(true)} className={btnPrimary}>
+                <Plus className="w-4 h-4" /> Nuevo agente
+              </button>
+            ) : undefined
           }
           error={listError ? (
             <>
@@ -267,17 +272,19 @@ export default function AgentesVozPage() {
                         <NoovaListMenuItem onClick={() => openAgent(agent.id)}>
                           Abrir configuración
                         </NoovaListMenuItem>
-                        <NoovaListMenuItem
-                          danger
-                          onClick={() => {
-                            setMenuAgentId(null);
-                            setDeleteTarget(agent);
-                          }}
-                        >
-                          <span className="flex items-center gap-2">
-                            <Trash2 className="w-3.5 h-3.5" /> Eliminar agente
-                          </span>
-                        </NoovaListMenuItem>
+                        {canDelete && (
+                          <NoovaListMenuItem
+                            danger
+                            onClick={() => {
+                              setMenuAgentId(null);
+                              setDeleteTarget(agent);
+                            }}
+                          >
+                            <span className="flex items-center gap-2">
+                              <Trash2 className="w-3.5 h-3.5" /> Eliminar agente
+                            </span>
+                          </NoovaListMenuItem>
+                        )}
                       </NoovaAnchoredMenu>
                     </td>
                   </tr>
@@ -321,7 +328,7 @@ export default function AgentesVozPage() {
 
       <AgentCreationWizard
         channel="voice"
-        open={showWizard}
+        open={showWizard && canWrite}
         onClose={() => setShowWizard(false)}
         onCreated={handleAgentCreated}
         getAuthHeaders={getAuthHeaders}

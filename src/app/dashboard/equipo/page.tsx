@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Users, RefreshCw, UserPlus, Shield, ChevronDown, CheckCircle,
-  PauseCircle, Trash2, Mail, AlertCircle, Loader2, ChevronLeft
+  Users, RefreshCw, UserPlus, Shield, CheckCircle,
+  PauseCircle, Trash2, Mail, AlertCircle, Loader2, ChevronLeft, MoreVertical, Pencil
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { InviteMemberModal } from "@/components/equipo/InviteMemberModal";
+import { EditMemberModal, type EditMemberValues } from "@/components/equipo/EditMemberModal";
 import { NoovaAnchoredMenu } from "@/components/ui/NoovaAnchoredMenu";
 import { NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 import {
@@ -72,8 +73,9 @@ export default function EquipoPage() {
   const [seatLimit, setSeatLimit] = useState<{ used: number; max: number | null; remaining: number | null } | null>(null);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [editMember, setEditMember] = useState<EditMemberValues | null>(null);
   const [saving, setSaving] = useState(false);
-  const [roleMenuId, setRoleMenuId] = useState<string | null>(null);
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const forbidden = !permLoading && !can("org_users", "view");
 
@@ -119,33 +121,31 @@ export default function EquipoPage() {
     if (res.ok) {
       setModalOpen(false);
       await load();
-      const lines = [json.message].filter(Boolean);
-      if (json.temporary_password) {
-        lines.push(`Contraseña temporal: ${json.temporary_password}`);
-      }
-      if (json.login_url) {
-        lines.push(`Link de ingreso: ${json.login_url}`);
-      }
-      if (lines.length) alert(lines.join("\n\n"));
     } else {
       alert(json.error ?? "Error al agregar");
     }
     setSaving(false);
   }
 
-  async function changeRole(memberId: string, roleId: string) {
-    setBusyId(memberId);
-    setRoleMenuId(null);
+  async function handleEdit(data: EditMemberValues) {
+    setSaving(true);
     const res = await authFetch("/api/org/members", {
       method: "PATCH",
-      body: JSON.stringify({ member_id: memberId, role_id: roleId }),
+      body: JSON.stringify({
+        member_id: data.member_id,
+        role_id: data.role_id,
+        full_name: data.full_name,
+        password: data.password,
+      }),
     });
-    if (res.ok) await load();
-    else {
-      const json = await res.json();
-      alert(json.error ?? "Error");
+    const json = await res.json();
+    if (res.ok) {
+      setEditMember(null);
+      await load();
+    } else {
+      alert(json.error ?? "Error al guardar");
     }
-    setBusyId(null);
+    setSaving(false);
   }
 
   async function setMemberStatus(memberId: string, status: string) {
@@ -378,64 +378,73 @@ export default function EquipoPage() {
                           ) : m.is_owner ? (
                             <span className="text-xs text-gray-600">Propietario</span>
                           ) : (
-                            <div className="flex items-center gap-2">
-                              {!m.is_owner && (
-                                <NoovaAnchoredMenu
-                                  open={roleMenuId === m.id}
-                                  onClose={() => setRoleMenuId(null)}
-                                  menuClassName="w-44"
-                                  anchor={
-                                    <button
-                                      type="button"
-                                      onClick={() => setRoleMenuId(p => (p === m.id ? null : m.id))}
-                                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs border border-white/[.08] text-gray-400 hover:text-white"
-                                    >
-                                      Rol <ChevronDown className="w-3 h-3" />
-                                    </button>
-                                  }
-                                >
-                                  {roles.map(r => (
-                                    <NoovaListMenuItem
-                                      key={r.id}
-                                      active={r.id === m.role_id}
-                                      onClick={() => changeRole(m.id, r.id)}
-                                    >
-                                      {r.name}
-                                    </NoovaListMenuItem>
-                                  ))}
-                                </NoovaAnchoredMenu>
-                              )}
-                              {canAdmin && m.status === "active" && (
+                            <NoovaAnchoredMenu
+                              open={actionMenuId === m.id}
+                              onClose={() => setActionMenuId(null)}
+                              menuClassName="w-48"
+                              anchor={
                                 <button
                                   type="button"
-                                  onClick={() => setMemberStatus(m.id, "suspended")}
-                                  className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400"
-                                  title="Suspender"
+                                  onClick={() => setActionMenuId(p => (p === m.id ? null : m.id))}
+                                  className="p-1.5 rounded-lg border border-white/[.08] text-gray-400 hover:text-white"
+                                  title="Acciones"
                                 >
-                                  <PauseCircle className="w-4 h-4" />
+                                  <MoreVertical className="w-4 h-4" />
                                 </button>
+                              }
+                            >
+                              <NoovaListMenuItem
+                                onClick={() => {
+                                  setActionMenuId(null);
+                                  setEditMember({
+                                    member_id: m.id,
+                                    email: m.email,
+                                    full_name: m.full_name ?? "",
+                                    role_id: m.role_id,
+                                  });
+                                }}
+                              >
+                                <span className="inline-flex items-center gap-2">
+                                  <Pencil className="w-3.5 h-3.5" /> Editar
+                                </span>
+                              </NoovaListMenuItem>
+                              {canAdmin && m.status === "active" && (
+                                <NoovaListMenuItem
+                                  onClick={() => {
+                                    setActionMenuId(null);
+                                    void setMemberStatus(m.id, "suspended");
+                                  }}
+                                >
+                                  <span className="inline-flex items-center gap-2">
+                                    <PauseCircle className="w-3.5 h-3.5" /> Suspender
+                                  </span>
+                                </NoovaListMenuItem>
                               )}
                               {canAdmin && m.status === "suspended" && (
-                                <button
-                                  type="button"
-                                  onClick={() => setMemberStatus(m.id, "active")}
-                                  className="p-1.5 rounded-lg bg-green-500/10 text-green-400"
-                                  title="Activar"
+                                <NoovaListMenuItem
+                                  onClick={() => {
+                                    setActionMenuId(null);
+                                    void setMemberStatus(m.id, "active");
+                                  }}
                                 >
-                                  <CheckCircle className="w-4 h-4" />
-                                </button>
+                                  <span className="inline-flex items-center gap-2">
+                                    <CheckCircle className="w-3.5 h-3.5" /> Activar
+                                  </span>
+                                </NoovaListMenuItem>
                               )}
                               {canAdmin && (
-                                <button
-                                  type="button"
-                                  onClick={() => removeMember(m.id)}
-                                  className="p-1.5 rounded-lg bg-red-500/10 text-red-400"
-                                  title="Quitar"
+                                <NoovaListMenuItem
+                                  onClick={() => {
+                                    setActionMenuId(null);
+                                    void removeMember(m.id);
+                                  }}
                                 >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                                  <span className="inline-flex items-center gap-2 text-red-400">
+                                    <Trash2 className="w-3.5 h-3.5" /> Quitar del equipo
+                                  </span>
+                                </NoovaListMenuItem>
                               )}
-                            </div>
+                            </NoovaAnchoredMenu>
                           )}
                         </td>
                       )}
@@ -455,6 +464,15 @@ export default function EquipoPage() {
         seatsRemaining={seatLimit?.remaining ?? null}
         onClose={() => setModalOpen(false)}
         onSubmit={handleInvite}
+      />
+
+      <EditMemberModal
+        open={editMember != null}
+        member={editMember}
+        roles={roles}
+        saving={saving}
+        onClose={() => setEditMember(null)}
+        onSubmit={handleEdit}
       />
     </div>
   );
