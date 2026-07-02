@@ -144,7 +144,7 @@ export const inputSearch =
 
 /** Contenedor del menú desplegable (NoovaSelect) — no usar en tablas */
 export const registryListShell =
-  "rounded-xl border border-[var(--nv-border-strong)] bg-[var(--nv-bg-control)] overflow-hidden shadow-[var(--nv-shadow-lg)]";
+  "nv-select-menu rounded-xl border border-[var(--nv-border-strong)] bg-[var(--nv-bg-popover)] overflow-hidden shadow-[var(--nv-shadow-lg)]";
 
 /* ── Tablas (registro de llamadas / agentes) — sin recuadros, solo líneas horizontales ── */
 export const registryPage =

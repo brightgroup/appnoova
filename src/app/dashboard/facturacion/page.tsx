@@ -12,7 +12,7 @@ import {
   registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
   registryTableRow, registryTableCell, registryTableCellFirst,
   registryTableEmpty, registryTableFooter, registrySearchRow,
-  registryTableArea, inputSearch, btnIcon, accentBadge, textMuted
+  registryTableArea, inputSearch, btnIcon, textMuted
 } from "@/lib/brand-ui";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
@@ -728,7 +728,7 @@ export default function FacturacionPage() {
                     return (
                       <div
                         key={p.id}
-                        className={`relative rounded-xl border flex flex-col transition-all bg-white ${
+                        className={`relative rounded-xl border flex flex-col transition-all bg-[var(--nv-bg-module)] ${
                           isActive
                             ? "border-[var(--nv-accent)]/40 shadow-sm"
                             : "border-[var(--nv-border)] hover:border-[var(--nv-border-strong)]"
@@ -755,30 +755,30 @@ export default function FacturacionPage() {
                           {/* Nombre + precio */}
                           <div>
                             <h3 className="text-sm font-bold text-[var(--nv-text)]">{p.name}</h3>
-                            <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">{copy.tagline}</p>
+                            <p className="text-[11px] text-[var(--nv-text-muted)] mt-0.5 leading-relaxed">{copy.tagline}</p>
                           </div>
                           <div className="flex items-baseline gap-1 flex-wrap">
                             {isActive && planPromo?.price_discount_pct ? (
                               <>
-                                <span className="text-sm text-gray-500 line-through mr-1">${fmtN(p.price_usd)}</span>
-                                <span className="text-xs text-gray-400">US$</span>
-                                <span className="text-3xl font-extrabold text-green-300">{fmtN(displayPrice)}</span>
-                                <span className="text-xs text-gray-500">/mes</span>
+                                <span className="text-sm text-[var(--nv-text-muted)] line-through mr-1">${fmtN(p.price_usd)}</span>
+                                <span className="text-xs text-[var(--nv-text-faint)]">US$</span>
+                                <span className="text-3xl font-extrabold text-green-400">{fmtN(displayPrice)}</span>
+                                <span className="text-xs text-[var(--nv-text-muted)]">/mes</span>
                               </>
                             ) : (
                               <>
-                                <span className="text-xs text-gray-400">US$</span>
+                                <span className="text-xs text-[var(--nv-text-faint)]">US$</span>
                                 <span className="text-3xl font-extrabold text-[var(--nv-text)]">{fmtN(displayPrice)}</span>
-                                <span className="text-xs text-gray-500">/mes</span>
+                                <span className="text-xs text-[var(--nv-text-muted)]">/mes</span>
                               </>
                             )}
                           </div>
 
                           {/* Barra de créditos si es el plan activo */}
                           {isActive && (
-                            <div className="py-3 border-y border-white/[.06] space-y-2">
+                            <div className="py-3 border-y border-[var(--nv-border)] space-y-2">
                               <div>
-                                <div className="flex justify-between text-[10px] text-gray-400 mb-1.5">
+                                <div className="flex justify-between text-[10px] text-[var(--nv-text-muted)] mb-1.5">
                                   <span>Créditos usados</span>
                                   <span>{fmtN(wallet?.used_credits ?? 0)} / {fmtN(planMonthlyCredits)}</span>
                                 </div>
@@ -794,19 +794,19 @@ export default function FacturacionPage() {
                             {isActive && planPromo?.credits_bonus_pct ? (
                               <>
                                 {fmtN(displayCredits)} créditos/mes
-                                <span className="text-gray-500 line-through font-normal ml-1">{fmtN(p.monthly_credits)}</span>
-                                <span className="text-green-300 font-normal ml-1">+{planPromo.credits_bonus_pct}%</span>
+                                <span className="text-[var(--nv-text-muted)] line-through font-normal ml-1">{fmtN(p.monthly_credits)}</span>
+                                <span className="text-green-400 font-normal ml-1">+{planPromo.credits_bonus_pct}%</span>
                               </>
                             ) : (
                               <>{fmtN(displayCredits)} créditos/mes</>
                             )}
                             {p.max_users != null && (
-                              <span className="text-gray-400 font-normal ml-1">· hasta {p.max_users} usuarios</span>
+                              <span className="text-[var(--nv-text-muted)] font-normal ml-1">· hasta {p.max_users} usuarios</span>
                             )}
                             {p.max_users == null && p.price_usd > 0 && (
-                              <span className="text-gray-400 font-normal ml-1">· usuarios ilimitados</span>
+                              <span className="text-[var(--nv-text-muted)] font-normal ml-1">· usuarios ilimitados</span>
                             )}
-                            {p.trial_days > 0 && <span className="text-gray-500 font-normal ml-1">· {p.trial_days} días gratis</span>}
+                            {p.trial_days > 0 && <span className="text-[var(--nv-text-faint)] font-normal ml-1">· {p.trial_days} días gratis</span>}
                           </p>
 
                           {/* Features */}
@@ -814,13 +814,13 @@ export default function FacturacionPage() {
                             {copy.features.map(f => (
                               <li key={f} className="flex items-start gap-2">
                                 <CheckCircle2 className="w-3 h-3 text-[#5b5bf6] shrink-0 mt-0.5" />
-                                <span className="text-gray-300">{f}</span>
+                                <span className="text-[var(--nv-text-muted)]">{f}</span>
                               </li>
                             ))}
                           </ul>
 
                           {/* Ideal para */}
-                          <p className="text-[10px] text-gray-500 italic">{copy.ideal}</p>
+                          <p className="text-[10px] text-[var(--nv-text-faint)] italic">{copy.ideal}</p>
                         </div>
 
                         {/* Pie de tarjeta */}
@@ -841,7 +841,7 @@ export default function FacturacionPage() {
                 </div>
 
                 {/* Nota informativa */}
-                <div className="rounded-xl border border-white/[.06] bg-white/[.02] p-4 flex items-start gap-3 text-sm text-gray-400">
+                <div className="rounded-xl border border-[var(--nv-border)] bg-[var(--nv-bg-control)] p-4 flex items-start gap-3 text-sm text-[var(--nv-text-muted)]">
                   <Info className="w-4 h-4 text-[#5b5bf6] shrink-0 mt-0.5" />
                   <p>
                     Los planes se activan manualmente por tu asesor.
@@ -944,16 +944,23 @@ export default function FacturacionPage() {
                 </div>
 
                 {/* Paginación + total */}
-                <div className={registryTableFooter}>
-                  <RegistryTablePagination
-                    {...uPag}
-                    onPageChange={uPag.setPage}
-                    onPageSizeChange={uPag.setPageSize}
-                    label="entradas"
-                  />
-                  <div className="flex items-center gap-2 text-sm font-bold text-white ml-auto">
-                    <Receipt className="w-4 h-4 text-[#5b5bf6]" />
-                    Total: <span className={accentBadge}>{fmtN(totalUsageCredits)} cr</span>
+                <div className="flex flex-wrap items-center gap-3 w-full pt-4 pb-2 shrink-0">
+                  <div className="flex-1 flex justify-center min-w-0">
+                    <RegistryTablePagination
+                      {...uPag}
+                      onPageChange={uPag.setPage}
+                      onPageSizeChange={uPag.setPageSize}
+                      label="entradas"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 text-sm font-bold text-[var(--nv-text)] shrink-0 whitespace-nowrap">
+                    <Receipt className="w-4 h-4 text-[#5b5bf6] shrink-0" />
+                    <span>
+                      Total:{" "}
+                      <span className="tabular-nums text-[var(--nv-hubspot-teal)]">
+                        {fmtN(totalUsageCredits)} cr
+                      </span>
+                    </span>
                   </div>
                 </div>
               </div>

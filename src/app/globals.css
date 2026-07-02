@@ -60,6 +60,7 @@
   --nv-bg-main: #212121;
   --nv-bg-surface: #2d2d2d;
   --nv-bg-elevated: #333333;
+  --nv-bg-module: #2d2d2d;
   --nv-bg-control: rgba(255, 255, 255, 0.06);
   --nv-bg-control-hover: rgba(255, 255, 255, 0.09);
   --nv-bg-chat: #111113;
@@ -936,8 +937,16 @@ html:not(.dark) [data-noova-dashboard] .nv-select-trigger {
 }
 html:not(.dark) [data-noova-dashboard] .nv-select-menu,
 html:not(.dark) [data-noova-dashboard] [role="listbox"] {
-  background-color: var(--nv-bg-control) !important;
+  background-color: var(--nv-bg-popover) !important;
   color: var(--nv-text) !important;
+}
+
+.dark .nv-select-menu,
+.dark [role="listbox"].nv-select-menu {
+  background-color: var(--nv-bg-popover) !important;
+  border-color: var(--nv-border-strong) !important;
+  color: var(--nv-text) !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55) !important;
 }
 
 html:not(.dark) [data-noova-dashboard] [role="listbox"] button:hover:not([class*="145,174"]) {

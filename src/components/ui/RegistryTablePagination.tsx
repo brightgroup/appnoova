@@ -35,7 +35,7 @@ export function RegistryTablePagination({
     : 25;
 
   return (
-    <div className="flex justify-center w-full select-none" role="navigation" aria-label="Paginación de tabla">
+    <div className="flex justify-center select-none" role="navigation" aria-label="Paginación de tabla">
       <div className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-2xl border border-[var(--nv-border)] bg-[var(--nv-bg-elevated)] shadow-[var(--nv-shadow-sm)]">
         <NavBtn disabled={pageSafe <= 1} onClick={() => go(1)} label="Primera página">
           <ChevronsLeft className="w-4 h-4" strokeWidth={1.75} />
