@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { X, Lock } from "lucide-react";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import {
-  ORG_MODULE_LABELS,
-  ORG_PERMISSION_MODULE_KEYS,
+  ORG_ROLE_UI_MODULE_KEYS,
   PERMISSION_LEVEL_LABELS,
   countActivePermissions,
+  ORG_MODULE_LABELS,
   type PermissionLevel,
 } from "@/types/rbac";
 import { btnPrimary, btnGhost } from "@/lib/brand-ui";
@@ -95,7 +95,7 @@ export function RoleEditorModal({
           <div>
             <p className="text-sm font-medium mb-3">Permisos</p>
             <div className="space-y-2">
-              {ORG_PERMISSION_MODULE_KEYS.map((key) => (
+              {ORG_ROLE_UI_MODULE_KEYS.map((key) => (
                 <div
                   key={key}
                   className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-white/[.03] border border-white/[.06]"

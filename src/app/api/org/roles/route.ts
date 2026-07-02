@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOrgContextFromRequest } from "@/lib/org-server";
 import { adminClient } from "@/lib/voice-agents-server";
+import { assignableRoleSlugsForCaller } from "@/lib/org-member-roles";
 
 /** GET — roles asignables en la organización (sin owner) */
 export async function GET(req: NextRequest) {
   const ctx = await getOrgContextFromRequest(req, { module: "org_users", minLevel: "view" });
   if (ctx instanceof NextResponse) return ctx;
+
+  const assignableSlugs = assignableRoleSlugsForCaller(ctx.membership.role_slug);
+  if (assignableSlugs.length === 0) {
+    return NextResponse.json({ roles: [] });
+  }
 
   const db = adminClient();
   const { data: roles, error } = await db
@@ -13,9 +19,15 @@ export async function GET(req: NextRequest) {
     .select("id, slug, name, description, is_system")
     .eq("organization_id", ctx.organizationId)
     .eq("is_active", true)
-    .neq("slug", "owner")
+    .in("slug", assignableSlugs)
     .order("name");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ roles: roles ?? [] });
+
+  const order = new Map(assignableSlugs.map((slug, i) => [slug, i]));
+  const sorted = [...(roles ?? [])].sort(
+    (a, b) => (order.get(a.slug) ?? 99) - (order.get(b.slug) ?? 99)
+  );
+
+  return NextResponse.json({ roles: sorted });
 }

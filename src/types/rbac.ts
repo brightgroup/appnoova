@@ -38,6 +38,28 @@ export const ORG_PERMISSION_MODULE_KEYS = [
 
 export type OrgPermissionModuleKey = (typeof ORG_PERMISSION_MODULE_KEYS)[number];
 
+/** Ocultos en el editor de roles — cubiertos por Canales o aún no implementados. */
+const ORG_ROLE_UI_HIDDEN = new Set<string>(["flow_studio", "whatsapp", "telephony"]);
+
+/** Módulos visibles al configurar plantillas de rol en superadmin. */
+export const ORG_ROLE_UI_MODULE_KEYS = ORG_PERMISSION_MODULE_KEYS.filter(
+  (k) => !ORG_ROLE_UI_HIDDEN.has(k)
+) as Exclude<
+  OrgPermissionModuleKey,
+  "flow_studio" | "whatsapp" | "telephony"
+>[];
+
+export type OrgRoleUiModuleKey = (typeof ORG_ROLE_UI_MODULE_KEYS)[number];
+
+/** Roles que el administrador de org puede asignar (desde Gerente hacia abajo). */
+export const ORG_ADMIN_ASSIGNABLE_ROLE_SLUGS = ["manager", "advisor", "viewer"] as const;
+
+/** Roles que el propietario puede asignar (incluye otro administrador). */
+export const ORG_OWNER_ASSIGNABLE_ROLE_SLUGS = [
+  "org_admin",
+  ...ORG_ADMIN_ASSIGNABLE_ROLE_SLUGS,
+] as const;
+
 export const ORG_MODULE_LABELS: Record<OrgPermissionModuleKey, string> = {
   voice_agents: "Agentes de voz",
   text_agents: "Agentes de texto",
@@ -45,7 +67,7 @@ export const ORG_MODULE_LABELS: Record<OrgPermissionModuleKey, string> = {
   crm: "CRM",
   campaigns: "Campañas",
   flow_studio: "Flow Studio",
-  channels: "Canales",
+  channels: "Canales (WhatsApp, teléfono, web)",
   whatsapp: "WhatsApp",
   telephony: "Telefonía",
   billing: "Facturación",

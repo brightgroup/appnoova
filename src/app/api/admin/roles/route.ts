@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin, isProtectedUser } from "@/lib/admin-server";
 import { adminClient } from "@/lib/voice-agents-server";
 import type { PermissionLevel } from "@/types/rbac";
-import { ORG_PERMISSION_MODULE_KEYS } from "@/types/rbac";
+import { ORG_PERMISSION_MODULE_KEYS, ORG_ROLE_UI_MODULE_KEYS } from "@/types/rbac";
 
 const LEVELS = new Set<PermissionLevel>(["none", "view", "edit", "manage"]);
 
@@ -109,7 +109,11 @@ export async function POST(req: NextRequest) {
   const permRows = ORG_PERMISSION_MODULE_KEYS.map((key) => ({
     role_id: role.id,
     module_key: key,
-    level: LEVELS.has(permissions[key]) ? permissions[key] : "none",
+    level: ORG_ROLE_UI_MODULE_KEYS.includes(key as (typeof ORG_ROLE_UI_MODULE_KEYS)[number])
+      ? LEVELS.has(permissions[key])
+        ? permissions[key]
+        : "none"
+      : "none",
   }));
 
   await db.from("role_permissions").insert(permRows);

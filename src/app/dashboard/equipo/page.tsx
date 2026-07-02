@@ -68,7 +68,7 @@ export default function EquipoPage() {
   const [orgName, setOrgName] = useState("");
   const [canManage, setCanManage] = useState(false);
   const [canAdmin, setCanAdmin] = useState(false);
-  const [seatLimit, setSeatLimit] = useState<{ used: number; max: number | null } | null>(null);
+  const [seatLimit, setSeatLimit] = useState<{ used: number; max: number | null; remaining: number | null } | null>(null);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -112,7 +112,11 @@ export default function EquipoPage() {
       setMembers(membersJson.members ?? []);
       setInvites(membersJson.invites ?? []);
       if (membersJson.seats) {
-        setSeatLimit({ used: membersJson.seats.used ?? 0, max: membersJson.seats.max ?? null });
+        setSeatLimit({
+          used: membersJson.seats.used ?? 0,
+          max: membersJson.seats.max ?? null,
+          remaining: membersJson.seats.remaining ?? null,
+        });
       }
     }
     if (rolesRes.ok) setRoles(rolesJson.roles ?? []);
@@ -122,7 +126,7 @@ export default function EquipoPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function handleInvite(data: { email: string; role_id: string; full_name: string }) {
+  async function handleInvite(data: { email: string; role_id: string; full_name: string; password?: string }) {
     setSaving(true);
     const res = await authFetch("/api/org/members", {
       method: "POST",
@@ -132,7 +136,14 @@ export default function EquipoPage() {
     if (res.ok) {
       setModalOpen(false);
       await load();
-      if (json.message) alert(json.message);
+      const lines = [json.message].filter(Boolean);
+      if (json.temporary_password) {
+        lines.push(`Contraseña temporal: ${json.temporary_password}`);
+      }
+      if (json.login_url) {
+        lines.push(`Link de ingreso: ${json.login_url}`);
+      }
+      if (lines.length) alert(lines.join("\n\n"));
     } else {
       alert(json.error ?? "Error al agregar");
     }
@@ -195,6 +206,7 @@ export default function EquipoPage() {
 
   const pagination = useRegistryPagination(filtered.length, search);
   const pageRows = pagination.pageRows(filtered);
+  const seatsFull = seatLimit?.remaining === 0;
 
   if (forbidden) {
     return (
@@ -232,6 +244,8 @@ export default function EquipoPage() {
                 ` · ${invites.length} invitación${invites.length !== 1 ? "es" : ""} pendiente${invites.length !== 1 ? "s" : ""}`}
               {seatLimit?.max != null &&
                 ` · ${seatLimit.used}/${seatLimit.max} usuarios del plan`}
+              {seatLimit?.max != null && seatsFull &&
+                " · límite alcanzado"}
               {seatLimit?.max == null && seatLimit != null &&
                 ` · usuarios ilimitados`}
             </p>
@@ -265,6 +279,18 @@ export default function EquipoPage() {
           </div>
         )}
 
+        {seatsFull && canManage && (
+          <div className="mb-4 p-4 rounded-xl border border-amber-500/25 bg-amber-500/10">
+            <p className="text-sm text-amber-200">
+              Tu plan permite hasta {seatLimit?.max} usuarios y ya están en uso. Para agregar gerentes o asesores,{" "}
+              <Link href="/dashboard/facturacion" className="text-[#5b5bf6] hover:underline font-medium">
+                actualiza el plan en Facturación
+              </Link>
+              .
+            </p>
+          </div>
+        )}
+
         <RegistryTableLayout
           search={search}
           onSearchChange={setSearch}
@@ -273,7 +299,12 @@ export default function EquipoPage() {
           error={error || undefined}
           action={
             canManage ? (
-              <button type="button" onClick={() => setModalOpen(true)} className={`${btnPrimary} flex items-center gap-2`}>
+              <button
+                type="button"
+                onClick={() => setModalOpen(true)}
+                disabled={seatsFull}
+                className={`${btnPrimary} flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
                 <UserPlus className="w-4 h-4" />
                 Agregar miembro
               </button>
@@ -427,6 +458,7 @@ export default function EquipoPage() {
         open={modalOpen}
         roles={roles}
         saving={saving}
+        seatsRemaining={seatLimit?.remaining ?? null}
         onClose={() => setModalOpen(false)}
         onSubmit={handleInvite}
       />

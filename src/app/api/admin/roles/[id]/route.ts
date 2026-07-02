@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/admin-server";
 import { adminClient } from "@/lib/voice-agents-server";
 import type { PermissionLevel } from "@/types/rbac";
-import { ORG_PERMISSION_MODULE_KEYS } from "@/types/rbac";
+import { ORG_ROLE_UI_MODULE_KEYS } from "@/types/rbac";
 
 const LEVELS = new Set<PermissionLevel>(["none", "view", "edit", "manage"]);
 
@@ -39,7 +39,7 @@ export async function PATCH(
 
   if (body.permissions && typeof body.permissions === "object") {
     const permissions = body.permissions as Record<string, PermissionLevel>;
-    for (const key of ORG_PERMISSION_MODULE_KEYS) {
+    for (const key of ORG_ROLE_UI_MODULE_KEYS) {
       const level = LEVELS.has(permissions[key]) ? permissions[key] : "none";
       await db.from("role_permissions").upsert({
         role_id: id,

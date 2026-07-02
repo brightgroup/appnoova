@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHash, randomBytes } from "crypto";
 import { getOrgContextFromRequest, getOrgRoleById } from "@/lib/org-server";
-import { adminClient, userDisplayName } from "@/lib/voice-agents-server";
+import { adminClient } from "@/lib/voice-agents-server";
+import { createAuthUser } from "@/lib/admin-provisioning";
+import { getAgencyAccessLoginUrl } from "@/lib/agency-access-url";
+import { assertOrgHasAvailableSeat, getOrgSeatSnapshot } from "@/lib/org-seats";
+import { canAssignOrgRole } from "@/lib/org-member-roles";
 import type { AccountStatus } from "@/types/rbac";
 import { isSuperAdminEmail } from "@/lib/rbac-constants";
 
@@ -43,30 +46,25 @@ export async function GET(req: NextRequest) {
     : { data: [] };
   const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
 
+  const seats = await getOrgSeatSnapshot(db, ctx.organizationId);
   const { data: subRow } = await db
     .from("organization_subscriptions")
-    .select("plan_id, plans(name, max_users)")
+    .select("plan_id, plans(name)")
     .eq("organization_id", ctx.organizationId)
     .maybeSingle();
-
-  const planRaw = subRow?.plans as { name: string; max_users: number | null } | { name: string; max_users: number | null }[] | null;
+  const planRaw = subRow?.plans as { name: string } | { name: string }[] | null;
   const plan = Array.isArray(planRaw) ? planRaw[0] : planRaw;
-  const maxUsers = plan?.max_users ?? null;
-
-  const activeOrInvited = (members ?? []).filter((m) => m.status === "active" || m.status === "invited").length;
-  const pendingInvites = (invites ?? []).length;
-  const seatsUsed = activeOrInvited + pendingInvites;
 
   return NextResponse.json({
     plan: {
-      id: subRow?.plan_id ?? null,
+      id: subRow?.plan_id ?? seats.planId,
       name: plan?.name ?? null,
-      max_users: maxUsers,
+      max_users: seats.max,
     },
     seats: {
-      used: seatsUsed,
-      max: maxUsers,
-      remaining: maxUsers != null ? Math.max(0, maxUsers - seatsUsed) : null,
+      used: seats.used,
+      max: seats.max,
+      remaining: seats.remaining,
     },
     members: (members ?? []).map((m) => {
       const profile = profileMap.get(m.user_id);
@@ -102,7 +100,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-/** POST — invitar o agregar miembro existente por email */
+/** POST — crear o agregar miembro por email (respeta cupos del plan) */
 export async function POST(req: NextRequest) {
   const ctx = await getOrgContextFromRequest(req, { module: "org_users", minLevel: "edit" });
   if (ctx instanceof NextResponse) return ctx;
@@ -111,6 +109,7 @@ export async function POST(req: NextRequest) {
   const email = (body.email as string | undefined)?.trim().toLowerCase();
   const roleId = body.role_id as string | undefined;
   const fullName = (body.full_name as string | undefined)?.trim() || null;
+  const password = (body.password as string | undefined)?.trim() || undefined;
 
   if (!email || !roleId) {
     return NextResponse.json({ error: "Email y rol requeridos" }, { status: 400 });
@@ -122,40 +121,24 @@ export async function POST(req: NextRequest) {
 
   const db = adminClient();
 
-  const { data: subRow } = await db
-    .from("organization_subscriptions")
-    .select("plan_id, plans(max_users)")
-    .eq("organization_id", ctx.organizationId)
-    .maybeSingle();
-
-  const planRaw = subRow?.plans as { max_users: number | null } | { max_users: number | null }[] | null;
-  const maxUsers = Array.isArray(planRaw) ? planRaw[0]?.max_users : planRaw?.max_users;
-  if (maxUsers != null) {
-    const [{ count: memberCount }, { count: inviteCount }] = await Promise.all([
-      db
-        .from("organization_members")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", ctx.organizationId)
-        .in("status", ["active", "invited"]),
-      db
-        .from("organization_invites")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", ctx.organizationId)
-        .is("accepted_at", null)
-        .gt("expires_at", new Date().toISOString()),
-    ]);
-    const totalSeats = (memberCount ?? 0) + (inviteCount ?? 0);
-    if (totalSeats >= maxUsers) {
-      return NextResponse.json(
-        { error: `Su plan permite máximo ${maxUsers} usuarios. Actualice el plan para agregar más.` },
-        { status: 403 }
-      );
-    }
+  const seatCheck = await assertOrgHasAvailableSeat(db, ctx.organizationId);
+  if (seatCheck.ok === false) {
+    return NextResponse.json(
+      { error: seatCheck.message, seats: seatCheck.seats },
+      { status: 403 }
+    );
   }
 
   const role = await getOrgRoleById(db, ctx.organizationId, roleId);
   if (!role || role.slug === "owner") {
     return NextResponse.json({ error: "Rol inválido" }, { status: 400 });
+  }
+
+  if (!canAssignOrgRole(ctx.membership.role_slug, role.slug)) {
+    return NextResponse.json(
+      { error: "Tu rol no puede asignar ese tipo de usuario. Solo Gerente, Asesor o Solo lectura." },
+      { status: 403 }
+    );
   }
 
   const { data: existingProfile } = await db
@@ -195,42 +178,77 @@ export async function POST(req: NextRequest) {
       await db.from("profiles").update({ full_name: fullName }).eq("id", existingProfile.id);
     }
 
+    await db.from("user_active_organization").upsert({
+      user_id: existingProfile.id,
+      organization_id: ctx.organizationId,
+    });
+    await db.from("users").update({ organization_id: ctx.organizationId }).eq("id", existingProfile.id);
+
     return NextResponse.json(
-      { member_id: member.id, status: "added", message: "Usuario agregado al equipo" },
+      {
+        member_id: member.id,
+        status: "added",
+        message: "Usuario agregado al equipo. Puede ingresar con su cuenta existente.",
+        login_url: getAgencyAccessLoginUrl(),
+      },
       { status: 201 }
     );
   }
 
-  const token = randomBytes(32).toString("hex");
-  const tokenHash = createHash("sha256").update(token).digest("hex");
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  try {
+    const created = await createAuthUser(db, {
+      email,
+      fullName: fullName ?? undefined,
+      password,
+    });
 
-  const { data: invite, error: invErr } = await db
-    .from("organization_invites")
-    .upsert(
-      {
+    const { data: member, error } = await db
+      .from("organization_members")
+      .insert({
         organization_id: ctx.organizationId,
-        email,
+        user_id: created.userId,
         role_id: roleId,
+        status: "active",
         invited_by: ctx.userId,
-        token_hash: tokenHash,
-        expires_at: expiresAt,
+        invited_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    await db.from("user_active_organization").upsert({
+      user_id: created.userId,
+      organization_id: ctx.organizationId,
+    });
+    await db.from("users").update({ organization_id: ctx.organizationId }).eq("id", created.userId);
+
+    await db
+      .from("organization_invites")
+      .delete()
+      .eq("organization_id", ctx.organizationId)
+      .ilike("email", email);
+
+    const loginUrl = getAgencyAccessLoginUrl();
+    const name = fullName || created.displayName || email.split("@")[0];
+
+    return NextResponse.json(
+      {
+        member_id: member.id,
+        status: "created",
+        email,
+        temporary_password: created.temporaryPassword,
+        login_url: loginUrl,
+        message: created.temporaryPassword
+          ? `Usuario ${name} creado. Comparte el acceso ${loginUrl} con correo ${email} y contraseña temporal.`
+          : `Usuario ${name} creado. Puede ingresar en ${loginUrl}.`,
       },
-      { onConflict: "organization_id,email" }
-    )
-    .select("id")
-    .single();
-
-  if (invErr) return NextResponse.json({ error: invErr.message }, { status: 500 });
-
-  return NextResponse.json(
-    {
-      invite_id: invite.id,
-      status: "invited",
-      message: "Invitación registrada. El usuario debe registrarse con este email para unirse.",
-    },
-    { status: 201 }
-  );
+      { status: 201 }
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "No se pudo crear el usuario";
+    return NextResponse.json({ error: msg }, { status: 400 });
+  }
 }
 
 /** PATCH — actualizar rol o estado de un miembro */
@@ -251,7 +269,7 @@ export async function PATCH(req: NextRequest) {
   const db = adminClient();
   const { data: target } = await db
     .from("organization_members")
-    .select("id, user_id, role_id, roles(slug)")
+    .select("id, user_id, role_id, status, roles(slug)")
     .eq("id", memberId)
     .eq("organization_id", ctx.organizationId)
     .maybeSingle();
@@ -280,6 +298,13 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "No puedes suspenderte a ti mismo" }, { status: 403 });
   }
 
+  if (status === "active" && target.status !== "active") {
+    const seatCheck = await assertOrgHasAvailableSeat(db, ctx.organizationId);
+    if (seatCheck.ok === false) {
+      return NextResponse.json({ error: seatCheck.message, seats: seatCheck.seats }, { status: 403 });
+    }
+  }
+
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
   if (roleId) {
@@ -289,6 +314,9 @@ export async function PATCH(req: NextRequest) {
     }
     if (targetRole?.slug === "owner") {
       return NextResponse.json({ error: "No se puede cambiar el rol del propietario" }, { status: 403 });
+    }
+    if (!canAssignOrgRole(ctx.membership.role_slug, role.slug)) {
+      return NextResponse.json({ error: "Tu rol no puede asignar ese tipo de usuario" }, { status: 403 });
     }
     updates.role_id = roleId;
   }

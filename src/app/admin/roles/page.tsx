@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Shield, RefreshCw, Plus, Pencil, Lock } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import {
-  ORG_PERMISSION_MODULE_KEYS,
+  ORG_ROLE_UI_MODULE_KEYS,
   type PermissionLevel,
   countActivePermissions,
 } from "@/types/rbac";
@@ -30,7 +30,7 @@ interface RoleRow {
 }
 
 function emptyPermissions(): Record<string, PermissionLevel> {
-  return Object.fromEntries(ORG_PERMISSION_MODULE_KEYS.map((k) => [k, "none" as PermissionLevel]));
+  return Object.fromEntries(ORG_ROLE_UI_MODULE_KEYS.map((k) => [k, "none" as PermissionLevel]));
 }
 
 export default function AdminRolesPage() {
