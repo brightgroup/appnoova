@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Building2, Pencil } from "lucide-react";
+import { X, Building2, Pencil, Copy, Check } from "lucide-react";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import { btnPrimary, btnGhost } from "@/lib/brand-ui";
+import { getAgencyAccessLoginUrl } from "@/lib/agency-access-url";
 import type { AccountStatus } from "@/types/rbac";
 
 export type OwnerMode = "new" | "existing";
@@ -61,6 +62,9 @@ export function AdminOrgModal({
   const [ownerFullName, setOwnerFullName] = useState("");
   const [ownerPassword, setOwnerPassword] = useState("");
   const [hideNoovaLogo, setHideNoovaLogo] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const agencyAccessUrl = getAgencyAccessLoginUrl();
 
   useEffect(() => {
     if (open) {
@@ -73,8 +77,19 @@ export function AdminOrgModal({
       setOwnerFullName(initial?.owner_full_name ?? "");
       setOwnerPassword("");
       setHideNoovaLogo(initial?.hide_noova_logo === true);
+      setCopiedLink(false);
     }
   }, [open, initial]);
+
+  async function copyAgencyLink() {
+    try {
+      await navigator.clipboard.writeText(agencyAccessUrl);
+      setCopiedLink(true);
+      window.setTimeout(() => setCopiedLink(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  }
 
   if (!open) return null;
 
@@ -223,9 +238,23 @@ export function AdminOrgModal({
                 <span className="block text-sm font-medium text-white">Cliente agencia (sin logo Noova)</span>
                 <span className="block text-xs text-gray-500 mt-1 leading-relaxed">
                   En el dashboard de esta organización se oculta el logo Noova y se muestra solo el título «Dashboard».
+                  Comparte el link de ingreso agencia con los usuarios de esta cuenta.
                 </span>
               </span>
             </label>
+            {hideNoovaLogo && (
+              <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/[.08] bg-[#12131a] px-3 py-2">
+                <code className="flex-1 min-w-0 text-[11px] text-gray-400 truncate">{agencyAccessUrl}</code>
+                <button
+                  type="button"
+                  onClick={copyAgencyLink}
+                  className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-gray-300 hover:text-white hover:bg-white/[.08] transition-colors"
+                >
+                  {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedLink ? "Copiado" : "Copiar"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
