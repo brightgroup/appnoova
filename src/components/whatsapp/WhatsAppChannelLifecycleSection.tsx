@@ -70,8 +70,8 @@ export function WhatsAppChannelLifecycleSection({
               canDisconnect
                 ? "bg-emerald-500/15 text-emerald-300"
                 : disconnected
-                  ? "bg-orange-500/15 text-orange-300"
-                  : "bg-amber-500/15 text-amber-300"
+                  ? "bg-[var(--nv-hubspot-teal)]/15 text-[var(--nv-hubspot-teal)]"
+                  : "bg-[var(--nv-accent)]/15 text-[var(--nv-hubspot-teal)]"
             }`}
           >
             {canDisconnect ? "En uso" : disconnected ? "Inactiva" : "Pendiente"}
@@ -84,7 +84,7 @@ export function WhatsAppChannelLifecycleSection({
               type="button"
               onClick={onDisconnect}
               disabled={disconnecting}
-              className={`${btnGhost} border border-amber-500/30 text-amber-200 hover:bg-amber-500/10`}
+              className={`${btnGhost} border border-[var(--nv-hubspot-teal)]/30 text-[var(--nv-hubspot-teal)] hover:bg-[var(--nv-hubspot-teal-soft)]`}
             >
               {disconnecting ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Desconectando…</>
@@ -152,7 +152,7 @@ function stepDotClass(variant: StepVariant, state: StepState): string {
     return state === "done" || state === "active" ? "bg-emerald-400" : "bg-white/10";
   }
   if (variant === "disconnected") {
-    return "bg-orange-400";
+    return "bg-[var(--nv-hubspot-teal)]";
   }
   return "bg-red-500";
 }
@@ -179,7 +179,7 @@ function StepLine({ highlight, muted }: { highlight?: boolean; muted?: boolean }
   return (
     <div
       className={`flex-1 h-px min-w-[1.5rem] mb-4 ${
-        muted ? "bg-white/[.06]" : highlight ? "bg-orange-500/35" : "bg-white/[.12]"
+        muted ? "bg-white/[.06]" : highlight ? "bg-[var(--nv-hubspot-teal)]/35" : "bg-white/[.12]"
       }`}
     />
   );

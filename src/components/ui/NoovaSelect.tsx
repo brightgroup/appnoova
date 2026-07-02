@@ -114,10 +114,10 @@ export function NoovaSelect({
         <button
           type="button"
           onClick={() => pick("")}
-          className={`w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center justify-between gap-2 bg-[var(--nv-bg-popover)] ${
+          className={`w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center justify-between gap-2 ${
             !value
-              ? "text-[var(--nv-accent-text-soft)] bg-[var(--nv-accent-muted)]"
-              : "text-[var(--nv-text-muted)] hover:bg-[var(--nv-hover-strong)] hover:text-[var(--nv-text)]"
+              ? "text-[var(--nv-hubspot-teal)] bg-[rgba(0,110,128,0.1)]"
+              : "text-[var(--nv-text-muted)] hover:bg-[var(--nv-bg-control-hover)] hover:text-[var(--nv-text)]"
           }`}
         >
           <span>{emptyLabel}</span>
@@ -131,10 +131,10 @@ export function NoovaSelect({
             key={opt.value}
             type="button"
             onClick={() => pick(opt.value)}
-            className={`w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center justify-between gap-2 bg-[var(--nv-bg-popover)] ${
+            className={`w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center justify-between gap-2 ${
               active
-                ? "text-[var(--nv-accent-text-soft)] bg-[var(--nv-accent-muted)]"
-                : "text-[var(--nv-text)] hover:bg-[var(--nv-hover-strong)]"
+                ? "text-[var(--nv-hubspot-teal)] bg-[rgba(0,110,128,0.1)]"
+                : "text-[var(--nv-text)] hover:bg-[var(--nv-bg-control-hover)]"
             }`}
           >
             <span className="truncate">{opt.label}</span>
@@ -152,9 +152,9 @@ export function NoovaSelect({
         disabled={disabled}
         onClick={toggleOpen}
         aria-expanded={open}
-        className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-sm text-left transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+        className={`nv-select-trigger w-full flex items-center justify-between gap-2 px-4 py-2.5 text-sm text-left transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
           open
-            ? `border border-[#5b5bf6]/45 bg-[var(--nv-bg-control)] text-[var(--nv-text)] ring-1 ring-[#5b5bf6]/20 ${accentFocus}`
+            ? `border border-[#006e80]/35 bg-[var(--nv-bg-control)] text-[var(--nv-text)] ring-1 ring-[#006e80]/15 ${accentFocus}`
             : `${nvControl}`
         }`}
       >
@@ -182,7 +182,7 @@ export function NoovaListMenu({
   onClick?: React.MouseEventHandler<HTMLDivElement>;
 }) {
   return (
-    <div className={`${registryListShell} py-1 bg-[var(--nv-bg-popover)] ${className}`} onClick={onClick}>
+    <div className={`${registryListShell} py-1 ${className}`} onClick={onClick}>
       {children}
     </div>
   );
@@ -203,12 +203,12 @@ export function NoovaListMenuItem({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full px-4 py-2.5 text-left text-sm transition-colors bg-[var(--nv-bg-popover)] ${
+      className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
         danger
           ? "text-red-400 hover:bg-red-500/10"
           : active
-            ? "text-[var(--nv-accent-text-soft)] bg-[var(--nv-accent-muted)]"
-            : "text-[var(--nv-text)] hover:bg-[var(--nv-hover-strong)]"
+                ? "text-[var(--nv-hubspot-teal)] bg-[rgba(0,110,128,0.1)]"
+            : "text-[var(--nv-text)] hover:bg-[var(--nv-bg-control-hover)]"
       }`}
     >
       {children}

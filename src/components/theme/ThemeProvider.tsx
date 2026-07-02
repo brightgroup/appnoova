@@ -20,6 +20,8 @@ import {
 interface ThemeContextValue {
   preference: ThemePreference;
   resolved: ResolvedTheme;
+  /** true tras leer localStorage en el cliente */
+  ready: boolean;
   setPreference: (preference: ThemePreference) => void;
 }
 
@@ -28,11 +30,13 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [preference, setPreferenceState] = useState<ThemePreference>("dark");
   const [resolved, setResolved] = useState<ResolvedTheme>("dark");
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const stored = getStoredThemePreference();
     setPreferenceState(stored);
     setResolved(applyThemePreference(stored));
+    setReady(true);
   }, []);
 
   useEffect(() => {
@@ -50,8 +54,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ preference, resolved, setPreference }),
-    [preference, resolved, setPreference]
+    () => ({ preference, resolved, ready, setPreference }),
+    [preference, resolved, ready, setPreference]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

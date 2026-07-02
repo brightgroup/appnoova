@@ -45,8 +45,8 @@ function outcomeBadgeClass(outcome: CrmLeadOutcome): string {
 }
 
 function temperaturaBadgeClass(temp: CrmLeadTemperatura | null | undefined): string {
-  if (temp === "caliente") return "bg-orange-500/15 text-orange-300";
-  if (temp === "tibio") return "bg-amber-500/15 text-amber-200";
+  if (temp === "caliente") return "bg-[var(--nv-accent)]/15 text-[var(--nv-hubspot-teal)]";
+  if (temp === "tibio") return "bg-[var(--nv-hubspot-teal)]/15 text-[var(--nv-hubspot-teal)]";
   if (temp === "frio") return "bg-sky-500/15 text-sky-300";
   return "bg-white/[.06] text-gray-400";
 }

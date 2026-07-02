@@ -5,7 +5,7 @@ export const BILLING_CHART_CATEGORIES = [
   { key: "milink",       label: "Mi Link",         color: "#818cf8", events: ["milink", "widget", "text_test"] as const },
   { key: "whatsapp",     label: "WhatsApp",        color: "#22c55e", events: ["whatsapp_ai", "whatsapp_manual"] as const },
   { key: "voz",          label: "Agentes de Voz",  color: "#c084fc", events: ["voice"] as const },
-  { key: "documentos",   label: "Documentos",      color: "#f59e0b", events: ["doc_scan"] as const },
+  { key: "documentos",   label: "Documentos",      color: "#006e80", events: ["doc_scan"] as const },
   { key: "formularios",  label: "Formularios",     color: "#06b6d4", events: ["form_fill"] as const },
   { key: "cotizaciones", label: "Cotizaciones",    color: "#ec4899", events: ["quote"] as const },
 ] as const;

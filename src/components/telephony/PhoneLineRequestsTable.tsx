@@ -25,7 +25,7 @@ function requestTypeLabel(type: string): string {
 
 function statusBadge(status: PhoneLineRequestStatus) {
   const map: Record<PhoneLineRequestStatus, { label: string; cls: string }> = {
-    pending: { label: "Pendiente", cls: "bg-amber-500/15 text-amber-300" },
+    pending: { label: "Pendiente", cls: "bg-[var(--nv-hubspot-teal)]/15 text-[var(--nv-hubspot-teal)]" },
     in_progress: { label: "En proceso", cls: "bg-blue-500/15 text-blue-300" },
     completed: { label: "Completada", cls: "bg-emerald-500/15 text-emerald-400" },
     rejected: { label: "Rechazada", cls: "bg-red-500/15 text-red-400" }

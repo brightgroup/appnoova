@@ -159,7 +159,7 @@ export function AgentPhoneChannelPanel({ agentId, isPremium = false }: AgentPhon
               </div>
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
                 premiumPending
-                  ? "bg-amber-500/15 text-amber-400 border-amber-500/25"
+                  ? "bg-[var(--nv-hubspot-teal)]/15 text-[var(--nv-hubspot-teal)] border-[var(--nv-hubspot-teal)]/25"
                   : "bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
               }`}>
                 <CheckCircle2 className="w-3.5 h-3.5" />

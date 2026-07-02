@@ -25,7 +25,7 @@ export function WhatsAppPhonePreview({
     <div className="flex flex-col items-center">
       <div className="relative w-[280px]">
         {/* Marco del teléfono */}
-        <div className="rounded-[2rem] border border-white/[.12] bg-[#111318] p-2 shadow-2xl shadow-black/40">
+        <div className="rounded-[2rem] border border-white/[.12] bg-[#111318] p-2">
           <div className="rounded-[1.5rem] overflow-hidden bg-[#0b141a]">
             {/* Notch */}
             <div className="h-6 bg-[#1f2c34] flex items-center justify-center">
@@ -39,7 +39,7 @@ export function WhatsAppPhonePreview({
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-medium text-white truncate">{contactName}</p>
-                <p className="text-[10px] text-emerald-400/80">en línea</p>
+                <p className="text-[10px] text-[var(--nv-online-green,#34d399)]">en línea</p>
               </div>
             </div>
 
@@ -58,7 +58,7 @@ export function WhatsAppPhonePreview({
               </div>
 
               <div className="flex justify-start">
-                <div className="max-w-[85%] rounded-lg rounded-tl-none bg-[#1f2c34] px-3 py-2 shadow-sm">
+                <div className="max-w-[85%] rounded-lg rounded-tl-none bg-[#1f2c34] px-3 py-2">
                   <p className="text-[13px] text-[#e9edef] whitespace-pre-wrap break-words leading-relaxed">
                     {previewText}
                   </p>

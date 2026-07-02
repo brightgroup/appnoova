@@ -54,7 +54,7 @@ function phaseColor(phase: CallPhase): string {
   if (phase === "ended") return "bg-gray-500";
   if (phase === "speaking") return "bg-[#5b5bf6] animate-pulse";
   if (phase === "connected" || phase === "answered") return "bg-emerald-400";
-  return "bg-amber-400 animate-pulse";
+  return "bg-[var(--nv-accent)] animate-pulse";
 }
 
 function formatDuration(sec: number) {
@@ -423,8 +423,8 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
                         {selected && <span className="ml-2 text-[10px] text-gray-400 font-sans">Actual</span>}
                       </td>
                       <td className={registryTableCell}>
-                        <span className={`inline-flex items-center gap-1.5 ${synced ? "text-emerald-400" : "text-amber-400"}`}>
-                          <span className={`w-2 h-2 rounded-full ${synced ? "bg-emerald-400" : "bg-amber-400"}`} />
+                        <span className={`inline-flex items-center gap-1.5 ${synced ? "text-emerald-400" : "text-[var(--nv-hubspot-teal)]"}`}>
+                          <span className={`w-2 h-2 rounded-full ${synced ? "bg-emerald-400" : "bg-[var(--nv-accent)]"}`} />
                           {synced ? "Activo" : "Pendiente"}
                         </span>
                       </td>

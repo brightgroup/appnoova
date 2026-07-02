@@ -508,7 +508,7 @@ function IconBtn({ children, onClick, title, disabled, active }: {
 }
 
 function QualityBar({ percent }: { percent: number }) {
-  const color = percent >= 80 ? "bg-emerald-500" : percent >= 60 ? "bg-amber-500" : "bg-orange-500";
+  const color = percent >= 80 ? "bg-emerald-500" : percent >= 60 ? "bg-[var(--nv-hubspot-teal)]" : "bg-[var(--nv-accent)]";
   return (
     <div className="flex items-center gap-2 min-w-[72px]">
       <div className="flex-1 h-1.5 rounded-full bg-white/[.08] overflow-hidden">

@@ -19,6 +19,7 @@ import {
   registryTableRowClickable,
   registryTableEmpty,
   registryTableLoading,
+  registrySectionTitle,
   textMuted
 } from "@/lib/brand-ui";
 import {
@@ -89,8 +90,8 @@ export default function DashboardWhatsAppTemplatesPage() {
               <ChevronLeft className="w-5 h-5" />
             </Link>
             <div>
-              <h1 className="text-xl font-bold flex items-center gap-2">
-                <FileText className="w-5 h-5 text-[#5b5bf6]" />
+              <h1 className={`${registrySectionTitle} flex items-center gap-2`}>
+                <FileText className="w-5 h-5 nv-section-icon" />
                 Plantillas WhatsApp
               </h1>
               <p className={`${textMuted} text-xs mt-0.5`}>

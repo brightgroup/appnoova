@@ -58,7 +58,7 @@ export function WhatsAppChannelConfirmModal({
             onClick={onConfirm}
             disabled={loading}
             className={`px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60 flex items-center gap-2 ${
-              isDelete ? "bg-red-600 hover:bg-red-500" : "bg-amber-600 hover:bg-amber-500"
+              isDelete ? "bg-red-600 hover:bg-red-500" : "bg-[var(--nv-accent)] hover:bg-[var(--nv-accent-hover)] text-[#1a202c]"
             }`}
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}

@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import {
-  btnFilterGroup, btnFilterActive, btnFilterIdle, btnGhost, btnPrimary,
+  btnFilterGroup, btnFilterActive, btnFilterIdle, btnGhost, btnPrimary, noticeWarning, promoCard,
   registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
   registryTableRow, registryTableCell, registryTableCellFirst,
   registryTableEmpty, registryTableFooter, registrySearchRow,
@@ -274,7 +274,7 @@ export default function FacturacionPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-noova-main text-white overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-0 bg-noova-main overflow-hidden">
 
       {/* Toolbar con pestañas */}
       <div className="shrink-0 bg-noova-main border-b border-white/[.08]">
@@ -360,24 +360,24 @@ export default function FacturacionPage() {
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
                   {/* Créditos disponibles */}
-                  <div className="col-span-2 bg-gradient-to-br from-[#5b5bf6]/15 to-[#7070f8]/5 border border-[#5b5bf6]/20 rounded-xl p-4">
+                  <div className={`${promoCard} col-span-2`}>
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] text-[#a5a5ff]/80 font-semibold uppercase tracking-wider">Créditos disponibles</p>
+                      <p className="text-[10px] text-[var(--nv-text-muted)] font-semibold uppercase tracking-wider">Créditos disponibles</p>
                       <span title="1 crédito equivale a un valor fijo en USD · el saldo es unificado para todos los servicios">
-                        <HelpCircle className="w-3 h-3 text-[#5b5bf6]/50 cursor-help" />
+                        <HelpCircle className="w-3 h-3 text-[var(--nv-text-faint)] cursor-help" />
                       </span>
                     </div>
                     <div className="flex items-baseline gap-2 mb-2">
-                      <p className="text-2xl font-bold tracking-tight">{fmtN(remaining)}</p>
-                      <p className="text-xs text-[#a5a5ff]/50">/ {fmtN(total)}</p>
+                      <p className="text-2xl font-bold tracking-tight text-[var(--nv-text)]">{fmtN(remaining)}</p>
+                      <p className="text-xs text-[var(--nv-text-muted)]">/ {fmtN(total)}</p>
                     </div>
-                    <div className="h-1.5 rounded-full bg-white/[.08] overflow-hidden mb-1.5">
+                    <div className="h-1.5 rounded-full bg-[var(--nv-bg-control)] overflow-hidden mb-1.5">
                       <div
-                        className={`h-full rounded-full transition-all ${usedPct >= 90 ? "bg-red-500" : usedPct >= 70 ? "bg-amber-500" : "bg-[#5b5bf6]"}`}
+                        className={`h-full rounded-full transition-all ${usedPct >= 90 ? "bg-red-500" : usedPct >= 70 ? "bg-[var(--nv-hubspot-teal)]" : "bg-[var(--nv-accent)]"}`}
                         style={{ width: `${usedPct}%` }}
                       />
                     </div>
-                    <p className="text-[10px] text-[#a5a5ff]/40">{fmtN(usedCredits)} usados · {usedPct}%</p>
+                    <p className="text-[10px] text-[var(--nv-text-muted)]">{fmtN(usedCredits)} usados · {usedPct}%</p>
                   </div>
 
                   {/* Plan actual */}
@@ -728,10 +728,10 @@ export default function FacturacionPage() {
                     return (
                       <div
                         key={p.id}
-                        className={`relative rounded-xl border flex flex-col transition-all ${
+                        className={`relative rounded-xl border flex flex-col transition-all bg-white ${
                           isActive
-                            ? "border-[#5b5bf6]/50 bg-gradient-to-b from-[#5b5bf6]/10 to-transparent shadow-lg shadow-[#5b5bf6]/10"
-                            : "border-white/[.08] bg-white/[.02] hover:bg-white/[.04] hover:border-white/[.14]"
+                            ? "border-[var(--nv-accent)]/40 shadow-sm"
+                            : "border-[var(--nv-border)] hover:border-[var(--nv-border-strong)]"
                         }`}
                       >
                         {/* Badges */}
@@ -754,7 +754,7 @@ export default function FacturacionPage() {
                         <div className="p-5 flex-1 space-y-4">
                           {/* Nombre + precio */}
                           <div>
-                            <h3 className="text-sm font-bold text-white">{p.name}</h3>
+                            <h3 className="text-sm font-bold text-[var(--nv-text)]">{p.name}</h3>
                             <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">{copy.tagline}</p>
                           </div>
                           <div className="flex items-baseline gap-1 flex-wrap">
@@ -768,7 +768,7 @@ export default function FacturacionPage() {
                             ) : (
                               <>
                                 <span className="text-xs text-gray-400">US$</span>
-                                <span className="text-3xl font-extrabold text-white">{fmtN(displayPrice)}</span>
+                                <span className="text-3xl font-extrabold text-[var(--nv-text)]">{fmtN(displayPrice)}</span>
                                 <span className="text-xs text-gray-500">/mes</span>
                               </>
                             )}
@@ -782,15 +782,15 @@ export default function FacturacionPage() {
                                   <span>Créditos usados</span>
                                   <span>{fmtN(wallet?.used_credits ?? 0)} / {fmtN(planMonthlyCredits)}</span>
                                 </div>
-                                <div className="h-1.5 rounded-full bg-white/[.08] overflow-hidden">
-                                  <div className="h-full bg-[#5b5bf6] rounded-full" style={{ width: `${usedPct}%` }} />
+                                <div className="h-1.5 rounded-full bg-[var(--nv-bg-control)] overflow-hidden">
+                                  <div className="h-full bg-[var(--nv-accent)] rounded-full" style={{ width: `${usedPct}%` }} />
                                 </div>
                               </div>
                             </div>
                           )}
 
                           {/* Créditos del plan */}
-                          <p className="text-xs font-semibold text-[#a5a5ff]">
+                          <p className="text-xs font-semibold text-[var(--nv-hubspot-teal)]">
                             {isActive && planPromo?.credits_bonus_pct ? (
                               <>
                                 {fmtN(displayCredits)} créditos/mes
@@ -826,12 +826,12 @@ export default function FacturacionPage() {
                         {/* Pie de tarjeta */}
                         {callsEstActive > 0 && (
                           <div className="px-5 pb-5">
-                            <div className="rounded-lg border border-white/[.06] bg-white/[.03] p-3 text-center">
-                              <p className="text-[9px] text-gray-500 font-semibold uppercase tracking-wide flex items-center justify-center gap-1 mb-1">
+                            <div className="rounded-lg border border-[var(--nv-border)] bg-[var(--nv-bg-control)] p-3 text-center">
+                              <p className="text-[9px] text-[var(--nv-text-muted)] font-semibold uppercase tracking-wide flex items-center justify-center gap-1 mb-1">
                                 <Phone className="w-2.5 h-2.5" /> Aprox. en llamadas de voz
                               </p>
-                              <p className="text-sm font-bold text-white">{fmtN(callsEstActive)} min/mes</p>
-                              <p className="text-[9px] text-gray-600">a {voiceCreditsPerMin} créditos / minuto</p>
+                              <p className="text-sm font-bold text-[var(--nv-text)]">{fmtN(callsEstActive)} min/mes</p>
+                              <p className="text-[9px] text-[var(--nv-text-muted)]">a {voiceCreditsPerMin} créditos / minuto</p>
                             </div>
                           </div>
                         )}
@@ -966,40 +966,39 @@ export default function FacturacionPage() {
               <div className="max-w-2xl space-y-5">
 
                 {/* Banner "próximamente" */}
-                <div className="rounded-xl border border-amber-500/20 bg-amber-500/[.06] p-4 flex items-start gap-3 text-sm text-amber-200">
-                  <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className={`${noticeWarning} flex items-start gap-3`}>
+                  <Info className="w-4 h-4 text-[var(--nv-hubspot-teal)] shrink-0 mt-0.5" />
                   <p>
                     Esta funcionalidad estará disponible al integrar la pasarela de pago.
                     Por ahora, las recargas se coordinan con tu asesor en{" "}
-                    <a href="mailto:info@bgsoluciones.com.co" className="text-amber-300 hover:underline font-semibold">
+                    <a href="mailto:info@bgsoluciones.com.co" className="hover:underline font-semibold">
                       info@bgsoluciones.com.co
                     </a>.
                   </p>
                 </div>
 
-                {/* Tarjeta principal — estilo Pro Tip del dashboard */}
-                <div className="rounded-xl bg-gradient-to-br from-[#5b5bf6]/20 to-[#7070f8]/5 border border-[#5b5bf6]/25 p-6">
+                <div className={promoCard}>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-[#5b5bf6]/20 border border-[#5b5bf6]/30">
-                        <Zap className="w-5 h-5 text-[#a5a5ff]" />
+                      <div className="w-10 h-10 rounded-full bg-[var(--nv-accent)] flex items-center justify-center shrink-0">
+                        <Zap className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-white">Recarga automática</h3>
-                        <p className="text-xs text-[#a5a5ff]/70 mt-0.5">Sin interrupciones en tu operación</p>
+                        <h3 className="nv-promo-title text-sm font-bold">Recarga automática</h3>
+                        <p className="nv-promo-subtitle text-xs mt-0.5">Sin interrupciones en tu operación</p>
                       </div>
                     </div>
                     {/* Toggle visual (deshabilitado hasta integrar pasarela) */}
                     <div
                       className={`relative w-11 h-6 rounded-full border cursor-not-allowed transition-colors ${
-                        autoOn ? "bg-[#5b5bf6] border-[#5b5bf6]" : "bg-white/[.06] border-white/[.12]"
+                        autoOn ? "bg-[var(--nv-accent)] border-[var(--nv-accent)]" : "bg-white/[.06] border-white/[.12]"
                       }`}
                       title="Disponible próximamente"
                     >
                       <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${autoOn ? "translate-x-5" : "translate-x-0.5"}`} />
                     </div>
                   </div>
-                  <p className="text-sm text-[#a5a5ff]/80 leading-relaxed">
+                  <p className="nv-promo-body text-sm leading-relaxed">
                     Configura un umbral mínimo de créditos. Cuando tu saldo baje de ese nivel, se añaden créditos automáticamente
                     para que tus agentes nunca se detengan.
                   </p>

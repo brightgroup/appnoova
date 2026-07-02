@@ -124,9 +124,9 @@ export function CrmLeadsKanban({ leads, stages, onLeadsChange, onSelectLead }: C
                       <span
                         className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase ${
                           lead.temperatura === "caliente"
-                            ? "bg-orange-500/20 text-orange-200"
+                            ? "bg-[var(--nv-accent)]/15 text-[var(--nv-hubspot-teal)]"
                             : lead.temperatura === "tibio"
-                              ? "bg-amber-500/15 text-amber-200"
+                              ? "bg-[var(--nv-hubspot-teal)]/15 text-[var(--nv-hubspot-teal)]"
                               : "bg-sky-500/15 text-sky-300"
                         }`}
                       >

@@ -1,7 +1,7 @@
-/** Colores de marca Noova — primario #5b5bf6 */
+/** Colores de marca Noova — primario #3b59fe */
 export const brand = {
-  primary: "#5b5bf6",
-  primaryHover: "#7070f8",
+  primary: "#3b59fe",
+  primaryHover: "#4d68ff",
   primaryText: "#ffffff",
   primaryMuted: "rgba(91, 91, 246, 0.12)",
   primaryBorder: "rgba(91, 91, 246, 0.35)",
@@ -23,12 +23,12 @@ export const textFaint = "text-gray-400";
 /* ── Botones principales (CTA) ── */
 export const btnPrimary =
   "nv-btn-primary inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold " +
-  "bg-[#5b5bf6] text-white hover:bg-[#7070f8] transition-colors " +
+  "transition-colors " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
 export const btnPrimarySm =
   "nv-btn-primary inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold " +
-  "bg-[#5b5bf6] text-white hover:bg-[#7070f8] transition-colors";
+  "transition-colors";
 
 /* ── Estilo sidebar / menú — minimalista ── */
 export const btnMenu =
@@ -73,13 +73,13 @@ export const sidebarNavIdle =
 export const sidebarIconActive = "text-[#5b5bf6]";
 
 export const sidebarBadge =
-  "nv-tag-neon nv-tag-neon-accent border-0 text-[10px] px-2.5 py-1 rounded-full text-white font-semibold leading-none";
+  "nv-tag-neon nv-tag-neon-accent border-0 text-[10px] px-2.5 py-1 rounded-full font-semibold leading-none";
 
 export const copilotBadge =
-  "nv-tag-neon nv-tag-neon-accent border-0 text-[11px] px-3 py-1.5 rounded-full text-white font-semibold leading-none";
+  "nv-tag-neon nv-tag-neon-accent border-0 text-[11px] px-3 py-1.5 rounded-full font-semibold leading-none";
 
 export const sidebarPlanCard =
-  "rounded-xl p-3.5 border border-[var(--nv-border)] bg-[var(--nv-hover)] hover:bg-[var(--nv-hover-strong)] transition-all duration-150";
+  "nv-sidebar-plan-card rounded-xl p-3.5 border transition-all duration-150";
 
 /* ── Acento de marca (reemplaza violet/indigo en toda la app) ── */
 export const accentText = "text-[#5b5bf6]";
@@ -92,7 +92,7 @@ export const accentBorderMedium = "border-[#5b5bf6]/30";
 export const accentFocus =
   "focus:border-[#5b5bf6]/50 focus:ring-1 focus:ring-[#5b5bf6]/20 focus:outline-none";
 export const accentBadge =
-  "nv-badge-vivid text-xs px-2 py-0.5 rounded-full bg-[#5b5bf6] text-white font-semibold";
+  "nv-badge-internal text-xs px-2 py-0.5 rounded-full font-semibold border";
 
 /* ── Tags neón (inbox bandeja, estados, calidad) — semitransparentes + glow ── */
 export const tagNeonBase = "nv-tag-neon inline-flex items-center font-semibold";
@@ -114,8 +114,11 @@ export const tagNeonOrange =
 
 /** Aviso / alerta informativa (URL fija, permisos, etc.) */
 export const noticeWarning =
-  "rounded-xl border border-amber-400/50 bg-amber-50 px-4 py-3 text-sm text-amber-950 " +
+  "nv-notice-green nv-notice-hubspot rounded-2xl border px-5 py-4 text-sm " +
   "dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200";
+
+/** Tarjeta destacada — fondo verde menta (Pro Tip, promos) */
+export const promoCard = "nv-promo-card rounded-2xl p-6";
 
 export const tagNeonAccent =
   `${tagNeonBase} nv-tag-neon-accent border-0 bg-[#5b5bf6]/20 text-white`;
@@ -137,11 +140,11 @@ export const nvControl =
 
 export const inputSearch =
   "nv-search-input w-full bg-[var(--nv-search-bg)] border border-[var(--nv-input-border)] rounded-lg pl-10 pr-4 py-2.5 text-sm text-[var(--nv-text)] " +
-  "placeholder-[var(--nv-text-faint)] focus:outline-none focus:border-[#5b5bf6]/45 focus:ring-1 focus:ring-[#5b5bf6]/15 transition-colors";
+  "placeholder-[var(--nv-text-faint)] focus:outline-none focus:border-[#0fe3ff]/50 focus:ring-1 focus:ring-[#0fe3ff]/20 transition-colors";
 
 /** Contenedor del menú desplegable (NoovaSelect) — no usar en tablas */
 export const registryListShell =
-  "rounded-xl border border-[var(--nv-border-strong)] bg-[var(--nv-bg-popover)] overflow-hidden shadow-[var(--nv-shadow-lg)]";
+  "rounded-xl border border-[var(--nv-border-strong)] bg-[var(--nv-bg-control)] overflow-hidden shadow-[var(--nv-shadow-lg)]";
 
 /* ── Tablas (registro de llamadas / agentes) — sin recuadros, solo líneas horizontales ── */
 export const registryPage =
@@ -180,13 +183,22 @@ export const registryTable =
   "w-full border-collapse text-xs";
 
 export const registryTableHead =
-  "sticky top-0 z-10 bg-noova-main";
+  "sticky top-0 z-10 nv-table-head";
 
 export const registryTableHeadRow =
   "border-b border-white/[.08]";
 
 export const registryTableHeadCell =
-  "px-5 py-3 text-left text-xs font-semibold text-white whitespace-nowrap";
+  "px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wide whitespace-nowrap nv-table-head-cell";
+
+export const registrySectionTitle =
+  "text-xl font-semibold tracking-tight nv-section-title";
+
+export const nvFieldLabel =
+  "block text-xs font-semibold nv-field-label mb-1.5";
+
+export const waTemplateInput =
+  `w-full ${nvControl} px-3 py-2.5 text-sm`;
 
 export const registryTableRow =
   "border-b border-white/[.06] hover:bg-white/[.03] transition-colors group registry-table-row";

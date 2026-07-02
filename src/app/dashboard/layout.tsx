@@ -1,21 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LogOut, Settings, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, CreditCard, Building2, Loader2, Share2, Contact, Users, Database } from "lucide-react";
+import { LogOut, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, Building2, Loader2, Share2, Contact, Database } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { NoovaLogo } from "@/components/brand/NoovaLogo";
 import { authFetch } from "@/lib/telephony-api";
 import {
-  sidebarNavActive, sidebarNavIdle, sidebarIconActive, sidebarBadge, sidebarPlanCard
+  sidebarNavActive, sidebarNavIdle, sidebarBadge, sidebarPlanCard
 } from "@/lib/brand-ui";
 import { CANALES_NAV } from "@/lib/canales-nav";
 import { AGENTES_VOZ_NAV } from "@/lib/agentes-voz-nav";
 import { AGENTES_TEXTO_NAV } from "@/lib/agentes-texto-nav";
 import { CRM_NAV } from "@/lib/crm-nav";
 import { CAMPAIGNS_NAV } from "@/lib/campaigns-nav";
+import { sidebarIconBase, sidebarNeonIcon } from "@/lib/sidebar-neon";
 import { DesktopOnlyGate } from "@/components/layout/DesktopOnlyGate";
+import { SidebarAccountMenu } from "@/components/layout/SidebarAccountMenu";
 import type { LucideIcon } from "lucide-react";
 
 function formatCreditsShort(n: number): string {
@@ -42,14 +44,14 @@ function SidebarSubMenu({
           <Link
             key={i}
             href={item.href}
-            className={`group flex items-center gap-2.5 px-3 py-2 text-sm font-medium transition-colors rounded-lg ${
+            className={`group nv-sidebar-sub-link flex items-center gap-2.5 px-3 py-2 text-sm font-medium transition-colors rounded-lg ${
               active
-                ? "text-[#a5a5ff] bg-[#5b5bf6]/10"
-                : "text-gray-300 hover:text-white hover:bg-white/[.06]"
+                ? "nv-sidebar-sub-active text-white bg-white/[.14]"
+                : "text-white/75 hover:text-white hover:bg-white/[.10]"
             }`}
           >
             {Icon ? (
-              <Icon className={`w-4 h-4 shrink-0 ${active ? "text-[#a5a5ff]" : "text-gray-500 group-hover:text-gray-300"}`} />
+              <Icon className={`w-4 h-4 shrink-0 nv-sidebar-sub-icon ${active ? "opacity-100" : ""}`} />
             ) : (
               <span
                 aria-hidden
@@ -60,7 +62,7 @@ function SidebarSubMenu({
                 }`}
               />
             )}
-            <span className="truncate">{item.name}</span>
+            <span className="truncate nv-sidebar-sub-label">{item.name}</span>
           </Link>
         );
       })}
@@ -73,6 +75,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
   const [authReady, setAuthReady] = useState(false);
+  const [profileName, setProfileName] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
   const [billing, setBilling] = useState<{
     planName: string;
     remaining: number;
@@ -147,6 +151,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           router.replace("/login");
         } else {
           setChecked(true);
+          const meta = session.user.user_metadata ?? {};
+          const dn =
+            (meta.nombre as string | undefined) ||
+            (meta.full_name as string | undefined) ||
+            session.user.email?.split("@")[0] ||
+            "Usuario";
+          setProfileName(dn);
+          setProfileEmail(session.user.email ?? "");
         }
       })
       .catch(() => {
@@ -178,14 +190,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="flex h-screen bg-noova-main text-white" data-noova-dashboard>
       {showShell && (
       <div
-        className={`${sidebarOpen ? "w-64" : "w-20"} bg-noova-surface border-r border-white/[.10] transition-all duration-300 flex flex-col overflow-hidden`}
+        className={`${sidebarOpen ? "w-64" : "w-20"} border-r border-white/[.10] transition-all duration-300 flex flex-col overflow-hidden`}
         data-noova-sidebar
       >
         {/* Logo */}
         <div className={`p-4 border-b border-white/[.08] flex items-center ${sidebarOpen ? "justify-between" : "justify-center"}`}>
           {sidebarOpen && (
             <Link href="/dashboard" className="flex-shrink-0">
-              <NoovaLogo width={176} height={40} priority />
+              <NoovaLogo width={176} height={40} priority variant="sidebar" />
             </Link>
           )}
           <button
@@ -199,6 +211,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Navigation */}
         <nav className={`flex-1 ${sidebarOpen ? "p-3 space-y-1" : "p-3 space-y-3"} overflow-y-auto scrollbar-thin`}>
+          {/* Dashboard — primero */}
+          <Link
+            href="/dashboard"
+            className={`w-full flex items-center justify-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              pathname === "/dashboard" ? sidebarNavActive : sidebarNavIdle
+            }`}
+            title="Dashboard"
+          >
+            {sidebarOpen ? (
+              <>
+                <BarChart3 className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.dashboard}`} />
+                <span className="flex-1 text-left">Dashboard</span>
+              </>
+            ) : (
+              <BarChart3 className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.dashboard}`} />
+            )}
+          </Link>
+
+          {sidebarOpen && <div className="h-px bg-white/[.08] my-2" />}
+
           {/* Agentes de Voz */}
           <div>
             <button
@@ -212,12 +244,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               {sidebarOpen ? (
                 <>
-                  <Radio className="w-5 h-5 flex-shrink-0 mr-3" />
+                  <Radio className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.voice}`} />
                   <span className="flex-1 text-left">Agentes de Voz</span>
                   <ChevronRight className={`w-4 h-4 transition-transform ml-2 ${expandedMenu === "voz" ? "rotate-90" : ""}`} />
                 </>
               ) : (
-                <Radio className="w-5 h-5 flex-shrink-0" />
+                <Radio className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.voice}`} />
               )}
             </button>
             {sidebarOpen && expandedMenu === "voz" && (
@@ -238,12 +270,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               {sidebarOpen ? (
                 <>
-                  <MessageSquare className="w-5 h-5 flex-shrink-0 mr-3" />
+                  <MessageSquare className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.text}`} />
                   <span className="flex-1 text-left">Agentes de Texto</span>
                   <ChevronRight className={`w-4 h-4 transition-transform ml-2 ${expandedMenu === "texto" ? "rotate-90" : ""}`} />
                 </>
               ) : (
-                <MessageSquare className="w-5 h-5 flex-shrink-0" />
+                <MessageSquare className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.text}`} />
               )}
             </button>
             {sidebarOpen && expandedMenu === "texto" && (
@@ -264,12 +296,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               {sidebarOpen ? (
                 <>
-                  <Share2 className="w-5 h-5 flex-shrink-0 mr-3" />
+                  <Share2 className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.channels}`} />
                   <span className="flex-1 text-left">Canales</span>
                   <ChevronRight className={`w-4 h-4 transition-transform ml-2 ${expandedMenu === "canales" ? "rotate-90" : ""}`} />
                 </>
               ) : (
-                <Share2 className="w-5 h-5 flex-shrink-0" />
+                <Share2 className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.channels}`} />
               )}
             </button>
             {sidebarOpen && expandedMenu === "canales" && (
@@ -290,12 +322,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               {sidebarOpen ? (
                 <>
-                  <Contact className="w-5 h-5 flex-shrink-0 mr-3" />
+                  <Contact className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.crm}`} />
                   <span className="flex-1 text-left">CRM</span>
                   <ChevronRight className={`w-4 h-4 transition-transform ml-2 ${expandedMenu === "crm" ? "rotate-90" : ""}`} />
                 </>
               ) : (
-                <Contact className="w-5 h-5 flex-shrink-0" />
+                <Contact className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.crm}`} />
               )}
             </button>
             {sidebarOpen && expandedMenu === "crm" && (
@@ -316,12 +348,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               {sidebarOpen ? (
                 <>
-                  <Target className="w-5 h-5 flex-shrink-0 mr-3" />
+                  <Target className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.campaigns}`} />
                   <span className="flex-1 text-left">Campañas</span>
                   <ChevronRight className={`w-4 h-4 transition-transform ml-2 ${expandedMenu === "campaigns" ? "rotate-90" : ""}`} />
                 </>
               ) : (
-                <Target className="w-5 h-5 flex-shrink-0" />
+                <Target className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.campaigns}`} />
               )}
             </button>
             {sidebarOpen && expandedMenu === "campaigns" && (
@@ -341,38 +373,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             {sidebarOpen ? (
               <>
-                <Bot className={`w-5 h-5 flex-shrink-0 mr-3 ${pathname === "/dashboard/ori" ? sidebarIconActive : "text-gray-400"}`} />
+                <Bot className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.ori}`} />
                 <div className="flex-1 flex items-center gap-2">
                   <span>ORI</span>
                   <span className={sidebarBadge}>Copiloto</span>
                 </div>
               </>
             ) : (
-              <Bot className={`w-5 h-5 flex-shrink-0 ${pathname === "/dashboard/ori" ? sidebarIconActive : "text-gray-400"}`} />
+              <Bot className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.ori}`} />
             )}
           </Link>
 
-          {sidebarOpen && <div className="h-px bg-white/[.08] my-2"></div>}
-
-          {/* Dashboard */}
-          <Link 
-            href="/dashboard"
-            className={`w-full flex items-center justify-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              pathname === "/dashboard" ? sidebarNavActive : sidebarNavIdle
-            }`}
-            title="Dashboard"
-          >
-            {sidebarOpen ? (
-              <>
-                <BarChart3 className={`w-5 h-5 flex-shrink-0 mr-3 ${pathname === "/dashboard" ? sidebarIconActive : "text-gray-400"}`} />
-                <span className="flex-1 text-left">Dashboard</span>
-              </>
-            ) : (
-              <BarChart3 className={`w-5 h-5 flex-shrink-0 ${pathname === "/dashboard" ? sidebarIconActive : "text-gray-400"}`} />
-            )}
-          </Link>
-
-          {sidebarOpen && <div className="h-px bg-white/[.08] my-2"></div>}
+          {sidebarOpen && <div className="h-px bg-white/[.08] my-2" />}
 
           {/* Contextos de marca */}
           <Link
@@ -386,11 +398,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             {sidebarOpen ? (
               <>
-                <Building2 className={`w-5 h-5 flex-shrink-0 mr-3 ${pathname === "/dashboard/contextos" ? sidebarIconActive : "text-gray-400"}`} />
+                <Building2 className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.contexts}`} />
                 <span className="flex-1 text-left">Contextos</span>
               </>
             ) : (
-              <Building2 className={`w-5 h-5 flex-shrink-0 ${pathname === "/dashboard/contextos" ? sidebarIconActive : "text-gray-400"}`} />
+              <Building2 className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.contexts}`} />
             )}
           </Link>
 
@@ -406,71 +418,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             {sidebarOpen ? (
               <>
-                <Database className={`w-5 h-5 flex-shrink-0 mr-3 ${pathname.startsWith("/dashboard/tablas") ? sidebarIconActive : "text-gray-400"}`} />
+                <Database className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.tables}`} />
                 <span className="flex-1 text-left">Tablas</span>
               </>
             ) : (
-              <Database className={`w-5 h-5 flex-shrink-0 ${pathname.startsWith("/dashboard/tablas") ? sidebarIconActive : "text-gray-400"}`} />
-            )}
-          </Link>
-
-          {/* Equipo */}
-          <Link
-            href="/dashboard/equipo"
-            className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              pathname === "/dashboard/equipo" || pathname.startsWith("/dashboard/equipo/")
-                ? sidebarNavActive
-                : sidebarNavIdle
-            }`}
-            title="Equipo"
-          >
-            {sidebarOpen ? (
-              <>
-                <Users className={`w-5 h-5 flex-shrink-0 mr-3 ${pathname.startsWith("/dashboard/equipo") ? sidebarIconActive : "text-gray-400"}`} />
-                <span className="flex-1 text-left">Equipo</span>
-              </>
-            ) : (
-              <Users className={`w-5 h-5 flex-shrink-0 ${pathname.startsWith("/dashboard/equipo") ? sidebarIconActive : "text-gray-400"}`} />
-            )}
-          </Link>
-
-          {/* Facturación */}
-          <Link
-            href="/dashboard/facturacion"
-            className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              pathname === "/dashboard/facturacion" || pathname.startsWith("/dashboard/facturacion/")
-                ? sidebarNavActive
-                : sidebarNavIdle
-            }`}
-            title="Facturación"
-          >
-            {sidebarOpen ? (
-              <>
-                <CreditCard className={`w-5 h-5 flex-shrink-0 mr-3 ${pathname.startsWith("/dashboard/facturacion") ? sidebarIconActive : "text-gray-400"}`} />
-                <span className="flex-1 text-left">Facturación</span>
-              </>
-            ) : (
-              <CreditCard className={`w-5 h-5 flex-shrink-0 ${pathname.startsWith("/dashboard/facturacion") ? sidebarIconActive : "text-gray-400"}`} />
-            )}
-          </Link>
-
-          {/* Configuración */}
-          <Link
-            href="/dashboard/configuracion"
-            className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              pathname === "/dashboard/configuracion" || pathname.startsWith("/dashboard/configuracion/")
-                ? sidebarNavActive
-                : sidebarNavIdle
-            }`}
-            title="Configuración"
-          >
-            {sidebarOpen ? (
-              <>
-                <Settings className={`w-5 h-5 flex-shrink-0 mr-3 ${pathname.startsWith("/dashboard/configuracion") ? sidebarIconActive : "text-gray-400"}`} />
-                <span className="flex-1 text-left">Configuración</span>
-              </>
-            ) : (
-              <Settings className={`w-5 h-5 flex-shrink-0 ${pathname.startsWith("/dashboard/configuracion") ? sidebarIconActive : "text-gray-400"}`} />
+              <Database className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.tables}`} />
             )}
           </Link>
         </nav>
@@ -533,7 +485,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </div>
                   <div className="h-[3px] rounded-full bg-[var(--nv-border)] overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-[#5b5bf6]"}`}
+                      className={`h-full rounded-full transition-all ${pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-[var(--nv-hubspot-teal)]" : "bg-[#5b5bf6]"}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -542,23 +494,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             );
           })()}
 
-          {/* Logout */}
-          <button
-            onClick={logout}
-            className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all ${
-              sidebarOpen ? "hover:text-red-400 hover:bg-red-500/10" : "hover:text-red-400"
-            }`}
-            title="Cerrar sesión"
-          >
-            {sidebarOpen ? (
-              <>
-                <LogOut className="w-5 h-5 flex-shrink-0 mr-3" />
-                <span className="flex-1 text-left">Cerrar sesión</span>
-              </>
-            ) : (
-              <LogOut className="w-5 h-5 flex-shrink-0" />
-            )}
-          </button>
+          {/* Cuenta + Logout */}
+          <div className={`flex items-center gap-2 ${sidebarOpen ? "" : "flex-col"}`}>
+            <SidebarAccountMenu
+              name={profileName}
+              email={profileEmail}
+              compact={!sidebarOpen}
+            />
+            <button
+              onClick={logout}
+              className={`flex flex-1 items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all min-w-0 ${
+                sidebarOpen ? "hover:text-red-400 hover:bg-red-500/10" : "hover:text-red-400"
+              }`}
+              title="Cerrar sesión"
+            >
+              {sidebarOpen ? (
+                <>
+                  <LogOut className="w-5 h-5 flex-shrink-0 mr-3" />
+                  <span className="flex-1 text-left">Cerrar sesión</span>
+                </>
+              ) : (
+                <LogOut className="w-5 h-5 flex-shrink-0" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
       )}

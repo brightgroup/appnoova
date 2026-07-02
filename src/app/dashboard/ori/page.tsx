@@ -148,11 +148,11 @@ export default function OriCopilotoPage() {
       {/* Header Ori */}
       <div className="relative z-10 shrink-0 flex items-center justify-between px-8 py-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#5b5bf6] to-[#7070f8] flex items-center justify-center shadow-lg shadow-[#5b5bf6]/30">
-            <Sparkles className="w-4 h-4 text-white" strokeWidth={2} />
+          <div className="nv-ori-icon w-9 h-9 rounded-xl bg-gradient-to-br from-[#5b5bf6] to-[#7070f8] flex items-center justify-center shadow-lg shadow-[#5b5bf6]/30">
+            <Sparkles className="w-4 h-4 text-white nv-ori-icon-glyph" strokeWidth={2} />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[15px] font-semibold tracking-tight text-white">Ori</span>
+            <span className="text-[15px] font-semibold tracking-tight text-white nv-ori-title">Ori</span>
             <span className={copilotBadge}>
               Copiloto
             </span>
@@ -238,7 +238,7 @@ export default function OriCopilotoPage() {
             )}
 
             {/* Input amplio */}
-            <div className="rounded-[1.35rem] border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] focus-within:border-[#5b5bf6]/30 focus-within:shadow-[0_0_0_1px_rgba(91,91,246,0.15)] transition-all">
+            <div className="nv-ori-composer rounded-[1.35rem] border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] focus-within:border-[#5b5bf6]/30 focus-within:shadow-[0_0_0_1px_rgba(91,91,246,0.15)] transition-all">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -247,7 +247,7 @@ export default function OriCopilotoPage() {
                 placeholder="¿En qué puedo ayudarte?"
                 disabled={loading}
                 rows={hasChat ? 1 : 2}
-                className="w-full bg-transparent px-6 pt-4 pb-2 text-base text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] resize-none focus:outline-none disabled:opacity-50 min-h-[56px] leading-relaxed"
+                className="nv-ori-composer-input w-full bg-transparent px-6 pt-4 pb-2 text-base text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] resize-none focus:outline-none disabled:opacity-50 min-h-[56px] leading-relaxed"
               />
               <div className="flex items-center justify-between px-4 pb-4 pt-1">
                 <button

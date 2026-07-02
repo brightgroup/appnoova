@@ -288,7 +288,7 @@ function ConfigContent() {
             <h2 className="text-sm font-semibold text-gray-300 mb-4">Configuración de voz</h2>
 
             <div className="space-y-4">
-              <div className={`p-3 rounded-xl border ${isPremium ? "border-amber-500/30 bg-amber-500/10" : "border-[#5b5bf6]/30 bg-[#5b5bf6]/10"}`}>
+              <div className="p-3 rounded-xl border border-[var(--nv-hubspot-teal)]/30 bg-[var(--nv-hubspot-teal-soft)]">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">Motor</p>
                 <p className="text-xs text-white font-medium">
                   {isPremium ? "Voz premium" : "Voz estándar"}
@@ -527,7 +527,7 @@ function SliderField({
           step={step}
           value={safe}
           onInput={e => onChange(parseFloat(e.currentTarget.value))}
-          className="flex-1 h-2 cursor-pointer accent-[#5b5bf6] bg-white/[.08] rounded-full appearance-none"
+          className="nv-range flex-1 h-2 cursor-pointer rounded-full appearance-none"
         />
         <span className="text-xs text-gray-300 w-9 text-right tabular-nums font-medium">
           {safe.toFixed(2)}

@@ -19,7 +19,7 @@ export function AgentTestPanel({ agentName, agentConfig, ...voiceProps }: AgentT
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <div className="px-6 py-3 border-b border-white/[.08] shrink-0">
+      <div className="px-6 py-3 border-b border-white/[.08] shrink-0 agent-test-tabs">
         <div className={btnFilterGroup}>
           <button
             onClick={() => setMode("web")}

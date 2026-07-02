@@ -531,11 +531,11 @@ export function VoiceSessionPanel({
 
   const statusDotClass =
     isActive ? "bg-emerald-400 premium-voice-dot-live" :
-    isConnecting ? "bg-amber-400 animate-pulse" :
+    isConnecting ? "bg-[var(--nv-accent)] animate-pulse" :
     state === "error" ? "bg-red-400" : "bg-emerald-400/70";
 
   return (
-    <div className="flex-1 flex min-h-0 p-4 gap-4 overflow-hidden">
+    <div className="flex-1 flex min-h-0 p-4 gap-4 overflow-hidden nv-voice-session">
       <aside className="w-[min(100%,320px)] shrink-0 flex flex-col">
         <div className="flex-1 rounded-2xl border border-white/[.08] bg-[#0c0c10]/80 backdrop-blur-sm p-6 flex flex-col min-h-[440px]">
           <div className="flex flex-col items-center text-center flex-1">
@@ -642,7 +642,7 @@ export function VoiceSessionPanel({
             <span className="text-sm font-medium text-gray-200">Transcripción en vivo</span>
           </div>
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[.03] border border-white/[.08] shrink-0">
-            <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-400 premium-voice-dot-live" : isConnecting ? "bg-amber-400 animate-pulse" : "bg-gray-600"}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-400 premium-voice-dot-live" : isConnecting ? "bg-[var(--nv-accent)] animate-pulse" : "bg-gray-600"}`} />
             <span className="text-[10px] text-gray-500">{geminiLabel}</span>
           </div>
         </div>

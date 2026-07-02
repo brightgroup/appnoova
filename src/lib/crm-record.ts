@@ -42,7 +42,7 @@ export const DEFAULT_CRM_STAGES: Omit<CrmPipelineStage, "id" | "user_id" | "crea
   {
     name: "Cotizado",
     slug: "cotizado",
-    color: "#f59e0b",
+    color: "#006e80",
     sort_order: 2,
     is_won: false,
     is_lost: false,

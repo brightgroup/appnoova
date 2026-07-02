@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Bell, MessageCircle, Zap, Phone, Loader2 } from "lucide-react";
+import { MessageCircle, Zap, Phone, Loader2, Sparkles } from "lucide-react";
 
-import { inputSearch } from "@/lib/brand-ui";
+import { btnPrimary, promoCard } from "@/lib/brand-ui";
 import { authFetch } from "@/lib/telephony-api";
 
 interface DashboardStats {
@@ -90,41 +90,13 @@ export default function Dashboard() {
 
   return (
     <div className="flex-1 flex flex-col bg-noova-main text-white overflow-hidden">
-      {/* Header */}
-      <div className="border-b border-white/[.06] bg-noova-main/50 backdrop-blur px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Buscar leads, agentes..."
-              className={`${inputSearch} max-w-md pl-4`}
-            />
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button className="p-2 hover:bg-white/[.08] rounded-lg transition-colors relative">
-              <Bell className="w-5 h-5 text-gray-400" />
-            </button>
-
-            <div className="flex items-center gap-3 pl-4 border-l border-white/[.06]">
-              <div>
-                <p className="text-sm font-medium text-white">{profile.name}</p>
-                <p className="text-xs text-gray-500">{profile.email || data?.organization.name}</p>
-              </div>
-              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#5b5bf6] to-[#7070f8] flex items-center justify-center">
-                <span className="text-sm font-bold">{profile.initials}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Content Area */}
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-7xl">
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">
-              Bienvenido{data?.organization.name ? ` a ${data.organization.name}` : " a Noova 360"}
+              Bienvenido{profile.name !== "—" ? `, ${profile.name.split(" ")[0]}` : ""}
+              {data?.organization.name ? ` — ${data.organization.name}` : ""}
             </h1>
             <p className="text-gray-400">Panel de control — IA operativa para tu negocio</p>
           </div>
@@ -151,11 +123,11 @@ export default function Dashboard() {
                           className={`text-sm font-medium ${changeClass(
                             stat.change,
                             stat.color === "primary"
-                              ? "text-[#5b5bf6]"
+                              ? "text-[var(--nv-accent)]"
                               : stat.color === "blue"
-                                ? "text-blue-400"
+                                ? "text-[var(--nv-hubspot-teal)]"
                                 : stat.color === "cyan"
-                                  ? "text-cyan-400"
+                                  ? "text-[var(--nv-hubspot-teal)]"
                                   : "text-green-400"
                           )}`}
                         >
@@ -227,15 +199,17 @@ export default function Dashboard() {
                 </div>
 
                 <div className="space-y-6">
-                  <div className="bg-gradient-to-br from-[#5b5bf6]/20 to-[#7070f8]/10 border border-[#5b5bf6]/20 rounded-xl p-6">
-                    <p className="text-sm font-semibold text-[#a5a5ff] mb-3">💡 Pro Tip</p>
-                    <p className="text-sm text-gray-300 mb-4">
-                      Activa ORI Copiloto para recibir sugerencias automáticas en tus cotizaciones.
+                  <div className={promoCard}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-full bg-[var(--nv-accent)] flex items-center justify-center shrink-0">
+                        <Sparkles className="w-5 h-5 text-white" />
+                      </div>
+                      <p className="nv-promo-title text-base font-bold">Pro Tip</p>
+                    </div>
+                    <p className="nv-promo-body text-sm leading-relaxed mb-4">
+                      Activa <strong>ORI Copiloto</strong> para recibir sugerencias automáticas en tus cotizaciones.
                     </p>
-                    <Link
-                      href="/dashboard/ori"
-                      className="block w-full text-center px-4 py-2 rounded-lg bg-[#5b5bf6] hover:bg-[#7070f8] text-white text-sm font-medium transition-colors"
-                    >
+                    <Link href="/dashboard/ori" className={`${btnPrimary} w-full justify-center`}>
                       Activar ORI
                     </Link>
                   </div>

@@ -188,7 +188,7 @@ export default function ContextosPage() {
                         : "text-gray-400 hover:text-white hover:bg-white/[.06]"
                     }`}
                   >
-                    {ctx.is_default && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />}
+                    {ctx.is_default && <Star className="w-3.5 h-3.5 text-[var(--nv-hubspot-teal)] fill-[var(--nv-hubspot-teal)] shrink-0" />}
                     <span className="truncate">{ctx.name}</span>
                   </button>
                 </li>

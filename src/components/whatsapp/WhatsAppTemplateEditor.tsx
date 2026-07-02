@@ -8,8 +8,13 @@ import { getAuthHeaders } from "@/lib/text-agents-api";
 import {
   btnGhost,
   btnPrimary,
-  accentFocus,
-  textMuted
+  nvFieldLabel,
+  registryContent,
+  registryPage,
+  registrySectionTitle,
+  registryToolbar,
+  textMuted,
+  waTemplateInput,
 } from "@/lib/brand-ui";
 import {
   extractNamedVariables,
@@ -38,9 +43,6 @@ const CATEGORIES: { value: WhatsAppTemplateCategory; label: string }[] = [
   { value: "marketing", label: "Marketing" },
   { value: "authentication", label: "Autenticación" }
 ];
-
-const inputClass =
-  `w-full bg-white/[.04] border border-white/[.10] rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 ${accentFocus}`;
 
 interface WhatsAppTemplateEditorProps {
   mode: "create" | "edit";
@@ -236,9 +238,8 @@ export function WhatsAppTemplateEditor({
   const selectedChannel = channels.find(c => c.id === channelId);
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0d0e14] text-white min-h-0">
-      {/* Header */}
-      <div className="border-b border-white/[.08] px-6 py-4 shrink-0">
+    <div className={`${registryPage} nv-wa-template-editor`}>
+      <div className={registryToolbar}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <Link
@@ -249,11 +250,11 @@ export function WhatsAppTemplateEditor({
             </Link>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-bold truncate">
+                <h1 className={`${registrySectionTitle} truncate`}>
                   {mode === "create" ? "Nueva plantilla" : templateName || "Plantilla"}
                 </h1>
                 {status && (
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${templateStatusColor(status)}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium nv-status-tag ${templateStatusColor(status)}`}>
                     {templateStatusLabel(status)}
                   </span>
                 )}
@@ -292,29 +293,27 @@ export function WhatsAppTemplateEditor({
       </div>
 
       {rejectionReason && status === "rejected" && (
-        <div className="mx-6 mt-4 rounded-xl border border-red-500/25 bg-red-500/[.06] px-4 py-3 text-sm text-red-300">
+        <div className="mx-6 mt-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 nv-flat-panel">
           <strong>Motivo de rechazo:</strong> {rejectionReason}
         </div>
       )}
 
       {error && (
-        <div className="mx-6 mt-4 rounded-xl border border-red-500/25 bg-red-500/[.06] px-4 py-3 text-sm text-red-300">
+        <div className="mx-6 mt-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 nv-flat-panel">
           {error}
         </div>
       )}
 
-      {/* Layout 3 columnas */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className={`${registryContent} flex-1 overflow-auto`}>
         <div className="grid xl:grid-cols-[1fr_auto_280px] gap-8 max-w-6xl mx-auto">
-          {/* Formulario */}
           <div className="space-y-5">
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-gray-400 nv-wa-template-hint">
               Esta plantilla se usará para enviar notificaciones de WhatsApp fuera de la ventana de 24 h.
             </p>
 
             {mode === "create" && (
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5">Canal WhatsApp</label>
+                <label className={nvFieldLabel}>Canal WhatsApp</label>
                 <NoovaSelect
                   value={channelId}
                   onChange={setChannelId}
@@ -330,29 +329,29 @@ export function WhatsAppTemplateEditor({
             )}
 
             {selectedChannel && mode === "edit" && (
-              <div className="rounded-xl border border-white/[.08] bg-white/[.02] px-4 py-3 text-sm">
+              <div className="rounded-xl border border-white/[.08] bg-white/[.02] px-4 py-3 text-sm nv-flat-panel">
                 <span className="text-gray-500">Canal: </span>
-                <span className="font-mono text-gray-200">{selectedChannel.e164}</span>
+                <span className="font-mono text-gray-200 nv-channel-mono">{selectedChannel.e164}</span>
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1.5">Nombre</label>
+              <label className={nvFieldLabel}>Nombre</label>
               <input
                 value={templateName}
                 onChange={e => setTemplateName(e.target.value)}
                 disabled={readOnly}
                 placeholder="confirmacion_pedido"
-                className={`${inputClass} font-mono`}
+                className={`${waTemplateInput} font-mono`}
               />
-              <p className="text-[11px] text-gray-500 mt-1">
+              <p className="text-[11px] text-gray-500 mt-1 nv-field-hint">
                 Solo minúsculas, números y guiones bajos (ej. confirmacion_pedido)
               </p>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5">Idioma</label>
+                <label className={nvFieldLabel}>Idioma</label>
                 <NoovaSelect
                   value={language}
                   onChange={setLanguage}
@@ -362,7 +361,7 @@ export function WhatsAppTemplateEditor({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5">Categoría</label>
+                <label className={nvFieldLabel}>Categoría</label>
                 <NoovaSelect
                   value={category}
                   onChange={v => setCategory(v as WhatsAppTemplateCategory)}
@@ -374,7 +373,7 @@ export function WhatsAppTemplateEditor({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1.5">Cuerpo del mensaje</label>
+              <label className={nvFieldLabel}>Cuerpo del mensaje</label>
               <textarea
                 value={bodySource}
                 onChange={e => setBodySource(e.target.value)}
@@ -382,27 +381,26 @@ export function WhatsAppTemplateEditor({
                 rows={8}
                 maxLength={1024}
                 placeholder="👋 ¡Hola {{contact_name}}! Te escribimos desde {{company_name}}…"
-                className={`${inputClass} resize-none leading-relaxed`}
+                className={`${waTemplateInput} resize-none leading-relaxed`}
               />
               <div className="flex justify-between mt-1">
-                <p className="text-[11px] text-gray-500">
+                <p className="text-[11px] text-gray-500 nv-field-hint">
                   Usa {"{{nombre_variable}}"} para contenido dinámico
                 </p>
-                <span className={`text-[11px] ${bodySource.length > 950 ? "text-amber-400" : "text-gray-500"}`}>
+                <span className={`text-[11px] ${bodySource.length > 950 ? "text-amber-400" : "text-gray-500"} nv-field-hint`}>
                   {bodySource.length}/1024
                 </span>
               </div>
             </div>
 
             {initialTemplate?.twilio_content_sid && (
-              <div className="rounded-xl border border-white/[.06] bg-white/[.02] px-4 py-3">
-                <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Referencia interna</p>
+              <div className="rounded-xl border border-white/[.06] bg-white/[.02] px-4 py-3 nv-flat-panel">
+                <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 nv-field-hint">Referencia interna</p>
                 <p className="font-mono text-xs text-gray-400 break-all">{initialTemplate.twilio_content_sid}</p>
               </div>
             )}
           </div>
 
-          {/* Preview */}
           <div className="hidden lg:flex flex-col items-center justify-start pt-2">
             <WhatsAppPhonePreview
               bodySource={bodySource}
@@ -411,18 +409,17 @@ export function WhatsAppTemplateEditor({
             />
           </div>
 
-          {/* Variables */}
           <div className="space-y-4">
             <div>
-              <h3 className="text-sm font-semibold text-white">Variables</h3>
+              <h3 className="text-sm font-semibold nv-subsection-title">Variables</h3>
               <p className={`${textMuted} text-xs mt-1 leading-relaxed`}>
                 Agrega valores de ejemplo. Se usan durante la revisión y aprobación.
               </p>
             </div>
 
             {variableNames.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-white/[.10] px-4 py-8 text-center">
-                <p className="text-xs text-gray-500">
+              <div className="rounded-xl border border-dashed border-white/[.10] px-4 py-8 text-center nv-flat-panel">
+                <p className="text-xs text-gray-500 nv-field-hint">
                   Escribe {"{{variable}}"} en el cuerpo para agregar variables dinámicas.
                 </p>
               </div>
@@ -431,15 +428,15 @@ export function WhatsAppTemplateEditor({
                 {variableNames.map((name, i) => (
                   <div
                     key={name}
-                    className="rounded-xl border border-white/[.08] bg-white/[.02] p-3 space-y-2"
+                    className="rounded-xl border border-white/[.08] bg-white/[.02] p-3 space-y-2 nv-flat-panel"
                   >
-                    <label className="text-xs font-mono text-[#a5a5ff]">{`{{${name}}}`}</label>
+                    <label className="text-xs font-mono nv-variable-label">{`{{${name}}}`}</label>
                     <input
                       value={variableExamples[i] ?? ""}
                       onChange={e => setExample(i, e.target.value)}
                       disabled={readOnly}
                       placeholder="Valor de ejemplo"
-                      className={inputClass}
+                      className={waTemplateInput}
                     />
                   </div>
                 ))}

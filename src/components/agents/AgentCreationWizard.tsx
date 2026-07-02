@@ -391,7 +391,7 @@ export function AgentCreationWizard({
                       onClick={() => setVoiceProvider("elevenlabs")}
                       className={`p-3 rounded-xl border text-left transition-all ${
                         voiceProvider === "elevenlabs"
-                          ? "border-amber-500/50 bg-amber-500/10 ring-1 ring-amber-500/30"
+                          ? "border-[var(--nv-hubspot-teal)]/50 bg-[var(--nv-hubspot-teal-soft)] ring-1 ring-[var(--nv-hubspot-teal)]/30"
                           : "border-white/[.08] bg-white/[.02] hover:border-white/[.16]"
                       }`}
                     >
@@ -421,7 +421,7 @@ export function AgentCreationWizard({
                         value={elevenlabsVoiceId}
                         onChange={e => setElevenlabsVoiceId(e.target.value)}
                         disabled={loadingElVoices}
-                        className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500/50 disabled:opacity-60"
+                        className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[var(--nv-accent)]/50 disabled:opacity-60"
                       >
                         {(elevenlabsVoices.length ? elevenlabsVoices : [{ id: DEFAULT_ELEVENLABS_VOICE_ID, label: "Voz predeterminada" }]).map(v => (
                           <option key={v.id} value={v.id} className="bg-[#232329]">{v.label}</option>

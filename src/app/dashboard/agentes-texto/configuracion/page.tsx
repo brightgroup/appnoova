@@ -449,7 +449,7 @@ function SliderField({
           step={step}
           value={safe}
           onInput={e => onChange(parseFloat(e.currentTarget.value))}
-          className="flex-1 h-2 cursor-pointer accent-[#5b5bf6] bg-white/[.08] rounded-full appearance-none"
+          className="nv-range flex-1 h-2 cursor-pointer rounded-full appearance-none"
         />
         <span className="text-xs text-gray-300 w-9 text-right tabular-nums font-medium">
           {safe.toFixed(2)}

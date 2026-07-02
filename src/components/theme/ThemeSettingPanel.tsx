@@ -18,7 +18,7 @@ const OPTIONS: {
 ];
 
 export function ThemeSettingPanel() {
-  const { preference, resolved, setPreference } = useTheme();
+  const { preference, resolved, ready, setPreference } = useTheme();
 
   return (
     <div className="space-y-4">
@@ -26,7 +26,10 @@ export function ThemeSettingPanel() {
         <h2 className="text-sm font-semibold text-[var(--nv-text)]">Apariencia</h2>
         <p className="text-xs text-[var(--nv-text-muted)] mt-1">
           Elige cómo se ve la plataforma. Por defecto Noova usa tema oscuro; elige Claro si lo prefieres
-          {preference === "system" ? ` (ahora: ${resolved === "dark" ? "oscuro" : "claro"})` : ""}.
+          {preference === "system" && ready
+            ? ` (ahora: ${resolved === "dark" ? "oscuro" : "claro"})`
+            : ""}
+          .
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
