@@ -244,7 +244,7 @@ async function placeCampaignCall(input: {
     await resolvePlatformSipConfig();
     const line = await resolveElevenLabsPhoneLine(phone, {
       elevenlabsAgentId: agentRow.elevenlabs_agent_id,
-      resync: true,
+      resync: !phone.elevenlabs_phone_number_id,
     });
     if (!line.configured || !line.phoneNumberId) {
       throw new Error(line.syncError ?? "Línea premium no configurada");
@@ -455,7 +455,8 @@ async function executeCampaignDialerTick(): Promise<DialerTickResult> {
     if (!claimed) continue;
 
     const slotsAfterClaim = await countActiveCampaignCalls(db);
-    if (slotsAfterClaim >= rules.max_concurrent) {
+    // Permitir el cupo que acabamos de reclamar (la fila en "calling" sin sesión aún).
+    if (slotsAfterClaim > rules.max_concurrent) {
       const maxAttempts = campaign.schedule_config.max_attempts_per_contact ?? 3;
       await revertClaimedRow(db, row.id, rules, maxAttempts);
       break;
@@ -476,6 +477,7 @@ async function executeCampaignDialerTick(): Promise<DialerTickResult> {
         maxAttempts,
         dispositionFromPlacementError(message)
       );
+      break;
     }
   }
 
