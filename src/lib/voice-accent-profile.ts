@@ -136,10 +136,18 @@ export const VOICE_OUTBOUND_PICKUP_PROMPT = `
 - Cuando responda, saluda en UNA sola frase breve (tu nombre y la empresa) y continúa el protocolo de la plantilla.
 - No des resumen de la empresa, pitch largo ni lista de servicios al abrir. No hables encima de la persona.`;
 
+/** Prioridad máxima: buzón antes de hablar (respaldo si AMD no lo detectó). */
+export const VOICE_OUTBOUND_VOICEMAIL_PROMPT = `
+
+## REGLA #0 — Buzón de voz (PRIORIDAD ABSOLUTA)
+- Escucha 2-4 segundos SIN hablar al conectar.
+- Si detectas contestadora, buzón, tono grabado o "deje su mensaje después del tono": NO hables, NO saludes, NO dejes mensaje. Permanece en silencio.
+- Solo continúa si una persona REAL responde con "aló", "bueno", "dígame" o similar conversacional.`;
+
 /** Mensaje de arranque: instruye esperar el "aló" antes de generar audio. */
 export function buildVoiceOutboundKickoffMessage(companyName?: string | null): string {
   const empresa = companyName?.trim() || "la empresa";
-  return `[Sistema — llamada conectada] La persona acaba de contestar el teléfono. Permanece en SILENCIO absoluto (sin audio) hasta escuchar su saludo ("aló", "bueno", "dígame", "hola", "sí"). Cuando salude, responde con UNA sola frase breve de presentación (tu nombre y "${empresa}") y sigue el guion de la plantilla. No digas "Mi empresa" ni otro nombre distinto de "${empresa}". No des resumen de la empresa al abrir.`;
+  return `[Sistema — llamada conectada] La persona acaba de contestar el teléfono. Si escuchas buzón, contestadora o mensaje grabado ("deje su mensaje"), permanece en SILENCIO y no hables. Si es una persona real, espera su saludo ("aló", "bueno", "dígame", "hola", "sí") antes de hablar. Cuando salude, responde con UNA sola frase breve de presentación (tu nombre y "${empresa}") y sigue el guion de la plantilla. No digas "Mi empresa" ni otro nombre distinto de "${empresa}". No des resumen de la empresa al abrir.`;
 }
 
 /** Cuando ya se escuchó el saludo del interlocutor (p. ej. antes de que Gemini terminara de conectar). */

@@ -1,4 +1,5 @@
 import type { CampaignFieldMapping, CampaignTriggerRule } from "@/types/voice-campaign";
+import type { DataTableColumn } from "@/types/data-table";
 import { computeScheduledCallAt, extractRowContactFields } from "@/lib/campaigns/audience-rows";
 
 export async function applyAudienceMapping(
@@ -6,8 +7,20 @@ export async function applyAudienceMapping(
   audienceTableId: string,
   organizationId: string,
   mapping: CampaignFieldMapping,
-  trigger: CampaignTriggerRule
+  trigger: CampaignTriggerRule,
+  columns?: DataTableColumn[]
 ): Promise<{ updated: number; skipped: number }> {
+  let schemaColumns = columns;
+  if (!schemaColumns?.length) {
+    const { data: table } = await db
+      .from("campaign_audience_tables")
+      .select("columns")
+      .eq("id", audienceTableId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    schemaColumns = (table?.columns ?? []) as DataTableColumn[];
+  }
+
   const { data: rows, error } = await db
     .from("campaign_audience_rows")
     .select("id, data")
@@ -23,7 +36,7 @@ export async function applyAudienceMapping(
 
   for (const row of rows ?? []) {
     const data = (row.data ?? {}) as Record<string, string | number | boolean | null>;
-    const { phone_e164, contact_name } = extractRowContactFields(data, mapping);
+    const { phone_e164, contact_name } = extractRowContactFields(data, mapping, schemaColumns);
     if (!phone_e164 || !contact_name) {
       skipped += 1;
       continue;

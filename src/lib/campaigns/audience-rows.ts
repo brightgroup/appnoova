@@ -1,4 +1,6 @@
 import type { CampaignFieldMapping, CampaignTriggerRule } from "@/types/voice-campaign";
+import type { DataTableColumn } from "@/types/data-table";
+import { resolveMappedCellValue } from "@/lib/campaigns/column-mapping";
 import { toE164 } from "@/lib/telephony/e164";
 
 function parseDateValue(raw: unknown): Date | null {
@@ -53,7 +55,7 @@ export function computeScheduledCallAt(
   if (trigger.type === "excel_date") {
     const col = mapping.call_date_column || trigger.column_key;
     if (!col) return defaultCallTime();
-    const parsed = parseDateValue(row[col]);
+    const parsed = parseDateValue(resolveMappedCellValue(row, col, undefined));
     if (!parsed) return null;
     const offset = trigger.offset_days ?? 0;
     const scheduled = applyOffset(parsed, offset);
@@ -64,13 +66,23 @@ export function computeScheduledCallAt(
   return defaultCallTime();
 }
 
+function cellToPhoneString(raw: unknown): string {
+  if (raw == null || raw === "") return "";
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return String(Math.trunc(raw));
+  }
+  return String(raw).trim();
+}
+
 export function extractRowContactFields(
   row: Record<string, string | number | boolean | null>,
-  mapping: CampaignFieldMapping
+  mapping: CampaignFieldMapping,
+  columns?: DataTableColumn[]
 ): { phone_e164: string | null; contact_name: string | null } {
-  const phoneRaw = mapping.phone_column ? row[mapping.phone_column] : null;
-  const nameRaw = mapping.name_column ? row[mapping.name_column] : null;
-  const phone = phoneRaw != null && String(phoneRaw).trim() ? toE164(String(phoneRaw)) : "";
+  const phoneRaw = resolveMappedCellValue(row, mapping.phone_column, columns);
+  const nameRaw = resolveMappedCellValue(row, mapping.name_column, columns);
+  const phoneStr = cellToPhoneString(phoneRaw);
+  const phone = phoneStr ? toE164(phoneStr) : "";
   const contact_name = nameRaw != null ? String(nameRaw).trim() : "";
   return {
     phone_e164: phone || null,

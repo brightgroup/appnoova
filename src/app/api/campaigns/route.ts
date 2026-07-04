@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     .from("voice_agents")
     .select("id")
     .eq("id", voiceAgentId)
-    .eq("user_id", ctx.userId)
+    .eq("organization_id", ctx.organizationId)
     .maybeSingle();
 
   if (agentErr) return NextResponse.json({ error: agentErr.message }, { status: 500 });
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       goal: body.goal?.trim() || null,
       voice_agent_id: voiceAgentId,
       status: "draft",
-      wizard_step: 1,
+      wizard_step: 2,
       schedule_config: defaultScheduleConfig(),
       trigger_rule: defaultTriggerRule(),
       field_mapping: defaultFieldMapping(),

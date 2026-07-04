@@ -11,7 +11,7 @@ import {
   labelForPhase,
   updatePhoneTestCallSession,
 } from "@/lib/telephony/test-call-session";
-import { getUserIdFromRequest } from "@/lib/voice-agents-server";
+import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
 
 /** GET — estado de llamada premium ElevenLabs (polling desde PhoneTestPanel). */
 export async function GET(req: NextRequest) {
@@ -47,12 +47,33 @@ export async function GET(req: NextRequest) {
 
     if (phase === "ended" || phase === "failed") {
       if (!session.metadata.finalized) {
-        await finalizeElevenLabsPremiumCall({
-          conversationId,
-          durationSec: conv.callDurationSecs,
-          transcript: conv.transcript,
-          disconnectReason: sipError ?? conv.terminationReason ?? conv.status,
-        });
+        if (phase === "failed" && conv.callDurationSecs <= 0 && !conv.voicemailDetected) {
+          const db = adminClient();
+          await db
+            .from("voice_agent_calls")
+            .update({
+              duration_sec: 0,
+              credits: 0,
+              status: "missed",
+              status_label: "No contestada",
+              in_voicemail: false,
+              disconnect_reason: sipError ?? conv.terminationReason ?? "No contestada",
+              summary: `Llamada a ${session.metadata.to} — no contestada.`,
+              metadata: {
+                ...session.metadata,
+                finalized: true,
+                outcome: "no_answer",
+              },
+            })
+            .eq("id", session.id);
+        } else {
+          await finalizeElevenLabsPremiumCall({
+            conversationId,
+            durationSec: conv.callDurationSecs,
+            transcript: conv.transcript,
+            disconnectReason: sipError ?? conv.terminationReason ?? conv.status,
+          });
+        }
       }
     } else {
       await updatePhoneTestCallSession(conversationId, {

@@ -31,7 +31,9 @@ export interface VoiceAgentCallListItem {
   phone_number: string;
   duration_sec: number;
   credits: number;
+  status?: string;
   status_label: string;
+  in_voicemail: boolean;
   disconnect_reason: string;
   user_sentiment: string;
   summary: string;

@@ -6,7 +6,7 @@ import {
   resolveOutboundTest,
   resolveOutboundTestFromState
 } from "@/lib/telephony/phone-call";
-import { answerAndSpeak, speakText, telnyxStartMediaStream } from "@/lib/telephony/telnyx-call-control";
+import { answerAndSpeak, speakText, telnyxHangup, telnyxStartMediaStream } from "@/lib/telephony/telnyx-call-control";
 import { telnyxStreamUrl } from "@/lib/telephony/app-url";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import {
@@ -14,6 +14,12 @@ import {
   setPendingBridgeSession
 } from "@/lib/telephony/bridge-session-store";
 import { finalizePhoneTestCall } from "@/lib/telephony/finalize-phone-test-call";
+import { finalizeOutboundShortCall } from "@/lib/telephony/finalize-outbound-short-call";
+import {
+  isHumanAmdResult,
+  isMachineAmdResult,
+  mapHangupCauseToOutcome,
+} from "@/lib/telephony/call-outcome";
 import { finalizeInboundTelnyxCall } from "@/lib/telephony/finalize-inbound-call";
 import {
   decodeTelnyxClientState,
@@ -21,13 +27,105 @@ import {
   isPhoneTestCall,
   labelForPhase,
   labelForManagedOutboundPhase,
+  managedOutboundKind,
   updatePhoneTestCallSession,
   type PhoneTestCallPhase
 } from "@/lib/telephony/test-call-session";
 import { resolveCrmOutboundFromState } from "@/lib/telephony/crm-call-session";
+import { connectCampaignElevenLabsAfterAmd } from "@/lib/elevenlabs/connect-campaign-after-amd";
+import { resolveCampaignOutboundFromState } from "@/lib/call-engine/campaign-call-session";
+import { adminClient } from "@/lib/voice-agents-server";
 
 function isOutbound(direction: string): boolean {
   return direction === "outgoing" || direction === "outbound";
+}
+
+/** Si AMD tarda demasiado, conectar igual (Telnyx recomienda tratar timeout como humano). */
+const amdBridgeFallbackMs = 12_000;
+const amdFallbackTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const amdFallbackContext = new Map<
+  string,
+  { payload: Record<string, unknown>; from: string; to: string; direction: string }
+>();
+
+function clearAmdFallback(callId: string) {
+  const t = amdFallbackTimers.get(callId);
+  if (t) {
+    clearTimeout(t);
+    amdFallbackTimers.delete(callId);
+  }
+  amdFallbackContext.delete(callId);
+}
+
+function scheduleAmdBridgeFallback(
+  callId: string,
+  payload: Record<string, unknown>,
+  from: string,
+  to: string,
+  direction: string
+) {
+  clearAmdFallback(callId);
+  amdFallbackContext.set(callId, { payload, from, to, direction });
+  amdFallbackTimers.set(
+    callId,
+    setTimeout(() => {
+      void (async () => {
+        const ctx = amdFallbackContext.get(callId);
+        amdFallbackContext.delete(callId);
+        amdFallbackTimers.delete(callId);
+        const session = await getPhoneTestCallSession(callId);
+        if (!session?.metadata.amd_pending || session.metadata.finalized) return;
+        // Telnyx recomienda tratar timeout AMD como humano — conectar agente (Gemini).
+        console.warn("[telnyx:voice] AMD sin respuesta — conectando agente (timeout)", { callId });
+        if (ctx) {
+          await handleOutboundAnswered(callId, ctx.payload, ctx.from, ctx.to, ctx.direction);
+        }
+      })();
+    }, amdBridgeFallbackMs)
+  );
+}
+
+async function handleAmdResult(
+  callId: string,
+  result: string,
+  payload: Record<string, unknown>,
+  from: string,
+  to: string,
+  direction: string
+) {
+  clearAmdFallback(callId);
+
+  const session = await getPhoneTestCallSession(callId);
+  if (!session || session.metadata.finalized) return;
+
+  await updatePhoneTestCallSession(callId, {
+    amd_pending: false,
+    amd_result: result,
+    last_event: "call.machine.detection.ended",
+    status_label: isMachineAmdResult(result)
+      ? "Buzón de voz detectado"
+      : "Persona detectada — conectando agente",
+  });
+
+  if (isMachineAmdResult(result)) {
+    await updatePhoneTestCallSession(callId, { voicemail_detected: true });
+    try {
+      await telnyxHangup(callId);
+    } catch (e) {
+      console.error("[telnyx:voice] hangup tras buzón:", e);
+    }
+    await finalizeOutboundShortCall({
+      callControlId: callId,
+      outcome: "voicemail",
+      disconnectReason: `Buzón de voz (${result})`,
+      amdResult: result,
+    });
+    return;
+  }
+
+  if (isHumanAmdResult(result)) {
+    await handleOutboundAnswered(callId, payload, from, to, direction);
+  }
 }
 
 async function resolveTestContext(
@@ -38,6 +136,21 @@ async function resolveTestContext(
   direction: string
 ) {
   const state = decodeTelnyxClientState(payload.client_state);
+  if (state?.type === "campaign_outbound") {
+    const campaignCtx = await resolveCampaignOutboundFromState(state);
+    if (campaignCtx) {
+      return {
+        ctx: {
+          phone: campaignCtx.phone,
+          agent: campaignCtx.agent,
+          connectionId: campaignCtx.connectionId,
+          destinationE164: campaignCtx.destinationE164,
+          isTestDestination: false,
+        },
+        state,
+      };
+    }
+  }
   if (state?.type === "crm_outbound") {
     const crmCtx = await resolveCrmOutboundFromState(state);
     if (crmCtx) {
@@ -110,9 +223,63 @@ async function handleOutboundAnswered(
     return;
   }
 
-  // ElevenLabs usa SIP directo (no Pipecat ni DIY bridge). Saltar aquí evita
-  // que el webhook intente arrancar un segundo stream de audio para esas llamadas.
-  if (agent.config.voice_provider === "elevenlabs") {
+  const promptOverride = (session.metadata as { prompt_override?: string }).prompt_override?.trim();
+  const bridgeConfig = promptOverride
+    ? { ...agent.config, prompt: promptOverride }
+    : agent.config;
+
+  const sessionMeta = session.metadata as unknown as Record<string, unknown>;
+
+  if (session.metadata.voicemail_detected || session.metadata.agent_skipped) {
+    return;
+  }
+
+  // Campaña premium: tras AMD humano conectar ElevenLabs (buzón nunca activa la IA).
+  if (
+    bridgeConfig.voice_provider === "elevenlabs" &&
+    sessionMeta.el_deferred_amd === true &&
+    sessionMeta.campaign_outbound === true &&
+    !sessionMeta.el_connected
+  ) {
+    const db = adminClient();
+    const { data: agentRow } = await db
+      .from("voice_agents")
+      .select("elevenlabs_agent_id")
+      .eq("id", ctx.agent.id)
+      .maybeSingle();
+    const elevenlabsAgentId = agentRow?.elevenlabs_agent_id?.trim();
+    if (!elevenlabsAgentId) {
+      console.warn("[telnyx:voice] campaña premium sin elevenlabs_agent_id", { callId });
+      return;
+    }
+
+    try {
+      await connectCampaignElevenLabsAfterAmd({
+        screeningCallControlId: callId,
+        session,
+        agent,
+        phoneNumberId: String(sessionMeta.phone_number_id ?? ctx.phone.id),
+        elevenlabsAgentId,
+      });
+      await updatePhoneTestCallSession(callId, {
+        phase: "dialing",
+        answered_at: new Date().toISOString(),
+        amd_pending: false,
+        status_label: "Campaña — Conectando agente premium",
+      });
+    } catch (e) {
+      console.error("[telnyx:voice] connectCampaignElevenLabsAfterAmd:", e);
+      await updatePhoneTestCallSession(callId, {
+        phase: "failed",
+        error: e instanceof Error ? e.message : "No se pudo conectar agente premium",
+        status_label: labelForPhase("failed"),
+      });
+    }
+    return;
+  }
+
+  // ElevenLabs con SIP directo (sin AMD diferido). Saltar bridge Pipecat.
+  if (bridgeConfig.voice_provider === "elevenlabs") {
     console.info("[telnyx:voice] agente ElevenLabs — bridge omitido (voz via SIP)", { callId });
     return;
   }
@@ -125,7 +292,7 @@ async function handleOutboundAnswered(
     from: ctx.phone.e164,
     to: ctx.destinationE164,
     agentName: agent.agentName,
-    config: agent.config,
+    config: bridgeConfig,
     companyContextText: agent.companyContextText,
     companyName: agent.companyName,
     preparedAt: Date.now()
@@ -136,7 +303,8 @@ async function handleOutboundAnswered(
   await updatePhoneTestCallSession(callId, {
     phase: "answered",
     last_event: "call.answered",
-    status_label: labelForPhase("answered")
+    status_label: labelForPhase("answered"),
+    amd_pending: false,
   });
 
   try {
@@ -184,9 +352,11 @@ export async function POST(req: NextRequest) {
 
   const testCall = await isPhoneTestCall(callId);
   const session = testCall ? await getPhoneTestCallSession(callId) : null;
-  const isCrmCall = Boolean(session?.metadata && (session.metadata as { crm_outbound?: boolean }).crm_outbound);
+  const outboundKind = session?.metadata
+    ? managedOutboundKind(session.metadata as unknown as Record<string, unknown>)
+    : "test";
   const phaseLabel = (phase: PhoneTestCallPhase) =>
-    labelForManagedOutboundPhase(phase, isCrmCall);
+    labelForManagedOutboundPhase(phase, outboundKind);
 
   const phaseByEvent: Record<string, PhoneTestCallPhase> = {
     "call.initiated": isOutbound(direction) || testCall ? "ringing" : "dialing",
@@ -205,29 +375,60 @@ export async function POST(req: NextRequest) {
   }
 
   if (eventType === "call.hangup") {
+    clearAmdFallback(callId);
     const row = testCall ? await getPhoneTestCallSession(callId) : null;
     if (row) {
-      try {
-        await closeActiveBridge(callId, "Phone Hangup");
-      } catch (e) {
-        console.error("[telnyx:voice] closeActiveBridge error:", e);
+      const rowMeta = row.metadata as unknown as Record<string, unknown>;
+      if (
+        rowMeta.el_connected &&
+        String(rowMeta.screening_call_id ?? "") === callId
+      ) {
+        // Pierna Telnyx de verificación colgada tras conectar ElevenLabs — la conversación sigue activa.
+        console.info("[telnyx:voice] hangup pierna screening post-EL", { callId });
+        return NextResponse.json({ ok: true });
       }
-      // Respaldo retardado: evita pisar el finalize del puente WS (con transcripción).
-      setTimeout(() => {
-        void (async () => {
-          const fresh = await getPhoneTestCallSession(callId);
-          if (!fresh || fresh.metadata.finalized) return;
-          try {
-            await finalizePhoneTestCall({
-              callControlId: callId,
-              transcript: [],
-              disconnectReason: "Phone Hangup"
-            });
-          } catch (e) {
-            console.error("[telnyx:voice] finalize hangup (delayed) error:", e);
-          }
-        })();
-      }, 10_000);
+
+      if (!row.metadata.finalized && !row.metadata.answered_at && !row.metadata.amd_pending) {
+        const cause = String(payload.hangup_cause ?? payload.sip_hangup_cause ?? "");
+        const outcome = mapHangupCauseToOutcome(cause);
+        await finalizeOutboundShortCall({
+          callControlId: callId,
+          outcome,
+          disconnectReason: cause || "No contestada",
+        });
+      } else if (!row.metadata.finalized && row.metadata.amd_pending && !row.metadata.answered_at) {
+        // Contestó la red pero AMD no terminó (cuelgue abrupto) — tratar como buzón/no conexión.
+        await finalizeOutboundShortCall({
+          callControlId: callId,
+          outcome: row.metadata.voicemail_detected ? "voicemail" : "no_answer",
+          disconnectReason: String(payload.hangup_cause ?? "Colgó durante verificación"),
+          amdResult: row.metadata.amd_result,
+        });
+      } else if (!row.metadata.finalized && row.metadata.voicemail_detected) {
+        // Ya manejado por AMD; noop.
+      } else {
+        try {
+          await closeActiveBridge(callId, "Phone Hangup");
+        } catch (e) {
+          console.error("[telnyx:voice] closeActiveBridge error:", e);
+        }
+        // Respaldo retardado: evita pisar el finalize del puente WS (con transcripción).
+        setTimeout(() => {
+          void (async () => {
+            const fresh = await getPhoneTestCallSession(callId);
+            if (!fresh || fresh.metadata.finalized) return;
+            try {
+              await finalizePhoneTestCall({
+                callControlId: callId,
+                transcript: [],
+                disconnectReason: String(payload.hangup_cause ?? "Phone Hangup"),
+              });
+            } catch (e) {
+              console.error("[telnyx:voice] finalize hangup (delayed) error:", e);
+            }
+          })();
+        }, 10_000);
+      }
     } else if (!isOutbound(direction)) {
       try {
         await finalizeInboundTelnyxCall(callId, payload);
@@ -237,8 +438,28 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  if (
+    eventType === "call.machine.detection.ended" ||
+    eventType === "call.machine.premium.detection.ended"
+  ) {
+    const result = String(payload.result ?? "");
+    if (result && testCall) {
+      await handleAmdResult(callId, result, payload, from, to, direction);
+    }
+  }
+
   if (eventType === "call.answered" && (isOutbound(direction) || testCall)) {
-    await handleOutboundAnswered(callId, payload, from, to, direction);
+    await updatePhoneTestCallSession(callId, {
+      amd_pending: true,
+      last_event: eventType,
+      status_label:
+        outboundKind === "campaign"
+          ? "Campaña — Verificando buzón…"
+          : outboundKind === "crm"
+            ? "Llamada IA — Verificando buzón…"
+            : "Prueba telefónica — Verificando buzón…",
+    });
+    scheduleAmdBridgeFallback(callId, payload, from, to, direction);
   }
 
   if (eventType === "call.initiated" && !isOutbound(direction) && !testCall && to) {

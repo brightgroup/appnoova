@@ -88,7 +88,17 @@ export interface ColombiaTemporalContext {
   dynamicVariables: Record<string, string>;
 }
 
-export function buildColombiaTemporalContext(now = new Date()): ColombiaTemporalContext {
+export interface TemporalOverrides {
+  /** Eventos especiales adicionales (desde configuración de plataforma). */
+  extraEvents?: ColombiaSpecialEvent[];
+  /** Notas adicionales para hoy (desde configuración de plataforma). */
+  extraNotes?: string[];
+}
+
+export function buildColombiaTemporalContext(
+  now = new Date(),
+  overrides: TemporalOverrides = {}
+): ColombiaTemporalContext {
   const fecha_hora_colombia = new Intl.DateTimeFormat("es-CO", {
     timeZone: BOGOTA_TZ,
     dateStyle: "full",
@@ -101,15 +111,17 @@ export function buildColombiaTemporalContext(now = new Date()): ColombiaTemporal
   }).format(now);
 
   const isoDate = formatDateKey(now);
-  const festivo = isColombiaHoliday(now);
-  const special = getColombiaSpecialEventLabel(now);
+  const allSpecialEvents = [...COLOMBIA_SPECIAL_EVENTS, ...(overrides.extraEvents ?? [])];
+  const festivo =
+    isColombiaHoliday(now) || allSpecialEvents.some(e => e.date === isoDate);
+  const special = allSpecialEvents.find(e => e.date === isoDate)?.label ?? null;
 
   const year = Number(isoDate.slice(0, 4));
   const upcoming = (COLOMBIA_HOLIDAYS[year] ?? [])
     .filter(d => d >= isoDate)
     .slice(0, 4)
     .map(d => {
-      const label = COLOMBIA_SPECIAL_EVENTS.find(e => e.date === d)?.label;
+      const label = allSpecialEvents.find(e => e.date === d)?.label;
       return label ? `${d} (${label})` : d;
     });
 
@@ -117,6 +129,7 @@ export function buildColombiaTemporalContext(now = new Date()): ColombiaTemporal
   const notas = [
     special,
     ...envNotes,
+    ...(overrides.extraNotes ?? []),
   ].filter(Boolean).join(" | ") || "Sin notas adicionales para hoy.";
 
   const es_festivo_colombia = festivo

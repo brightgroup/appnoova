@@ -1,9 +1,15 @@
 import { adminClient } from "@/lib/voice-agents-server";
 import { buildCallRecordFields, splitCallRecordFields, updateAgentCallsCount } from "@/lib/voice/persist-call-record";
-import { getPhoneTestCallSession, updatePhoneTestCallSession, labelForPhase } from "@/lib/telephony/test-call-session";
+import { getPhoneTestCallSession, updatePhoneTestCallSession, labelForManagedOutboundPhase, managedOutboundKind } from "@/lib/telephony/test-call-session";
+import { managedOutboundOutcomeLabel } from "@/lib/telephony/call-outcome";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import { uploadCallRecording } from "@/lib/voice-call-storage";
 import { chargeVoiceCall, resolveOrgIdForUser } from "@/lib/billing/meter";
+import {
+  mapToCampaignAudienceOutcome,
+  resolveCampaignContextFromSession,
+  syncCampaignAudienceAfterCall,
+} from "@/lib/call-engine/campaign-audience-status";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
 
 export async function finalizePhoneTestCall(input: {
@@ -123,11 +129,40 @@ export async function finalizePhoneTestCall(input: {
     }
   }
 
+  const kind = managedOutboundKind(meta as unknown as Record<string, unknown>);
+  const connected = durationSec > 0 || input.transcript.length > 0;
+  const finalStatusLabel = connected
+    ? labelForManagedOutboundPhase("ended", kind)
+    : managedOutboundOutcomeLabel(kind, "no_answer");
+
+  await db
+    .from("voice_agent_calls")
+    .update({
+      status_label: finalStatusLabel,
+      ...(connected ? {} : { status: "missed", in_voicemail: false }),
+    })
+    .eq("id", session.id);
+
   await updatePhoneTestCallSession(input.callControlId, {
     phase: "ended",
     last_event: "call.finalized",
-    status_label: labelForPhase("ended")
+    status_label: finalStatusLabel,
+    ...(connected ? {} : { outcome: "no_answer" }),
   });
+
+  if (kind === "campaign") {
+    const ctx = resolveCampaignContextFromSession(session);
+    if (ctx) {
+      await syncCampaignAudienceAfterCall({
+        campaignId: ctx.campaignId,
+        audienceRowId: ctx.audienceRowId,
+        outcome: mapToCampaignAudienceOutcome({
+          durationSec,
+          transcriptLength: input.transcript.length,
+        }),
+      });
+    }
+  }
 
   console.info("[finalize-phone-test] ok", {
     callControlId: input.callControlId,

@@ -140,6 +140,10 @@ export async function telnyxPlaceCall(params: {
   from: string;
   to: string;
   clientState?: Record<string, unknown>;
+  /** Activa detección de buzón (AMD). Por defecto true en salientes. */
+  amd?: boolean;
+  /** Segundos de timbre antes de colgar. Por defecto 45. */
+  timeoutSecs?: number;
 }): Promise<{ callControlId: string }> {
   await ensureTelnyxOutboundProfile(params.connectionId);
 
@@ -147,8 +151,21 @@ export async function telnyxPlaceCall(params: {
     connection_id: params.connectionId,
     from: params.from,
     to: params.to,
-    timeout_secs: 45
+    timeout_secs: params.timeoutSecs ?? 45,
   };
+
+  const enableAmd = params.amd !== false;
+  if (enableAmd) {
+    body.answering_machine_detection = "detect";
+    body.answering_machine_detection_config = {
+      total_analysis_time_millis: 4500,
+      initial_silence_millis: 1200,
+      after_greeting_silence_millis: 800,
+      greeting_duration_millis: 1800,
+      maximum_number_of_words: 6,
+    };
+  }
+
   if (params.clientState) {
     body.client_state = Buffer.from(JSON.stringify(params.clientState)).toString("base64");
   }

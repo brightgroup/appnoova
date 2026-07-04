@@ -70,3 +70,11 @@ export const PREMIUM_END_CALL_TOOL = {
   description:
     "Colgar la llamada cuando el usuario se despide o cuando ya dijiste tu despedida final. Usar tras chao, adiós, gracias, hasta luego, cuelga o listo.",
 };
+
+/** Detecta buzón/contestadora y cuelga sin dejar mensaje (ahorra créditos). */
+export const PREMIUM_VOICEMAIL_DETECTION_TOOL = {
+  type: "system" as const,
+  name: "voicemail_detection",
+  description:
+    "Usa esta herramienta en cuanto detectes buzón de voz, contestadora automática o mensaje grabado pidiendo dejar un mensaje. Cuelga de inmediato; NO hables ni dejes mensaje.",
+};

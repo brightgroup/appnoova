@@ -15,6 +15,7 @@ interface CampaignStepScheduleProps {
   trigger: CampaignTriggerRule;
   onScheduleChange: (schedule: CampaignScheduleConfig) => void;
   onTriggerChange: (trigger: CampaignTriggerRule) => void;
+  embedded?: boolean;
 }
 
 export function CampaignStepSchedule({
@@ -22,6 +23,7 @@ export function CampaignStepSchedule({
   trigger,
   onScheduleChange,
   onTriggerChange,
+  embedded,
 }: CampaignStepScheduleProps) {
   const updateSlot = (day: string, patch: Partial<{ enabled: boolean; start: string; end: string }>) => {
     onScheduleChange({
@@ -33,13 +35,11 @@ export function CampaignStepSchedule({
     });
   };
 
-  return (
-    <CampaignWizardPanel
-      title="Configura tu campaña"
-      description="Define fechas, días activos, franjas horarias e intentos de llamada. Elige cuándo llamar a cada contacto."
-    >
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  const content = (
+    <div className="space-y-6">
+      <section className="space-y-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Periodo</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <CampaignFieldLabel label="Fecha de inicio" required />
             <CampaignInput
@@ -49,7 +49,7 @@ export function CampaignStepSchedule({
             />
           </div>
           <div>
-            <CampaignFieldLabel label="Fecha de finalización" hint="Opcional" />
+            <CampaignFieldLabel label="Fecha de finalización" hint="opcional" />
             <CampaignInput
               type="date"
               value={schedule.end_date ?? ""}
@@ -59,10 +59,13 @@ export function CampaignStepSchedule({
             />
           </div>
         </div>
+      </section>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <section className="space-y-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Límites</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <CampaignFieldLabel label="Intentos máximos por contacto" />
+            <CampaignFieldLabel label="Intentos máximos" />
             <CampaignSelect
               value={String(schedule.max_attempts_per_contact)}
               onChange={e =>
@@ -102,140 +105,153 @@ export function CampaignStepSchedule({
             </CampaignSelect>
           </div>
         </div>
+      </section>
 
-        <div>
-          <CampaignFieldLabel label="Horarios por día" />
-          <div className="rounded-xl border border-white/[.08] overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/[.06] bg-white/[.02]">
-                  <th className="text-left px-3 py-2 text-gray-500 font-medium w-28">Día</th>
-                  <th className="text-left px-3 py-2 text-gray-500 font-medium">Inicio</th>
-                  <th className="text-left px-3 py-2 text-gray-500 font-medium">Fin</th>
-                </tr>
-              </thead>
-              <tbody>
-                {CAMPAIGN_DAY_KEYS.map(day => {
-                  const slot = schedule.day_slots[day] ?? {
-                    enabled: false,
-                    start: "08:00",
-                    end: "18:00",
-                  };
-                  return (
-                    <tr key={day} className="border-b border-white/[.04] last:border-0">
-                      <td className="px-3 py-2.5">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={slot.enabled}
-                            onChange={e => updateSlot(day, { enabled: e.target.checked })}
-                            className="rounded border-white/20 bg-white/5 text-[#5b5bf6] focus:ring-[#5b5bf6]/40"
-                          />
-                          <span className="text-gray-300">{CAMPAIGN_DAY_LABELS[day]}</span>
-                        </label>
-                      </td>
-                      <td className="px-3 py-2">
-                        <CampaignInput
-                          type="time"
-                          value={slot.start}
-                          disabled={!slot.enabled}
-                          onChange={e => updateSlot(day, { start: e.target.value })}
-                          className="py-1.5 text-xs"
+      <section className="space-y-3">
+        <CampaignFieldLabel label="Horarios por día" />
+        <div className="rounded-lg border border-white/[.08] overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/[.06] bg-white/[.02]">
+                <th className="text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500 w-32">
+                  Día
+                </th>
+                <th className="text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                  Inicio
+                </th>
+                <th className="text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                  Fin
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {CAMPAIGN_DAY_KEYS.map(day => {
+                const slot = schedule.day_slots[day] ?? {
+                  enabled: false,
+                  start: "08:00",
+                  end: "18:00",
+                };
+                return (
+                  <tr key={day} className="border-b border-white/[.04] last:border-0">
+                    <td className="px-3 py-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={slot.enabled}
+                          onChange={e => updateSlot(day, { enabled: e.target.checked })}
+                          className="rounded border-white/20 bg-white/5 text-[#5b5bf6]"
                         />
-                      </td>
-                      <td className="px-3 py-2">
-                        <CampaignInput
-                          type="time"
-                          value={slot.end}
-                          disabled={!slot.enabled}
-                          onChange={e => updateSlot(day, { end: e.target.value })}
-                          className="py-1.5 text-xs"
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        <span className="text-sm text-gray-300">{CAMPAIGN_DAY_LABELS[day]}</span>
+                      </label>
+                    </td>
+                    <td className="px-3 py-2">
+                      <CampaignInput
+                        type="time"
+                        value={slot.start}
+                        disabled={!slot.enabled}
+                        onChange={e => updateSlot(day, { start: e.target.value })}
+                        className="py-1.5 text-xs"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <CampaignInput
+                        type="time"
+                        value={slot.end}
+                        disabled={!slot.enabled}
+                        onChange={e => updateSlot(day, { end: e.target.value })}
+                        className="py-1.5 text-xs"
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <CampaignFieldLabel
+          label="¿Cuándo llamar?"
+          hint="regla de programación por contacto"
+        />
+        <div className="grid grid-cols-1 gap-2">
+          {(
+            [
+              {
+                type: "excel_date" as const,
+                title: "Según fecha en el Excel",
+                desc: "Llama N días antes de una columna de fecha.",
+              },
+              {
+                type: "on_activate" as const,
+                title: "Al activar la campaña",
+                desc: "Todos los contactos al activar.",
+              },
+              {
+                type: "fixed_datetime" as const,
+                title: "Fecha y hora fija",
+                desc: "Mismo momento para todos.",
+              },
+            ] as const
+          ).map(opt => (
+            <button
+              key={opt.type}
+              type="button"
+              onClick={() => onTriggerChange({ ...trigger, type: opt.type })}
+              className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${
+                trigger.type === opt.type
+                  ? "border-[#5b5bf6]/50 bg-[#5b5bf6]/12 ring-1 ring-[#5b5bf6]/25"
+                  : "border-white/[.08] bg-white/[.02] hover:bg-white/[.04] hover:border-white/[.14]"
+              }`}
+            >
+              <p className={`text-sm font-medium ${trigger.type === opt.type ? "text-white" : "text-gray-300"}`}>
+                {opt.title}
+              </p>
+              <p className={`text-[11px] mt-0.5 ${trigger.type === opt.type ? "text-gray-400" : "text-gray-500"}`}>
+                {opt.desc}
+              </p>
+            </button>
+          ))}
         </div>
 
-        <div>
-          <CampaignFieldLabel
-            label="¿Cuándo llamar a cada contacto?"
-            hint="Elige la regla que define el momento de la llamada."
-          />
-          <div className="space-y-2">
-            {(
-              [
-                {
-                  type: "excel_date" as const,
-                  title: "Según fecha en el Excel",
-                  desc: "Ideal para renovaciones: llama N días antes de una columna de fecha.",
-                },
-                {
-                  type: "on_activate" as const,
-                  title: "Al activar la campaña",
-                  desc: "Llama a todos en cuanto la campaña esté activa.",
-                },
-                {
-                  type: "fixed_datetime" as const,
-                  title: "Fecha y hora fija para todos",
-                  desc: "Todos los contactos en el mismo momento.",
-                },
-              ] as const
-            ).map(opt => (
-              <button
-                key={opt.type}
-                type="button"
-                onClick={() => onTriggerChange({ ...trigger, type: opt.type })}
-                className={`w-full text-left px-4 py-3 rounded-xl border transition-colors ${
-                  trigger.type === opt.type
-                    ? "border-[#5b5bf6]/50 bg-[#5b5bf6]/10"
-                    : "border-white/[.08] bg-white/[.02] hover:bg-white/[.04]"
-                }`}
-              >
-                <p className="text-sm font-medium text-white">{opt.title}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
-              </button>
-            ))}
+        {trigger.type === "excel_date" && (
+          <div className="max-w-xs">
+            <CampaignFieldLabel label="Días de anticipación" />
+            <CampaignSelect
+              value={String(trigger.offset_days ?? -30)}
+              onChange={e =>
+                onTriggerChange({ ...trigger, offset_days: Number(e.target.value) })
+              }
+            >
+              {[-60, -45, -30, -15, -7, -3, 0].map(n => (
+                <option key={n} value={n}>
+                  {n === 0 ? "El mismo día" : `${Math.abs(n)} días antes`}
+                </option>
+              ))}
+            </CampaignSelect>
           </div>
+        )}
 
-          {trigger.type === "excel_date" && (
-            <div className="mt-3">
-              <CampaignFieldLabel label="Días de anticipación" hint="Negativo = antes de la fecha" />
-              <CampaignSelect
-                value={String(trigger.offset_days ?? -30)}
-                onChange={e =>
-                  onTriggerChange({ ...trigger, offset_days: Number(e.target.value) })
-                }
-              >
-                {[-60, -45, -30, -15, -7, -3, 0].map(n => (
-                  <option key={n} value={n}>
-                    {n === 0 ? "El mismo día" : `${Math.abs(n)} días antes`}
-                  </option>
-                ))}
-              </CampaignSelect>
-            </div>
-          )}
-
-          {trigger.type === "fixed_datetime" && (
-            <div className="mt-3">
-              <CampaignFieldLabel label="Fecha y hora" />
-              <CampaignInput
-                type="datetime-local"
-                value={trigger.fixed_at?.slice(0, 16) ?? ""}
-                onChange={e =>
-                  onTriggerChange({
-                    ...trigger,
-                    fixed_at: e.target.value ? new Date(e.target.value).toISOString() : null,
-                  })
-                }
-              />
-            </div>
-          )}
-        </div>
-      </div>
-    </CampaignWizardPanel>
+        {trigger.type === "fixed_datetime" && (
+          <div className="max-w-xs">
+            <CampaignFieldLabel label="Fecha y hora" />
+            <CampaignInput
+              type="datetime-local"
+              value={trigger.fixed_at?.slice(0, 16) ?? ""}
+              onChange={e =>
+                onTriggerChange({
+                  ...trigger,
+                  fixed_at: e.target.value ? new Date(e.target.value).toISOString() : null,
+                })
+              }
+            />
+          </div>
+        )}
+      </section>
+    </div>
   );
+
+  if (embedded) return content;
+  return <CampaignWizardPanel>{content}</CampaignWizardPanel>;
 }

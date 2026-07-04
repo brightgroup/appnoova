@@ -4,7 +4,8 @@ import { ORI_SYSTEM_PROMPT } from "@/lib/ori-prompt";
 /** Ensambla system instruction de ORI: plataforma → empresa → persona. */
 export function buildOriSystemInstruction(
   companyContext?: string | null,
-  platformHelp?: string | null
+  platformHelp?: string | null,
+  temporalBlock?: string | null
 ): string {
   const parts: string[] = [];
 
@@ -18,9 +19,8 @@ export function buildOriSystemInstruction(
     companyContext
   );
 
-  if (platform) {
-    return `${withCompany}\n\n---\n\n${ORI_SYSTEM_PROMPT}`;
-  }
+  const base = platform ? `${withCompany}\n\n---\n\n${ORI_SYSTEM_PROMPT}` : withCompany;
 
-  return withCompany;
+  const temporal = temporalBlock?.trim();
+  return temporal ? `${temporal}\n\n---\n\n${base}` : base;
 }

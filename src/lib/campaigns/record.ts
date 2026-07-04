@@ -85,6 +85,7 @@ export function toVoiceCampaignRecord(raw: Record<string, unknown>): VoiceCampai
       ...mapping,
       custom_fields: Array.isArray(mapping.custom_fields) ? mapping.custom_fields : [],
     },
+    prompt_template: raw.prompt_template ? String(raw.prompt_template) : null,
     created_at: String(raw.created_at ?? ""),
     updated_at: String(raw.updated_at ?? ""),
   };

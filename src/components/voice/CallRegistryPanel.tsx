@@ -28,31 +28,73 @@ function callMeta(call: VoiceAgentCallListItem): Record<string, unknown> {
   return call.metadata ?? {};
 }
 
-function isPhoneTest(call: VoiceAgentCallListItem): boolean {
-  const meta = callMeta(call);
-  return meta.source === "phone_test" || meta.phone_test === true;
+function callChannel(meta: Record<string, unknown>): "phone_test" | "campaign" | "crm" | "web_test" {
+  if (meta.campaign_outbound) return "campaign";
+  if (meta.crm_outbound) return "crm";
+  if (meta.phone_test || meta.source === "phone_test") return "phone_test";
+  return "web_test";
+}
+
+function isOutboundCall(call: VoiceAgentCallListItem): boolean {
+  return callChannel(callMeta(call)) !== "web_test";
 }
 
 function callOriginNumber(call: VoiceAgentCallListItem): string {
-  if (isPhoneTest(call)) return String(callMeta(call).from ?? "—");
+  const meta = callMeta(call);
+  if (isOutboundCall(call)) return String(meta.from ?? "—");
   return "Prueba web";
 }
 
 function callDestNumber(call: VoiceAgentCallListItem): string {
-  if (isPhoneTest(call)) return String(callMeta(call).to ?? call.phone_number);
+  const meta = callMeta(call);
+  if (isOutboundCall(call)) return String(meta.to ?? call.phone_number);
   return call.phone_number;
 }
 
 function callDirection(call: VoiceAgentCallListItem): string {
-  return isPhoneTest(call) ? "phone_test" : "web_test";
+  const ch = callChannel(callMeta(call));
+  if (ch === "campaign") return "campaña";
+  if (ch === "crm") return "crm";
+  if (ch === "phone_test") return "prueba";
+  return "web";
+}
+
+function callStatusDisplay(call: VoiceAgentCallListItem): string {
+  if (call.in_voicemail || call.status === "voicemail") {
+    const label = call.status_label?.trim();
+    if (label?.toLowerCase().includes("buzón")) return label;
+    const meta = callMeta(call);
+    const kind = callChannel(meta);
+    if (kind === "campaign") return "Campaña — Buzón de voz";
+    if (kind === "crm") return "Llamada IA — Buzón de voz";
+    if (kind === "phone_test") return "Prueba — Buzón de voz";
+    return "Buzón de voz";
+  }
+  if (call.status_label?.trim()) return call.status_label;
+  return call.status ?? "—";
+}
+
+function callDisconnectDisplay(call: VoiceAgentCallListItem): string {
+  if (call.in_voicemail || callMeta(call).outcome === "voicemail") return "buzón de voz";
+  const outcome = String(callMeta(call).outcome ?? "");
+  if (outcome === "no_answer") return "no contestada";
+  if (outcome === "busy") return "línea ocupada";
+  if (outcome === "failed") return "error de conexión";
+  const reason = call.disconnect_reason?.trim() ?? "";
+  if (/buz[oó]n|voicemail|machine/i.test(reason)) return "buzón de voz";
+  if (/no contest|no_answer|timeout|amd sin/i.test(reason)) return "no contestada";
+  return reason.replace(/\s+/g, " ").toLowerCase() || "—";
 }
 
 interface CallRegistryPanelProps {
-  agentId: string;
+  /** Filtra por agente. Si se omite, muestra todas las llamadas del usuario. */
+  agentId?: string;
+  /** Filtra por campaña. */
+  campaignId?: string;
   refreshKey?: number;
 }
 
-export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanelProps) {
+export function CallRegistryPanel({ agentId, campaignId, refreshKey = 0 }: CallRegistryPanelProps) {
   const [calls, setCalls] = useState<VoiceAgentCallListItem[]>([]);
   const [selected, setSelected] = useState<VoiceAgentCallRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,26 +110,41 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
 
   useEffect(() => () => { audioRef.current?.pause(); }, []);
 
-  const loadList = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  const loadList = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) {
+      setLoading(true);
+      setError("");
+    }
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch(`/api/voice/agents/calls?agent_id=${agentId}`, { headers });
+      const params = new URLSearchParams();
+      if (agentId) params.set("agent_id", agentId);
+      if (campaignId) params.set("campaign_id", campaignId);
+      const res = await fetch(`/api/voice/agents/calls?${params.toString()}`, { headers });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Error al cargar llamadas");
+        if (!opts?.silent) setError(data.error || "Error al cargar llamadas");
         return;
       }
       setDbReady(data.dbReady !== false);
       setCalls(data.calls ?? []);
     } catch {
-      setError("Error de red");
+      if (!opts?.silent) setError("Error de red");
     }
-    setLoading(false);
-  }, [agentId]);
+    if (!opts?.silent) setLoading(false);
+  }, [agentId, campaignId]);
 
-  useEffect(() => { loadList(); }, [loadList, refreshKey]);
+  useEffect(() => { void loadList(); }, [loadList, refreshKey]);
+
+  useEffect(() => {
+    if (!campaignId) return;
+    const tick = () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      void loadList();
+    };
+    const t = setInterval(tick, 60_000);
+    return () => clearInterval(t);
+  }, [campaignId, loadList]);
 
   const filteredCalls = useMemo(() => {
     let list = calls;
@@ -205,7 +262,7 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
           search={search}
           onSearchChange={setSearch}
           searchPlaceholder="Buscar"
-          onRefresh={loadList}
+          onRefresh={() => void loadList()}
           refreshing={loading}
           error={error || undefined}
           alerts={!dbReady ? (
@@ -295,8 +352,8 @@ export function CallRegistryPanel({ agentId, refreshKey = 0 }: CallRegistryPanel
                     <Td mono className="text-gray-400">{callOriginNumber(call)}</Td>
                     <Td mono>{callDestNumber(call)}</Td>
                     <Td className="text-gray-400">N/A</Td>
-                    <Td><span className="text-gray-200">ended</span></Td>
-                    <Td mono className="text-gray-400 lowercase">{call.disconnect_reason.replace(/\s+/g, "_").toLowerCase()}</Td>
+                    <Td><span className="text-gray-200">{callStatusDisplay(call)}</span></Td>
+                    <Td mono className="text-gray-400">{callDisconnectDisplay(call)}</Td>
                     <Td>{isSuccess ? <span className="text-gray-200">Sí</span> : <span className="text-gray-400">No</span>}</Td>
                     <Td className="text-gray-400">{callDirection(call)}</Td>
                     <Td>
@@ -385,8 +442,8 @@ function CallDetailView({
           <MetaRow label="Fecha" value={formatCallTimestamp(selected.created_at)} />
           <MetaRow label="Créditos" value={String(selected.credits)} />
           <MetaRow label="Calidad" value={`${quality}%`} />
-          <MetaRow label="Estado" value={selected.status_label} />
-          <MetaRow label="Desconexión" value={selected.disconnect_reason} />
+          <MetaRow label="Estado" value={callStatusDisplay(selected)} />
+          <MetaRow label="Desconexión" value={callDisconnectDisplay(selected)} />
           <MetaRow label="Sentimiento" value={selected.user_sentiment} />
         </MetaSection>
 

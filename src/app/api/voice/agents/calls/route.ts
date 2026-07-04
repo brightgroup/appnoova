@@ -13,6 +13,7 @@ import {
 } from "@/lib/billing/meter";
 import type { TranscriptEntry, VoiceAgentCallRecord } from "@/types/voice-agent-call";
 import { getElevenLabsConversation } from "@/lib/elevenlabs/outbound-call";
+import { syncOpenElevenLabsCampaignCalls } from "@/lib/elevenlabs/sync-open-campaign-calls";
 import {
   getElevenLabsConversationAudioWithRetry,
   waitForElevenLabsConversationReady,
@@ -209,23 +210,40 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ call: toRecord(callRow), dbReady: true });
   }
 
-  if (!agentId) {
-    return NextResponse.json({ error: "agent_id o id requerido" }, { status: 400 });
+  // Registro unificado:
+  //  - agent_id → llamadas del agente (todas sus campañas)
+  //  - campaign_id → llamadas de una campaña
+  //  - sin filtro → historial global del usuario (todos los agentes)
+  const campaignId = req.nextUrl.searchParams.get("campaign_id");
+
+  if (campaignId) {
+    try {
+      await syncOpenElevenLabsCampaignCalls();
+    } catch (err) {
+      console.warn("[calls] sync campaign EL:", err);
+    }
   }
 
-  const { data, error } = await db
+  let query = db
     .from("voice_agent_calls")
-    .select("id, voice_agent_id, phone_number, duration_sec, credits, status_label, disconnect_reason, user_sentiment, summary, audio_url, metadata, created_at")
+    .select("id, voice_agent_id, campaign_id, phone_number, duration_sec, credits, status, status_label, in_voicemail, disconnect_reason, user_sentiment, summary, audio_url, metadata, created_at")
     .eq("user_id", userId)
-    .eq("voice_agent_id", agentId)
     .order("created_at", { ascending: false });
+
+  if (agentId) query = query.eq("voice_agent_id", agentId);
+  if (campaignId) query = query.eq("campaign_id", campaignId);
+
+  const { data, error } = await query;
 
   if (error) {
     if (error.code === "42P01") return NextResponse.json({ calls: [], dbReady: false });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ calls: data ?? [], dbReady: true });
+  return NextResponse.json({
+    calls: (data ?? []).map(row => toRecord(row as Record<string, unknown>)),
+    dbReady: true,
+  });
 }
 
 /** POST — guarda registro, sube audio, analiza con IA y actualiza contador */

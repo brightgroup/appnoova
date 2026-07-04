@@ -5,6 +5,7 @@ import { parse } from "url";
 import next from "next";
 import { WebSocketServer } from "ws";
 import { handleTelnyxMediaSocket } from "./src/lib/telephony/telnyx-ws-handler";
+import { startCampaignDialerScheduler } from "./src/lib/call-engine/dialer-scheduler";
 
 /** Limpia caché dev corrupta (p. ej. restos de build en .next-dev). */
 function clearStaleDevCache(): void {
@@ -64,6 +65,7 @@ app.prepare().then(() => {
     if (hostname === "0.0.0.0") {
       console.log(`> Local: http://127.0.0.1:${port}`);
     }
+    startCampaignDialerScheduler();
   }).on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EADDRINUSE") {
       console.error(`> Puerto ${port} en uso. Libéralo con: lsof -ti:${port} | xargs kill -9`);

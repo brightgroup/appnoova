@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Plus, Target, MoreHorizontal, Trash2 } from "lucide-react";
-import Link from "next/link";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Plus, Target, MoreHorizontal, Trash2, Rocket, Pause, Play } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
+import { CampaignWizardModal } from "@/components/campaigns/CampaignWizardModal";
 import { NoovaAnchoredMenu } from "@/components/ui/NoovaAnchoredMenu";
 import { NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 import {
@@ -23,13 +23,24 @@ import { CAMPAIGN_STATUS_LABELS } from "@/lib/campaigns/record";
 import type { VoiceCampaignRecord } from "@/types/voice-campaign";
 
 export default function CampaignsPage() {
+  return (
+    <Suspense fallback={null}>
+      <CampaignsPageContent />
+    </Suspense>
+  );
+}
+
+function CampaignsPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [campaigns, setCampaigns] = useState<VoiceCampaignRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardCampaignId, setWizardCampaignId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -42,6 +53,27 @@ export default function CampaignsPage() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    const wizardId = searchParams.get("wizard");
+    if (wizardId) {
+      setWizardCampaignId(wizardId);
+      setWizardOpen(true);
+    }
+  }, [searchParams]);
+
+  const openWizard = (id?: string | null) => {
+    setWizardCampaignId(id ?? null);
+    setWizardOpen(true);
+  };
+
+  const closeWizard = () => {
+    setWizardOpen(false);
+    setWizardCampaignId(null);
+    if (searchParams.get("wizard")) {
+      router.replace("/dashboard/campaigns");
+    }
+  };
 
   const filtered = campaigns.filter(c => {
     const q = search.trim().toLowerCase();
@@ -77,6 +109,45 @@ export default function CampaignsPage() {
     );
   };
 
+  const openCampaign = (c: VoiceCampaignRecord) => {
+    if (c.status === "draft" && c.wizard_step < 3) {
+      openWizard(c.id);
+    } else {
+      router.push(`/dashboard/campaigns/${c.id}`);
+    }
+  };
+
+  const activateCampaign = async (c: VoiceCampaignRecord) => {
+    setOpenMenuId(null);
+    if (c.wizard_step < 3) {
+      openWizard(c.id);
+      return;
+    }
+    setError("");
+    const res = await authFetch(`/api/campaigns/${c.id}/finalize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ field_mapping: c.field_mapping, activate: true }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      setError(json.error ?? "No se pudo activar la campaña");
+      return;
+    }
+    setCampaigns(prev => prev.map(x => (x.id === c.id ? json.campaign : x)));
+  };
+
+  const setCampaignStatus = async (c: VoiceCampaignRecord, status: "active" | "paused") => {
+    setOpenMenuId(null);
+    const res = await authFetch(`/api/campaigns/${c.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    const json = await res.json();
+    if (res.ok) setCampaigns(prev => prev.map(x => (x.id === c.id ? json.campaign : x)));
+  };
+
   return (
     <ChannelListPage
       title="Campañas de voz"
@@ -89,10 +160,10 @@ export default function CampaignsPage() {
       refreshing={loading}
       error={error || undefined}
       action={
-        <Link href="/dashboard/campaigns/nueva" className={`${btnPrimary} gap-2`}>
+        <button type="button" onClick={() => openWizard()} className={`${btnPrimary} gap-2`}>
           <Plus className="w-4 h-4" />
           Nueva campaña
-        </Link>
+        </button>
       }
     >
       {filtered.length === 0 ? (
@@ -102,9 +173,9 @@ export default function CampaignsPage() {
             {search.trim() ? "No hay campañas con ese nombre." : "Aún no tienes campañas de voz."}
           </p>
           {!search.trim() && (
-            <Link href="/dashboard/campaigns/nueva" className={`${btnPrimary} gap-2`}>
+            <button type="button" onClick={() => openWizard()} className={`${btnPrimary} gap-2`}>
               <Plus className="w-4 h-4" /> Crear primera campaña
-            </Link>
+            </button>
           )}
         </div>
       ) : (
@@ -123,13 +194,7 @@ export default function CampaignsPage() {
               <tr
                 key={c.id}
                 className={registryTableRowClickable}
-                onClick={() =>
-                  router.push(
-                    c.status === "draft" || c.wizard_step < 4
-                      ? `/dashboard/campaigns/${c.id}/editar`
-                      : `/dashboard/campaigns/${c.id}`
-                  )
-                }
+                onClick={() => openCampaign(c)}
               >
                 <td className={registryTableCellFirst}>
                   <div className="flex items-center gap-3">
@@ -144,7 +209,7 @@ export default function CampaignsPage() {
                 </td>
                 <td className={registryTableCell}>{statusBadge(c.status)}</td>
                 <td className={`${registryTableCell} text-gray-400 text-sm`}>
-                  {c.wizard_step}/4
+                  {Math.min(c.wizard_step, 3)}/3
                 </td>
                 <td className={`${registryTableCell} text-gray-400 text-sm`}>
                   {c.updated_at
@@ -176,11 +241,30 @@ export default function CampaignsPage() {
                     <NoovaListMenuItem
                       onClick={() => {
                         setOpenMenuId(null);
-                        router.push(`/dashboard/campaigns/${c.id}/editar`);
+                        if (c.status === "draft" && c.wizard_step < 3) {
+                          openWizard(c.id);
+                        } else {
+                          router.push(`/dashboard/campaigns/${c.id}?tab=general`);
+                        }
                       }}
                     >
                       Editar
                     </NoovaListMenuItem>
+                    {c.status === "draft" && (
+                      <NoovaListMenuItem onClick={() => void activateCampaign(c)}>
+                        <Rocket className="w-3.5 h-3.5" /> Activar
+                      </NoovaListMenuItem>
+                    )}
+                    {c.status === "active" && (
+                      <NoovaListMenuItem onClick={() => void setCampaignStatus(c, "paused")}>
+                        <Pause className="w-3.5 h-3.5" /> Pausar
+                      </NoovaListMenuItem>
+                    )}
+                    {c.status === "paused" && (
+                      <NoovaListMenuItem onClick={() => void setCampaignStatus(c, "active")}>
+                        <Play className="w-3.5 h-3.5" /> Reanudar
+                      </NoovaListMenuItem>
+                    )}
                     <NoovaListMenuItem
                       danger
                       onClick={() => void deleteCampaign(c.id, c.name)}
@@ -194,6 +278,16 @@ export default function CampaignsPage() {
           </tbody>
         </table>
       )}
+
+      <CampaignWizardModal
+        open={wizardOpen}
+        campaignId={wizardCampaignId}
+        onClose={closeWizard}
+        onComplete={id => {
+          void load();
+          router.push(`/dashboard/campaigns/${id}`);
+        }}
+      />
     </ChannelListPage>
   );
 }

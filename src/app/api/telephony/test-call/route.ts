@@ -82,6 +82,7 @@ export async function POST(req: NextRequest) {
       test_number_id
     };
 
+    // AMD activo por defecto: detecta buzón antes de conectar Gemini (agente estándar Google).
     const { callControlId } = await telnyxPlaceCall({
       connectionId,
       from: phone.e164,

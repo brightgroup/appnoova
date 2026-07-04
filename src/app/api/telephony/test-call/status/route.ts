@@ -46,6 +46,9 @@ export async function GET(req: NextRequest) {
     error: meta.error,
     answered_at: meta.answered_at ?? null,
     ended_at: meta.ended_at ?? null,
-    duration_sec: connected ? computeConnectedDuration(meta) : 0
+    amd_pending: meta.amd_pending ?? false,
+    voicemail_detected: meta.voicemail_detected ?? false,
+    outcome: meta.outcome ?? null,
+    duration_sec: connected ? computeConnectedDuration(meta) : 0,
   });
 }

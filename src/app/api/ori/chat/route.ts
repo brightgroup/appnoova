@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getOriApiKey, getOriModel } from "@/lib/google-ai";
 import { buildOriSystemInstruction } from "@/lib/merge-ori-context";
+import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
+import { getTimeRules } from "@/lib/call-engine/platform-config";
 import {
   formatPlatformHelpContext,
   messageLooksLikePlatformQuestion,
@@ -87,7 +89,16 @@ export async function POST(req: NextRequest) {
       : [];
   const platformHelp = formatPlatformHelpContext(platformArticles);
 
-  const systemInstruction = buildOriSystemInstruction(companyContextText, platformHelp);
+  const timeRules = await getTimeRules(billingDb);
+  const temporal = buildColombiaTemporalContext(new Date(), {
+    extraEvents: timeRules.extra_events,
+    extraNotes: timeRules.extra_notes,
+  });
+  const systemInstruction = buildOriSystemInstruction(
+    companyContextText,
+    platformHelp,
+    temporal.promptBlock
+  );
   const model = getOriModel();
   const ai = new GoogleGenAI({ apiKey });
 

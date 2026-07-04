@@ -1,7 +1,5 @@
-"use client";
-
-import { CampaignWizard } from "@/components/campaigns/CampaignWizard";
+import { redirect } from "next/navigation";
 
 export default function NuevaCampanaPage() {
-  return <CampaignWizard />;
+  redirect("/dashboard/campaigns");
 }

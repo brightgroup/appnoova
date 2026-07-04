@@ -7,6 +7,7 @@ import {
 import {
   DEFAULT_ELEVENLABS_VOICE_ID,
   PREMIUM_END_CALL_TOOL,
+  PREMIUM_VOICEMAIL_DETECTION_TOOL,
   buildPremiumFirstMessage,
 } from "@/lib/elevenlabs/default-voices";
 import { listCuratedPremiumVoices } from "@/lib/elevenlabs/premium-voices";
@@ -50,6 +51,10 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
     companyContextText: input.companyContextText,
   });
 
+  const outboundTools = outbound
+    ? [PREMIUM_VOICEMAIL_DETECTION_TOOL, PREMIUM_END_CALL_TOOL]
+    : [PREMIUM_END_CALL_TOOL];
+
   return {
     agent: {
       // Outbound telefónico: vacío → ElevenLabs espera el "aló" del cliente.
@@ -63,7 +68,7 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
         prompt: systemPrompt,
         llm: ELEVENLABS_DEFAULT_LLM,
         temperature,
-        tools: [PREMIUM_END_CALL_TOOL],
+        tools: outboundTools,
       },
     },
     asr: {

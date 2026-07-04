@@ -3,6 +3,7 @@ import { adminClient } from "@/lib/voice-agents-server";
 import { requireOrgModule } from "@/lib/module-auth";
 import { applyAudienceMapping } from "@/lib/campaigns/apply-mapping";
 import { toVoiceCampaignRecord } from "@/lib/campaigns/record";
+import { triggerCampaignDialerOnActivation } from "@/lib/call-engine/dialer-scheduler";
 import type { CampaignFieldMapping, CampaignTriggerRule } from "@/types/voice-campaign";
 
 type RouteCtx = { params: Promise<{ id: string }> };
@@ -36,7 +37,6 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
     .select("*")
     .eq("id", id)
     .eq("organization_id", auth.organizationId)
-    .eq("user_id", auth.userId)
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -54,9 +54,12 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
     trigger
   );
 
-  if (stats.updated === 0) {
+  if (body.activate && stats.updated === 0) {
     return NextResponse.json(
-      { error: "Ninguna fila válida con teléfono y nombre. Revisa el mapeo." },
+      {
+        error: "Ninguna fila válida con teléfono y nombre. Revisa el mapeo.",
+        mapping_stats: stats,
+      },
       { status: 400 }
     );
   }
@@ -66,7 +69,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
     .from("voice_campaigns")
     .update({
       field_mapping: mapping,
-      wizard_step: 4,
+      wizard_step: 3,
       status: body.activate ? "active" : campaign.status,
       updated_at: now,
     })
@@ -75,6 +78,10 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
     .single();
 
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+
+  if (body.activate) {
+    triggerCampaignDialerOnActivation();
+  }
 
   return NextResponse.json({
     campaign: toVoiceCampaignRecord(updated),

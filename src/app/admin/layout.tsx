@@ -7,7 +7,8 @@ import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, Settings, Phone, LogOut,
-  ChevronLeft, ChevronRight, Shield, Loader2, Building2, KeyRound, CreditCard, BarChart3, Settings2
+  ChevronLeft, ChevronRight, Shield, Loader2, Building2, KeyRound, CreditCard, BarChart3, Settings2,
+  PhoneOutgoing
 } from "lucide-react";
 import {
   sidebarNavActive, sidebarNavIdle, sidebarIconActive, accentGradientIcon
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { href: "/admin/consumption",   label: "Consumo",          icon: BarChart3 },
   { href: "/admin/pricing",       label: "Pricing",          icon: Settings2 },
   { href: "/admin/roles",         label: "Roles",            icon: KeyRound },
+  { href: "/admin/motor-llamadas", label: "Motor de llamadas", icon: PhoneOutgoing },
   { href: "/admin/telephony",     label: "Líneas telefónicas", icon: Phone, badgeKey: "telephony" as const },
   { href: "/admin/whatsapp",      label: "WhatsApp",         icon: Phone },
   { href: "/admin/templates",     label: "Agentes IA",       icon: Settings },

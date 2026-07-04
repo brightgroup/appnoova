@@ -7,9 +7,15 @@ import {
 } from "@/lib/elevenlabs/premium-voices";
 import { uploadCallRecording } from "@/lib/voice-call-storage";
 import { buildCallRecordFields, splitCallRecordFields, updateAgentCallsCount } from "@/lib/voice/persist-call-record";
-import { getPhoneTestCallSession, updatePhoneTestCallSession } from "@/lib/telephony/test-call-session";
+import { getPhoneTestCallSession, updatePhoneTestCallSession, managedOutboundKind } from "@/lib/telephony/test-call-session";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
+import {
+  mapToCampaignAudienceOutcome,
+  resolveCampaignContextFromSession,
+  syncCampaignAudienceAfterCall,
+} from "@/lib/call-engine/campaign-audience-status";
+import { managedOutboundOutcomeLabel } from "@/lib/telephony/call-outcome";
 
 export async function finalizeElevenLabsPremiumCall(input: {
   conversationId: string;
@@ -34,15 +40,80 @@ export async function finalizeElevenLabsPremiumCall(input: {
 
   let durationSec = input.durationSec ?? 0;
   let transcript = input.transcript ?? [];
+  let voicemailDetected = false;
 
   if (durationSec <= 0 || transcript.length === 0) {
     try {
       const conv = await getElevenLabsConversation(input.conversationId);
       if (durationSec <= 0) durationSec = conv.callDurationSecs;
       if (transcript.length === 0) transcript = conv.transcript;
+      voicemailDetected = conv.voicemailDetected;
     } catch (err) {
       console.warn("[elevenlabs-finalize] no se pudo leer conversación:", err);
     }
+  } else {
+    try {
+      const conv = await getElevenLabsConversation(input.conversationId);
+      voicemailDetected = conv.voicemailDetected;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (voicemailDetected) {
+    const kind = managedOutboundKind(meta as unknown as Record<string, unknown>);
+    const statusLabel = managedOutboundOutcomeLabel(kind, "voicemail");
+    const db = adminClient();
+    const now = new Date().toISOString();
+    await db
+      .from("voice_agent_calls")
+      .update({
+        duration_sec: durationSec,
+        credits: 0,
+        status: "voicemail",
+        status_label: statusLabel,
+        in_voicemail: true,
+        disconnect_reason: "Buzón de voz detectado (ElevenLabs)",
+        user_sentiment: "Neutral",
+        summary: `Llamada a ${meta.to} fue a buzón de voz. El agente colgó sin continuar.`,
+        transcript,
+        extracted_data: {},
+        metadata: {
+          ...meta,
+          phone_test: true,
+          voice_provider: "elevenlabs",
+          phase: "ended",
+          finalized: true,
+          finalized_at: now,
+          outcome: "voicemail",
+          voicemail_detected: true,
+          agent_skipped: true,
+          conversation_id: input.conversationId,
+        },
+      })
+      .eq("id", session.id);
+
+    await updateAgentCallsCount(db, session.voice_agent_id, agent.callsCount + 1);
+
+    await updatePhoneTestCallSession(input.conversationId, {
+      phase: "ended",
+      last_event: "elevenlabs.voicemail",
+      status_label: statusLabel,
+      voicemail_detected: true,
+      finalized: true,
+    });
+
+    if (kind === "campaign") {
+      const ctx = resolveCampaignContextFromSession(session);
+      if (ctx) {
+        await syncCampaignAudienceAfterCall({
+          campaignId: ctx.campaignId,
+          audienceRowId: ctx.audienceRowId,
+          outcome: mapToCampaignAudienceOutcome({ outcome: "voicemail", voicemailDetected: true }),
+        });
+      }
+    }
+    return;
   }
 
   const answeredAt = meta.answered_at ? new Date(meta.answered_at).getTime() : null;
@@ -134,4 +205,19 @@ export async function finalizeElevenLabsPremiumCall(input: {
     last_event: "elevenlabs.finalized",
     status_label: "Prueba premium - Finalizada",
   });
+
+  const kind = managedOutboundKind(meta as unknown as Record<string, unknown>);
+  if (kind === "campaign") {
+    const ctx = resolveCampaignContextFromSession(session);
+    if (ctx) {
+      await syncCampaignAudienceAfterCall({
+        campaignId: ctx.campaignId,
+        audienceRowId: ctx.audienceRowId,
+        outcome: mapToCampaignAudienceOutcome({
+          durationSec,
+          transcriptLength: transcript.length,
+        }),
+      });
+    }
+  }
 }

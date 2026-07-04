@@ -1,4 +1,5 @@
 import { adminClient } from "@/lib/voice-agents-server";
+import { campaignLabelForPhase } from "@/lib/call-engine/campaign-call-session";
 
 export type PhoneTestCallPhase =
   | "dialing"
@@ -26,6 +27,12 @@ export interface PhoneTestCallMeta {
   answered_at?: string;
   ended_at?: string;
   finalized?: boolean;
+  /** Esperando resultado AMD de Telnyx antes de activar el agente. */
+  amd_pending?: boolean;
+  amd_result?: string;
+  voicemail_detected?: boolean;
+  outcome?: string;
+  agent_skipped?: boolean;
 }
 
 export async function createPhoneTestCallSession(input: {
@@ -73,12 +80,26 @@ export async function createPhoneTestCallSession(input: {
   return data.id as string;
 }
 
-export async function getPhoneTestCallSession(callControlId: string) {
+export interface PhoneTestCallSessionRow {
+  id: string;
+  user_id: string;
+  voice_agent_id: string;
+  campaign_id?: string | null;
+  campaign_audience_row_id?: string | null;
+  metadata: PhoneTestCallMeta;
+  status: string;
+  status_label: string;
+  created_at: string;
+}
+
+export async function getPhoneTestCallSession(callControlId: string): Promise<PhoneTestCallSessionRow | null> {
   const db = adminClient();
   const { data: rows, error } = await db
     .from("voice_agent_calls")
-    .select("id, user_id, voice_agent_id, metadata, status, status_label, created_at")
-    .filter("metadata->>call_control_id", "eq", callControlId)
+    .select("id, user_id, voice_agent_id, campaign_id, campaign_audience_row_id, metadata, status, status_label, created_at")
+    .or(
+      `metadata->>call_control_id.eq.${callControlId},metadata->>conversation_id.eq.${callControlId},metadata->>screening_call_id.eq.${callControlId}`
+    )
     .order("created_at", { ascending: false })
     .limit(1);
 
@@ -91,15 +112,29 @@ export async function getPhoneTestCallSession(callControlId: string) {
   if (!row) return null;
   return {
     ...row,
-    metadata: (row.metadata ?? {}) as PhoneTestCallMeta
+    campaign_id: row.campaign_id as string | null | undefined,
+    campaign_audience_row_id: row.campaign_audience_row_id as string | null | undefined,
+    metadata: (row.metadata ?? {}) as PhoneTestCallMeta,
   };
 }
 
 export async function isPhoneTestCall(callControlId: string): Promise<boolean> {
   const session = await getPhoneTestCallSession(callControlId);
   if (!session) return false;
-  const meta = session.metadata as { phone_test?: boolean; crm_outbound?: boolean };
-  return Boolean(meta.phone_test || meta.crm_outbound);
+  const meta = session.metadata as {
+    phone_test?: boolean;
+    crm_outbound?: boolean;
+    campaign_outbound?: boolean;
+  };
+  return Boolean(meta.phone_test || meta.crm_outbound || meta.campaign_outbound);
+}
+
+export type ManagedOutboundKind = "test" | "crm" | "campaign";
+
+export function managedOutboundKind(meta: Record<string, unknown>): ManagedOutboundKind {
+  if (meta.campaign_outbound) return "campaign";
+  if (meta.crm_outbound) return "crm";
+  return "test";
 }
 
 async function findSessionRow(callControlId: string, retries = 3) {
@@ -119,12 +154,16 @@ export async function updatePhoneTestCallSession(
   if (!row) return;
 
   const prev = row.metadata;
-  const isCrm = Boolean((prev as { crm_outbound?: boolean }).crm_outbound);
+  const kind = managedOutboundKind(prev as unknown as Record<string, unknown>);
   const metadata = {
     ...prev,
     ...patch,
     call_control_id: callControlId,
-    ...(isCrm ? { crm_outbound: true as const, phone_test: false as const } : { phone_test: true as const })
+    ...(kind === "campaign"
+      ? { campaign_outbound: true as const, phone_test: false as const, crm_outbound: false as const }
+      : kind === "crm"
+        ? { crm_outbound: true as const, phone_test: false as const }
+        : { phone_test: true as const }),
   };
 
   if (patch.phase === "answered" && !metadata.answered_at) {
@@ -134,19 +173,31 @@ export async function updatePhoneTestCallSession(
     metadata.ended_at = new Date().toISOString();
   }
 
+  const outcome = String(patch.outcome ?? metadata.outcome ?? "").trim();
+  const isVoicemail =
+    patch.voicemail_detected === true ||
+    metadata.voicemail_detected === true ||
+    outcome === "voicemail";
   const status =
-    metadata.phase === "ended" ? "ended_success" :
-    metadata.phase === "failed" ? "missed" :
-    "in_progress";
+    isVoicemail
+      ? "voicemail"
+      : metadata.finalized && (outcome === "no_answer" || outcome === "busy" || outcome === "failed")
+        ? "missed"
+        : metadata.phase === "ended"
+          ? "ended_success"
+          : metadata.phase === "failed"
+            ? "missed"
+            : "in_progress";
 
   const db = adminClient();
   await db
     .from("voice_agent_calls")
     .update({
       status,
-      status_label: patch.status_label ?? labelForManagedOutboundPhase(metadata.phase as PhoneTestCallPhase, isCrm),
+      status_label: patch.status_label ?? labelForManagedOutboundPhase(metadata.phase as PhoneTestCallPhase, kind),
+      ...(isVoicemail ? { in_voicemail: true } : {}),
       ...(patch.summary ? { summary: patch.summary } : {}),
-      metadata
+      metadata,
     })
     .eq("id", row.id);
 }
@@ -164,8 +215,14 @@ export function labelForPhase(phase: PhoneTestCallPhase): string {
   }
 }
 
-export function labelForManagedOutboundPhase(phase: PhoneTestCallPhase, isCrm: boolean): string {
-  if (!isCrm) return labelForPhase(phase);
+export function labelForManagedOutboundPhase(
+  phase: PhoneTestCallPhase,
+  kind: ManagedOutboundKind | boolean
+): string {
+  const resolved: ManagedOutboundKind =
+    typeof kind === "boolean" ? (kind ? "crm" : "test") : kind;
+  if (resolved === "test") return labelForPhase(phase);
+  if (resolved === "campaign") return campaignLabelForPhase(phase);
   switch (phase) {
     case "dialing": return "Llamada IA — Marcando";
     case "ringing": return "Llamada IA — Sonando";

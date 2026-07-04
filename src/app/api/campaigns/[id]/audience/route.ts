@@ -3,7 +3,9 @@ import { adminClient } from "@/lib/voice-agents-server";
 import { requireOrgModule } from "@/lib/module-auth";
 import { parseExcelBuffer } from "@/lib/data-tables/parse-excel";
 import { toVoiceCampaignRecord } from "@/lib/campaigns/record";
-import { autoMapCampaignColumns } from "@/lib/campaigns/auto-map-fields";
+import type { CampaignFieldMapping } from "@/types/voice-campaign";
+import type { DataTableColumn } from "@/types/data-table";
+import { autoMapCampaignColumnsFromSchema } from "@/lib/campaigns/column-mapping";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -19,7 +21,6 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
     .select("*")
     .eq("id", id)
     .eq("organization_id", auth.organizationId)
-    .eq("user_id", auth.userId)
     .maybeSingle();
 
   if (campErr) return NextResponse.json({ error: campErr.message }, { status: 500 });
@@ -84,22 +85,28 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
       if (rowsErr) return NextResponse.json({ error: rowsErr.message }, { status: 500 });
     }
 
-    const autoMap = autoMapCampaignColumns(
-      parsed.headers,
-      (campaign.trigger_rule as { type?: string })?.type === "excel_date"
-    );
+    const mappingRaw = form.get("field_mapping");
+    let fieldMappingOverride: CampaignFieldMapping | null = null;
+    if (typeof mappingRaw === "string" && mappingRaw.trim()) {
+      try {
+        fieldMappingOverride = JSON.parse(mappingRaw) as CampaignFieldMapping;
+      } catch {
+        return NextResponse.json({ error: "field_mapping inválido" }, { status: 400 });
+      }
+    }
+
+    const triggerNeedsDate =
+      (campaign.trigger_rule as { type?: string })?.type === "excel_date";
+    const fieldMapping =
+      fieldMappingOverride ??
+      autoMapCampaignColumnsFromSchema(parsed.columns, triggerNeedsDate);
 
     const { data: updated, error: linkErr } = await db
       .from("voice_campaigns")
       .update({
         audience_table_id: table.id,
-        field_mapping: {
-          phone_column: autoMap.phone_column ?? "",
-          name_column: autoMap.name_column ?? "",
-          call_date_column: autoMap.call_date_column,
-          custom_fields: autoMap.custom_fields,
-        },
-        wizard_step: Math.max(Number(campaign.wizard_step), 3),
+        field_mapping: fieldMapping,
+        wizard_step: 3,
         updated_at: now,
       })
       .eq("id", id)
@@ -112,7 +119,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
       campaign: toVoiceCampaignRecord(updated),
       audience_table_id: table.id,
       row_count: parsed.rows.length,
-      auto_map: autoMap,
+      auto_map: fieldMapping,
     });
   }
 
@@ -138,25 +145,18 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
   if (tableErr) return NextResponse.json({ error: tableErr.message }, { status: 500 });
   if (!table) return NextResponse.json({ error: "Tabla no encontrada" }, { status: 404 });
 
-  const columns = Array.isArray(table.columns) ? table.columns : [];
-  const labels = columns.map((c: { label?: string }) => String(c.label ?? ""));
-  const autoMap = autoMapCampaignColumns(
-    labels,
-    (campaign.trigger_rule as { type?: string })?.type === "excel_date"
-  );
+  const columns = (Array.isArray(table.columns) ? table.columns : []) as DataTableColumn[];
+  const triggerNeedsDate =
+    (campaign.trigger_rule as { type?: string })?.type === "excel_date";
+  const fieldMapping = autoMapCampaignColumnsFromSchema(columns, triggerNeedsDate);
 
   const now = new Date().toISOString();
   const { data: updated, error: linkErr } = await db
     .from("voice_campaigns")
     .update({
       audience_table_id: audienceTableId,
-      field_mapping: {
-        phone_column: autoMap.phone_column ?? "",
-        name_column: autoMap.name_column ?? "",
-        call_date_column: autoMap.call_date_column,
-        custom_fields: autoMap.custom_fields,
-      },
-      wizard_step: Math.max(Number(campaign.wizard_step), 3),
+      field_mapping: fieldMapping,
+      wizard_step: 3,
       updated_at: now,
     })
     .eq("id", id)
@@ -168,6 +168,6 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
   return NextResponse.json({
     campaign: toVoiceCampaignRecord(updated),
     audience_table_id: audienceTableId,
-    auto_map: autoMap,
+    auto_map: fieldMapping,
   });
 }

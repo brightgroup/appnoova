@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/voice-agents-server";
 import { requireOrgModule } from "@/lib/module-auth";
 import { toVoiceCampaignRecord } from "@/lib/campaigns/record";
+import { triggerCampaignDialerOnActivation } from "@/lib/call-engine/dialer-scheduler";
 import type {
   CampaignFieldMapping,
   CampaignScheduleConfig,
@@ -10,14 +11,13 @@ import type {
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
-async function loadCampaign(id: string, organizationId: string, userId: string) {
+async function loadCampaign(id: string, organizationId: string) {
   const db = adminClient();
   const { data, error } = await db
     .from("voice_campaigns")
     .select("*")
     .eq("id", id)
     .eq("organization_id", organizationId)
-    .eq("user_id", userId)
     .maybeSingle();
   if (error) throw new Error(error.message);
   return data;
@@ -29,7 +29,7 @@ export async function GET(_req: NextRequest, ctx: RouteCtx) {
 
   const { id } = await ctx.params;
   try {
-    const row = await loadCampaign(id, auth.organizationId, auth.userId);
+    const row = await loadCampaign(id, auth.organizationId);
     if (!row) return NextResponse.json({ error: "Campaña no encontrada" }, { status: 404 });
     return NextResponse.json({ campaign: toVoiceCampaignRecord(row) });
   } catch (e) {
@@ -50,6 +50,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
     schedule_config?: CampaignScheduleConfig;
     trigger_rule?: CampaignTriggerRule;
     field_mapping?: CampaignFieldMapping;
+    prompt_template?: string | null;
     status?: string;
   };
 
@@ -59,7 +60,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const existing = await loadCampaign(id, auth.organizationId, auth.userId);
+  const existing = await loadCampaign(id, auth.organizationId);
   if (!existing) return NextResponse.json({ error: "Campaña no encontrada" }, { status: 404 });
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -70,6 +71,9 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
   if (body.schedule_config !== undefined) patch.schedule_config = body.schedule_config;
   if (body.trigger_rule !== undefined) patch.trigger_rule = body.trigger_rule;
   if (body.field_mapping !== undefined) patch.field_mapping = body.field_mapping;
+  if (body.prompt_template !== undefined) {
+    patch.prompt_template = body.prompt_template?.trim() ? body.prompt_template : null;
+  }
   if (body.status !== undefined) patch.status = body.status;
 
   const db = adminClient();
@@ -81,6 +85,11 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (body.status === "active" && existing.status !== "active") {
+    triggerCampaignDialerOnActivation();
+  }
+
   return NextResponse.json({ campaign: toVoiceCampaignRecord(data) });
 }
 
@@ -89,7 +98,7 @@ export async function DELETE(_req: NextRequest, ctx: RouteCtx) {
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await ctx.params;
-  const existing = await loadCampaign(id, auth.organizationId, auth.userId);
+  const existing = await loadCampaign(id, auth.organizationId);
   if (!existing) return NextResponse.json({ error: "Campaña no encontrada" }, { status: 404 });
 
   const db = adminClient();

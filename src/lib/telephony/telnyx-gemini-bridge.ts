@@ -10,12 +10,15 @@ import {
   telnyxSilencePayload20ms
 } from "@/lib/telephony/telnyx-media-audio";
 import { finalizePhoneTestCall } from "@/lib/telephony/finalize-phone-test-call";
+import { finalizeOutboundShortCall } from "@/lib/telephony/finalize-outbound-short-call";
+import { telnyxHangup } from "@/lib/telephony/telnyx-call-control";
 import {
   registerActiveBridge,
   unregisterActiveBridge,
   type PendingBridgeSession
 } from "@/lib/telephony/bridge-session-store";
 import { updatePhoneTestCallSession, labelForPhase } from "@/lib/telephony/test-call-session";
+import { isVoicemailUtterance } from "@/lib/voice-voicemail-detection";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
 
 export class TelnyxGeminiBridge {
@@ -29,6 +32,7 @@ export class TelnyxGeminiBridge {
   private closed = false;
   private closing = false;
   private goodbyeTriggered = false;
+  private voicemailTriggered = false;
   private sentAudio = false;
   private inboundFrames = 0;
   private outboundChunksSent = 0;
@@ -219,6 +223,51 @@ export class TelnyxGeminiBridge {
     this.outboundQueue = [];
   }
 
+  private checkVoicemail(text: string) {
+    if (this.voicemailTriggered || this.closed) return;
+    if (!isVoicemailUtterance(text)) return;
+    this.voicemailTriggered = true;
+    console.info("[telnyx-gemini] buzón detectado en audio", { callControlId: this.callControlId, text });
+    void this.closeAsVoicemail();
+  }
+
+  private async closeAsVoicemail(): Promise<void> {
+    if (this.closed) return;
+    this.closed = true;
+    this.closing = true;
+    this.stopSilenceKeepalive();
+    this.stopOutboundPump();
+    if (this.listenEnableTimer) clearTimeout(this.listenEnableTimer);
+    unregisterActiveBridge(this.callControlId);
+
+    try {
+      this.gemini?.close();
+    } catch {
+      /* ignore */
+    }
+    this.gemini = null;
+
+    if (this.ws.readyState === 1) {
+      try { this.ws.close(); } catch { /* ignore */ }
+    }
+
+    try {
+      await telnyxHangup(this.callControlId);
+    } catch {
+      /* ignore */
+    }
+
+    try {
+      await finalizeOutboundShortCall({
+        callControlId: this.callControlId,
+        outcome: "voicemail",
+        disconnectReason: "Buzón de voz detectado (Gemini)",
+      });
+    } catch (e) {
+      console.error("[telnyx-gemini] finalize voicemail error:", e);
+    }
+  }
+
   private checkGoodbye() {
     if (this.goodbyeTriggered || this.transcript.length < 2) return;
     const last = this.transcript[this.transcript.length - 1];
@@ -278,6 +327,8 @@ export class TelnyxGeminiBridge {
 
     if (sc.inputTranscription?.text && this.listeningEnabled) {
       this.appendTranscript("user", sc.inputTranscription.text);
+      this.checkVoicemail(sc.inputTranscription.text);
+      if (this.voicemailTriggered) return;
       void updatePhoneTestCallSession(this.callControlId, {
         phase: "connected",
         last_event: "gemini.listening",

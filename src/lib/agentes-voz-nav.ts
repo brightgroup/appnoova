@@ -8,7 +8,7 @@ export interface AgenteVozNavItem {
 
 export const AGENTES_VOZ_NAV: AgenteVozNavItem[] = [
   { name: "Agentes", href: "/dashboard/agentes-voz", icon: Bot },
-  { name: "Historial", href: "#", icon: History },
+  { name: "Historial", href: "/dashboard/agentes-voz/historial", icon: History },
   { name: "Números telefónicos", href: "/dashboard/agentes-voz/numeros", icon: Phone },
   { name: "Números de prueba", href: "/dashboard/agentes-voz/numeros-prueba", icon: FlaskConical },
   { name: "Troncales SIP", href: "#", icon: Network },

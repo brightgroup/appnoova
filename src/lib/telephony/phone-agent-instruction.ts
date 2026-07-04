@@ -1,6 +1,6 @@
 import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
-import { VOICE_OUTBOUND_PICKUP_PROMPT } from "@/lib/voice-accent-profile";
+import { VOICE_OUTBOUND_PICKUP_PROMPT, VOICE_OUTBOUND_VOICEMAIL_PROMPT } from "@/lib/voice-accent-profile";
 
 /** Instrucción de sistema para llamadas telefónicas (Gemini Live / Pipecat). */
 export function buildPhoneAgentSystemInstruction(
@@ -29,6 +29,7 @@ export function buildPhoneAgentSystemInstruction(
   const temporal = buildColombiaTemporalContext();
 
   return `${identityBlock}${temporal.promptBlock}\n\n${merged}
+${VOICE_OUTBOUND_VOICEMAIL_PROMPT}
 ${VOICE_OUTBOUND_PICKUP_PROMPT}
 
 ## Cierre de llamada (obligatorio)
