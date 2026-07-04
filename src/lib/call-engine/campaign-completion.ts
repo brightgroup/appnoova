@@ -1,14 +1,16 @@
 import { adminClient } from "@/lib/voice-agents-server";
 import type { CampaignCallStatus } from "@/types/voice-campaign";
 
-const WORK_REMAINING_STATUSES: CampaignCallStatus[] = ["pending", "retry", "calling"];
-
 export interface CampaignAudienceProgress {
   total: number;
   pending: number;
   calling: number;
   retry: number;
-  completed: number;
+  connected: number;
+  voicemail: number;
+  no_answer: number;
+  busy: number;
+  rejected: number;
   failed: number;
   skipped: number;
   /** Filas activas que aún pueden recibir llamadas o están en curso. */
@@ -27,12 +29,16 @@ export async function getCampaignAudienceProgress(
 
   if (error) throw new Error(error.message);
 
-  const counts = {
+  const counts: Omit<CampaignAudienceProgress, "has_work_remaining"> = {
     total: 0,
     pending: 0,
     calling: 0,
     retry: 0,
-    completed: 0,
+    connected: 0,
+    voicemail: 0,
+    no_answer: 0,
+    busy: 0,
+    rejected: 0,
     failed: 0,
     skipped: 0,
   };
@@ -40,12 +46,40 @@ export async function getCampaignAudienceProgress(
   for (const row of rows ?? []) {
     counts.total += 1;
     const status = String(row.call_status ?? "pending") as CampaignCallStatus;
-    if (status === "pending") counts.pending += 1;
-    else if (status === "calling") counts.calling += 1;
-    else if (status === "retry") counts.retry += 1;
-    else if (status === "completed") counts.completed += 1;
-    else if (status === "failed") counts.failed += 1;
-    else if (status === "skipped") counts.skipped += 1;
+    switch (status) {
+      case "pending":
+        counts.pending += 1;
+        break;
+      case "calling":
+        counts.calling += 1;
+        break;
+      case "retry":
+        counts.retry += 1;
+        break;
+      case "connected":
+        counts.connected += 1;
+        break;
+      case "voicemail":
+        counts.voicemail += 1;
+        break;
+      case "no_answer":
+        counts.no_answer += 1;
+        break;
+      case "busy":
+        counts.busy += 1;
+        break;
+      case "rejected":
+        counts.rejected += 1;
+        break;
+      case "failed":
+        counts.failed += 1;
+        break;
+      case "skipped":
+        counts.skipped += 1;
+        break;
+      default:
+        break;
+    }
   }
 
   const hasWorkRemaining =
@@ -71,7 +105,7 @@ async function campaignHasInProgressCalls(campaignId: string): Promise<boolean> 
 
 /**
  * Marca la campaña como finalizada cuando todos los contactos activos
- * están en estado terminal (completed / failed / skipped) y no hay llamadas en curso.
+ * están en estado terminal y no hay llamadas en curso.
  */
 export async function tryAutoCompleteCampaign(campaignId: string): Promise<boolean> {
   const db = adminClient();
@@ -109,7 +143,9 @@ export async function tryAutoCompleteCampaign(campaignId: string): Promise<boole
   console.info("[campaign-completion] finalizada:", {
     campaignId,
     total: progress.total,
-    completed: progress.completed,
+    connected: progress.connected,
+    voicemail: progress.voicemail,
+    no_answer: progress.no_answer,
     failed: progress.failed,
     skipped: progress.skipped,
   });

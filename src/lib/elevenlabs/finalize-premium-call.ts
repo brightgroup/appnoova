@@ -11,7 +11,11 @@ import { getPhoneTestCallSession, updatePhoneTestCallSession, managedOutboundKin
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
 import {
-  mapToCampaignAudienceOutcome,
+  transcriptIndicatesVoicemail,
+  userHadLiveConversation,
+} from "@/lib/voice-voicemail-detection";
+import {
+  mapCallToTechnicalDisposition,
   resolveCampaignContextFromSession,
   syncCampaignAudienceAfterCall,
 } from "@/lib/call-engine/campaign-audience-status";
@@ -55,9 +59,15 @@ export async function finalizeElevenLabsPremiumCall(input: {
     try {
       const conv = await getElevenLabsConversation(input.conversationId);
       voicemailDetected = conv.voicemailDetected;
+      if (transcript.length === 0) transcript = conv.transcript;
     } catch {
       /* ignore */
     }
+  }
+
+  const voicemailFromContent = transcriptIndicatesVoicemail(transcript);
+  if (!voicemailDetected && voicemailFromContent) {
+    voicemailDetected = true;
   }
 
   if (voicemailDetected) {
@@ -109,7 +119,7 @@ export async function finalizeElevenLabsPremiumCall(input: {
         await syncCampaignAudienceAfterCall({
           campaignId: ctx.campaignId,
           audienceRowId: ctx.audienceRowId,
-          outcome: mapToCampaignAudienceOutcome({ outcome: "voicemail", voicemailDetected: true }),
+          disposition: "voicemail",
         });
       }
     }
@@ -213,9 +223,8 @@ export async function finalizeElevenLabsPremiumCall(input: {
       await syncCampaignAudienceAfterCall({
         campaignId: ctx.campaignId,
         audienceRowId: ctx.audienceRowId,
-        outcome: mapToCampaignAudienceOutcome({
-          durationSec,
-          transcriptLength: transcript.length,
+        disposition: mapCallToTechnicalDisposition({
+          userSpokeLive: userHadLiveConversation(transcript),
         }),
       });
     }

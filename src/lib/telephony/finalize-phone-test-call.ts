@@ -6,10 +6,11 @@ import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import { uploadCallRecording } from "@/lib/voice-call-storage";
 import { chargeVoiceCall, resolveOrgIdForUser } from "@/lib/billing/meter";
 import {
-  mapToCampaignAudienceOutcome,
+  mapCallToTechnicalDisposition,
   resolveCampaignContextFromSession,
   syncCampaignAudienceAfterCall,
 } from "@/lib/call-engine/campaign-audience-status";
+import { userHadLiveConversation } from "@/lib/voice-voicemail-detection";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
 
 export async function finalizePhoneTestCall(input: {
@@ -156,9 +157,8 @@ export async function finalizePhoneTestCall(input: {
       await syncCampaignAudienceAfterCall({
         campaignId: ctx.campaignId,
         audienceRowId: ctx.audienceRowId,
-        outcome: mapToCampaignAudienceOutcome({
-          durationSec,
-          transcriptLength: input.transcript.length,
+        disposition: mapCallToTechnicalDisposition({
+          userSpokeLive: userHadLiveConversation(input.transcript),
         }),
       });
     }

@@ -5,9 +5,13 @@ export type VoiceCampaignStatus = "draft" | "active" | "paused" | "completed";
 export type CampaignCallStatus =
   | "pending"
   | "calling"
-  | "completed"
-  | "failed"
   | "retry"
+  | "connected"
+  | "voicemail"
+  | "no_answer"
+  | "busy"
+  | "rejected"
+  | "failed"
   | "skipped";
 
 export type CampaignTriggerType = "excel_date" | "fixed_datetime" | "on_activate";
@@ -120,28 +124,39 @@ export interface CampaignAudienceRowRecord {
 export interface CampaignAudienceStats {
   total_contacts: number;
   called: number;
-  completed: number;
+  connected: number;
+  voicemail: number;
+  no_answer: number;
+  busy: number;
+  rejected: number;
   failed: number;
   pending: number;
   connection_rate: number;
-  success_rate: number;
 }
 
 export const CAMPAIGN_CALL_STATUS_LABELS: Record<CampaignCallStatus, string> = {
   pending: "Pendiente",
   calling: "Marcando",
-  completed: "Completado",
-  failed: "Fallido",
   retry: "Reintento",
+  connected: "Conectado",
+  voicemail: "Buzón de voz",
+  no_answer: "No contestó",
+  busy: "Ocupado",
+  rejected: "Rechazada",
+  failed: "Error técnico",
   skipped: "Omitido",
 };
 
 export const CAMPAIGN_CALL_STATUS_COLORS: Record<CampaignCallStatus, string> = {
   pending: "bg-gray-500/20 text-gray-300 border-gray-500/30",
   calling: "bg-sky-500/20 text-sky-300 border-sky-500/30",
-  completed: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-  failed: "bg-red-500/20 text-red-300 border-red-500/30",
   retry: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+  connected: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  voicemail: "bg-violet-500/20 text-violet-300 border-violet-500/30",
+  no_answer: "bg-orange-500/20 text-orange-300 border-orange-500/30",
+  busy: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
+  rejected: "bg-rose-500/20 text-rose-300 border-rose-500/30",
+  failed: "bg-red-500/20 text-red-300 border-red-500/30",
   skipped: "bg-white/10 text-gray-400 border-white/10",
 };
 

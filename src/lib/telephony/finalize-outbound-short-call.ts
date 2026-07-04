@@ -11,7 +11,7 @@ import {
   type OutboundCallOutcome,
 } from "@/lib/telephony/call-outcome";
 import {
-  mapToCampaignAudienceOutcome,
+  mapCallToTechnicalDisposition,
   resolveCampaignContextFromSession,
   syncCampaignAudienceAfterCall,
 } from "@/lib/call-engine/campaign-audience-status";
@@ -99,7 +99,7 @@ export async function finalizeOutboundShortCall(input: {
       await syncCampaignAudienceAfterCall({
         campaignId: ctx.campaignId,
         audienceRowId: ctx.audienceRowId,
-        outcome: mapToCampaignAudienceOutcome({
+        disposition: mapCallToTechnicalDisposition({
           outcome: input.outcome,
           voicemailDetected: isVoicemail,
         }),

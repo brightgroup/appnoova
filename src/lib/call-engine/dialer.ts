@@ -21,7 +21,12 @@ import { tryAutoCompleteActiveCampaigns } from "@/lib/call-engine/campaign-compl
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import { telnyxPlaceCall } from "@/lib/telephony/telnyx-call-control";
 import { adminClient } from "@/lib/voice-agents-server";
-import type { CampaignAudienceTableRecord } from "@/types/voice-campaign";
+import {
+  dispositionFromPlacementError,
+  resolveAudienceStatusAfterAttempt,
+  type CampaignTechnicalDisposition,
+} from "@/lib/call-engine/campaign-audience-status";
+import type { CampaignAudienceTableRecord, CampaignCallStatus } from "@/types/voice-campaign";
 import { randomUUID } from "crypto";
 
 export interface DialerTickResult {
@@ -120,14 +125,37 @@ async function claimAudienceRow(
 async function revertClaimedRow(
   db: ReturnType<typeof adminClient>,
   rowId: string,
-  rules: CallEngineRules
+  rules: CallEngineRules,
+  maxAttempts: number,
+  disposition?: CampaignTechnicalDisposition
 ): Promise<void> {
-  const next = new Date(Date.now() + rules.retry_gap_minutes * 60_000).toISOString();
+  const { data: row } = await db
+    .from("campaign_audience_rows")
+    .select("total_attempts")
+    .eq("id", rowId)
+    .maybeSingle();
+
+  const attempts = Number(row?.total_attempts) || 0;
+  const resolved = disposition
+    ? resolveAudienceStatusAfterAttempt({
+        disposition,
+        attempts,
+        maxAttempts,
+        retryGapMinutes: rules.retry_gap_minutes,
+      })
+    : {
+        call_status: (attempts >= maxAttempts ? "failed" : "retry") as CampaignCallStatus,
+        scheduled_call_at:
+          attempts >= maxAttempts
+            ? null
+            : new Date(Date.now() + rules.retry_gap_minutes * 60_000).toISOString(),
+      };
+
   await db
     .from("campaign_audience_rows")
     .update({
-      call_status: "retry",
-      scheduled_call_at: next,
+      call_status: resolved.call_status,
+      scheduled_call_at: resolved.scheduled_call_at,
       updated_at: new Date().toISOString(),
     })
     .eq("id", rowId)
@@ -428,7 +456,8 @@ async function executeCampaignDialerTick(): Promise<DialerTickResult> {
 
     const slotsAfterClaim = await countActiveCampaignCalls(db);
     if (slotsAfterClaim >= rules.max_concurrent) {
-      await revertClaimedRow(db, row.id, rules);
+      const maxAttempts = campaign.schedule_config.max_attempts_per_contact ?? 3;
+      await revertClaimedRow(db, row.id, rules, maxAttempts);
       break;
     }
 
@@ -439,7 +468,14 @@ async function executeCampaignDialerTick(): Promise<DialerTickResult> {
       const message = err instanceof Error ? err.message : "Error al marcar";
       console.error("[campaign-dialer] place failed:", { campaignId: campaign.id, rowId: row.id, message });
       errors.push({ campaign_id: campaign.id, row_id: row.id, error: message });
-      await revertClaimedRow(db, row.id, rules);
+      const maxAttempts = campaign.schedule_config.max_attempts_per_contact ?? 3;
+      await revertClaimedRow(
+        db,
+        row.id,
+        rules,
+        maxAttempts,
+        dispositionFromPlacementError(message)
+      );
     }
   }
 

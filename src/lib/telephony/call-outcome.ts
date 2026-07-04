@@ -15,7 +15,13 @@ export type TelnyxAmdPremiumResult =
   | "fax_detected"
   | "not_sure";
 
-export type OutboundCallOutcome = "voicemail" | "no_answer" | "busy" | "failed" | "connected";
+export type OutboundCallOutcome =
+  | "voicemail"
+  | "no_answer"
+  | "busy"
+  | "rejected"
+  | "failed"
+  | "connected";
 
 export function isMachineAmdResult(result: string): boolean {
   const r = result.toLowerCase();
@@ -40,6 +46,8 @@ export function outcomeStatusLabel(outcome: OutboundCallOutcome): string {
       return "No contestada";
     case "busy":
       return "Línea ocupada";
+    case "rejected":
+      return "Llamada rechazada";
     case "failed":
       return "Error de conexión";
     case "connected":
@@ -69,7 +77,8 @@ export function mapHangupCauseToOutcome(cause: string): OutboundCallOutcome {
   const c = cause.toLowerCase();
   if (c.includes("busy")) return "busy";
   if (c.includes("no_answer") || c.includes("no answer") || c.includes("timeout")) return "no_answer";
-  if (c.includes("reject") || c.includes("failed") || c.includes("unallocated")) return "failed";
+  if (c.includes("reject") || c.includes("declin")) return "rejected";
+  if (c.includes("failed") || c.includes("unallocated")) return "failed";
   return "no_answer";
 }
 
@@ -86,6 +95,8 @@ export function outcomeSummary(
       return `Llamada a ${phone} — no contestada.`;
     case "busy":
       return `Llamada a ${phone} — línea ocupada.`;
+    case "rejected":
+      return `Llamada a ${phone} — rechazada por el destinatario.`;
     case "failed":
       return `Llamada a ${phone} — no se pudo conectar.`;
     default:

@@ -7,6 +7,7 @@ import {
 } from "@/lib/campaigns/audience-rows";
 import type { DataTableColumn } from "@/types/data-table";
 import type {
+  CampaignAudienceStats,
   CampaignCallStatus,
   CampaignFieldMapping,
   CampaignTriggerRule,
@@ -234,32 +235,42 @@ export async function DELETE(req: NextRequest, ctx: RouteCtx) {
   return NextResponse.json({ ok: true });
 }
 
-function emptyStats() {
+function emptyStats(): CampaignAudienceStats {
   return {
     total_contacts: 0,
     called: 0,
-    completed: 0,
+    connected: 0,
+    voicemail: 0,
+    no_answer: 0,
+    busy: 0,
+    rejected: 0,
     failed: 0,
     pending: 0,
     connection_rate: 0,
-    success_rate: 0,
   };
 }
 
-function computeStats(statuses: CampaignCallStatus[]) {
+function computeStats(statuses: CampaignCallStatus[]): CampaignAudienceStats {
   const total = statuses.length;
-  const completed = statuses.filter(s => s === "completed").length;
+  const connected = statuses.filter(s => s === "connected").length;
+  const voicemail = statuses.filter(s => s === "voicemail").length;
+  const no_answer = statuses.filter(s => s === "no_answer").length;
+  const busy = statuses.filter(s => s === "busy").length;
+  const rejected = statuses.filter(s => s === "rejected").length;
   const failed = statuses.filter(s => s === "failed").length;
-  const pending = statuses.filter(s => s === "pending" || s === "retry").length;
+  const pending = statuses.filter(s => s === "pending" || s === "retry" || s === "calling").length;
   const called = statuses.filter(s => s !== "pending" && s !== "skipped").length;
-  const connected = completed + failed;
+
   return {
     total_contacts: total,
     called,
-    completed,
+    connected,
+    voicemail,
+    no_answer,
+    busy,
+    rejected,
     failed,
     pending,
     connection_rate: total > 0 ? Math.round((connected / total) * 100) : 0,
-    success_rate: connected > 0 ? Math.round((completed / connected) * 100) : 0,
   };
 }

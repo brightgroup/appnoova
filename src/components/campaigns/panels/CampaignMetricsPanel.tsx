@@ -13,11 +13,14 @@ interface CampaignMetricsPanelProps {
 const EMPTY: CampaignAudienceStats = {
   total_contacts: 0,
   called: 0,
-  completed: 0,
+  connected: 0,
+  voicemail: 0,
+  no_answer: 0,
+  busy: 0,
+  rejected: 0,
   failed: 0,
   pending: 0,
   connection_rate: 0,
-  success_rate: 0,
 };
 
 export function CampaignMetricsPanel({ campaignId }: CampaignMetricsPanelProps) {
@@ -41,7 +44,7 @@ export function CampaignMetricsPanel({ campaignId }: CampaignMetricsPanelProps) 
   const cards = [
     { label: "Créditos usados", value: "0", icon: Coins },
     { label: "Total de llamadas", value: String(stats.called), icon: Phone },
-    { label: "Contactos llamados", value: String(stats.called), icon: Users },
+    { label: "Contactos conectados", value: String(stats.connected), icon: Users },
     { label: "Tasa de conexión", value: `${stats.connection_rate}%`, icon: Phone },
     { label: "Duración promedio", value: "00m 00s", icon: Timer },
   ];
@@ -49,14 +52,25 @@ export function CampaignMetricsPanel({ campaignId }: CampaignMetricsPanelProps) 
   const funnel = [
     { label: "Total de contactos", pct: 100, color: "bg-[#5b5bf6]" },
     {
-      label: "Conectado",
+      label: "Conectado (RPC)",
       pct: stats.connection_rate,
-      color: "bg-amber-400",
+      color: "bg-emerald-400",
     },
     {
-      label: "Exitosas",
-      pct: stats.success_rate,
-      color: "bg-emerald-400",
+      label: "Buzón de voz",
+      pct: stats.total_contacts > 0 ? Math.round((stats.voicemail / stats.total_contacts) * 100) : 0,
+      color: "bg-violet-400",
+    },
+    {
+      label: "Sin contacto",
+      pct:
+        stats.total_contacts > 0
+          ? Math.round(
+              ((stats.no_answer + stats.busy + stats.rejected + stats.failed) / stats.total_contacts) *
+                100
+            )
+          : 0,
+      color: "bg-orange-400",
     },
   ];
 
@@ -97,16 +111,20 @@ export function CampaignMetricsPanel({ campaignId }: CampaignMetricsPanelProps) 
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-xl border border-white/[.08] bg-white/[.02] p-5 min-h-[280px]">
-          <h3 className="text-sm font-semibold text-white mb-4">Llamadas realizadas</h3>
+          <h3 className="text-sm font-semibold text-white mb-4">Tipificación técnica</h3>
           {stats.called === 0 ? (
             <div className="flex items-center justify-center h-48 text-xs text-gray-500 text-center px-4">
-              No hay datos disponibles para el rango de fechas seleccionado
+              No hay intentos de llamada registrados
             </div>
           ) : (
             <div className="space-y-2 text-sm text-gray-400">
-              <p>Completadas: {stats.completed}</p>
-              <p>Fallidas: {stats.failed}</p>
-              <p>Pendientes: {stats.pending}</p>
+              <p>Conectados: {stats.connected}</p>
+              <p>Buzón de voz: {stats.voicemail}</p>
+              <p>No contestó: {stats.no_answer}</p>
+              <p>Ocupado: {stats.busy}</p>
+              <p>Rechazadas: {stats.rejected}</p>
+              <p>Error técnico: {stats.failed}</p>
+              <p>Pendientes / reintento: {stats.pending}</p>
             </div>
           )}
         </div>
@@ -132,7 +150,7 @@ export function CampaignMetricsPanel({ campaignId }: CampaignMetricsPanelProps) 
               </div>
             ))}
             <p className="text-[11px] text-gray-600 pt-2">
-              {stats.total_contacts} contactos en audiencia
+              {stats.total_contacts} contactos en audiencia · disposición CRM próximamente
             </p>
           </div>
         </div>

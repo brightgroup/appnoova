@@ -102,9 +102,20 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
   const pageRows = pagination.pageRows(filtered);
 
   const stats = useMemo(() => {
-    const counts = { pending: 0, calling: 0, completed: 0, failed: 0, retry: 0 };
+    const counts = {
+      pending: 0,
+      calling: 0,
+      retry: 0,
+      connected: 0,
+      voicemail: 0,
+      no_answer: 0,
+      busy: 0,
+      rejected: 0,
+      failed: 0,
+    };
     for (const r of rows) {
-      if (r.call_status in counts) counts[r.call_status as keyof typeof counts] += 1;
+      const key = r.call_status as keyof typeof counts;
+      if (key in counts) counts[key] += 1;
     }
     return counts;
   }, [rows]);
@@ -228,9 +239,29 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
                   {stats.calling} marcando
                 </span>
               )}
-              {stats.completed > 0 && (
+              {stats.connected > 0 && (
                 <span className="rounded-full border px-2 py-0.5 bg-emerald-500/10 text-emerald-300 border-emerald-500/20">
-                  {stats.completed} completados
+                  {stats.connected} conectados
+                </span>
+              )}
+              {stats.voicemail > 0 && (
+                <span className="rounded-full border px-2 py-0.5 bg-violet-500/10 text-violet-300 border-violet-500/20">
+                  {stats.voicemail} buzón
+                </span>
+              )}
+              {stats.no_answer > 0 && (
+                <span className="rounded-full border px-2 py-0.5 bg-orange-500/10 text-orange-300 border-orange-500/20">
+                  {stats.no_answer} no contestó
+                </span>
+              )}
+              {stats.rejected > 0 && (
+                <span className="rounded-full border px-2 py-0.5 bg-rose-500/10 text-rose-300 border-rose-500/20">
+                  {stats.rejected} rechazadas
+                </span>
+              )}
+              {stats.failed > 0 && (
+                <span className="rounded-full border px-2 py-0.5 bg-red-500/10 text-red-300 border-red-500/20">
+                  {stats.failed} error
                 </span>
               )}
               {stats.retry > 0 && (
@@ -278,7 +309,7 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
                   <tr className={registryTableHeadRow}>
                     <th className={registryTableHeadCell}>Contacto</th>
                     <th className={registryTableHeadCell}>Teléfono</th>
-                    <th className={registryTableHeadCell}>Estado</th>
+                    <th className={registryTableHeadCell}>Resultado</th>
                     <th className={registryTableHeadCell}>Intentos</th>
                     <th className={registryTableHeadCell}>Próxima llamada</th>
                     {displayCols.map(c => (

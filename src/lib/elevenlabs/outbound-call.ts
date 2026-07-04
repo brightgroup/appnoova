@@ -1,4 +1,5 @@
 import { elevenLabsFetch } from "@/lib/elevenlabs/client";
+import { isVoicemailUtterance } from "@/lib/voice-voicemail-detection";
 import { CAMPAIGN_ELEVENLABS_OUTBOUND_TOOLS } from "@/lib/elevenlabs/campaign-outbound-prompt";
 import { getElevenLabsPhoneNumberId } from "@/lib/elevenlabs/config";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
@@ -90,12 +91,15 @@ function detectVoicemailInConversation(data: Record<string, unknown>): boolean {
         }
       }
 
-      const message = String(row.message ?? row.text ?? "").toLowerCase();
-      if (row.role === "agent" && message.includes("voicemail_detection")) return true;
+      const message = String(row.message ?? row.text ?? "").trim();
+      if (row.role === "agent" && message.toLowerCase().includes("voicemail_detection")) return true;
+      if (row.role === "user" && message && isVoicemailUtterance(message)) return true;
     }
   }
 
   const analysis = data.analysis as Record<string, unknown> | undefined;
+  const summary = String(analysis?.transcript_summary ?? "").trim();
+  if (summary && isVoicemailUtterance(summary)) return true;
   const evalResults = analysis?.evaluation_criteria_results ?? analysis?.evaluations;
   if (Array.isArray(evalResults)) {
     for (const ev of evalResults) {

@@ -8,7 +8,9 @@ const VOICEMAIL_PATTERNS: RegExp[] = [
   /\bno puede atender\b/i,
   /\bfavor dejar (su |un )?mensaje\b/i,
   /\bpor favor deje\b/i,
-  /\bcontestadora\b/i,
+  /\bcontestador(a)?\b/i,
+  /\bdeja(r)? (su |tu |un )?mensaje\b/i,
+  /\bservicio de contestador\b/i,
   /\bgrabadora\b/i,
   /\bbuz[oó]n\b/i,
   /\bcorreo de voz\b/i,
@@ -43,4 +45,29 @@ export function isVoicemailUtterance(text: string): boolean {
   if (!normalized || normalized.length < 8) return false;
   if (VOICEMAIL_GREETING_ONLY.test(normalized)) return false;
   return VOICEMAIL_PATTERNS.some(p => p.test(normalized));
+}
+
+export function transcriptIndicatesVoicemail(
+  transcript: Array<{ role: string; text: string }>,
+  summary?: string | null
+): boolean {
+  if (summary?.trim() && isVoicemailUtterance(summary)) return true;
+  for (const line of transcript) {
+    if (line.role === "user" && isVoicemailUtterance(line.text)) return true;
+  }
+  return false;
+}
+
+/** Usuario habló en vivo (no solo mensaje de buzón/contestadora). */
+export function userHadLiveConversation(
+  transcript: Array<{ role: string; text: string }>
+): boolean {
+  for (const line of transcript) {
+    if (line.role !== "user") continue;
+    const text = line.text.trim();
+    if (text.length < 3) continue;
+    if (isVoicemailUtterance(text)) continue;
+    return true;
+  }
+  return false;
 }
