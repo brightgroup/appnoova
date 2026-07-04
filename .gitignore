@@ -37,3 +37,9 @@ backups/*.sql
 backups/*.dump
 backups/*.log
 !backups/.gitkeep
+
+# Supabase CLI (estado local al hacer `supabase link`; no commitear)
+supabase/.temp/
+
+# Scripts temporales de debug (prefijo _)
+scripts/_*.ts
