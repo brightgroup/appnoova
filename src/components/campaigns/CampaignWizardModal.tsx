@@ -231,22 +231,8 @@ export function CampaignWizardModal({
     void loadAudienceTables();
   };
 
-  const persistMapping = async () => {
-    if (!campaignId) return false;
-    const res = await authFetch(`/api/campaigns/${campaignId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ field_mapping: fieldMapping }),
-    });
-    return res.ok;
-  };
-
-  const finalize = async (activate: boolean) => {
+  const saveCampaign = async () => {
     if (!campaignId) return;
-    if (!fieldMapping.phone_column || !fieldMapping.name_column) {
-      setError("Mapea teléfono y nombre antes de continuar");
-      return;
-    }
     if (!audienceTableId) {
       setError("Importa o selecciona una audiencia");
       return;
@@ -254,22 +240,18 @@ export function CampaignWizardModal({
     setSaving(true);
     setError("");
 
-    const mappingOk = await persistMapping();
-    if (!mappingOk) {
-      setSaving(false);
-      setError("No se pudo guardar el mapeo");
-      return;
-    }
-
-    const res = await authFetch(`/api/campaigns/${campaignId}/finalize`, {
-      method: "POST",
+    const res = await authFetch(`/api/campaigns/${campaignId}`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ field_mapping: fieldMapping, activate }),
+      body: JSON.stringify({
+        field_mapping: fieldMapping,
+        wizard_step: 3,
+      }),
     });
     const json = await res.json();
     setSaving(false);
     if (!res.ok) {
-      setError(json.error ?? "Error al finalizar");
+      setError(json.error ?? "Error al guardar");
       return;
     }
     initKeyRef.current = null;
@@ -400,29 +382,14 @@ export function CampaignWizardModal({
               </button>
             )}
             {step === 3 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => void finalize(false)}
-                  disabled={saving || !audienceTableId}
-                  className={`${btnGhost} text-sm disabled:opacity-50`}
-                >
-                  {saving ? "Guardando…" : "Guardar borrador"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void finalize(true)}
-                  disabled={
-                    saving ||
-                    !audienceTableId ||
-                    !fieldMapping.phone_column ||
-                    !fieldMapping.name_column
-                  }
-                  className={`${btnPrimary} text-sm disabled:opacity-50`}
-                >
-                  {saving ? "Activando…" : "Activar campaña"}
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => void saveCampaign()}
+                disabled={saving || !audienceTableId}
+                className={`${btnPrimary} text-sm disabled:opacity-50`}
+              >
+                {saving ? "Guardando…" : "Guardar campaña"}
+              </button>
             )}
           </div>
         </div>

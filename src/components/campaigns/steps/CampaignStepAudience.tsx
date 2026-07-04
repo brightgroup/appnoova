@@ -195,7 +195,12 @@ export function CampaignStepAudience({
             </div>
             <span className="text-[10px] text-emerald-400 shrink-0">Conectada</span>
           </div>
-          {showMapping && (
+          {embedded && (
+            <p className="text-xs text-gray-400">
+              Guarda la campaña para continuar con el mapeo de variables, revisión del guion y activación.
+            </p>
+          )}
+          {!embedded && showMapping && (
             <CampaignMappingFields
               campaignId={campaignId}
               mapping={fieldMapping}

@@ -304,7 +304,7 @@ export function CampaignsPageContent({ initialWizardId = null }: CampaignsPageCo
         onClose={closeWizard}
         onComplete={id => {
           void load();
-          router.push(`/dashboard/campaigns/${id}`);
+          router.push(`/dashboard/campaigns/${id}?tab=audiencia`);
         }}
       />
     </ChannelListPage>
