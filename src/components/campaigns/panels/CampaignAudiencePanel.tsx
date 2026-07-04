@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Plus, Trash2, Check, X, Columns3, Users } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
+import { formatScheduledCol } from "@/lib/format-datetime";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
@@ -34,19 +35,6 @@ interface CampaignAudiencePanelProps {
 
 type CellValue = string | number | boolean | null;
 type AudienceSubTab = "contactos" | "mapeo";
-
-function formatScheduledAt(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("es-CO", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-}
 
 function StatusBadge({ status }: { status: CampaignAudienceRowRecord["call_status"] }) {
   return (
@@ -324,7 +312,7 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
                           {row.total_attempts}
                         </td>
                         <td className={`${registryTableCell} text-xs text-gray-400 whitespace-nowrap`}>
-                          {formatScheduledAt(row.scheduled_call_at)}
+                          {formatScheduledCol(row.scheduled_call_at)}
                         </td>
                         {displayCols.map(c => {
                           const isEditing =

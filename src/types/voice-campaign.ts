@@ -83,6 +83,7 @@ export interface VoiceCampaignRecord {
   field_mapping: CampaignFieldMapping;
   /** Prompt propio de la campaña con variables {{...}}. Si es null, usa el prompt del agente. */
   prompt_template: string | null;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 }

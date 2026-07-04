@@ -1,23 +1,15 @@
-"use client";
-
-import { Suspense, use } from "react";
 import { CampaignDetailView } from "@/components/campaigns/CampaignDetailView";
+import { parseCampaignDetailTab } from "@/lib/campaigns/detail-tab";
 
-export default function CampanaDetailPage({
+export default async function CampanaDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
-  const { id } = use(params);
-  return (
-    <Suspense
-      fallback={
-        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-          Cargando…
-        </div>
-      }
-    >
-      <CampaignDetailView campaignId={id} />
-    </Suspense>
-  );
+  const { id } = await params;
+  const { tab } = await searchParams;
+
+  return <CampaignDetailView campaignId={id} initialTab={parseCampaignDetailTab(tab)} />;
 }

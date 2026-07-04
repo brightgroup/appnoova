@@ -5,10 +5,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 import { useOrgPermissions } from "@/components/layout/OrgPermissionsProvider";
+import { useMounted } from "@/hooks/useMounted";
 import { routeRuleForPath } from "@/lib/org-permissions";
 import { ORG_MODULE_LABELS, type OrgPermissionModuleKey } from "@/types/rbac";
 
 export function DashboardRouteGuard({ children }: { children: React.ReactNode }) {
+  const mounted = useMounted();
   const pathname = usePathname();
   const router = useRouter();
   const { loading, canAccessPath } = useOrgPermissions();
@@ -17,12 +19,11 @@ export function DashboardRouteGuard({ children }: { children: React.ReactNode })
   const rule = routeRuleForPath(pathname);
 
   useEffect(() => {
-    if (!loading && !allowed && pathname !== "/dashboard") {
-      router.replace("/dashboard");
-    }
-  }, [loading, allowed, pathname, router]);
+    if (!mounted || loading || allowed || pathname === "/dashboard") return;
+    router.replace("/dashboard");
+  }, [mounted, loading, allowed, pathname, router]);
 
-  if (loading) return <>{children}</>;
+  if (!mounted || loading) return <>{children}</>;
 
   if (!allowed && rule) {
     const moduleLabel = ORG_MODULE_LABELS[rule.module] ?? rule.module;

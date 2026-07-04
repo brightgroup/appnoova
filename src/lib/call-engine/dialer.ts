@@ -12,6 +12,7 @@ import { getCallEngineRules, type CallEngineRules } from "@/lib/call-engine/plat
 import { campaignLocalDateKey, isCampaignInSchedule } from "@/lib/call-engine/campaign-schedule";
 import { buildCampaignCallPrompt } from "@/lib/campaigns/render-prompt";
 import { toVoiceCampaignRecord } from "@/lib/campaigns/record";
+import { tryAutoCompleteActiveCampaigns } from "@/lib/call-engine/campaign-completion";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import { telnyxPlaceCall } from "@/lib/telephony/telnyx-call-control";
 import { adminClient } from "@/lib/voice-agents-server";
@@ -25,6 +26,7 @@ export interface DialerTickResult {
   released_screening: number;
   active_calls: number;
   placed: number;
+  completed_campaigns: string[];
   errors: { campaign_id: string; row_id: string; error: string }[];
 }
 
@@ -284,6 +286,17 @@ async function placeCampaignCall(input: {
 }
 
 export async function runCampaignDialerTick(): Promise<DialerTickResult> {
+  const result = await executeCampaignDialerTick();
+  try {
+    result.completed_campaigns = await tryAutoCompleteActiveCampaigns();
+  } catch (err) {
+    console.error("[campaign-dialer] auto-complete:", err);
+    result.completed_campaigns = [];
+  }
+  return result;
+}
+
+async function executeCampaignDialerTick(): Promise<DialerTickResult> {
   const db = adminClient();
   const rules = await getCallEngineRules(db);
 
@@ -296,6 +309,7 @@ export async function runCampaignDialerTick(): Promise<DialerTickResult> {
       released_screening: 0,
       active_calls: 0,
       placed: 0,
+      completed_campaigns: [],
       errors: [],
     };
   }
@@ -315,6 +329,7 @@ export async function runCampaignDialerTick(): Promise<DialerTickResult> {
       released_screening: releasedScreening,
       active_calls: activeCalls,
       placed: 0,
+      completed_campaigns: [],
       errors: [],
     };
   }
@@ -345,6 +360,7 @@ export async function runCampaignDialerTick(): Promise<DialerTickResult> {
       released_screening: releasedScreening,
       active_calls: activeCalls,
       placed: 0,
+      completed_campaigns: [],
       errors: [],
     };
   }
@@ -428,6 +444,7 @@ export async function runCampaignDialerTick(): Promise<DialerTickResult> {
     released_screening: releasedScreening,
     active_calls: activeCalls,
     placed,
+    completed_campaigns: [],
     errors,
   };
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Calendar, Coins, Loader2, Phone, Timer, Users } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
+import { bogotaDateKey, shiftDateKey } from "@/lib/format-datetime";
 import type { CampaignAudienceStats } from "@/types/voice-campaign";
 
 interface CampaignMetricsPanelProps {
@@ -22,12 +23,8 @@ const EMPTY: CampaignAudienceStats = {
 export function CampaignMetricsPanel({ campaignId }: CampaignMetricsPanelProps) {
   const [stats, setStats] = useState<CampaignAudienceStats>(EMPTY);
   const [loading, setLoading] = useState(true);
-  const [dateFrom] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().slice(0, 10);
-  });
-  const [dateTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const dateTo = bogotaDateKey();
+  const dateFrom = shiftDateKey(dateTo, -1);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -145,8 +142,13 @@ export function CampaignMetricsPanel({ campaignId }: CampaignMetricsPanelProps) 
 }
 
 function formatRange(from: string, to: string): string {
-  const f = new Date(from + "T12:00:00");
-  const t = new Date(to + "T12:00:00");
-  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
+  const opts: Intl.DateTimeFormatOptions = {
+    timeZone: "America/Bogota",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  };
+  const f = new Date(`${from}T12:00:00Z`);
+  const t = new Date(`${to}T12:00:00Z`);
   return `${f.toLocaleDateString("es-CO", opts)} – ${t.toLocaleDateString("es-CO", opts)}`;
 }

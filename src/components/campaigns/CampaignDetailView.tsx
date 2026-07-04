@@ -19,11 +19,13 @@ import {
   RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/telephony-api";
 import { btnPrimary, tabActive, tabIdle } from "@/lib/brand-ui";
 import { CAMPAIGN_STATUS_LABELS } from "@/lib/campaigns/record";
 import { describeCampaignScheduleNow } from "@/lib/call-engine/campaign-schedule";
+import { formatDatetimeCol } from "@/lib/format-datetime";
+import { useMounted } from "@/hooks/useMounted";
 import { CampaignGeneralPanel } from "@/components/campaigns/panels/CampaignGeneralPanel";
 import { CampaignScriptPanel } from "@/components/campaigns/panels/CampaignScriptPanel";
 import { CampaignAudiencePanel } from "@/components/campaigns/panels/CampaignAudiencePanel";
@@ -47,26 +49,15 @@ const TABS: { id: CampaignDetailTab; label: string; icon: React.ElementType }[] 
   { id: "metricas", label: "Métricas", icon: LayoutGrid },
 ];
 
-const VALID_TABS = new Set(TABS.map(t => t.id));
-
-function parseTab(raw: string | null): CampaignDetailTab {
-  if (raw && VALID_TABS.has(raw as CampaignDetailTab)) return raw as CampaignDetailTab;
-  // Compatibilidad con enlaces antiguos.
-  if (raw === "configuracion") return "general";
-  if (raw === "contactos") return "audiencia";
-  return "general";
-}
-
 interface CampaignDetailViewProps {
   campaignId: string;
+  initialTab?: CampaignDetailTab;
 }
 
-export function CampaignDetailView({ campaignId }: CampaignDetailViewProps) {
+export function CampaignDetailView({ campaignId, initialTab = "general" }: CampaignDetailViewProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<CampaignDetailTab>(() =>
-    parseTab(searchParams.get("tab"))
-  );
+  const mounted = useMounted();
+  const [activeTab, setActiveTab] = useState<CampaignDetailTab>(initialTab);
   const [campaign, setCampaign] = useState<VoiceCampaignRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,16 +70,14 @@ export function CampaignDetailView({ campaignId }: CampaignDetailViewProps) {
   const setTab = useCallback(
     (tab: CampaignDetailTab) => {
       setActiveTab(tab);
-      const qs = new URLSearchParams(searchParams.toString());
-      qs.set("tab", tab);
-      router.replace(`/dashboard/campaigns/${campaignId}?${qs.toString()}`, { scroll: false });
+      router.replace(`/dashboard/campaigns/${campaignId}?tab=${tab}`, { scroll: false });
     },
-    [router, campaignId, searchParams]
+    [router, campaignId]
   );
 
   useEffect(() => {
-    setActiveTab(parseTab(searchParams.get("tab")));
-  }, [searchParams]);
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -105,6 +94,12 @@ export function CampaignDetailView({ campaignId }: CampaignDetailViewProps) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!campaign || campaign.status !== "active") return;
+    const id = window.setInterval(() => void load(), 60_000);
+    return () => window.clearInterval(id);
+  }, [campaign?.status, load]);
 
   const handleSave = async () => {
     if (!campaign) return;
@@ -151,7 +146,14 @@ export function CampaignDetailView({ campaignId }: CampaignDetailViewProps) {
       setError("Pausa la campaña antes de reiniciar los contactos.");
       return;
     }
-    if (!window.confirm("¿Reiniciar todos los contactos a pendiente? El historial de llamadas se conserva.")) {
+    const isNewRound = campaign.status === "completed";
+    if (
+      !window.confirm(
+        isNewRound
+          ? "¿Iniciar una nueva ronda? Todos los contactos volverán a pendiente. El historial de llamadas se conserva."
+          : "¿Reiniciar todos los contactos a pendiente? El historial de llamadas se conserva."
+      )
+    ) {
       return;
     }
     setResetting(true);
@@ -164,6 +166,7 @@ export function CampaignDetailView({ campaignId }: CampaignDetailViewProps) {
       setError(json.error ?? "No se pudo reiniciar");
       return;
     }
+    if (json.campaign) setCampaign(json.campaign);
     setResetMsg(json.message ?? "Contactos reiniciados.");
   };
 
@@ -205,7 +208,7 @@ export function CampaignDetailView({ campaignId }: CampaignDetailViewProps) {
   }
 
   const statusLabel = CAMPAIGN_STATUS_LABELS[campaign.status];
-  const scheduleLive = describeCampaignScheduleNow(campaign.schedule_config);
+  const scheduleLive = mounted ? describeCampaignScheduleNow(campaign.schedule_config) : null;
   const isConfigTab = CAMPAIGN_CONFIG_TABS.includes(activeTab);
 
   return (
@@ -247,7 +250,7 @@ export function CampaignDetailView({ campaignId }: CampaignDetailViewProps) {
                   onClick={() => void resetAudience()}
                   disabled={resetting}
                   className="inline-flex items-center gap-2 rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white hover:bg-white/[.08] disabled:opacity-50"
-                  title="Vuelve todos los contactos a pendiente para una nueva ronda de prueba"
+                  title="Vuelve todos los contactos a pendiente para una nueva ronda"
                 >
                   {resetting ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -269,6 +272,22 @@ export function CampaignDetailView({ campaignId }: CampaignDetailViewProps) {
               )}
             </button>
             </>
+          )}
+          {campaign.status === "completed" && (
+            <button
+              type="button"
+              onClick={() => void resetAudience()}
+              disabled={resetting}
+              className={`${btnPrimary} gap-2`}
+              title="Reinicia la audiencia y deja la campaña pausada para una nueva ronda"
+            >
+              {resetting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RotateCcw className="w-4 h-4" />
+              )}
+              {resetting ? "Preparando…" : "Nueva ronda"}
+            </button>
           )}
           {isConfigTab && (
             <button
@@ -309,7 +328,15 @@ export function CampaignDetailView({ campaignId }: CampaignDetailViewProps) {
         })}
       </div>
 
-      {campaign.status === "active" && !scheduleLive.in_schedule && (
+      {campaign.status === "completed" && (
+        <div className="mx-6 mt-4 p-3 rounded-xl bg-[#5b5bf6]/10 border border-[#5b5bf6]/25 text-xs text-[#c8c8ff] shrink-0">
+          <strong className="font-medium">Campaña finalizada.</strong>{" "}
+          Todos los contactos fueron procesados
+          {campaign.completed_at ? ` el ${formatDatetimeCol(campaign.completed_at)}` : ""}
+          . Usa <strong className="font-medium">Nueva ronda</strong> para volver a marcar la misma audiencia; el historial de llamadas se conserva.
+        </div>
+      )}
+      {mounted && campaign.status === "active" && scheduleLive && !scheduleLive.in_schedule && (
         <div className="mx-6 mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 shrink-0">
           <strong className="font-medium">Marcador en pausa — fuera de horario.</strong>{" "}
           {scheduleLive.message} Hora local: {scheduleLive.local_time} · ventana {scheduleLive.window}.

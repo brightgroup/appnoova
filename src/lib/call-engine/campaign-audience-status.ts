@@ -1,5 +1,6 @@
 import { adminClient } from "@/lib/voice-agents-server";
 import { getCallEngineRules } from "@/lib/call-engine/platform-config";
+import { tryAutoCompleteCampaign } from "@/lib/call-engine/campaign-completion";
 import type { OutboundCallOutcome } from "@/lib/telephony/call-outcome";
 
 export type CampaignAudienceOutcome = "completed" | "retry" | "failed";
@@ -64,6 +65,7 @@ export async function syncCampaignAudienceAfterCall(input: {
       .from("campaign_audience_rows")
       .update({ call_status: "completed", updated_at: now })
       .eq("id", input.audienceRowId);
+    await tryAutoCompleteCampaign(input.campaignId);
     return;
   }
 
@@ -84,6 +86,8 @@ export async function syncCampaignAudienceAfterCall(input: {
     .from("campaign_audience_rows")
     .update({ call_status: "failed", updated_at: now })
     .eq("id", input.audienceRowId);
+
+  await tryAutoCompleteCampaign(input.campaignId);
 }
 
 /** Libera filas atascadas en "calling" tras un timeout. */

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/voice-agents-server";
 import { requireOrgModule } from "@/lib/module-auth";
+import { toVoiceCampaignRecord } from "@/lib/campaigns/record";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
 /**
- * POST — reinicia contactos de la campaña para una nueva ronda de prueba.
- * Requiere campaña pausada (flujo profesional: pausar → reiniciar → reanudar).
+ * POST — reinicia contactos para una nueva ronda.
+ * Requiere campaña pausada o finalizada (no activa).
  */
 export async function POST(_req: NextRequest, ctx: RouteCtx) {
   const auth = await requireOrgModule(_req, "campaigns", "edit");
@@ -32,6 +33,15 @@ export async function POST(_req: NextRequest, ctx: RouteCtx) {
       {
         error: "Pausa la campaña antes de reiniciar los contactos.",
         code: "campaign_active",
+      },
+      { status: 400 }
+    );
+  }
+  if (campaign.status === "draft") {
+    return NextResponse.json(
+      {
+        error: "Activa la campaña primero; los contactos ya están en pendiente.",
+        code: "campaign_draft",
       },
       { status: 400 }
     );
@@ -63,9 +73,23 @@ export async function POST(_req: NextRequest, ctx: RouteCtx) {
     if (!upErr) updated += 1;
   }
 
+  const { data: refreshed, error: campErr } = await db
+    .from("voice_campaigns")
+    .update({
+      status: "paused",
+      completed_at: null,
+      updated_at: now,
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (campErr) return NextResponse.json({ error: campErr.message }, { status: 500 });
+
   return NextResponse.json({
     ok: true,
     reset_rows: updated,
-    message: `${updated} contacto(s) listos para marcar. Reanuda la campaña cuando quieras iniciar.`,
+    campaign: toVoiceCampaignRecord(refreshed),
+    message: `${updated} contacto(s) listos para marcar. Reanuda la campaña cuando quieras iniciar la nueva ronda.`,
   });
 }

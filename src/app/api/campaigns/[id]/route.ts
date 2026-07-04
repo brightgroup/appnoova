@@ -63,6 +63,16 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
   const existing = await loadCampaign(id, auth.organizationId);
   if (!existing) return NextResponse.json({ error: "Campaña no encontrada" }, { status: 404 });
 
+  if (body.status === "active" && existing.status === "completed") {
+    return NextResponse.json(
+      {
+        error: "Reinicia los contactos antes de reactivar una campaña finalizada.",
+        code: "campaign_completed",
+      },
+      { status: 400 }
+    );
+  }
+
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (body.name !== undefined) patch.name = body.name.trim();
   if (body.goal !== undefined) patch.goal = body.goal?.trim() || null;
@@ -74,7 +84,12 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
   if (body.prompt_template !== undefined) {
     patch.prompt_template = body.prompt_template?.trim() ? body.prompt_template : null;
   }
-  if (body.status !== undefined) patch.status = body.status;
+  if (body.status !== undefined) {
+    patch.status = body.status;
+    if (body.status === "active" && existing.status !== "active") {
+      patch.completed_at = null;
+    }
+  }
 
   const db = adminClient();
   const { data, error } = await db
