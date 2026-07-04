@@ -7,7 +7,12 @@ import { resolvePlatformSipConfig } from "@/lib/elevenlabs/sip-config";
 import { billingBlockedMessage, checkBillingForOrg } from "@/lib/billing/meter";
 import { releaseStuckCampaignRows } from "@/lib/call-engine/campaign-audience-status";
 import { syncOpenElevenLabsCampaignCalls, syncStuckCampaignScreeningCalls } from "@/lib/elevenlabs/sync-open-campaign-calls";
-import { createCampaignOutboundCallSession } from "@/lib/call-engine/campaign-call-session";
+import {
+  bindCampaignCallControlId,
+  cancelReservedCampaignCall,
+  createCampaignOutboundCallSession,
+} from "@/lib/call-engine/campaign-call-session";
+import { countCampaignDialerActiveSlots } from "@/lib/call-engine/dialer-lock";
 import { getCallEngineRules, type CallEngineRules } from "@/lib/call-engine/platform-config";
 import { campaignLocalDateKey, isCampaignInSchedule } from "@/lib/call-engine/campaign-schedule";
 import { buildCampaignCallPrompt } from "@/lib/campaigns/render-prompt";
@@ -17,6 +22,7 @@ import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import { telnyxPlaceCall } from "@/lib/telephony/telnyx-call-control";
 import { adminClient } from "@/lib/voice-agents-server";
 import type { CampaignAudienceTableRecord } from "@/types/voice-campaign";
+import { randomUUID } from "crypto";
 
 export interface DialerTickResult {
   ok: boolean;
@@ -43,17 +49,7 @@ interface EligibleRow {
 }
 
 async function countActiveCampaignCalls(db: ReturnType<typeof adminClient>): Promise<number> {
-  const { count, error } = await db
-    .from("voice_agent_calls")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "in_progress")
-    .not("campaign_id", "is", null);
-
-  if (error) {
-    console.error("[campaign-dialer] count active:", error.message);
-    return 0;
-  }
-  return count ?? 0;
+  return countCampaignDialerActiveSlots(db);
 }
 
 function rowEligibleForDial(
@@ -193,6 +189,25 @@ async function placeCampaignCall(input: {
 
   const destination = row.phone_e164.trim();
   const contactName = row.contact_name?.trim() || destination;
+  const reserveId = `pending:${randomUUID()}`;
+
+  const reserveSession = async (voiceProvider: "google" | "elevenlabs", from: string) => {
+    return createCampaignOutboundCallSession({
+      userId: campaign.user_id,
+      voiceAgentId: campaign.voice_agent_id!,
+      callControlId: reserveId,
+      phoneNumberId: phone.id,
+      campaignId: campaign.id,
+      campaignAudienceRowId: row.id,
+      from,
+      to: destination,
+      agentName: loaded.agentName,
+      contactName,
+      campaignName: campaign.name,
+      voiceProvider,
+      promptOverride: campaignPrompt,
+    });
+  };
 
   if (loaded.config.voice_provider === "elevenlabs") {
     if (!agentRow.elevenlabs_agent_id) {
@@ -215,29 +230,20 @@ async function placeCampaignCall(input: {
       companyContextText: loaded.companyContextText,
     });
 
-    const { conversationId } = await placeElevenLabsOutboundCall({
-      agentId: agentRow.elevenlabs_agent_id,
-      toE164: destination,
-      agentPhoneNumberId: line.phoneNumberId,
-      systemPromptOverride,
-      campaignOutbound: true,
-    });
-
-    await createCampaignOutboundCallSession({
-      userId: campaign.user_id,
-      voiceAgentId: campaign.voice_agent_id,
-      callControlId: conversationId,
-      phoneNumberId: phone.id,
-      campaignId: campaign.id,
-      campaignAudienceRowId: row.id,
-      from: line.e164 ?? phone.e164,
-      to: destination,
-      agentName: loaded.agentName,
-      contactName,
-      campaignName: campaign.name,
-      voiceProvider: "elevenlabs",
-      promptOverride: campaignPrompt,
-    });
+    const callId = await reserveSession("elevenlabs", line.e164 ?? phone.e164);
+    try {
+      const { conversationId } = await placeElevenLabsOutboundCall({
+        agentId: agentRow.elevenlabs_agent_id,
+        toE164: destination,
+        agentPhoneNumberId: line.phoneNumberId,
+        systemPromptOverride,
+        campaignOutbound: true,
+      });
+      await bindCampaignCallControlId(callId, conversationId);
+    } catch (err) {
+      await cancelReservedCampaignCall(callId);
+      throw err;
+    }
     return;
   }
 
@@ -260,29 +266,20 @@ async function placeCampaignCall(input: {
     destination_e164: destination,
   };
 
-  const { callControlId } = await telnyxPlaceCall({
-    connectionId,
-    from: phone.e164,
-    to: destination,
-    clientState,
-    timeoutSecs: rules.ring_timeout_seconds,
-  });
-
-  await createCampaignOutboundCallSession({
-    userId: campaign.user_id,
-    voiceAgentId: campaign.voice_agent_id,
-    callControlId,
-    phoneNumberId: phone.id,
-    campaignId: campaign.id,
-    campaignAudienceRowId: row.id,
-    from: phone.e164,
-    to: destination,
-    agentName: loaded.agentName,
-    contactName,
-    campaignName: campaign.name,
-    voiceProvider: "google",
-    promptOverride: campaignPrompt,
-  });
+  const callId = await reserveSession("google", phone.e164);
+  try {
+    const { callControlId } = await telnyxPlaceCall({
+      connectionId,
+      from: phone.e164,
+      to: destination,
+      clientState,
+      timeoutSecs: rules.ring_timeout_seconds,
+    });
+    await bindCampaignCallControlId(callId, callControlId);
+  } catch (err) {
+    await cancelReservedCampaignCall(callId);
+    throw err;
+  }
 }
 
 export async function runCampaignDialerTick(): Promise<DialerTickResult> {
@@ -423,8 +420,17 @@ async function executeCampaignDialerTick(): Promise<DialerTickResult> {
   for (const { campaign, row, table } of candidates) {
     if (placed >= batchLimit) break;
 
+    const slotsNow = await countActiveCampaignCalls(db);
+    if (slotsNow >= rules.max_concurrent) break;
+
     const claimed = await claimAudienceRow(db, row.id);
     if (!claimed) continue;
+
+    const slotsAfterClaim = await countActiveCampaignCalls(db);
+    if (slotsAfterClaim >= rules.max_concurrent) {
+      await revertClaimedRow(db, row.id, rules);
+      break;
+    }
 
     try {
       await placeCampaignCall({ campaign, row: claimed, audienceTable: table, rules });

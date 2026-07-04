@@ -89,6 +89,46 @@ export async function createCampaignOutboundCallSession(input: {
   return data.id as string;
 }
 
+export async function bindCampaignCallControlId(
+  callId: string,
+  callControlId: string,
+  metaPatch?: Record<string, unknown>
+): Promise<void> {
+  const db = adminClient();
+  const { data: row, error: fetchErr } = await db
+    .from("voice_agent_calls")
+    .select("metadata")
+    .eq("id", callId)
+    .maybeSingle();
+
+  if (fetchErr || !row) {
+    throw new Error(fetchErr?.message ?? "Sesión de llamada no encontrada");
+  }
+
+  const prev = (row.metadata ?? {}) as Record<string, unknown>;
+  const isPremium = prev.voice_provider === "elevenlabs";
+
+  const { error } = await db
+    .from("voice_agent_calls")
+    .update({
+      metadata: {
+        ...prev,
+        ...metaPatch,
+        call_control_id: callControlId,
+        ...(isPremium ? { conversation_id: callControlId } : {}),
+        last_event: isPremium ? "elevenlabs.dialing" : "call.dialing",
+      },
+    })
+    .eq("id", callId);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function cancelReservedCampaignCall(callId: string): Promise<void> {
+  const db = adminClient();
+  await db.from("voice_agent_calls").delete().eq("id", callId);
+}
+
 export function campaignLabelForPhase(phase: PhoneTestCallPhase): string {
   switch (phase) {
     case "dialing":

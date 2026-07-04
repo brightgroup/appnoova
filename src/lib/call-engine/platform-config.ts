@@ -64,12 +64,13 @@ export async function saveSetting(
   db: Db,
   key: string,
   value: unknown,
-  updatedBy: string
+  updatedBy?: string | null
 ): Promise<void> {
-  await db.from("platform_settings").upsert({
+  const { error } = await db.from("platform_settings").upsert({
     key,
     value: value as Record<string, unknown>,
     updated_at: new Date().toISOString(),
-    updated_by: updatedBy,
+    updated_by: updatedBy ?? null,
   });
+  if (error) throw new Error(error.message);
 }

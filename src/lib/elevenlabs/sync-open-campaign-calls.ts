@@ -80,6 +80,7 @@ export async function syncOpenElevenLabsCampaignCalls(): Promise<number> {
     if (meta.el_deferred_amd && !meta.conversation_id) continue;
 
     const conversationId = String(meta.conversation_id ?? meta.call_control_id ?? "").trim();
+    if (conversationId.startsWith("pending:")) continue;
     const isElevenLabs =
       meta.voice_provider === "elevenlabs" ||
       conversationId.startsWith("conv_");
