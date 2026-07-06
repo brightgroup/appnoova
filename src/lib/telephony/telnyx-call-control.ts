@@ -135,6 +135,26 @@ export async function telnyxStartMediaStream(callControlId: string, streamUrl: s
   });
 }
 
+export type TelnyxAmdMode = "detect" | "premium";
+export type TelnyxAmdProfile = "default" | "campaign_strict";
+
+const AMD_CONFIG: Record<TelnyxAmdProfile, Record<string, number>> = {
+  default: {
+    total_analysis_time_millis: 4500,
+    initial_silence_millis: 1200,
+    after_greeting_silence_millis: 800,
+    greeting_duration_millis: 1800,
+    maximum_number_of_words: 6,
+  },
+  campaign_strict: {
+    total_analysis_time_millis: 7000,
+    initial_silence_millis: 1600,
+    after_greeting_silence_millis: 1000,
+    greeting_duration_millis: 2800,
+    maximum_number_of_words: 5,
+  },
+};
+
 export async function telnyxPlaceCall(params: {
   connectionId: string;
   from: string;
@@ -142,6 +162,10 @@ export async function telnyxPlaceCall(params: {
   clientState?: Record<string, unknown>;
   /** Activa detección de buzón (AMD). Por defecto true en salientes. */
   amd?: boolean;
+  /** detect = estándar; premium = ML Telnyx (recomendado campañas). */
+  amdMode?: TelnyxAmdMode;
+  /** Perfil de sensibilidad AMD. campaign_strict reduce falsos "humano". */
+  amdProfile?: TelnyxAmdProfile;
   /** Segundos de timbre antes de colgar. Por defecto 45. */
   timeoutSecs?: number;
 }): Promise<{ callControlId: string }> {
@@ -156,14 +180,9 @@ export async function telnyxPlaceCall(params: {
 
   const enableAmd = params.amd !== false;
   if (enableAmd) {
-    body.answering_machine_detection = "detect";
-    body.answering_machine_detection_config = {
-      total_analysis_time_millis: 4500,
-      initial_silence_millis: 1200,
-      after_greeting_silence_millis: 800,
-      greeting_duration_millis: 1800,
-      maximum_number_of_words: 6,
-    };
+    const profile = params.amdProfile ?? "default";
+    body.answering_machine_detection = params.amdMode === "premium" ? "premium" : "detect";
+    body.answering_machine_detection_config = AMD_CONFIG[profile];
   }
 
   if (params.clientState) {

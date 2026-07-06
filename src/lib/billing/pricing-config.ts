@@ -10,6 +10,7 @@ import {
   type UnitPriceMeta,
 } from "@/lib/billing/pricing-defaults";
 import type { UsageEventType } from "@/lib/billing/pricing-types";
+import { syncOfficialTrm } from "@/lib/billing/trm-colombia";
 
 export interface PricingConfig {
   trmCop: number;
@@ -25,7 +26,10 @@ export interface PricingConfig {
 let activeConfig: PricingConfig = buildFromDefaults();
 let cacheExpiresAt = 0;
 let cachedRevision = 0;
+let lastTrmSyncAttemptAt = 0;
 const CACHE_TTL_MS = 5_000;
+/** Sincroniza TRM oficial como máximo cada hora antes de cobrar. */
+const TRM_SYNC_INTERVAL_MS = 60 * 60 * 1000;
 
 function defaultUnitPriceUsd(): Record<UsageEventType, number> {
   const map = { ...DEFAULT_CREDIT_COST } as Record<UsageEventType, number>;
@@ -131,9 +135,19 @@ export async function refreshPricingConfig(db: SupabaseClient): Promise<PricingC
 }
 
 export async function ensurePricingConfig(db: SupabaseClient): Promise<PricingConfig> {
+  const now = Date.now();
+  if (now - lastTrmSyncAttemptAt >= TRM_SYNC_INTERVAL_MS) {
+    lastTrmSyncAttemptAt = now;
+    try {
+      await syncOfficialTrm(db);
+    } catch (err) {
+      console.warn("[billing] TRM sync:", err instanceof Error ? err.message : err);
+    }
+  }
+
   const { getPricingRevision } = await import("@/lib/billing/pricing-revision");
   const revision = await getPricingRevision(db);
-  if (revision !== cachedRevision || Date.now() >= cacheExpiresAt) {
+  if (revision !== cachedRevision || now >= cacheExpiresAt) {
     return refreshPricingConfig(db);
   }
   return activeConfig;

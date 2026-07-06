@@ -3,6 +3,7 @@ import { requireSuperAdmin } from "@/lib/admin-server";
 import { adminClient } from "@/lib/voice-agents-server";
 import { refreshPricingConfig } from "@/lib/billing/pricing-config";
 import { publishPricingChange } from "@/lib/billing/pricing-revision";
+import { recalculateUnitPricesFromCopReference } from "@/lib/billing/recalculate-unit-prices-from-trm";
 import { creditsPerUsdFromTiers } from "@/lib/billing/plan-credits";
 import { syncOfficialTrm } from "@/lib/billing/trm-colombia";
 import { usdPriceFromCredits } from "@/lib/billing/credit-usd";
@@ -99,13 +100,15 @@ export async function PATCH(req: NextRequest) {
     if (!Number.isFinite(trm) || trm <= 0) {
       return NextResponse.json({ error: "TRM inválida" }, { status: 400 });
     }
+    const now = new Date().toISOString();
     const { error } = await db.from("billing_settings").upsert({
       key: "trm_cop",
       value: trm,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
       updated_by: auth.userId,
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await recalculateUnitPricesFromCopReference(db, trm, auth.userId);
   }
 
   const revision = await publishPricingChange(db, auth.userId);

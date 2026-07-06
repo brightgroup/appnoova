@@ -28,14 +28,31 @@ export function isMachineAmdResult(result: string): boolean {
   return r === "machine" || r === "fax_detected" || r === "silence";
 }
 
+/** Solo resultados humanos claros — para campañas premium (evita conectar IA en duda). */
+export function isHumanAmdResultStrict(result: string): boolean {
+  const r = result.toLowerCase();
+  return r === "human" || r === "human_residence" || r === "human_business";
+}
+
+export function isAmbiguousAmdResult(result: string): boolean {
+  return result.toLowerCase() === "not_sure";
+}
+
 export function isHumanAmdResult(result: string): boolean {
   const r = result.toLowerCase();
   return (
     r === "human" ||
     r === "human_residence" ||
     r === "human_business" ||
-    r === "not_sure" // Telnyx recomienda tratar not_sure como humano
+    r === "not_sure" // Telnyx recomienda tratar not_sure como humano (CRM/prueba)
   );
+}
+
+/** Campaña saliente premium: máquina, silencio, fax o resultado ambiguo → no conectar ElevenLabs. */
+export function shouldSkipAgentForCampaignAmd(result: string): boolean {
+  if (isMachineAmdResult(result)) return true;
+  if (isAmbiguousAmdResult(result)) return true;
+  return !isHumanAmdResultStrict(result);
 }
 
 export function outcomeStatusLabel(outcome: OutboundCallOutcome): string {

@@ -3,10 +3,14 @@ import { adminClient } from "@/lib/voice-agents-server";
 import { refreshPricingConfig } from "@/lib/billing/pricing-config";
 import { creditsFromUsdPrice } from "@/lib/billing/credit-usd";
 import { getPricingRevision } from "@/lib/billing/pricing-revision";
+import { syncOfficialTrm } from "@/lib/billing/trm-colombia";
 
 /** GET — catálogo público de precios al cliente (para UI y cotizadores). */
 export async function GET() {
   const db = adminClient();
+  await syncOfficialTrm(db).catch(err => {
+    console.warn("[pricing/catalog] TRM sync:", err instanceof Error ? err.message : err);
+  });
   const [config, revision] = await Promise.all([
     refreshPricingConfig(db),
     getPricingRevision(db),
@@ -35,6 +39,8 @@ export async function GET() {
     })),
     voice_standard_per_min: creditsFromUsdPrice(config.unitPriceUsd.voice ?? 0),
     voice_premium_per_min: creditsFromUsdPrice(config.unitPriceUsd.voice_premium ?? 0),
+    voice_voicemail: creditsFromUsdPrice(config.unitPriceUsd.voice_voicemail ?? 0),
+    voice_no_answer: creditsFromUsdPrice(config.unitPriceUsd.voice_no_answer ?? 0),
     plans: (plans ?? []).map((p) => ({
       id: String(p.id),
       name: String(p.name),

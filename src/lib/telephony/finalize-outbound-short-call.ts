@@ -15,10 +15,11 @@ import {
   resolveCampaignContextFromSession,
   syncCampaignAudienceAfterCall,
 } from "@/lib/call-engine/campaign-audience-status";
+import { chargeVoiceAttempt, resolveOrgIdForUser } from "@/lib/billing/meter";
 
 /**
- * Finaliza llamadas salientes cortas (buzón, no contestada, ocupado)
- * sin activar el agente ni cobrar créditos de conversación.
+ * Finaliza llamadas salientes cortas (buzón, no contestada, ocupado).
+ * Cobra tarifa fija por intento (voice_voicemail / voice_no_answer).
  */
 export async function finalizeOutboundShortCall(input: {
   callControlId: string;
@@ -105,6 +106,25 @@ export async function finalizeOutboundShortCall(input: {
         }),
       });
     }
+  }
+
+  const orgId = await resolveOrgIdForUser(db, session.user_id);
+  if (orgId) {
+    const attemptType = isVoicemail ? "voice_voicemail" : "voice_no_answer";
+    await chargeVoiceAttempt({
+      db,
+      organizationId: orgId,
+      userId: session.user_id,
+      callId: session.id,
+      eventType: attemptType,
+      voiceAgentId: session.voice_agent_id,
+      metadata: {
+        outcome: input.outcome,
+        amd_result: input.amdResult ?? null,
+        campaign_outbound: isCampaign,
+        agent_skipped: true,
+      },
+    });
   }
 
   console.info("[finalize-short-call] ok", {

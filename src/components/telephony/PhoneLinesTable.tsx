@@ -1,6 +1,6 @@
 "use client";
 
-import { Phone, Trash2, Loader2 } from "lucide-react";
+import { Phone, Trash2, Loader2, ArrowRightLeft } from "lucide-react";
 import {
   registryRowIcon, registryTable, registryTableHead, registryTableHeadRow,
   registryTableHeadCell, registryTableRow, registryTableCell, registryTableCellFirst,
@@ -28,6 +28,7 @@ interface PhoneLinesTableProps {
   loading?: boolean;
   emptyMessage?: string;
   onRelease?: (id: string, e164: string) => void;
+  onTransfer?: (row: PhoneLineRow) => void;
   releasingId?: string | null;
 }
 
@@ -37,6 +38,7 @@ export function PhoneLinesTable({
   loading,
   emptyMessage = "No hay líneas todavía.",
   onRelease,
+  onTransfer,
   releasingId
 }: PhoneLinesTableProps) {
   if (loading) {
@@ -68,7 +70,7 @@ export function PhoneLinesTable({
           {mode === "admin" && <th className={registryTableHeadCell}>Agente</th>}
           <th className={registryTableHeadCell}>Proveedor</th>
           <th className={registryTableHeadCell}>Estado</th>
-          {mode === "admin" && onRelease && (
+          {mode === "admin" && (onRelease || onTransfer) && (
             <th className={`${registryTableHeadCell} text-right`}>Acciones</th>
           )}
         </tr>
@@ -107,20 +109,37 @@ export function PhoneLinesTable({
                   {row.status}
                 </span>
               </td>
-              {mode === "admin" && onRelease && (
+              {mode === "admin" && (onRelease || onTransfer) && (
                 <td className={registryTableCellRight}>
-                  <button
-                    onClick={e => { e.stopPropagation(); onRelease(row.id, row.e164); }}
-                    disabled={releasingId === row.id}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-                  >
-                    {releasingId === row.id ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-3 h-3" />
+                  <div className="inline-flex items-center gap-1">
+                    {onTransfer && (
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          onTransfer(row);
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-[#5b5bf6] hover:bg-[#5b5bf6]/10"
+                        title="Transferir a otro cliente"
+                      >
+                        <ArrowRightLeft className="w-3 h-3" />
+                        Transferir
+                      </button>
                     )}
-                    Liberar
-                  </button>
+                    {onRelease && (
+                      <button
+                        onClick={e => { e.stopPropagation(); onRelease(row.id, row.e164); }}
+                        disabled={releasingId === row.id}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                      >
+                        {releasingId === row.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3 h-3" />
+                        )}
+                        Liberar
+                      </button>
+                    )}
+                  </div>
                 </td>
               )}
             </tr>

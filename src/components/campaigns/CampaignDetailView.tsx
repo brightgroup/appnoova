@@ -19,6 +19,7 @@ import {
   Rocket,
   ChevronLeft,
   RotateCcw,
+  Copy,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -70,6 +71,7 @@ export function CampaignDetailView({ campaignId, initialTab = "general" }: Campa
   const [saved, setSaved] = useState(true);
   const [activating, setActivating] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const [resetMsg, setResetMsg] = useState("");
   const [error, setError] = useState("");
 
@@ -179,6 +181,28 @@ export function CampaignDetailView({ campaignId, initialTab = "general" }: Campa
     setResetMsg(json.message ?? "Contactos reiniciados.");
   };
 
+  const duplicateCampaign = async () => {
+    if (!campaign) return;
+    const suggested = `${campaign.name.trim()} (copia)`;
+    const name = window.prompt("Nombre de la campaña duplicada", suggested);
+    if (!name?.trim()) return;
+
+    setDuplicating(true);
+    setError("");
+    const res = await authFetch(`/api/campaigns/${campaignId}/duplicate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim() }),
+    });
+    const json = await res.json();
+    setDuplicating(false);
+    if (!res.ok) {
+      setError(json.error ?? "No se pudo duplicar la campaña");
+      return;
+    }
+    router.push(`/dashboard/campaigns/${json.campaign.id}?tab=audiencia`);
+  };
+
   const activateDraft = async () => {
     if (!campaign) return;
     setActivating(true);
@@ -240,6 +264,20 @@ export function CampaignDetailView({ campaignId, initialTab = "general" }: Campa
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => void duplicateCampaign()}
+            disabled={duplicating}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white hover:bg-white/[.08] disabled:opacity-50"
+            title="Copia agente, guion, campos y programación (sin contactos)"
+          >
+            {duplicating ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Copy className="w-4 h-4" />
+            )}
+            Duplicar
+          </button>
           {campaign.status === "draft" && (
             <button
               type="button"

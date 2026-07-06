@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { publishPricingChange } from "@/lib/billing/pricing-revision";
+import { recalculateUnitPricesFromCopReference } from "@/lib/billing/recalculate-unit-prices-from-trm";
 import { DEFAULT_TRM_COP } from "@/lib/billing/pricing-defaults";
 
 const TRM_DATASET_URL = "https://www.datos.gov.co/resource/32sa-8pi3.json";
@@ -108,7 +109,7 @@ export async function syncOfficialTrm(
     ];
     const { error } = await db.from("billing_settings").upsert(rows, { onConflict: "key" });
     if (error) throw new Error(error.message);
-    await publishPricingChange(db, options?.userId);
+    await recalculateUnitPricesFromCopReference(db, quote.trmCop, options?.userId);
   }
 
   return {

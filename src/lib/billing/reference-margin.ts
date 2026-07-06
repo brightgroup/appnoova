@@ -19,6 +19,8 @@ const REFERENCE_USAGE: Record<UsageEventType, ReferenceUsageProfile> = {
   whatsapp_ai: { twilioMessages: 2, geminiModel: "flash", promptTokens: 900, completionTokens: 650 },
   voice: { voiceMinutes: 1 },
   voice_premium: { voiceMinutes: 1, voicePremium: true },
+  voice_voicemail: { voiceMinutes: 0.05, voicePremium: true },
+  voice_no_answer: { voiceMinutes: 0.03 },
   doc_scan: { geminiModel: "pro", promptTokens: 2200, completionTokens: 1600 },
   form_fill: { geminiModel: "flash", promptTokens: 1100, completionTokens: 850 },
   quote: { geminiModel: "pro", promptTokens: 1600, completionTokens: 1300 },

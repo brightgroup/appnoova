@@ -281,6 +281,8 @@ async function placeCampaignCall(input: {
         to: destination,
         clientState,
         timeoutSecs: rules.ring_timeout_seconds,
+        amdMode: "premium",
+        amdProfile: "campaign_strict",
       });
       await bindCampaignCallControlId(callId, callControlId);
     } catch (err) {

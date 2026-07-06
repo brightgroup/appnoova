@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-server";
 import { getTelephonyProvider } from "@/lib/telephony";
+import { transferPhoneLineToUser } from "@/lib/telephony/transfer-phone-line";
 import { adminClient } from "@/lib/voice-agents-server";
 
 /** GET — lista números (todos o filtrados por user_id). */
@@ -27,19 +28,39 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ phone_numbers: data ?? [] });
 }
 
-/** PATCH — reasignar agente. Body: { id, voice_agent_id } */
+/** PATCH — reasignar agente o transferir línea a otro cliente. Body: { id, voice_agent_id?, user_id? } */
 export async function PATCH(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json();
-  const { id, voice_agent_id } = body as { id?: string; voice_agent_id?: string | null };
+  const { id, voice_agent_id, user_id } = body as {
+    id?: string;
+    voice_agent_id?: string | null;
+    user_id?: string;
+  };
   if (!id) return NextResponse.json({ error: "id requerido" }, { status: 400 });
 
   const db = adminClient();
   const { data: phone } = await db.from("phone_numbers").select("*").eq("id", id).maybeSingle();
   if (!phone || phone.status !== "active") {
     return NextResponse.json({ error: "Número no encontrado" }, { status: 404 });
+  }
+
+  if (user_id && user_id !== phone.user_id) {
+    try {
+      const transferred = await transferPhoneLineToUser({
+        db,
+        phoneId: id,
+        targetUserId: user_id,
+        voiceAgentId: voice_agent_id !== undefined ? voice_agent_id : phone.voice_agent_id,
+        assignedBy: auth.userId,
+      });
+      return NextResponse.json({ phone_number: transferred });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Error al transferir línea";
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
   }
 
   if (voice_agent_id) {

@@ -1,5 +1,5 @@
 import { adminClient } from "@/lib/voice-agents-server";
-import { chargeVoiceCall, resolveOrgIdForUser } from "@/lib/billing/meter";
+import { chargeVoiceCall, chargeVoiceAttempt, resolveOrgIdForUser } from "@/lib/billing/meter";
 import {
   conversationIsVoicemail,
   loadElevenLabsConversationForFinalize,
@@ -93,6 +93,25 @@ async function finalizeAsVoicemail(input: {
         disposition: "voicemail",
       });
     }
+  }
+
+  const orgId = await resolveOrgIdForUser(db, session.user_id);
+  if (orgId) {
+    await chargeVoiceAttempt({
+      db,
+      organizationId: orgId,
+      userId: session.user_id,
+      callId: session.id,
+      eventType: "voice_voicemail",
+      voiceAgentId: session.voice_agent_id,
+      metadata: {
+        outcome: "voicemail",
+        conversation_id: conversationId,
+        campaign_outbound: kind === "campaign",
+        agent_skipped: true,
+        el_voicemail_after_connect: true,
+      },
+    });
   }
 }
 

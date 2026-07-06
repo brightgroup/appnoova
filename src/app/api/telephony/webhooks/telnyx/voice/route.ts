@@ -16,9 +16,12 @@ import {
 import { finalizePhoneTestCall } from "@/lib/telephony/finalize-phone-test-call";
 import { finalizeOutboundShortCall } from "@/lib/telephony/finalize-outbound-short-call";
 import {
+  isAmbiguousAmdResult,
   isHumanAmdResult,
+  isHumanAmdResultStrict,
   isMachineAmdResult,
   mapHangupCauseToOutcome,
+  shouldSkipAgentForCampaignAmd,
 } from "@/lib/telephony/call-outcome";
 import { finalizeInboundTelnyxCall } from "@/lib/telephony/finalize-inbound-call";
 import {
@@ -75,7 +78,27 @@ function scheduleAmdBridgeFallback(
         amdFallbackTimers.delete(callId);
         const session = await getPhoneTestCallSession(callId);
         if (!session?.metadata.amd_pending || session.metadata.finalized) return;
-        // Telnyx recomienda tratar timeout AMD como humano — conectar agente (Gemini).
+
+        const meta = session.metadata as unknown as Record<string, unknown>;
+        const campaignStrict =
+          meta.campaign_outbound === true && meta.el_deferred_amd === true;
+
+        if (campaignStrict) {
+          console.warn("[telnyx:voice] AMD sin respuesta — campaña: colgar sin IA", { callId });
+          try {
+            await telnyxHangup(callId);
+          } catch (e) {
+            console.error("[telnyx:voice] hangup tras timeout AMD campaña:", e);
+          }
+          await finalizeOutboundShortCall({
+            callControlId: callId,
+            outcome: "no_answer",
+            disconnectReason: "AMD sin resultado — no se conectó agente premium",
+          });
+          return;
+        }
+
+        // CRM/prueba: Telnyx recomienda tratar timeout AMD como humano.
         console.warn("[telnyx:voice] AMD sin respuesta — conectando agente (timeout)", { callId });
         if (ctx) {
           await handleOutboundAnswered(callId, ctx.payload, ctx.from, ctx.to, ctx.direction);
@@ -98,17 +121,24 @@ async function handleAmdResult(
   const session = await getPhoneTestCallSession(callId);
   if (!session || session.metadata.finalized) return;
 
+  const sessionMeta = session.metadata as unknown as Record<string, unknown>;
+  const campaignStrict =
+    sessionMeta.campaign_outbound === true && sessionMeta.el_deferred_amd === true;
+
   await updatePhoneTestCallSession(callId, {
     amd_pending: false,
     amd_result: result,
     last_event: "call.machine.detection.ended",
-    status_label: isMachineAmdResult(result)
+    status_label: isMachineAmdResult(result) || (campaignStrict && shouldSkipAgentForCampaignAmd(result))
       ? "Buzón de voz detectado"
       : "Persona detectada — conectando agente",
   });
 
-  if (isMachineAmdResult(result)) {
-    await updatePhoneTestCallSession(callId, { voicemail_detected: true });
+  if (isMachineAmdResult(result) || (campaignStrict && shouldSkipAgentForCampaignAmd(result))) {
+    const outcome = isMachineAmdResult(result) || isAmbiguousAmdResult(result) ? "voicemail" : "no_answer";
+    await updatePhoneTestCallSession(callId, {
+      voicemail_detected: outcome === "voicemail",
+    });
     try {
       await telnyxHangup(callId);
     } catch (e) {
@@ -116,14 +146,18 @@ async function handleAmdResult(
     }
     await finalizeOutboundShortCall({
       callControlId: callId,
-      outcome: "voicemail",
-      disconnectReason: `Buzón de voz (${result})`,
+      outcome,
+      disconnectReason:
+        outcome === "voicemail"
+          ? `Buzón de voz (${result})`
+          : `Sin persona clara (${result})`,
       amdResult: result,
     });
     return;
   }
 
-  if (isHumanAmdResult(result)) {
+  const connectHuman = campaignStrict ? isHumanAmdResultStrict(result) : isHumanAmdResult(result);
+  if (connectHuman) {
     await handleOutboundAnswered(callId, payload, from, to, direction);
   }
 }

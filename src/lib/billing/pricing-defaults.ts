@@ -1,7 +1,7 @@
 import type { UsageEventType } from "@/lib/billing/pricing-types";
 
 /** Valores por defecto si la BD no tiene configuración. */
-export const DEFAULT_TRM_COP = 4200;
+export const DEFAULT_TRM_COP = 3350.68;
 export const DEFAULT_CREDIT_USD_VALUE = 0.0003;
 
 const trmRef = DEFAULT_TRM_COP;
@@ -17,6 +17,8 @@ export const DEFAULT_CREDIT_COST: Record<UsageEventType, number> = {
   whatsapp_manual: 30,
   voice: 900,
   voice_premium: 1200,
+  voice_voicemail: 270,
+  voice_no_answer: 100,
   doc_scan: 90,
   form_fill: 50,
   quote: 70,
@@ -26,6 +28,8 @@ export const DEFAULT_PROVIDER_RATES: Record<string, number> = {
   twilio_wa_per_msg: 0.005,
   voice_standard_per_min: 0.05,
   voice_premium_per_min: 0.12,
+  telnyx_amd_premium: 0.0065,
+  voice_attempt_telnyx: 0.012,
   gemini_flash_input_per_m: 0.3,
   gemini_flash_output_per_m: 2.5,
   gemini_pro_input_per_m: 1.25,
@@ -64,6 +68,8 @@ export const DEFAULT_UNIT_PRICE_META: UnitPriceMeta[] = [
   { event_type: "whatsapp_manual", label: "WhatsApp manual", description: "Sin IA", unit_label: "por mensaje", category: "whatsapp", price_usd: usdFromCopCredits(30), credits_cop: 30, sort_order: 31, is_active: true },
   { event_type: "voice", label: "Voz estándar", description: "Gemini Live + Telnyx", unit_label: "por minuto", category: "voice", price_usd: usdFromCopCredits(900), credits_cop: 900, sort_order: 40, is_active: true },
   { event_type: "voice_premium", label: "Voz premium", description: "ElevenLabs + Telnyx", unit_label: "por minuto", category: "voice", price_usd: usdFromCopCredits(1200), credits_cop: 1200, sort_order: 41, is_active: true },
+  { event_type: "voice_voicemail", label: "Buzón de voz", description: "Intento campaña — contestadora detectada", unit_label: "por intento", category: "voice", price_usd: usdFromCopCredits(270), credits_cop: 270, sort_order: 42, is_active: true },
+  { event_type: "voice_no_answer", label: "No contestada", description: "Intento campaña — sin respuesta u ocupado", unit_label: "por intento", category: "voice", price_usd: usdFromCopCredits(100), credits_cop: 100, sort_order: 43, is_active: true },
   { event_type: "doc_scan", label: "Escaneo de documento", description: null, unit_label: "por documento", category: "documents", price_usd: usdFromCopCredits(90), credits_cop: 90, sort_order: 50, is_active: true },
   { event_type: "form_fill", label: "Llenado de formulario", description: null, unit_label: "por formulario", category: "documents", price_usd: usdFromCopCredits(50), credits_cop: 50, sort_order: 51, is_active: true },
   { event_type: "quote", label: "Cotización", description: null, unit_label: "por cotización", category: "documents", price_usd: usdFromCopCredits(70), credits_cop: 70, sort_order: 52, is_active: true },
@@ -73,6 +79,8 @@ export const DEFAULT_PROVIDER_RATE_META: ProviderRateMeta[] = [
   { rate_key: "twilio_wa_per_msg", provider: "twilio", label: "Twilio WhatsApp", description: "Mensaje entrante o saliente", unit_label: "por mensaje", cost_usd: 0.005, sort_order: 10 },
   { rate_key: "voice_standard_per_min", provider: "telnyx", label: "Voz estándar", description: "Telnyx + Gemini Live", unit_label: "por minuto", cost_usd: 0.05, sort_order: 20 },
   { rate_key: "voice_premium_per_min", provider: "elevenlabs", label: "Voz premium ElevenLabs", description: "ElevenLabs Agents", unit_label: "por minuto", cost_usd: 0.12, sort_order: 21 },
+  { rate_key: "telnyx_amd_premium", provider: "telnyx", label: "AMD Premium Telnyx", description: "Detección buzón por llamada", unit_label: "por detección", cost_usd: 0.0065, sort_order: 22 },
+  { rate_key: "voice_attempt_telnyx", provider: "telnyx", label: "Intento saliente Telnyx", description: "Timbrado / conexión corta", unit_label: "por intento", cost_usd: 0.012, sort_order: 23 },
   { rate_key: "gemini_flash_input_per_m", provider: "google", label: "Gemini Flash entrada", description: null, unit_label: "por millón tokens", cost_usd: 0.3, sort_order: 30 },
   { rate_key: "gemini_flash_output_per_m", provider: "google", label: "Gemini Flash salida", description: null, unit_label: "por millón tokens", cost_usd: 2.5, sort_order: 31 },
   { rate_key: "gemini_pro_input_per_m", provider: "google", label: "Gemini Pro entrada", description: null, unit_label: "por millón tokens", cost_usd: 1.25, sort_order: 32 },

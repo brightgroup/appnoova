@@ -7,6 +7,8 @@ export type UsageEventType =
   | "whatsapp_manual"
   | "voice"
   | "voice_premium"
+  | "voice_voicemail"
+  | "voice_no_answer"
   | "doc_scan"
   | "form_fill"
   | "quote";

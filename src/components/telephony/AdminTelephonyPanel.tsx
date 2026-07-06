@@ -23,6 +23,7 @@ import {
 import { isPurchasedNumber, isVerifiedNumber } from "@/lib/telephony/number-type-labels";
 import { PhoneLineRequestsTable } from "@/components/telephony/PhoneLineRequestsTable";
 import { AdminBuyLineModal } from "@/components/telephony/AdminBuyLineModal";
+import { AdminTransferLineModal } from "@/components/telephony/AdminTransferLineModal";
 import type { PhoneNumberRecord } from "@/types/phone-number";
 import type { PhoneLineRequestAdminRow, PhoneLineRequestStatus } from "@/types/phone-line-request";
 
@@ -60,6 +61,7 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
   const [buyUserId, setBuyUserId] = useState<string | null>(preselectedUserId ?? null);
   const [attendRequestId, setAttendRequestId] = useState<string | null>(null);
   const [releasingId, setReleasingId] = useState<string | null>(null);
+  const [transferLine, setTransferLine] = useState<PhoneLineRow | null>(null);
   const [updatingRequestId, setUpdatingRequestId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -349,6 +351,7 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
                   : "Aún no hay líneas compradas. Usa «Comprar línea» para aprovisionar vía Telnyx."
               }
               onRelease={handleRelease}
+              onTransfer={row => setTransferLine(row)}
               releasingId={releasingId}
             />
           ) : (
@@ -364,6 +367,20 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
         </div>
       </div>
 
+      <AdminTransferLineModal
+        open={Boolean(transferLine)}
+        line={
+          transferLine
+            ? {
+                id: transferLine.id,
+                e164: transferLine.e164,
+                clientName: transferLine.clientName,
+              }
+            : null
+        }
+        onClose={() => setTransferLine(null)}
+        onSuccess={() => void load()}
+      />
       <AdminBuyLineModal
         open={showBuy}
         onClose={() => {

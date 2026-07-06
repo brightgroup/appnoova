@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Trash2, Check, X, Columns3, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Loader2, Plus, Trash2, Check, X, Columns3, Users, Upload } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { formatScheduledCol } from "@/lib/format-datetime";
 import { ExportMenu } from "@/components/ui/ExportMenu";
@@ -37,6 +37,7 @@ interface CampaignAudiencePanelProps {
 
 type CellValue = string | number | boolean | null;
 type AudienceSubTab = "contactos" | "mapeo";
+type EditField = string | "__contact_name__" | "__phone_e164__";
 
 function StatusBadge({ status }: { status: CampaignAudienceRowRecord["call_status"] }) {
   return (
@@ -55,9 +56,11 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
   const [tableName, setTableName] = useState("");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [editing, setEditing] = useState<{ rowId: string; key: string } | null>(null);
+  const [editing, setEditing] = useState<{ rowId: string; key: EditField } | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [importBusy, setImportBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -142,7 +145,7 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
     return counts;
   }, [rows]);
 
-  const startEdit = (rowId: string, key: string, current: CellValue) => {
+  const startEdit = (rowId: string, key: EditField, current: CellValue | string | null | undefined) => {
     setEditing({ rowId, key });
     setDraft(current == null ? "" : String(current));
   };
@@ -154,12 +157,23 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
       setEditing(null);
       return;
     }
-    const nextData = { ...row.data, [editing.key]: draft === "" ? null : draft };
+
     setBusy(true);
+    let body: Record<string, unknown> = { row_id: editing.rowId };
+
+    if (editing.key === "__contact_name__") {
+      body = { row_id: editing.rowId, contact_name: draft.trim() || null };
+    } else if (editing.key === "__phone_e164__") {
+      body = { row_id: editing.rowId, phone_e164: draft.trim() || null };
+    } else {
+      const nextData = { ...row.data, [editing.key]: draft === "" ? null : draft };
+      body = { row_id: editing.rowId, data: nextData };
+    }
+
     const res = await authFetch(`/api/campaigns/${campaign.id}/audience-rows`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ row_id: editing.rowId, data: nextData }),
+      body: JSON.stringify(body),
     });
     const json = await res.json();
     setBusy(false);
@@ -180,17 +194,61 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
   };
 
   const addRow = async () => {
+    const name = window.prompt("Nombre del contacto (opcional)") ?? "";
+    const phone = window.prompt("Teléfono (requerido para marcar)") ?? "";
+    if (!phone.trim()) return;
+
     setBusy(true);
     const empty: Record<string, CellValue> = {};
     for (const c of columns) empty[c.key] = null;
     const res = await authFetch(`/api/campaigns/${campaign.id}/audience-rows`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data: empty }),
+      body: JSON.stringify({
+        data: empty,
+        contact_name: name.trim() || null,
+        phone_e164: phone.trim(),
+      }),
     });
     const json = await res.json();
     setBusy(false);
     if (res.ok && json.row) setRows(prev => [...prev, json.row]);
+  };
+
+  const replaceAudience = async (file: File) => {
+    if (campaign.status === "active") {
+      window.alert("Pausa la campaña antes de reemplazar la audiencia.");
+      return;
+    }
+    if (
+      !window.confirm(
+        "¿Reemplazar toda la base de contactos? Se borrarán los registros actuales y se cargará el Excel nuevo."
+      )
+    ) {
+      return;
+    }
+
+    setImportBusy(true);
+    const form = new FormData();
+    form.append("file", file);
+    form.append("replace", "true");
+    form.append("name", tableName || file.name.replace(/\.[^.]+$/, ""));
+
+    const res = await authFetch(`/api/campaigns/${campaign.id}/audience`, {
+      method: "POST",
+      body: form,
+    });
+    const json = await res.json();
+    setImportBusy(false);
+    if (!res.ok) {
+      window.alert(json.error ?? "No se pudo importar la nueva base");
+      return;
+    }
+    onChange({
+      audience_table_id: json.audience_table_id,
+      field_mapping: json.auto_map ?? campaign.field_mapping,
+    });
+    await load();
   };
 
   if (columns.length === 0) {
@@ -293,6 +351,32 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
               )}
             </div>
             <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) void replaceAudience(file);
+                }}
+              />
+              {campaign.status !== "active" && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={importBusy}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-xs text-white hover:bg-white/[.08] disabled:opacity-50"
+                >
+                  {importBusy ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="w-3.5 h-3.5" />
+                  )}
+                  Reemplazar base
+                </button>
+              )}
               <ExportMenu
                 filename="audiencia"
                 sheetName="Audiencia"
@@ -361,10 +445,64 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
                     pageRows.map(row => (
                       <tr key={row.id} className={registryTableRow}>
                         <td className={registryTableCellFirst}>
-                          {row.contact_name?.trim() || "—"}
+                          {editing?.rowId === row.id && editing.key === "__contact_name__" ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                autoFocus
+                                value={draft}
+                                onChange={e => setDraft(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === "Enter") void commitEdit();
+                                  if (e.key === "Escape") setEditing(null);
+                                }}
+                                className="w-full min-w-[100px] rounded-md border border-[#5b5bf6]/40 bg-white/[.06] px-2 py-1 text-xs text-white focus:outline-none"
+                              />
+                              <button type="button" onClick={() => void commitEdit()} disabled={busy} className="p-1 text-emerald-400">
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button type="button" onClick={() => setEditing(null)} className="p-1 text-gray-400">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => startEdit(row.id, "__contact_name__", row.contact_name)}
+                              className="w-full text-left text-white hover:text-[#5b5bf6] text-sm"
+                            >
+                              {row.contact_name?.trim() || "—"}
+                            </button>
+                          )}
                         </td>
                         <td className={`${registryTableCell} font-mono text-[11px] text-gray-200`}>
-                          {row.phone_e164 || "—"}
+                          {editing?.rowId === row.id && editing.key === "__phone_e164__" ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                autoFocus
+                                value={draft}
+                                onChange={e => setDraft(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === "Enter") void commitEdit();
+                                  if (e.key === "Escape") setEditing(null);
+                                }}
+                                className="w-full min-w-[120px] rounded-md border border-[#5b5bf6]/40 bg-white/[.06] px-2 py-1 text-xs text-white focus:outline-none"
+                              />
+                              <button type="button" onClick={() => void commitEdit()} disabled={busy} className="p-1 text-emerald-400">
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button type="button" onClick={() => setEditing(null)} className="p-1 text-gray-400">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => startEdit(row.id, "__phone_e164__", row.phone_e164)}
+                              className="w-full text-left hover:text-[#5b5bf6]"
+                            >
+                              {row.phone_e164 || "—"}
+                            </button>
+                          )}
                         </td>
                         <td className={registryTableCell}>
                           <StatusBadge status={row.call_status} />

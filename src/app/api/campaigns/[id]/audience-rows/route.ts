@@ -4,7 +4,9 @@ import { requireOrgModule } from "@/lib/module-auth";
 import {
   computeScheduledCallAt,
   extractRowContactFields,
+  applyContactFieldsToRowData,
 } from "@/lib/campaigns/audience-rows";
+import { toE164 } from "@/lib/telephony/e164";
 import type { DataTableColumn } from "@/types/data-table";
 import type {
   CampaignAudienceStats,
@@ -131,10 +133,43 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
   const meta = await loadCampaignForEdit(db, id, auth.organizationId);
   if (!meta) return NextResponse.json({ error: "Campaña sin audiencia" }, { status: 404 });
 
+  const { data: existingRow } = await db
+    .from("campaign_audience_rows")
+    .select("data")
+    .eq("id", rowId)
+    .eq("audience_table_id", meta.audienceTableId)
+    .eq("organization_id", auth.organizationId)
+    .maybeSingle();
+
+  if (!existingRow) return NextResponse.json({ error: "Fila no encontrada" }, { status: 404 });
+
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
-  if (body.data && typeof body.data === "object") {
-    const data = body.data as RowData;
+  let data =
+    body.data && typeof body.data === "object"
+      ? (body.data as RowData)
+      : ({ ...(existingRow.data as RowData) } as RowData);
+
+  if (typeof body.contact_name === "string" || body.contact_name === null) {
+    data = applyContactFieldsToRowData(data, meta.mapping, {
+      contact_name: body.contact_name as string | null,
+    });
+  }
+  if (typeof body.phone_e164 === "string" || body.phone_e164 === null) {
+    const raw = body.phone_e164 == null ? null : String(body.phone_e164).trim();
+    const normalized = raw ? toE164(raw) || raw : null;
+    data = applyContactFieldsToRowData(data, meta.mapping, {
+      phone_e164: normalized,
+    });
+  }
+
+  if (
+    body.data ||
+    typeof body.contact_name === "string" ||
+    body.contact_name === null ||
+    typeof body.phone_e164 === "string" ||
+    body.phone_e164 === null
+  ) {
     patch.data = data;
     const derived = deriveRowFields(data, meta.mapping, meta.trigger, meta.columns);
     patch.phone_e164 = derived.phone_e164;
@@ -168,11 +203,26 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
   const body = await req.json().catch(() => ({}));
   const data = (body.data ?? {}) as RowData;
 
+  let contactName =
+    typeof body.contact_name === "string" ? body.contact_name.trim() : undefined;
+  let phoneRaw =
+    typeof body.phone_e164 === "string" ? body.phone_e164.trim() : undefined;
+
   const db = adminClient();
   const meta = await loadCampaignForEdit(db, id, auth.organizationId);
   if (!meta) return NextResponse.json({ error: "Campaña sin audiencia" }, { status: 404 });
 
-  const derived = deriveRowFields(data, meta.mapping, meta.trigger, meta.columns);
+  let rowData = data;
+  if (contactName !== undefined || phoneRaw !== undefined) {
+    rowData = applyContactFieldsToRowData(rowData, meta.mapping, {
+      ...(contactName !== undefined ? { contact_name: contactName || null } : {}),
+      ...(phoneRaw !== undefined
+        ? { phone_e164: phoneRaw ? toE164(phoneRaw) || phoneRaw : null }
+        : {}),
+    });
+  }
+
+  const derived = deriveRowFields(rowData, meta.mapping, meta.trigger, meta.columns);
   const now = new Date().toISOString();
 
   const { data: inserted, error } = await db
@@ -180,7 +230,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
     .insert({
       audience_table_id: meta.audienceTableId,
       organization_id: auth.organizationId,
-      data,
+      data: rowData,
       phone_e164: derived.phone_e164,
       contact_name: derived.contact_name,
       scheduled_call_at: derived.scheduled_call_at,

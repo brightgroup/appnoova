@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const db = adminClient();
   const { data, error } = await db
     .from("voice_agents")
-    .select("id, name, template_id, status")
+    .select("id, name, voice_provider, status")
     .eq("user_id", userId)
     .order("name");
 

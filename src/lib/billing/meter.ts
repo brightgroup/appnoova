@@ -274,6 +274,51 @@ export async function chargeVoiceCall(input: {
   });
 }
 
+export type VoiceAttemptEventType = "voice_voicemail" | "voice_no_answer";
+
+/** Cobro fijo por buzón o no contestada (campañas / salientes cortos). Idempotente por callId. */
+export async function chargeVoiceAttempt(input: {
+  db: SupabaseClient;
+  organizationId: string;
+  userId: string;
+  callId: string;
+  eventType: VoiceAttemptEventType;
+  voiceAgentId?: string;
+  channel?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<number> {
+  await ensurePricingConfig(input.db);
+  const credits = creditsForEvent(input.eventType, 1);
+  if (credits <= 0) return 0;
+
+  const providerCostUsd =
+    input.eventType === "voice_voicemail"
+      ? (getVoiceUsdPerMinute("elevenlabs") > 0 ? 0.02 : 0.015)
+      : 0.012;
+
+  await recordUsageSafe({
+    db: input.db,
+    organizationId: input.organizationId,
+    userId: input.userId,
+    eventType: input.eventType,
+    channel: input.channel ?? "voice",
+    quantity: 1,
+    creditsOverride: credits,
+    provider: "telnyx",
+    providerCostUsdOverride: providerCostUsd,
+    referenceType: "voice_agent_call",
+    referenceId: input.callId,
+    idempotencyKey: `${input.eventType}_${input.callId}`,
+    metadata: {
+      voice_agent_id: input.voiceAgentId,
+      ...(input.metadata ?? {}),
+    },
+  });
+
+  await input.db.from("voice_agent_calls").update({ credits }).eq("id", input.callId);
+  return credits;
+}
+
 export function billingBlockedMessage(reason: string): string {
   if (reason === "no_credits") {
     return "Te quedaste sin créditos este mes. Recarga o espera tu próxima fecha de facturación.";

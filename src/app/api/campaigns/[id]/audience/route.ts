@@ -42,6 +42,30 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
       return NextResponse.json({ error: "Archivo requerido" }, { status: 400 });
     }
 
+    const replace = String(form.get("replace") ?? "") === "true";
+    if (replace) {
+      if (campaign.status === "active") {
+        return NextResponse.json(
+          { error: "Pausa la campaña antes de reemplazar la audiencia.", code: "campaign_active" },
+          { status: 400 }
+        );
+      }
+      if (campaign.audience_table_id) {
+        const oldTableId = String(campaign.audience_table_id);
+        await db.from("campaign_audience_rows").delete().eq("audience_table_id", oldTableId);
+        await db.from("campaign_audience_tables").delete().eq("id", oldTableId);
+      }
+    } else if (campaign.audience_table_id) {
+      return NextResponse.json(
+        {
+          error:
+            "Esta campaña ya tiene audiencia. Usa «Reemplazar base» o duplica la campaña para cargar otra lista.",
+          code: "audience_exists",
+        },
+        { status: 400 }
+      );
+    }
+
     let parsed;
     try {
       parsed = parseExcelBuffer(await file.arrayBuffer(), file.name);

@@ -89,3 +89,19 @@ export function extractRowContactFields(
     contact_name: contact_name || null,
   };
 }
+
+/** Sincroniza nombre/teléfono editados hacia las columnas mapeadas del Excel. */
+export function applyContactFieldsToRowData(
+  data: Record<string, string | number | boolean | null>,
+  mapping: CampaignFieldMapping,
+  fields: { contact_name?: string | null; phone_e164?: string | null }
+): Record<string, string | number | boolean | null> {
+  const next = { ...data };
+  if (fields.phone_e164 !== undefined && mapping.phone_column) {
+    next[mapping.phone_column] = fields.phone_e164?.trim() || null;
+  }
+  if (fields.contact_name !== undefined && mapping.name_column) {
+    next[mapping.name_column] = fields.contact_name?.trim() || null;
+  }
+  return next;
+}
