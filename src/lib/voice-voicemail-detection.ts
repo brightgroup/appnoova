@@ -13,6 +13,8 @@ const VOICEMAIL_PATTERNS: RegExp[] = [
   /\bservicio de contestador\b/i,
   /\bgrabadora\b/i,
   /\bbuz[oó]n\b/i,
+  /\bbuz[oó]n de mensajes\b/i,
+  /\bbuz[oó]n.*lleno\b/i,
   /\bcorreo de voz\b/i,
   /\bmailbox\b/i,
   /\bleave a message\b/i,

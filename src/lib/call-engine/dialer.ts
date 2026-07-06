@@ -1,7 +1,3 @@
-import { buildElevenLabsAgentSystemPrompt } from "@/lib/elevenlabs/agent-phone-prompt";
-import { CAMPAIGN_OUTBOUND_VOICEMAIL_BLOCK } from "@/lib/elevenlabs/campaign-outbound-prompt";
-import { PREMIUM_OUTBOUND_PICKUP_PROMPT } from "@/lib/elevenlabs/default-voices";
-import { placeElevenLabsOutboundCall } from "@/lib/elevenlabs/outbound-call";
 import { resolveElevenLabsPhoneLine } from "@/lib/elevenlabs/phone-line";
 import { resolvePlatformSipConfig } from "@/lib/elevenlabs/sip-config";
 import { billingBlockedMessage, checkBillingForOrg } from "@/lib/billing/meter";
@@ -221,7 +217,11 @@ async function placeCampaignCall(input: {
   const contactName = row.contact_name?.trim() || destination;
   const reserveId = `pending:${randomUUID()}`;
 
-  const reserveSession = async (voiceProvider: "google" | "elevenlabs", from: string) => {
+  const reserveSession = async (
+    voiceProvider: "google" | "elevenlabs",
+    from: string,
+    opts?: { elDeferredAmd?: boolean }
+  ) => {
     return createCampaignOutboundCallSession({
       userId: campaign.user_id,
       voiceAgentId: campaign.voice_agent_id!,
@@ -236,46 +236,9 @@ async function placeCampaignCall(input: {
       campaignName: campaign.name,
       voiceProvider,
       promptOverride: campaignPrompt,
+      elDeferredAmd: opts?.elDeferredAmd,
     });
   };
-
-  if (loaded.config.voice_provider === "elevenlabs") {
-    if (!agentRow.elevenlabs_agent_id) {
-      throw new Error("Agente premium sin sincronizar");
-    }
-    await resolvePlatformSipConfig();
-    const line = await resolveElevenLabsPhoneLine(phone, {
-      elevenlabsAgentId: agentRow.elevenlabs_agent_id,
-      resync: !phone.elevenlabs_phone_number_id,
-    });
-    if (!line.configured || !line.phoneNumberId) {
-      throw new Error(line.syncError ?? "Línea premium no configurada");
-    }
-
-    const systemPromptOverride = buildElevenLabsAgentSystemPrompt({
-      prompt: campaignPrompt + CAMPAIGN_OUTBOUND_VOICEMAIL_BLOCK + PREMIUM_OUTBOUND_PICKUP_PROMPT,
-      purposeId: loaded.config.source_template,
-      agentName: loaded.agentName,
-      companyName: loaded.companyName,
-      companyContextText: loaded.companyContextText,
-    });
-
-    const callId = await reserveSession("elevenlabs", line.e164 ?? phone.e164);
-    try {
-      const { conversationId } = await placeElevenLabsOutboundCall({
-        agentId: agentRow.elevenlabs_agent_id,
-        toE164: destination,
-        agentPhoneNumberId: line.phoneNumberId,
-        systemPromptOverride,
-        campaignOutbound: true,
-      });
-      await bindCampaignCallControlId(callId, conversationId);
-    } catch (err) {
-      await cancelReservedCampaignCall(callId);
-      throw err;
-    }
-    return;
-  }
 
   const telnyx = (phone.voice_config as { telnyx?: { connection_id?: string; call_control_app_id?: string } })
     ?.telnyx;
@@ -295,6 +258,37 @@ async function placeCampaignCall(input: {
     campaign_audience_row_id: row.id,
     destination_e164: destination,
   };
+
+  if (loaded.config.voice_provider === "elevenlabs") {
+    if (!agentRow.elevenlabs_agent_id) {
+      throw new Error("Agente premium sin sincronizar");
+    }
+    await resolvePlatformSipConfig();
+    const line = await resolveElevenLabsPhoneLine(phone, {
+      elevenlabsAgentId: agentRow.elevenlabs_agent_id,
+      resync: !phone.elevenlabs_phone_number_id,
+    });
+    if (!line.configured || !line.phoneNumberId) {
+      throw new Error(line.syncError ?? "Línea premium no configurada");
+    }
+
+    // AMD Telnyx primero: buzón de voz no conecta ElevenLabs (sin cobro premium).
+    const callId = await reserveSession("elevenlabs", phone.e164, { elDeferredAmd: true });
+    try {
+      const { callControlId } = await telnyxPlaceCall({
+        connectionId,
+        from: phone.e164,
+        to: destination,
+        clientState,
+        timeoutSecs: rules.ring_timeout_seconds,
+      });
+      await bindCampaignCallControlId(callId, callControlId);
+    } catch (err) {
+      await cancelReservedCampaignCall(callId);
+      throw err;
+    }
+    return;
+  }
 
   const callId = await reserveSession("google", phone.e164);
   try {

@@ -1,25 +1,100 @@
 import { adminClient } from "@/lib/voice-agents-server";
 import { chargeVoiceCall, resolveOrgIdForUser } from "@/lib/billing/meter";
-import { getElevenLabsConversation } from "@/lib/elevenlabs/outbound-call";
+import {
+  conversationIsVoicemail,
+  loadElevenLabsConversationForFinalize,
+} from "@/lib/elevenlabs/finalize-conversation";
 import {
   getElevenLabsConversationAudioWithRetry,
-  waitForElevenLabsConversationReady,
 } from "@/lib/elevenlabs/premium-voices";
 import { uploadCallRecording } from "@/lib/voice-call-storage";
 import { buildCallRecordFields, splitCallRecordFields, updateAgentCallsCount } from "@/lib/voice/persist-call-record";
 import { getPhoneTestCallSession, updatePhoneTestCallSession, managedOutboundKind } from "@/lib/telephony/test-call-session";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
-import {
-  transcriptIndicatesVoicemail,
-  userHadLiveConversation,
-} from "@/lib/voice-voicemail-detection";
+import { userHadLiveConversation } from "@/lib/voice-voicemail-detection";
 import {
   mapCallToTechnicalDisposition,
   resolveCampaignContextFromSession,
   syncCampaignAudienceAfterCall,
 } from "@/lib/call-engine/campaign-audience-status";
-import { managedOutboundOutcomeLabel } from "@/lib/telephony/call-outcome";
+import { managedOutboundOutcomeLabel, outcomeSummary } from "@/lib/telephony/call-outcome";
+
+function managedMetadataFlags(kind: "test" | "crm" | "campaign") {
+  return {
+    phone_test: kind === "test",
+    crm_outbound: kind === "crm",
+    campaign_outbound: kind === "campaign",
+  };
+}
+
+async function finalizeAsVoicemail(input: {
+  session: NonNullable<Awaited<ReturnType<typeof getPhoneTestCallSession>>>;
+  agent: NonNullable<Awaited<ReturnType<typeof loadVoiceAgentForCall>>>;
+  conversationId: string;
+  durationSec: number;
+  transcript: TranscriptEntry[];
+  disconnectReason: string;
+}): Promise<void> {
+  const { session, agent, conversationId, durationSec, transcript } = input;
+  const meta = session.metadata;
+  const kind = managedOutboundKind(meta as unknown as Record<string, unknown>);
+  const statusLabel = managedOutboundOutcomeLabel(kind, "voicemail");
+  const summary = outcomeSummary("voicemail", meta.to, meta.agent_name);
+  const db = adminClient();
+  const now = new Date().toISOString();
+
+  await db
+    .from("voice_agent_calls")
+    .update({
+      duration_sec: durationSec,
+      credits: 0,
+      status: "voicemail",
+      status_label: statusLabel,
+      in_voicemail: true,
+      disconnect_reason: input.disconnectReason,
+      user_sentiment: "Neutral",
+      summary,
+      transcript,
+      extracted_data: {},
+      metadata: {
+        ...meta,
+        ...managedMetadataFlags(kind),
+        voice_provider: "elevenlabs",
+        phase: "ended",
+        finalized: true,
+        finalized_at: now,
+        outcome: "voicemail",
+        voicemail_detected: true,
+        agent_skipped: true,
+        conversation_id: conversationId,
+      },
+    })
+    .eq("id", session.id);
+
+  await updateAgentCallsCount(db, session.voice_agent_id, agent.callsCount + 1);
+
+  await updatePhoneTestCallSession(conversationId, {
+    phase: "ended",
+    last_event: "elevenlabs.voicemail",
+    status_label: statusLabel,
+    summary,
+    voicemail_detected: true,
+    outcome: "voicemail",
+    finalized: true,
+  });
+
+  if (kind === "campaign") {
+    const ctx = resolveCampaignContextFromSession(session);
+    if (ctx) {
+      await syncCampaignAudienceAfterCall({
+        campaignId: ctx.campaignId,
+        audienceRowId: ctx.audienceRowId,
+        disposition: "voicemail",
+      });
+    }
+  }
+}
 
 export async function finalizeElevenLabsPremiumCall(input: {
   conversationId: string;
@@ -42,107 +117,61 @@ export async function finalizeElevenLabsPremiumCall(input: {
     return;
   }
 
-  let durationSec = input.durationSec ?? 0;
-  let transcript = input.transcript ?? [];
-  let voicemailDetected = false;
+  const kind = managedOutboundKind(meta as unknown as Record<string, unknown>);
 
-  if (durationSec <= 0 || transcript.length === 0) {
-    try {
-      const conv = await getElevenLabsConversation(input.conversationId);
-      if (durationSec <= 0) durationSec = conv.callDurationSecs;
-      if (transcript.length === 0) transcript = conv.transcript;
-      voicemailDetected = conv.voicemailDetected;
-    } catch (err) {
-      console.warn("[elevenlabs-finalize] no se pudo leer conversación:", err);
-    }
-  } else {
-    try {
-      const conv = await getElevenLabsConversation(input.conversationId);
-      voicemailDetected = conv.voicemailDetected;
-      if (transcript.length === 0) transcript = conv.transcript;
-    } catch {
-      /* ignore */
-    }
+  let conv;
+  try {
+    conv = await loadElevenLabsConversationForFinalize(input.conversationId);
+  } catch (err) {
+    console.warn("[elevenlabs-finalize] no se pudo leer conversación:", err);
+    conv = null;
   }
 
-  const voicemailFromContent = transcriptIndicatesVoicemail(transcript);
-  if (!voicemailDetected && voicemailFromContent) {
-    voicemailDetected = true;
-  }
+  const durationSec = conv?.callDurationSecs ?? input.durationSec ?? 0;
+  const transcript = conv?.transcript?.length ? conv.transcript : (input.transcript ?? []);
+  const disconnectReason =
+    input.disconnectReason ??
+    conv?.terminationReason ??
+    conv?.errorReason ??
+    "ElevenLabs call ended";
 
-  if (voicemailDetected) {
-    const kind = managedOutboundKind(meta as unknown as Record<string, unknown>);
-    const statusLabel = managedOutboundOutcomeLabel(kind, "voicemail");
-    const db = adminClient();
-    const now = new Date().toISOString();
-    await db
-      .from("voice_agent_calls")
-      .update({
-        duration_sec: durationSec,
-        credits: 0,
-        status: "voicemail",
-        status_label: statusLabel,
-        in_voicemail: true,
-        disconnect_reason: "Buzón de voz detectado (ElevenLabs)",
-        user_sentiment: "Neutral",
-        summary: `Llamada a ${meta.to} fue a buzón de voz. El agente colgó sin continuar.`,
-        transcript,
-        extracted_data: {},
-        metadata: {
-          ...meta,
-          phone_test: true,
-          voice_provider: "elevenlabs",
-          phase: "ended",
-          finalized: true,
-          finalized_at: now,
-          outcome: "voicemail",
-          voicemail_detected: true,
-          agent_skipped: true,
-          conversation_id: input.conversationId,
-        },
-      })
-      .eq("id", session.id);
-
-    await updateAgentCallsCount(db, session.voice_agent_id, agent.callsCount + 1);
-
-    await updatePhoneTestCallSession(input.conversationId, {
-      phase: "ended",
-      last_event: "elevenlabs.voicemail",
-      status_label: statusLabel,
-      voicemail_detected: true,
-      finalized: true,
+  if (conv && conversationIsVoicemail(conv)) {
+    await finalizeAsVoicemail({
+      session,
+      agent,
+      conversationId: input.conversationId,
+      durationSec,
+      transcript,
+      disconnectReason: "Buzón de voz detectado",
     });
-
-    if (kind === "campaign") {
-      const ctx = resolveCampaignContextFromSession(session);
-      if (ctx) {
-        await syncCampaignAudienceAfterCall({
-          campaignId: ctx.campaignId,
-          audienceRowId: ctx.audienceRowId,
-          disposition: "voicemail",
-        });
-      }
-    }
     return;
   }
 
   const answeredAt = meta.answered_at ? new Date(meta.answered_at).getTime() : null;
-  if (durationSec <= 0 && answeredAt) {
-    durationSec = Math.max(0, Math.floor((Date.now() - answeredAt) / 1000));
+  let billedDuration = durationSec;
+  if (billedDuration <= 0 && answeredAt) {
+    billedDuration = Math.max(0, Math.floor((Date.now() - answeredAt) / 1000));
   }
+
+  const successLabel =
+    kind === "campaign"
+      ? "Campaña — Llamada exitosa"
+      : kind === "crm"
+        ? "Llamada IA — Finalizada"
+        : "Prueba premium - Finalizada";
 
   const built = await buildCallRecordFields({
     userId: session.user_id,
     voiceAgentId: session.voice_agent_id,
     agentName: agent.agentName,
     phoneNumber: meta.to,
-    durationSec,
-    disconnectReason: input.disconnectReason ?? "ElevenLabs call ended",
+    durationSec: billedDuration,
+    disconnectReason,
     transcript,
     callsCount: agent.callsCount,
-    statusLabel: durationSec > 0 ? "Ended - Llamada premium exitosa" : "Ended - Error de conexión",
+    statusLabel: billedDuration > 0 ? successLabel : "Ended - Error de conexión",
     metadata: {
-      source: "phone_test",
+      source: kind === "test" ? "phone_test" : kind,
       voice_provider: "elevenlabs",
       conversation_id: input.conversationId,
       from: meta.from,
@@ -157,7 +186,6 @@ export async function finalizeElevenLabsPremiumCall(input: {
 
   let audioUrl: string | null = null;
   try {
-    await waitForElevenLabsConversationReady(input.conversationId, { maxAttempts: 8, delayMs: 750 });
     const audio = await getElevenLabsConversationAudioWithRetry(input.conversationId, {
       maxAttempts: 5,
       delayMs: 1200,
@@ -180,21 +208,24 @@ export async function finalizeElevenLabsPremiumCall(input: {
     .update({
       ...dbFields,
       ...(audioUrl ? { audio_url: audioUrl } : {}),
-      status: durationSec > 0 ? "ended_success" : "missed",
+      status: billedDuration > 0 ? "ended_success" : "missed",
+      status_label: billedDuration > 0 ? successLabel : managedOutboundOutcomeLabel(kind, "no_answer"),
+      in_voicemail: false,
       metadata: {
         ...meta,
         ...dbFields.metadata,
-        phone_test: true,
+        ...managedMetadataFlags(kind),
         voice_provider: "elevenlabs",
         phase: "ended",
         finalized: true,
+        conversation_id: input.conversationId,
       },
     })
     .eq("id", session.id);
 
   await updateAgentCallsCount(db, session.voice_agent_id, callsCountNext);
 
-  if (durationSec > 0) {
+  if (billedDuration > 0) {
     const orgId = await resolveOrgIdForUser(db, session.user_id);
     if (orgId) {
       await chargeVoiceCall({
@@ -202,10 +233,10 @@ export async function finalizeElevenLabsPremiumCall(input: {
         organizationId: orgId,
         userId: session.user_id,
         callId: session.id,
-        durationSec,
+        durationSec: billedDuration,
         voiceAgentId: session.voice_agent_id,
         voiceProvider: "elevenlabs",
-        metadata: { conversation_id: input.conversationId, source: "phone_test" },
+        metadata: { conversation_id: input.conversationId, source: kind },
       });
     }
   }
@@ -213,10 +244,9 @@ export async function finalizeElevenLabsPremiumCall(input: {
   await updatePhoneTestCallSession(input.conversationId, {
     phase: "ended",
     last_event: "elevenlabs.finalized",
-    status_label: "Prueba premium - Finalizada",
+    status_label: successLabel,
   });
 
-  const kind = managedOutboundKind(meta as unknown as Record<string, unknown>);
   if (kind === "campaign") {
     const ctx = resolveCampaignContextFromSession(session);
     if (ctx) {

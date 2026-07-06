@@ -89,37 +89,15 @@ export async function syncOpenElevenLabsCampaignCalls(): Promise<number> {
     try {
       const conv = await getElevenLabsConversation(conversationId);
       const phase = mapElevenLabsStatusToPhase(conv.status);
+      if (phase !== "ended" && phase !== "failed") continue;
 
-      if (phase === "ended") {
-        await finalizeElevenLabsPremiumCall({
-          conversationId,
-          durationSec: conv.callDurationSecs,
-          transcript: conv.transcript,
-          disconnectReason: conv.terminationReason ?? conv.status,
-        });
-        synced += 1;
-        continue;
-      }
-
-      if (phase === "failed") {
-        if (conv.voicemailDetected) {
-          await finalizeElevenLabsPremiumCall({ conversationId });
-        } else if (conv.callDurationSecs <= 0) {
-          await finalizeOutboundShortCall({
-            callControlId: conversationId,
-            outcome: "no_answer",
-            disconnectReason: conv.terminationReason ?? "No contestada",
-          });
-        } else {
-          await finalizeElevenLabsPremiumCall({
-            conversationId,
-            durationSec: conv.callDurationSecs,
-            transcript: conv.transcript,
-            disconnectReason: conv.terminationReason ?? conv.status,
-          });
-        }
-        synced += 1;
-      }
+      await finalizeElevenLabsPremiumCall({
+        conversationId,
+        durationSec: conv.callDurationSecs,
+        transcript: conv.transcript,
+        disconnectReason: conv.terminationReason ?? conv.status,
+      });
+      synced += 1;
     } catch (err) {
       console.warn("[sync-el-campaign-calls]", conversationId, err);
     }

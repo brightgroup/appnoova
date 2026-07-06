@@ -107,6 +107,7 @@ export async function bindCampaignCallControlId(
 
   const prev = (row.metadata ?? {}) as Record<string, unknown>;
   const isPremium = prev.voice_provider === "elevenlabs";
+  const deferredAmd = prev.el_deferred_amd === true;
 
   const { error } = await db
     .from("voice_agent_calls")
@@ -115,8 +116,12 @@ export async function bindCampaignCallControlId(
         ...prev,
         ...metaPatch,
         call_control_id: callControlId,
-        ...(isPremium ? { conversation_id: callControlId } : {}),
-        last_event: isPremium ? "elevenlabs.dialing" : "call.dialing",
+        ...(isPremium && !deferredAmd ? { conversation_id: callControlId } : {}),
+        last_event: isPremium
+          ? deferredAmd
+            ? "telnyx.amd_screening"
+            : "elevenlabs.dialing"
+          : "call.dialing",
       },
     })
     .eq("id", callId);
