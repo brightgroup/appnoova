@@ -220,13 +220,27 @@ export async function finalizeElevenLabsPremiumCall(input: {
   if (kind === "campaign") {
     const ctx = resolveCampaignContextFromSession(session);
     if (ctx) {
+      const disposition = mapCallToTechnicalDisposition({
+        userSpokeLive: userHadLiveConversation(transcript),
+      });
       await syncCampaignAudienceAfterCall({
         campaignId: ctx.campaignId,
         audienceRowId: ctx.audienceRowId,
-        disposition: mapCallToTechnicalDisposition({
-          userSpokeLive: userHadLiveConversation(transcript),
-        }),
+        disposition,
       });
+      if (disposition === "connected") {
+        try {
+          const { captureCampaignCallResults } = await import("@/lib/campaigns/capture-results");
+          await captureCampaignCallResults({
+            campaignId: ctx.campaignId,
+            audienceRowId: ctx.audienceRowId,
+            callId: session.id,
+            transcript,
+          });
+        } catch (err) {
+          console.error("[elevenlabs-finalize] campaign capture:", err);
+        }
+      }
     }
   }
 }

@@ -51,7 +51,7 @@ export async function POST(_req: NextRequest, ctx: RouteCtx) {
 
   const { data: rows, error: rowsErr } = await db
     .from("campaign_audience_rows")
-    .select("id")
+    .select("id, excluded_reason")
     .eq("audience_table_id", campaign.audience_table_id)
     .eq("is_active", true);
 
@@ -59,6 +59,8 @@ export async function POST(_req: NextRequest, ctx: RouteCtx) {
 
   let updated = 0;
   for (const row of rows ?? []) {
+    // Los excluidos por "no contactar" jamás vuelven a la cola.
+    if (row.excluded_reason === "no_contactar") continue;
     const { error: upErr } = await db
       .from("campaign_audience_rows")
       .update({

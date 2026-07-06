@@ -19,6 +19,8 @@ import {
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
+import { ExportMenu } from "@/components/ui/ExportMenu";
+import type { ExportColumn } from "@/lib/export-table";
 import { CrmLeadsKanban } from "@/components/crm/CrmLeadsKanban";
 import { useModuleWriteAccess } from "@/components/layout/DashboardRouteGuard";
 import type { CrmLead, CrmLeadFilter, CrmLeadsView, CrmPipelineStage } from "@/types/crm";
@@ -69,6 +71,26 @@ export default function CrmLeadsPage() {
 
   const pagination = useRegistryPagination(filteredLeads.length, `${filter}-${view}`);
   const pageRows = pagination.pageRows(filteredLeads);
+
+  const stageName = useCallback(
+    (stageId: string | null) => stages.find(s => s.id === stageId)?.name ?? "",
+    [stages]
+  );
+
+  const exportColumns = useMemo<ExportColumn<CrmLead>[]>(
+    () => [
+      { header: "Título", value: l => l.title },
+      { header: "Contacto", value: l => l.contact?.name ?? "" },
+      { header: "Etapa", value: l => l.stage?.name ?? stageName(l.stage_id) },
+      { header: "Estado", value: l => CRM_LEAD_OUTCOME_LABELS[l.outcome] ?? l.outcome },
+      { header: "Valor", value: l => formatLeadValue(l.value_amount, l.currency) },
+      { header: "Fuente", value: l => l.source ?? "" },
+      { header: "Asesor", value: l => l.asesor_responsable ?? "" },
+      { header: "Creado", value: l => l.created_at },
+      { header: "Actualizado", value: l => l.updated_at },
+    ],
+    [stageName]
+  );
 
   const kanbanFilters: CrmLeadFilter[] = ["open", "mine"];
 
@@ -129,6 +151,12 @@ export default function CrmLeadsPage() {
           }
           action={
             <div className="flex items-center gap-2">
+              <ExportMenu
+                filename="leads"
+                sheetName="Leads"
+                columns={exportColumns}
+                rows={filteredLeads}
+              />
               <Link href="/dashboard/crm/configuracion" className={btnGhost}>
                 <Settings className="w-4 h-4" />
               </Link>

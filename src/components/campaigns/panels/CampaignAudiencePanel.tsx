@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Plus, Trash2, Check, X, Columns3, Users } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { formatScheduledCol } from "@/lib/format-datetime";
+import { ExportMenu } from "@/components/ui/ExportMenu";
+import type { ExportColumn } from "@/lib/export-table";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
@@ -100,6 +102,26 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
 
   const pagination = useRegistryPagination(filtered.length, search, { defaultPageSize: 50 });
   const pageRows = pagination.pageRows(filtered);
+
+  const exportColumns = useMemo<ExportColumn<CampaignAudienceRowRecord>[]>(
+    () => [
+      { header: "Contacto", value: r => r.contact_name ?? "" },
+      { header: "Teléfono", value: r => r.phone_e164 ?? "" },
+      { header: "Resultado", value: r => CAMPAIGN_CALL_STATUS_LABELS[r.call_status] },
+      { header: "Intentos", value: r => r.total_attempts },
+      { header: "Próxima llamada", value: r => formatScheduledCol(r.scheduled_call_at) },
+      ...columns
+        .filter(c => c.display !== false)
+        .map<ExportColumn<CampaignAudienceRowRecord>>(c => ({
+          header: c.label,
+          value: r => {
+            const v = r.data[c.key];
+            return v == null ? "" : String(v);
+          },
+        })),
+    ],
+    [columns]
+  );
 
   const stats = useMemo(() => {
     const counts = {
@@ -270,14 +292,22 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
                 </span>
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => void addRow()}
-              disabled={busy}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-xs text-white hover:bg-white/[.08] disabled:opacity-50"
-            >
-              <Plus className="w-3.5 h-3.5" /> Agregar
-            </button>
+            <div className="flex items-center gap-2">
+              <ExportMenu
+                filename="audiencia"
+                sheetName="Audiencia"
+                columns={exportColumns}
+                rows={filtered}
+              />
+              <button
+                type="button"
+                onClick={() => void addRow()}
+                disabled={busy}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-xs text-white hover:bg-white/[.08] disabled:opacity-50"
+              >
+                <Plus className="w-3.5 h-3.5" /> Agregar
+              </button>
+            </div>
           </div>
 
           {loading ? (

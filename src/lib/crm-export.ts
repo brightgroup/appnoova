@@ -1,4 +1,5 @@
 import { FUENTE_ORIGEN_OPTIONS, TIPO_RELACION_LABELS, VENTANA_WA_LABELS } from "@/lib/crm-contactability";
+import type { ExportColumn } from "@/lib/export-table";
 import type { CrmContact } from "@/types/crm";
 
 const FUENTE_LABELS = Object.fromEntries(FUENTE_ORIGEN_OPTIONS.map(o => [o.value, o.label]));
@@ -52,6 +53,12 @@ const CSV_HEADERS = [
   "Creado",
   "Actualizado"
 ];
+
+/** Columnas para el menú de exportación CSV/Excel de contactos. */
+export const CONTACT_EXPORT_COLUMNS: ExportColumn<CrmContact>[] = CSV_HEADERS.map((header, i) => ({
+  header,
+  value: (c: CrmContact) => contactToRow(c)[i],
+}));
 
 export function contactsToCsv(contacts: CrmContact[]): string {
   const lines = [

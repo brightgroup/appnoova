@@ -66,6 +66,32 @@ export function buildFallbackSummary(transcript: TranscriptEntry[]): string {
   return `${joined.slice(0, 317)}...`;
 }
 
+/** Texto plano de la transcripción para exportar a Excel/CSV. */
+export function formatTranscriptForExport(transcript: TranscriptEntry[] | null | undefined): string {
+  if (!transcript?.length) return "";
+  return transcript
+    .map(t => `${t.role === "user" ? "Usuario" : "Agente"}: ${t.text}`)
+    .join("\n");
+}
+
+/** Datos extraídos por la IA en formato legible para hojas de cálculo. */
+export function formatExtractedDataForExport(data: Record<string, unknown> | null | undefined): string {
+  if (!data || Object.keys(data).length === 0) return "";
+  return Object.entries(data)
+    .map(([key, value]) => {
+      if (value == null || value === "") return `${key}:`;
+      if (typeof value === "object") return `${key}: ${JSON.stringify(value)}`;
+      return `${key}: ${String(value)}`;
+    })
+    .join("\n");
+}
+
+/** Nombre del archivo de audio tal como se descarga desde el registro. */
+export function callAudioExportFilename(call: { id: string; audio_url: string | null }): string {
+  if (!call.audio_url) return "";
+  return `${displayCallId(call.id)}.${audioExtensionFromUrl(call.audio_url)}`;
+}
+
 export function downloadCallJson(call: Record<string, unknown>, filename: string) {
   const blob = new Blob([JSON.stringify(call, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);

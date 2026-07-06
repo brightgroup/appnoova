@@ -3,7 +3,9 @@ import type { CampaignDetailTab } from "@/types/voice-campaign";
 const VALID_TABS = new Set<CampaignDetailTab>([
   "general",
   "guion",
+  "campos",
   "audiencia",
+  "resultados",
   "programacion",
   "conexiones",
   "registro",

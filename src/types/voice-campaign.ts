@@ -12,7 +12,82 @@ export type CampaignCallStatus =
   | "busy"
   | "rejected"
   | "failed"
+  | "invalid"
   | "skipped";
+
+/** Tipo de campaña — define el comportamiento CRM por defecto. */
+export type CampaignType = "prospeccion" | "seguimiento" | "encuesta" | "notificacion";
+
+export type CampaignOutputFieldType =
+  | "select"
+  | "text"
+  | "boolean"
+  | "date"
+  | "time"
+  | "number";
+
+/** Regla de escritura al vincular un campo de campaña con la ficha del contacto. */
+export type CampaignContactLinkMode = "overwrite" | "fill_empty";
+
+export interface CampaignOutputFieldContactLink {
+  /** Campo destino en la ficha: builtin (name, email, ciudad…) o "metadata.<field_key>" */
+  contact_field: string;
+  mode: CampaignContactLinkMode;
+}
+
+/** Campo de salida personalizable que la IA llena tras cada llamada. */
+export interface CampaignOutputField {
+  key: string;
+  label: string;
+  field_type: CampaignOutputFieldType;
+  options: string[];
+  /** Instrucción literal que usa la IA para capturar el dato. */
+  ai_instruction: string;
+  required: boolean;
+  /** Tipificación principal — veredicto de la llamada. Solo una por campaña (tipo select). */
+  is_primary: boolean;
+  contact_link?: CampaignOutputFieldContactLink | null;
+}
+
+/** Configuración CRM por campaña (defaults según campaign_type, ajustables). */
+export interface CampaignCrmConfig {
+  /** Cuándo crear lead + oportunidad: al detectar interés, al importar, o nunca. */
+  create_leads: "on_interest" | "on_import" | "never";
+  /** Valores de la tipificación principal que significan "interés". */
+  interest_values: string[];
+  /** Etapa del pipeline para leads creados (null → primera etapa). */
+  pipeline_stage_id: string | null;
+}
+
+/** Política para contactos que ya existen en el CRM al importar audiencia. */
+export type CampaignImportPolicy = "skip" | "fill_empty" | "overwrite";
+
+/** Mapeo columna del Excel → campo de la ficha del contacto. */
+export interface CampaignContactColumnMapping {
+  column_key: string;
+  /** builtin: name, email, ciudad, organizacion, documento_id — o "metadata.<key>" */
+  contact_field: string;
+}
+
+export interface CampaignImportSummary {
+  total_rows: number;
+  duplicates_in_file: number;
+  invalid_phone: number;
+  existing_contacts: number;
+  new_contacts: number;
+  suppressed: number;
+  rejected_rows: { row_index: number; phone_raw: string; reason: string }[];
+}
+
+export interface CampaignImportResult {
+  created_contacts: number;
+  linked_contacts: number;
+  enrolled: number;
+  rejected: number;
+  suppressed: number;
+  leads_created: number;
+  rejected_rows: { row_index: number; phone_raw: string; reason: string }[];
+}
 
 export type CampaignTriggerType = "excel_date" | "fixed_datetime" | "on_activate";
 
@@ -57,6 +132,8 @@ export interface CampaignFieldMapping {
   name_column: string;
   call_date_column?: string | null;
   custom_fields: CampaignCustomFieldMapping[];
+  /** Columnas del archivo que alimentan la ficha del contacto (email, ciudad, etc.). */
+  contact_fields?: CampaignContactColumnMapping[];
 }
 
 export interface CampaignAudienceTableRecord {
@@ -82,6 +159,9 @@ export interface VoiceCampaignRecord {
   audience_table_id: string | null;
   status: VoiceCampaignStatus;
   wizard_step: number;
+  campaign_type: CampaignType;
+  output_fields: CampaignOutputField[];
+  crm_config: CampaignCrmConfig;
   schedule_config: CampaignScheduleConfig;
   trigger_rule: CampaignTriggerRule;
   field_mapping: CampaignFieldMapping;
@@ -119,6 +199,15 @@ export interface CampaignAudienceRowRecord {
   last_attempt_at: string | null;
   sort_order: number;
   is_active: boolean;
+  crm_contact_id?: string | null;
+  crm_lead_id?: string | null;
+  /** Última captura de la IA por campo de salida ({ [field_key]: valor }). */
+  results?: Record<string, string | number | boolean | null>;
+  /** Metadatos de captura ({ [field_key]: { pending_review, raw } }). */
+  results_meta?: Record<string, { pending_review?: boolean; raw?: string } | undefined>;
+  /** Valor de la tipificación principal. */
+  result_primary?: string | null;
+  excluded_reason?: string | null;
 }
 
 export interface CampaignAudienceStats {
@@ -140,11 +229,37 @@ export const CAMPAIGN_CALL_STATUS_LABELS: Record<CampaignCallStatus, string> = {
   retry: "Reintento",
   connected: "Conectado",
   voicemail: "Buzón de voz",
-  no_answer: "No contestó",
+  no_answer: "No contactable",
   busy: "Ocupado",
   rejected: "Rechazada",
   failed: "Error técnico",
-  skipped: "Omitido",
+  invalid: "Número inválido",
+  skipped: "Excluido",
+};
+
+export const CAMPAIGN_TYPE_LABELS: Record<CampaignType, string> = {
+  prospeccion: "Prospección en frío",
+  seguimiento: "Seguimiento comercial",
+  encuesta: "Encuesta",
+  notificacion: "Notificación / transaccional",
+};
+
+export const CAMPAIGN_TYPE_DESCRIPTIONS: Record<CampaignType, string> = {
+  prospeccion:
+    "Los contactos entran como contactos normales. Se crea lead y oportunidad solo cuando la IA detecta interés.",
+  seguimiento:
+    "La lista viene de gente que ya mostró interés. Al importar, cada persona queda como lead con su oportunidad en el embudo.",
+  encuesta: "Solo captura respuestas. Nunca crea leads ni oportunidades.",
+  notificacion: "Recordatorios o avisos. Nunca crea leads ni oportunidades.",
+};
+
+export const CAMPAIGN_OUTPUT_FIELD_TYPE_LABELS: Record<CampaignOutputFieldType, string> = {
+  select: "Lista desplegable",
+  text: "Texto libre",
+  boolean: "Sí / No",
+  date: "Fecha",
+  time: "Hora",
+  number: "Número",
 };
 
 export const CAMPAIGN_CALL_STATUS_COLORS: Record<CampaignCallStatus, string> = {
@@ -157,13 +272,16 @@ export const CAMPAIGN_CALL_STATUS_COLORS: Record<CampaignCallStatus, string> = {
   busy: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
   rejected: "bg-rose-500/20 text-rose-300 border-rose-500/30",
   failed: "bg-red-500/20 text-red-300 border-red-500/30",
+  invalid: "bg-red-500/20 text-red-300 border-red-500/30",
   skipped: "bg-white/10 text-gray-400 border-white/10",
 };
 
 export type CampaignDetailTab =
   | "general"
   | "guion"
+  | "campos"
   | "audiencia"
+  | "resultados"
   | "programacion"
   | "conexiones"
   | "registro"
@@ -173,6 +291,7 @@ export type CampaignDetailTab =
 export const CAMPAIGN_CONFIG_TABS: CampaignDetailTab[] = [
   "general",
   "guion",
+  "campos",
   "audiencia",
   "programacion",
 ];

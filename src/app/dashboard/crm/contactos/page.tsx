@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Check,
-  Download,
   Mail,
   MapPin,
   MoreHorizontal,
@@ -41,7 +40,8 @@ import {
   TIPO_RELACION_LABELS,
   VENTANA_WA_LABELS
 } from "@/lib/crm-contactability";
-import { downloadContactsCsv } from "@/lib/crm-export";
+import { CONTACT_EXPORT_COLUMNS } from "@/lib/crm-export";
+import { ExportMenu } from "@/components/ui/ExportMenu";
 import { NoovaAnchoredMenu } from "@/components/ui/NoovaAnchoredMenu";
 import { NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 import type { CrmContact, CrmContactFilter } from "@/types/crm";
@@ -247,10 +247,6 @@ export default function CrmContactsPage() {
     setBulkBusy(false);
   };
 
-  const exportList = (list: CrmContact[]) => {
-    const stamp = new Date().toISOString().slice(0, 10);
-    downloadContactsCsv(list, `contactos-${stamp}.csv`);
-  };
 
   return (
     <ChannelListPage
@@ -280,16 +276,12 @@ export default function CrmContactsPage() {
       }
       action={
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          <button
-            type="button"
-            onClick={() => exportList(filtered)}
-            disabled={filtered.length === 0}
-            className={btnGhost}
-            title="Descargar CSV"
-          >
-            <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">Exportar</span>
-          </button>
+          <ExportMenu
+            filename="contactos"
+            sheetName="Contactos"
+            columns={CONTACT_EXPORT_COLUMNS}
+            rows={filtered}
+          />
           <Link href="/dashboard/crm/configuracion" className={btnGhost}>
             <Settings className="w-4 h-4" />
           </Link>
@@ -311,14 +303,14 @@ export default function CrmContactsPage() {
               <span className="text-sm text-[#c4c4ff]">
                 <span className="font-semibold text-white">{selected.size}</span> seleccionado(s)
               </span>
-              <button
-                type="button"
+              <ExportMenu
+                filename="contactos-seleccion"
+                sheetName="Contactos"
+                columns={CONTACT_EXPORT_COLUMNS}
+                rows={selectedContacts}
+                label="Exportar selección"
                 disabled={bulkBusy}
-                onClick={() => exportList(selectedContacts)}
-                className={btnGhost}
-              >
-                <Download className="w-4 h-4" /> Exportar selección
-              </button>
+              />
               <button
                 type="button"
                 disabled={bulkBusy}

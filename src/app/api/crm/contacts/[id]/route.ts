@@ -142,6 +142,24 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Contacto no encontrado" }, { status: 404 });
+
+  // "No contactar" recién marcado → cancela sus llamadas pendientes en todas las campañas.
+  const prevSup = Array.isArray(existing.supresiones) ? (existing.supresiones as string[]) : [];
+  const nextSup = Array.isArray(updates.supresiones) ? (updates.supresiones as string[]) : prevSup;
+  if (nextSup.includes("no_llamadas") && !prevSup.includes("no_llamadas")) {
+    try {
+      const { applyDoNotCallEverywhere } = await import("@/lib/campaigns/capture-results");
+      const contact = toCrmContact(data);
+      await applyDoNotCallEverywhere({
+        userId,
+        contactId: id,
+        phoneE164: contact.telefono ?? contact.whatsapp ?? null,
+      });
+    } catch (err) {
+      console.error("[crm-contact] cancelar llamadas pendientes:", err);
+    }
+  }
+
   return NextResponse.json({ contact: toCrmContact(data) });
 }
 

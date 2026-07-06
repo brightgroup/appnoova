@@ -3,7 +3,14 @@ import { adminClient } from "@/lib/voice-agents-server";
 import { requireOrgModule } from "@/lib/module-auth";
 import { parseExcelBuffer } from "@/lib/data-tables/parse-excel";
 import { toVoiceCampaignRecord } from "@/lib/campaigns/record";
-import type { CampaignFieldMapping } from "@/types/voice-campaign";
+import { analyzeAudienceAgainstCrm, commitAudienceImport } from "@/lib/campaigns/import-contacts";
+import { computeScheduledCallAt } from "@/lib/campaigns/audience-rows";
+import type {
+  CampaignFieldMapping,
+  CampaignImportPolicy,
+  CampaignImportResult,
+  CampaignTriggerRule,
+} from "@/types/voice-campaign";
 import type { DataTableColumn } from "@/types/data-table";
 import { autoMapCampaignColumnsFromSchema } from "@/lib/campaigns/column-mapping";
 
@@ -48,43 +55,6 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
     const now = new Date().toISOString();
     const tableName = String(form.get("name") ?? "").trim() || parsed.suggestedName;
 
-    const { data: table, error: tableErr } = await db
-      .from("campaign_audience_tables")
-      .insert({
-        organization_id: auth.organizationId,
-        user_id: auth.userId,
-        name: tableName,
-        description: `Audiencia de campaña · ${campaign.name}`,
-        columns: parsed.columns,
-        row_count: parsed.rows.length,
-        source_file_name: file.name,
-        created_at: now,
-        updated_at: now,
-      })
-      .select("*")
-      .single();
-
-    if (tableErr) return NextResponse.json({ error: tableErr.message }, { status: 500 });
-
-    const rowPayload = parsed.rows.map((row, i) => ({
-      audience_table_id: table.id,
-      organization_id: auth.organizationId,
-      data: row,
-      sort_order: i,
-      is_active: true,
-      call_status: "pending",
-      created_at: now,
-      updated_at: now,
-    }));
-
-    const chunk = 200;
-    for (let i = 0; i < rowPayload.length; i += chunk) {
-      const { error: rowsErr } = await db
-        .from("campaign_audience_rows")
-        .insert(rowPayload.slice(i, i + chunk));
-      if (rowsErr) return NextResponse.json({ error: rowsErr.message }, { status: 500 });
-    }
-
     const mappingRaw = form.get("field_mapping");
     let fieldMappingOverride: CampaignFieldMapping | null = null;
     if (typeof mappingRaw === "string" && mappingRaw.trim()) {
@@ -101,6 +71,81 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
       fieldMappingOverride ??
       autoMapCampaignColumnsFromSchema(parsed.columns, triggerNeedsDate);
 
+    const policyRaw = String(form.get("contact_policy") ?? "skip");
+    const policy: CampaignImportPolicy =
+      policyRaw === "fill_empty" || policyRaw === "overwrite" ? policyRaw : "skip";
+
+    const campaignRecord = toVoiceCampaignRecord(campaign as Record<string, unknown>);
+    const trigger = campaignRecord.trigger_rule as CampaignTriggerRule;
+
+    // Cruce contra CRM por teléfono, deduplicación y detección de "no contactar".
+    const { analyzed, summary } = await analyzeAudienceAgainstCrm(
+      db,
+      String(campaign.user_id),
+      parsed.rows,
+      fieldMapping,
+      parsed.columns
+    );
+
+    const { data: table, error: tableErr } = await db
+      .from("campaign_audience_tables")
+      .insert({
+        organization_id: auth.organizationId,
+        user_id: auth.userId,
+        name: tableName,
+        description: `Audiencia de campaña · ${campaign.name}`,
+        columns: parsed.columns,
+        row_count: 0,
+        source_file_name: file.name,
+        created_at: now,
+        updated_at: now,
+      })
+      .select("*")
+      .single();
+
+    if (tableErr) return NextResponse.json({ error: tableErr.message }, { status: 500 });
+
+    const commit = await commitAudienceImport({
+      db,
+      userId: String(campaign.user_id),
+      organizationId: auth.organizationId,
+      campaignId: id,
+      campaignName: String(campaign.name ?? ""),
+      audienceTableId: table.id,
+      analyzed,
+      mapping: fieldMapping,
+      columns: parsed.columns,
+      policy,
+      createLeads:
+        campaignRecord.crm_config.create_leads === "on_import"
+          ? { stageId: campaignRecord.crm_config.pipeline_stage_id }
+          : undefined,
+      scheduledCallAtFor: data =>
+        computeScheduledCallAt(data, fieldMapping, trigger)?.toISOString() ?? null,
+    });
+
+    const rowPayload = commit.rowsPayload.map(row => ({
+      audience_table_id: table.id,
+      organization_id: auth.organizationId,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+      ...row,
+    }));
+
+    const chunk = 200;
+    for (let i = 0; i < rowPayload.length; i += chunk) {
+      const { error: rowsErr } = await db
+        .from("campaign_audience_rows")
+        .insert(rowPayload.slice(i, i + chunk));
+      if (rowsErr) return NextResponse.json({ error: rowsErr.message }, { status: 500 });
+    }
+
+    await db
+      .from("campaign_audience_tables")
+      .update({ row_count: rowPayload.length, updated_at: now })
+      .eq("id", table.id);
+
     const { data: updated, error: linkErr } = await db
       .from("voice_campaigns")
       .update({
@@ -115,11 +160,22 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
 
     if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 500 });
 
+    const importResult: CampaignImportResult = {
+      created_contacts: commit.createdContacts,
+      linked_contacts: commit.linkedContacts,
+      enrolled: commit.enrolled,
+      rejected: summary.invalid_phone,
+      suppressed: commit.suppressed,
+      leads_created: commit.leadsCreated,
+      rejected_rows: summary.rejected_rows,
+    };
+
     return NextResponse.json({
       campaign: toVoiceCampaignRecord(updated),
       audience_table_id: table.id,
-      row_count: parsed.rows.length,
+      row_count: rowPayload.length,
       auto_map: fieldMapping,
+      import_result: importResult,
     });
   }
 

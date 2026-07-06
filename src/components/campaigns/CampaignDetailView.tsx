@@ -9,6 +9,8 @@ import {
   Plug,
   History,
   LayoutGrid,
+  ListChecks,
+  ClipboardList,
   Loader2,
   Save,
   CheckCircle2,
@@ -28,6 +30,8 @@ import { formatDatetimeCol } from "@/lib/format-datetime";
 import { useMounted } from "@/hooks/useMounted";
 import { CampaignGeneralPanel } from "@/components/campaigns/panels/CampaignGeneralPanel";
 import { CampaignScriptPanel } from "@/components/campaigns/panels/CampaignScriptPanel";
+import { CampaignFieldsPanel } from "@/components/campaigns/panels/CampaignFieldsPanel";
+import { CampaignResultsPanel } from "@/components/campaigns/panels/CampaignResultsPanel";
 import { CampaignAudiencePanel } from "@/components/campaigns/panels/CampaignAudiencePanel";
 import { CampaignSchedulePanel } from "@/components/campaigns/panels/CampaignSchedulePanel";
 import { CampaignConnectionsPanel } from "@/components/campaigns/panels/CampaignConnectionsPanel";
@@ -42,7 +46,9 @@ import {
 const TABS: { id: CampaignDetailTab; label: string; icon: React.ElementType }[] = [
   { id: "general", label: "General", icon: Settings2 },
   { id: "guion", label: "Agente y guion", icon: FileText },
+  { id: "campos", label: "Campos de salida", icon: ListChecks },
   { id: "audiencia", label: "Audiencia", icon: Users },
+  { id: "resultados", label: "Resultados", icon: ClipboardList },
   { id: "programacion", label: "Programación", icon: CalendarClock },
   { id: "conexiones", label: "Conexiones", icon: Plug },
   { id: "registro", label: "Registro de llamadas", icon: History },
@@ -116,6 +122,9 @@ export function CampaignDetailView({ campaignId, initialTab = "general" }: Campa
         trigger_rule: campaign.trigger_rule,
         field_mapping: campaign.field_mapping,
         prompt_template: campaign.prompt_template,
+        campaign_type: campaign.campaign_type,
+        output_fields: campaign.output_fields,
+        crm_config: campaign.crm_config,
       }),
     });
     const json = await res.json();
@@ -361,6 +370,10 @@ export function CampaignDetailView({ campaignId, initialTab = "general" }: Campa
         {activeTab === "guion" && (
           <CampaignScriptPanel campaign={campaign} onChange={onPatch(setCampaign, setSaved)} />
         )}
+        {activeTab === "campos" && (
+          <CampaignFieldsPanel campaign={campaign} onChange={onPatch(setCampaign, setSaved)} />
+        )}
+        {activeTab === "resultados" && <CampaignResultsPanel campaign={campaign} />}
         {activeTab === "audiencia" && (
           <CampaignAudiencePanel campaign={campaign} onChange={onPatch(setCampaign, setSaved)} />
         )}

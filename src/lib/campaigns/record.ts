@@ -3,10 +3,14 @@ import type {
   CampaignFieldMapping,
   CampaignScheduleConfig,
   CampaignTriggerRule,
+  CampaignType,
   VoiceCampaignRecord,
   CampaignAudienceTableRecord,
 } from "@/types/voice-campaign";
 import { CAMPAIGN_DAY_KEYS } from "@/types/voice-campaign";
+import { normalizeCrmConfig, normalizeOutputFields } from "@/lib/campaigns/output-fields";
+
+const CAMPAIGN_TYPES: CampaignType[] = ["prospeccion", "seguimiento", "encuesta", "notificacion"];
 
 export function defaultDaySlots(): Record<string, CampaignDaySlot> {
   const slots: Record<string, CampaignDaySlot> = {};
@@ -50,6 +54,7 @@ export function defaultFieldMapping(): CampaignFieldMapping {
     name_column: "",
     call_date_column: null,
     custom_fields: [],
+    contact_fields: [],
   };
 }
 
@@ -68,6 +73,16 @@ export function toVoiceCampaignRecord(raw: Record<string, unknown>): VoiceCampai
     audience_table_id: raw.audience_table_id ? String(raw.audience_table_id) : null,
     status: (raw.status as VoiceCampaignRecord["status"]) ?? "draft",
     wizard_step: Number(raw.wizard_step ?? 1),
+    campaign_type: CAMPAIGN_TYPES.includes(raw.campaign_type as CampaignType)
+      ? (raw.campaign_type as CampaignType)
+      : "prospeccion",
+    output_fields: normalizeOutputFields(raw.output_fields),
+    crm_config: normalizeCrmConfig(
+      raw.crm_config,
+      CAMPAIGN_TYPES.includes(raw.campaign_type as CampaignType)
+        ? (raw.campaign_type as CampaignType)
+        : "prospeccion"
+    ),
     schedule_config: {
       ...defaultScheduleConfig(),
       ...schedule,
@@ -84,6 +99,7 @@ export function toVoiceCampaignRecord(raw: Record<string, unknown>): VoiceCampai
       ...defaultFieldMapping(),
       ...mapping,
       custom_fields: Array.isArray(mapping.custom_fields) ? mapping.custom_fields : [],
+      contact_fields: Array.isArray(mapping.contact_fields) ? mapping.contact_fields : [],
     },
     prompt_template: raw.prompt_template ? String(raw.prompt_template) : null,
     completed_at: raw.completed_at ? String(raw.completed_at) : null,

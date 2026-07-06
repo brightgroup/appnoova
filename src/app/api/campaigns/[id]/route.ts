@@ -3,11 +3,22 @@ import { adminClient } from "@/lib/voice-agents-server";
 import { requireOrgModule } from "@/lib/module-auth";
 import { toVoiceCampaignRecord } from "@/lib/campaigns/record";
 import { triggerCampaignDialerOnActivation } from "@/lib/call-engine/dialer-scheduler";
+import {
+  mergeOutputFieldsRespectingLock,
+  normalizeCrmConfig,
+  normalizeOutputFields,
+  validateOutputFields,
+} from "@/lib/campaigns/output-fields";
 import type {
+  CampaignCrmConfig,
   CampaignFieldMapping,
+  CampaignOutputField,
   CampaignScheduleConfig,
   CampaignTriggerRule,
+  CampaignType,
 } from "@/types/voice-campaign";
+
+const CAMPAIGN_TYPES: CampaignType[] = ["prospeccion", "seguimiento", "encuesta", "notificacion"];
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -52,6 +63,9 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
     field_mapping?: CampaignFieldMapping;
     prompt_template?: string | null;
     status?: string;
+    campaign_type?: CampaignType;
+    output_fields?: CampaignOutputField[];
+    crm_config?: CampaignCrmConfig;
   };
 
   try {
@@ -84,11 +98,57 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
   if (body.prompt_template !== undefined) {
     patch.prompt_template = body.prompt_template?.trim() ? body.prompt_template : null;
   }
+
+  const locked = existing.status !== "draft";
+
+  if (body.campaign_type !== undefined) {
+    if (!CAMPAIGN_TYPES.includes(body.campaign_type)) {
+      return NextResponse.json({ error: "Tipo de campaña inválido" }, { status: 400 });
+    }
+    if (locked && body.campaign_type !== existing.campaign_type) {
+      return NextResponse.json(
+        { error: "El tipo de campaña no se puede cambiar después de activarla" },
+        { status: 400 }
+      );
+    }
+    patch.campaign_type = body.campaign_type;
+  }
+
+  if (body.output_fields !== undefined) {
+    const incoming = normalizeOutputFields(body.output_fields);
+    const validationError = validateOutputFields(incoming);
+    if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
+    // Tras activar: tipos y opciones congelados; la instrucción IA sí se puede ajustar.
+    patch.output_fields = mergeOutputFieldsRespectingLock(
+      normalizeOutputFields(existing.output_fields),
+      incoming,
+      locked
+    );
+  }
+
+  if (body.crm_config !== undefined) {
+    const type =
+      (patch.campaign_type as CampaignType | undefined) ??
+      (CAMPAIGN_TYPES.includes(existing.campaign_type as CampaignType)
+        ? (existing.campaign_type as CampaignType)
+        : "prospeccion");
+    patch.crm_config = normalizeCrmConfig(body.crm_config, type);
+  }
+
   if (body.status !== undefined) {
-    patch.status = body.status;
     if (body.status === "active" && existing.status !== "active") {
+      const fields = normalizeOutputFields(
+        (patch.output_fields as CampaignOutputField[] | undefined) ?? existing.output_fields
+      );
+      const activationError = validateOutputFields(fields, {
+        requirePrimary: fields.length > 0,
+      });
+      if (activationError) {
+        return NextResponse.json({ error: activationError }, { status: 400 });
+      }
       patch.completed_at = null;
     }
+    patch.status = body.status;
   }
 
   const db = adminClient();

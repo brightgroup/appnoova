@@ -224,11 +224,21 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  let query = db
-    .from("voice_agent_calls")
-    .select("id, voice_agent_id, campaign_id, phone_number, duration_sec, credits, status, status_label, in_voicemail, disconnect_reason, user_sentiment, summary, audio_url, metadata, created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+  const forExport = req.nextUrl.searchParams.get("export") === "1";
+
+  let query = forExport
+    ? db
+        .from("voice_agent_calls")
+        .select(
+          "id, voice_agent_id, campaign_id, phone_number, duration_sec, credits, status, status_label, in_voicemail, disconnect_reason, user_sentiment, summary, audio_url, metadata, created_at, transcript, extracted_data"
+        )
+    : db
+        .from("voice_agent_calls")
+        .select(
+          "id, voice_agent_id, campaign_id, phone_number, duration_sec, credits, status, status_label, in_voicemail, disconnect_reason, user_sentiment, summary, audio_url, metadata, created_at"
+        );
+
+  query = query.eq("user_id", userId).order("created_at", { ascending: false });
 
   if (agentId) query = query.eq("voice_agent_id", agentId);
   if (campaignId) query = query.eq("campaign_id", campaignId);

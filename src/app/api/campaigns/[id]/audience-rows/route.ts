@@ -94,7 +94,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
   const { data: rows, error: rowsErr } = await db
     .from("campaign_audience_rows")
     .select(
-      "id, data, phone_e164, contact_name, scheduled_call_at, call_status, total_attempts, last_attempt_at, sort_order, is_active"
+      "id, data, phone_e164, contact_name, scheduled_call_at, call_status, total_attempts, last_attempt_at, sort_order, is_active, crm_contact_id, crm_lead_id, results, results_meta, result_primary, excluded_reason"
     )
     .eq("audience_table_id", campaign.audience_table_id)
     .eq("organization_id", auth.organizationId)
@@ -151,7 +151,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
     .eq("audience_table_id", meta.audienceTableId)
     .eq("organization_id", auth.organizationId)
     .select(
-      "id, data, phone_e164, contact_name, scheduled_call_at, call_status, total_attempts, last_attempt_at, sort_order, is_active"
+      "id, data, phone_e164, contact_name, scheduled_call_at, call_status, total_attempts, last_attempt_at, sort_order, is_active, crm_contact_id, crm_lead_id, results, results_meta, result_primary, excluded_reason"
     )
     .maybeSingle();
 
@@ -189,7 +189,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
       updated_at: now,
     })
     .select(
-      "id, data, phone_e164, contact_name, scheduled_call_at, call_status, total_attempts, last_attempt_at, sort_order, is_active"
+      "id, data, phone_e164, contact_name, scheduled_call_at, call_status, total_attempts, last_attempt_at, sort_order, is_active, crm_contact_id, crm_lead_id, results, results_meta, result_primary, excluded_reason"
     )
     .single();
 

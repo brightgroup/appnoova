@@ -15,10 +15,13 @@ import {
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
+import { ExportMenu } from "@/components/ui/ExportMenu";
+import type { ExportColumn } from "@/lib/export-table";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import {
-  audioExtensionFromUrl, callQualityPercent, displayCallId, downloadCallJson, downloadCallAudio,
-  formatCallDateShort, formatCallDuration, formatCallTimestamp, formatTranscriptTime
+  audioExtensionFromUrl, callQualityPercent, callAudioExportFilename, displayCallId, downloadCallJson, downloadCallAudio,
+  formatCallDateShort, formatCallDuration, formatCallTimestamp, formatExtractedDataForExport,
+  formatTranscriptForExport, formatTranscriptTime
 } from "@/lib/voice-call-utils";
 import type { VoiceAgentCallListItem, VoiceAgentCallRecord } from "@/types/voice-agent-call";
 
@@ -167,6 +170,40 @@ export function CallRegistryPanel({ agentId, campaignId, refreshKey = 0 }: CallR
   const pagination = useRegistryPagination(filteredCalls.length, `${filter}-${search}`);
   const pageRows = pagination.pageRows(filteredCalls);
 
+  const exportColumns = useMemo<ExportColumn<VoiceAgentCallRecord>[]>(
+    () => [
+      { header: "ID llamada", value: c => displayCallId(c.id) },
+      { header: "Fecha", value: c => formatCallTimestamp(c.created_at) },
+      { header: "Duración", value: c => formatCallDuration(c.duration_sec) },
+      { header: "Créditos", value: c => c.credits },
+      { header: "Núm. origen", value: c => callOriginNumber(c) },
+      { header: "Núm. destino", value: c => callDestNumber(c) },
+      { header: "Canal", value: c => callDirection(c) },
+      { header: "Estado", value: c => callStatusDisplay(c) },
+      { header: "Desconexión", value: c => callDisconnectDisplay(c) },
+      { header: "Sentimiento", value: c => c.user_sentiment ?? "" },
+      { header: "Resumen", value: c => c.summary ?? "" },
+      { header: "Transcripción", value: c => formatTranscriptForExport(c.transcript) },
+      { header: "Datos extraídos", value: c => formatExtractedDataForExport(c.extracted_data) },
+      { header: "Archivo de audio", value: c => callAudioExportFilename(c) },
+    ],
+    []
+  );
+
+  const prepareExportRows = useCallback(async (): Promise<VoiceAgentCallRecord[]> => {
+    const headers = await getAuthHeaders();
+    const params = new URLSearchParams();
+    if (agentId) params.set("agent_id", agentId);
+    if (campaignId) params.set("campaign_id", campaignId);
+    params.set("export", "1");
+    const res = await fetch(`/api/voice/agents/calls?${params.toString()}`, { headers });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "No se pudieron cargar los datos para exportar");
+    const all = (data.calls ?? []) as VoiceAgentCallRecord[];
+    const ids = new Set(filteredCalls.map(c => c.id));
+    return all.filter(c => ids.has(c.id));
+  }, [agentId, campaignId, filteredCalls]);
+
   const stopAudio = () => {
     audioRef.current?.pause();
     setPlayingId(null);
@@ -228,7 +265,7 @@ export function CallRegistryPanel({ agentId, campaignId, refreshKey = 0 }: CallR
   const handleDownloadAudio = async (call: { id: string; audio_url: string | null }) => {
     if (!call.audio_url) return;
     const ext = audioExtensionFromUrl(call.audio_url);
-    await downloadCallAudio(call.audio_url, `${displayCallId(call.id)}.${ext}`);
+    await downloadCallAudio(call.audio_url, callAudioExportFilename(call) || `${displayCallId(call.id)}.${ext}`);
   };
 
   if (detailLoading) {
@@ -288,9 +325,18 @@ export function CallRegistryPanel({ agentId, campaignId, refreshKey = 0 }: CallR
             </div>
           }
           action={
-            <button className={btnIcon} title="Columnas">
-              <SlidersHorizontal className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <ExportMenu
+                filename="registro-llamadas"
+                sheetName="Llamadas"
+                columns={exportColumns}
+                rows={filteredCalls}
+                prepareRows={prepareExportRows}
+              />
+              <button className={btnIcon} title="Columnas">
+                <SlidersHorizontal className="w-4 h-4" />
+              </button>
+            </div>
           }
           footer={!loading && filteredCalls.length > 0 ? (
             <RegistryTablePagination

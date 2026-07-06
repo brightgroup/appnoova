@@ -4,6 +4,7 @@ import { requireOrgModule } from "@/lib/module-auth";
 import { applyAudienceMapping } from "@/lib/campaigns/apply-mapping";
 import { toVoiceCampaignRecord } from "@/lib/campaigns/record";
 import { triggerCampaignDialerOnActivation } from "@/lib/call-engine/dialer-scheduler";
+import { normalizeOutputFields, validateOutputFields } from "@/lib/campaigns/output-fields";
 import type { CampaignFieldMapping, CampaignTriggerRule } from "@/types/voice-campaign";
 
 type RouteCtx = { params: Promise<{ id: string }> };
@@ -43,6 +44,14 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
   if (!campaign) return NextResponse.json({ error: "Campaña no encontrada" }, { status: 404 });
   if (!campaign.audience_table_id) {
     return NextResponse.json({ error: "Primero conecta una audiencia" }, { status: 400 });
+  }
+
+  if (body.activate) {
+    const fields = normalizeOutputFields(campaign.output_fields);
+    const activationError = validateOutputFields(fields, { requirePrimary: fields.length > 0 });
+    if (activationError) {
+      return NextResponse.json({ error: activationError }, { status: 400 });
+    }
   }
 
   const trigger = (campaign.trigger_rule ?? {}) as CampaignTriggerRule;

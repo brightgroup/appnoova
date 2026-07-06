@@ -22,6 +22,7 @@ import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import { telnyxPlaceCall } from "@/lib/telephony/telnyx-call-control";
 import { adminClient } from "@/lib/voice-agents-server";
 import {
+  contactSuppressedForCalls,
   dispositionFromPlacementError,
   resolveAudienceStatusAfterAttempt,
   type CampaignTechnicalDisposition,
@@ -51,6 +52,7 @@ interface EligibleRow {
   last_attempt_at: string | null;
   call_status: string;
   scheduled_call_at?: string | null;
+  crm_contact_id?: string | null;
 }
 
 async function countActiveCampaignCalls(db: ReturnType<typeof adminClient>): Promise<number> {
@@ -450,6 +452,26 @@ async function executeCampaignDialerTick(): Promise<DialerTickResult> {
 
     const slotsNow = await countActiveCampaignCalls(db);
     if (slotsNow >= rules.max_concurrent) break;
+
+    // Regla: "no contactar" se revisa antes de cada llamada, no solo al importar.
+    const suppressed = await contactSuppressedForCalls({
+      crmContactId: row.crm_contact_id,
+      phoneE164: row.phone_e164,
+      userId: campaign.user_id,
+    });
+    if (suppressed) {
+      await db
+        .from("campaign_audience_rows")
+        .update({
+          call_status: "skipped",
+          excluded_reason: "no_contactar",
+          scheduled_call_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", row.id)
+        .in("call_status", ["pending", "retry"]);
+      continue;
+    }
 
     const claimed = await claimAudienceRow(db, row.id);
     if (!claimed) continue;

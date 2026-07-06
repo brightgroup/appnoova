@@ -28,9 +28,20 @@ import {
   formatMessageTime,
   isSuccessfulChat
 } from "@/lib/text-chat-utils";
+import { ExportMenu } from "@/components/ui/ExportMenu";
+import type { ExportColumn } from "@/lib/export-table";
 import type { TextAgentConversationListItem, TextAgentConversationRecord } from "@/types/text-agent-conversation";
 
 type ChatFilter = "todas" | "exitosas" | "activas";
+
+const chatExportColumns: ExportColumn<TextAgentConversationListItem>[] = [
+  { header: "Fecha", value: c => formatChatTimestamp(c.created_at) },
+  { header: "Contacto", value: c => c.contact_label },
+  { header: "Canal", value: c => channelLabel(c.channel) },
+  { header: "Estado", value: c => c.status_label },
+  { header: "Exitosa", value: c => isSuccessfulChat(c) },
+  { header: "Resumen", value: c => c.summary ?? "" },
+];
 
 interface ChatRegistryPanelProps {
   agentId: string;
@@ -204,9 +215,17 @@ export function ChatRegistryPanel({ agentId, refreshKey = 0 }: ChatRegistryPanel
             </div>
           }
           action={
-            <button className={btnIcon} title="Columnas">
-              <SlidersHorizontal className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <ExportMenu
+                filename="registro-chats"
+                sheetName="Chats"
+                columns={chatExportColumns}
+                rows={filtered}
+              />
+              <button className={btnIcon} title="Columnas">
+                <SlidersHorizontal className="w-4 h-4" />
+              </button>
+            </div>
           }
           footer={!loading && filtered.length > 0 ? (
             <RegistryTablePagination

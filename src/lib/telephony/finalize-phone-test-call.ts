@@ -154,13 +154,27 @@ export async function finalizePhoneTestCall(input: {
   if (kind === "campaign") {
     const ctx = resolveCampaignContextFromSession(session);
     if (ctx) {
+      const disposition = mapCallToTechnicalDisposition({
+        userSpokeLive: userHadLiveConversation(input.transcript),
+      });
       await syncCampaignAudienceAfterCall({
         campaignId: ctx.campaignId,
         audienceRowId: ctx.audienceRowId,
-        disposition: mapCallToTechnicalDisposition({
-          userSpokeLive: userHadLiveConversation(input.transcript),
-        }),
+        disposition,
       });
+      if (disposition === "connected") {
+        try {
+          const { captureCampaignCallResults } = await import("@/lib/campaigns/capture-results");
+          await captureCampaignCallResults({
+            campaignId: ctx.campaignId,
+            audienceRowId: ctx.audienceRowId,
+            callId: session.id,
+            transcript: input.transcript,
+          });
+        } catch (err) {
+          console.error("[finalize-phone-test] campaign capture:", err);
+        }
+      }
     }
   }
 

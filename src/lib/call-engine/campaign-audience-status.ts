@@ -11,7 +11,8 @@ export type CampaignTechnicalDisposition =
   | "no_answer"
   | "busy"
   | "rejected"
-  | "failed";
+  | "failed"
+  | "invalid";
 
 export const CAMPAIGN_WORKFLOW_STATUSES = ["pending", "calling", "retry"] as const;
 
@@ -22,6 +23,7 @@ export const CAMPAIGN_TERMINAL_STATUSES = [
   "busy",
   "rejected",
   "failed",
+  "invalid",
   "skipped",
 ] as const;
 
@@ -71,6 +73,11 @@ export function resolveAudienceStatusAfterAttempt(input: {
     return { call_status: "connected", scheduled_call_at: null };
   }
 
+  // Número dañado: no se reintenta jamás.
+  if (input.disposition === "invalid") {
+    return { call_status: "invalid", scheduled_call_at: null };
+  }
+
   if (input.attempts < input.maxAttempts) {
     return {
       call_status: "retry",
@@ -83,9 +90,57 @@ export function resolveAudienceStatusAfterAttempt(input: {
 
 export function dispositionFromPlacementError(message: string): CampaignTechnicalDisposition {
   const m = message.toLowerCase();
+  if (
+    m.includes("invalid") ||
+    m.includes("inválido") ||
+    m.includes("invalido") ||
+    m.includes("unallocated") ||
+    m.includes("not a valid")
+  ) {
+    return "invalid";
+  }
   if (m.includes("busy") || m.includes("ocupad")) return "busy";
   if (m.includes("reject") || m.includes("declin") || m.includes("rechaz")) return "rejected";
   return "failed";
+}
+
+/**
+ * "No contactar" manda sobre todo: se revisa también justo antes de marcar,
+ * por si el contacto se marcó después de cargar la lista.
+ */
+export async function contactSuppressedForCalls(input: {
+  crmContactId?: string | null;
+  phoneE164?: string | null;
+  userId: string;
+}): Promise<boolean> {
+  const db = adminClient();
+
+  if (input.crmContactId) {
+    const { data } = await db
+      .from("crm_contacts")
+      .select("supresiones")
+      .eq("id", input.crmContactId)
+      .maybeSingle();
+    const sup = Array.isArray(data?.supresiones) ? (data.supresiones as string[]) : [];
+    if (sup.includes("no_llamadas")) return true;
+  }
+
+  if (input.phoneE164) {
+    const { data } = await db
+      .from("crm_contacts")
+      .select("id, supresiones")
+      .eq("user_id", input.userId)
+      .or(
+        `whatsapp.eq."${input.phoneE164}",telefono.eq."${input.phoneE164}",phone.eq."${input.phoneE164}"`
+      )
+      .limit(3);
+    for (const c of data ?? []) {
+      const sup = Array.isArray(c.supresiones) ? (c.supresiones as string[]) : [];
+      if (sup.includes("no_llamadas")) return true;
+    }
+  }
+
+  return false;
 }
 
 export async function syncCampaignAudienceAfterCall(input: {
