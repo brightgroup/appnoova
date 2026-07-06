@@ -34,7 +34,7 @@ export async function duplicateVoiceCampaign(input: {
       voice_agent_id: source.voice_agent_id,
       audience_table_id: null,
       status: "draft",
-      wizard_step: source.audience_table_id ? 3 : Number(source.wizard_step ?? 2),
+      wizard_step: 2,
       campaign_type: source.campaign_type,
       output_fields: source.output_fields,
       crm_config: source.crm_config,

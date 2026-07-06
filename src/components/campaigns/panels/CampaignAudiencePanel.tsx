@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Plus, Trash2, Check, X, Columns3, Users, Upload } from "lucide-react";
+import { Loader2, Plus, Trash2, Check, X, Columns3, Users, Upload, FileSpreadsheet } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { formatScheduledCol } from "@/lib/format-datetime";
 import { ExportMenu } from "@/components/ui/ExportMenu";
@@ -270,27 +270,75 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
     await load();
   };
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando audiencia…
-      </div>
-    );
-  }
+  const needsAudienceImport = !campaign.audience_table_id;
 
-  if (columns.length === 0) {
+  const importAudienceFile = async (file: File) => {
+    setImportBusy(true);
+    const form = new FormData();
+    form.append("file", file);
+    if (importMapping) form.append("field_mapping", JSON.stringify(importMapping));
+    form.append("name", file.name.replace(/\.[^.]+$/, ""));
+
+    const res = await authFetch(`/api/campaigns/${campaign.id}/audience`, {
+      method: "POST",
+      body: form,
+    });
+    const json = await res.json();
+    setImportBusy(false);
+    if (!res.ok) {
+      window.alert(json.error ?? "No se pudo importar la audiencia");
+      return;
+    }
+    onChange({
+      audience_table_id: json.audience_table_id,
+      field_mapping: json.auto_map ?? campaign.field_mapping,
+    });
+    await load();
+  };
+
+  if (needsAudienceImport) {
     return (
       <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div className="max-w-3xl mx-auto space-y-5">
           <div>
             <h2 className="text-sm font-semibold text-white">Importar audiencia</h2>
             <p className="text-xs text-gray-500 mt-1">
-              Sube un Excel con los contactos de esta campaña o reutiliza una tabla guardada.
+              Esta campaña no tiene contactos. Sube un Excel (.xlsx o .csv) o usa el flujo completo con
+              mapeo y revisión contra el CRM.
             </p>
           </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={e => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) void importAudienceFile(file);
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importBusy}
+            className="w-full rounded-xl border-2 border-dashed border-[#5b5bf6]/40 bg-[#5b5bf6]/5 p-8 text-center transition-colors hover:border-[#5b5bf6]/60 hover:bg-[#5b5bf6]/10 disabled:opacity-50"
+          >
+            {importBusy ? (
+              <Loader2 className="w-8 h-8 text-[#5b5bf6] animate-spin mx-auto" />
+            ) : (
+              <FileSpreadsheet className="w-8 h-8 text-[#5b5bf6] mx-auto" />
+            )}
+            <p className="text-sm font-medium text-white mt-3">
+              {importBusy ? "Importando contactos…" : "Subir Excel de audiencia"}
+            </p>
+            <p className="text-[11px] text-gray-500 mt-1">Arrastra un archivo aquí o haz clic para seleccionar</p>
+          </button>
+
           <CampaignStepAudience
             campaignId={campaign.id}
-            audienceTableId={campaign.audience_table_id}
+            audienceTableId={null}
             existingTables={existingTables}
             columns={importColumns}
             fieldMapping={importMapping}
@@ -310,6 +358,43 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
             embedded
           />
         </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando audiencia…
+      </div>
+    );
+  }
+
+  if (columns.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-16 text-sm text-gray-500 gap-3">
+        <p>La audiencia vinculada no tiene columnas configuradas.</p>
+        {campaign.status !== "active" && (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importBusy}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-xs text-white hover:bg-white/[.08] disabled:opacity-50"
+          >
+            <Upload className="w-3.5 h-3.5" /> Reemplazar base
+          </button>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          className="hidden"
+          onChange={e => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void replaceAudience(file);
+          }}
+        />
       </div>
     );
   }
