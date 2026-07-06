@@ -22,10 +22,13 @@ import {
   tabActive,
   tabIdle,
 } from "@/lib/brand-ui";
+import { CampaignStepAudience } from "@/components/campaigns/steps/CampaignStepAudience";
 import {
   CAMPAIGN_CALL_STATUS_COLORS,
   CAMPAIGN_CALL_STATUS_LABELS,
   type CampaignAudienceRowRecord,
+  type CampaignAudienceTableRecord,
+  type CampaignFieldMapping,
   type VoiceCampaignRecord,
 } from "@/types/voice-campaign";
 import type { DataTableColumn } from "@/types/data-table";
@@ -60,6 +63,9 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
+  const [existingTables, setExistingTables] = useState<CampaignAudienceTableRecord[]>([]);
+  const [importColumns, setImportColumns] = useState<DataTableColumn[]>([]);
+  const [importMapping, setImportMapping] = useState<CampaignFieldMapping>(campaign.field_mapping);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
@@ -76,6 +82,19 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    setImportMapping(campaign.field_mapping);
+  }, [campaign.field_mapping]);
+
+  useEffect(() => {
+    if (campaign.audience_table_id) return;
+    void authFetch("/api/campaigns/audience-tables").then(async res => {
+      if (!res.ok) return;
+      const json = await res.json();
+      setExistingTables(json.tables ?? []);
+    });
+  }, [campaign.audience_table_id]);
 
   useEffect(() => {
     if (campaign.status !== "active") return;
@@ -251,10 +270,46 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
     await load();
   };
 
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando audiencia…
+      </div>
+    );
+  }
+
   if (columns.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center px-6 py-16 text-sm text-gray-500">
-        Esta campaña aún no tiene audiencia importada.
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
+        <div className="max-w-3xl mx-auto space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold text-white">Importar audiencia</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Sube un Excel con los contactos de esta campaña o reutiliza una tabla guardada.
+            </p>
+          </div>
+          <CampaignStepAudience
+            campaignId={campaign.id}
+            audienceTableId={campaign.audience_table_id}
+            existingTables={existingTables}
+            columns={importColumns}
+            fieldMapping={importMapping}
+            triggerNeedsDate={campaign.trigger_rule.type === "excel_date"}
+            onColumnsChange={setImportColumns}
+            onMappingChange={mapping => {
+              setImportMapping(mapping);
+              onChange({ field_mapping: mapping });
+            }}
+            onLinked={(audienceTableId, mapping) => {
+              onChange({
+                audience_table_id: audienceTableId,
+                field_mapping: mapping ?? importMapping,
+              });
+              void load();
+            }}
+            embedded
+          />
+        </div>
       </div>
     );
   }
