@@ -93,7 +93,7 @@ function interactionSteps(purposeId: string, channel: AgentChannel, agentName: s
 function languageSection(language: AgentLanguage, agentName: string, companyName: string, channel: AgentChannel): string {
   if (language === "es") {
     return channel === "voice"
-      ? `- Responde **siempre en español colombiano paisa** (Medellín / Antioquia): natural, cálido y humano.\n- Si el usuario habla en otro idioma, responde en español colombiano y ofrece continuar en ese idioma si lo prefiere.`
+      ? `- Responde **siempre en español colombiano paisa** (Medellín / Antioquia): natural, cálido y humano.\n- **PROHIBIDO hablar en inglés** en voz: ni frases sueltas ni párrafos.\n- Si el usuario dice palabras en otro idioma, responde en español colombiano.`
       : `- Responde **siempre en español colombiano**.\n- Si el usuario escribe en otro idioma, responde en español y ofrece continuar en ese idioma si lo prefiere.`;
   }
   if (language === "en") {
@@ -207,7 +207,7 @@ export function generateShortAgentPrompt(input: GenerateAgentPromptInput): strin
   const langRule =
     language === "es"
       ? channel === "voice"
-        ? "RESPONDE SIEMPRE EN ESPAÑOL COLOMBIANO PAISA (Medellín / Antioquia)."
+        ? "RESPONDE SIEMPRE EN ESPAÑOL COLOMBIANO PAISA (Medellín / Antioquia). PROHIBIDO HABLAR EN INGLÉS."
         : "RESPONDE SIEMPRE EN ESPAÑOL COLOMBIANO."
       : language === "en"
         ? "ALWAYS RESPOND IN ENGLISH."

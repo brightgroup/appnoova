@@ -7,7 +7,7 @@ import {
 export const CAMPAIGN_OUTBOUND_VOICEMAIL_BLOCK = `
 
 ## REGLA #0 — Buzón de voz (PRIORIDAD ABSOLUTA)
-- Escucha primero 2-4 segundos SIN hablar.
+- Escucha primero 1-2 segundos SIN hablar.
 - Si detectas contestadora, buzón, tono grabado o "deje su mensaje después del tono": usa voicemail_detection DE INMEDIATO.
 - PROHIBIDO hablar, saludar, presentarte o dejar mensaje en buzón.
 - PROHIBIDO decir en voz alta que detectaste buzón; solo ejecuta la herramienta y cuelga.

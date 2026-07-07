@@ -55,6 +55,43 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
     ? [PREMIUM_VOICEMAIL_DETECTION_TOOL, PREMIUM_END_CALL_TOOL]
     : [PREMIUM_END_CALL_TOOL];
 
+  const turn = outbound
+    ? {
+        turn_timeout: 15,
+        turn_eagerness: "normal" as const,
+        mode: "turn" as const,
+        speculative_turn: true,
+        turn_model: "turn_v3" as const,
+        interruption_ignore_terms: [
+          "aló",
+          "alo",
+          "bueno",
+          "eh",
+          "pues",
+          "mm",
+          "mhm",
+          "este",
+          "o sea",
+        ],
+        soft_timeout_config: {
+          timeout_seconds: 5,
+          message: "Un momentico, ya le confirmo.",
+          use_llm_generated_message: false,
+        },
+      }
+    : {
+        turn_timeout: 7,
+        turn_eagerness: "normal" as const,
+        mode: "turn" as const,
+        speculative_turn: true,
+        turn_model: "turn_v3" as const,
+        soft_timeout_config: {
+          timeout_seconds: 5,
+          message: "Un momentico, ya le confirmo.",
+          use_llm_generated_message: false,
+        },
+      };
+
   return {
     agent: {
       // Outbound telefónico: vacío → ElevenLabs espera el "aló" del cliente.
@@ -74,16 +111,11 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
     asr: {
       quality: "high",
     },
-    turn: {
-      turn_timeout: 7,
-      turn_eagerness: "patient",
-      mode: "turn",
-      speculative_turn: false,
-    },
+    turn,
     tts: {
       voice_id: voiceId,
       model_id: ELEVENLABS_TTS_MODEL_ID,
-      optimize_streaming_latency: 0,
+      optimize_streaming_latency: 3,
       stability: 0.72,
       similarity_boost: 0.78,
     },

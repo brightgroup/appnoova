@@ -3,7 +3,6 @@ import {
   CAMPAIGN_ELEVENLABS_OUTBOUND_TOOLS,
   CAMPAIGN_OUTBOUND_VOICEMAIL_BLOCK,
 } from "@/lib/elevenlabs/campaign-outbound-prompt";
-import { PREMIUM_OUTBOUND_PICKUP_PROMPT } from "@/lib/elevenlabs/default-voices";
 import { placeElevenLabsOutboundCall } from "@/lib/elevenlabs/outbound-call";
 import { resolveElevenLabsPhoneLine } from "@/lib/elevenlabs/phone-line";
 import { resolvePlatformSipConfig } from "@/lib/elevenlabs/sip-config";
@@ -57,7 +56,7 @@ export async function connectCampaignElevenLabsAfterAmd(input: {
   if (!destination) throw new Error("Destino no definido");
 
   const systemPromptOverride = buildElevenLabsAgentSystemPrompt({
-    prompt: promptOverride + CAMPAIGN_OUTBOUND_VOICEMAIL_BLOCK + PREMIUM_OUTBOUND_PICKUP_PROMPT,
+    prompt: promptOverride + CAMPAIGN_OUTBOUND_VOICEMAIL_BLOCK,
     purposeId: input.agent.config.source_template,
     agentName: input.agent.agentName,
     companyName: input.agent.companyName,
