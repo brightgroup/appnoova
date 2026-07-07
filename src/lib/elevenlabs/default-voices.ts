@@ -54,14 +54,22 @@ export function buildOutboundCampaignFirstMessage(agentName: string, companyName
 }
 
 /**
- * Llamadas salientes directas (sin AMD previo): espera "aló" del cliente.
- * En campañas con AMD, la plataforma envía first_message y saluda al conectar.
+ * Saludo inmediato al conectar en llamada saliente por teléfono.
+ * La IA habla primero: no espera silencio ni que dejen de hablar voces de fondo.
+ */
+export function buildOutboundPhoneFirstMessage(agentName: string, companyName: string): string {
+  return buildOutboundCampaignFirstMessage(agentName, companyName);
+}
+
+/**
+ * @deprecated Usar buildOutboundPhoneFirstMessage — ya no esperamos "aló" en telefonía.
  */
 export const PREMIUM_OUTBOUND_PICKUP_PROMPT = `
 
 ## Apertura en llamada saliente
-- Cuando la persona diga "aló", "bueno", "dígame" o "hola": saluda UNA sola vez (nombre + empresa) en una frase breve.
-- Después de ese primer saludo, si repiten "aló" solo di "Sí, le escucho" — NUNCA vuelvas a saludar.`;
+- Al conectar, **tú saludas primero** (nombre + empresa en una frase breve). No esperes silencio ni que dejen de hablar personas al fondo.
+- Si hay ruido, voces de fondo o conversaciones ajenas: **ignóralas** y habla con quien contestó la llamada.
+- Si después del saludo repiten "aló": solo "Sí, le escucho" — **nunca** vuelvas a saludar desde cero.`;
 
 /** Instrucción de cierre — el agente debe usar end_call al despedirse. */
 export const PREMIUM_CALL_ENDING_PROMPT = `

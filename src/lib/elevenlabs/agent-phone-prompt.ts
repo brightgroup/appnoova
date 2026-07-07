@@ -1,14 +1,11 @@
 import { getPurposeMeta } from "@/lib/agent-purpose-catalog";
 import { ELEVENLABS_TEMPORAL_PROMPT_BLOCK } from "@/lib/colombia-calendar";
-import { mergeCompanyContext } from "@/lib/merge-company-context";
+import { buildVoiceCompanyContextSection } from "@/lib/merge-company-context";
 import {
   PREMIUM_CALL_ENDING_PROMPT,
   PREMIUM_OUTBOUND_PICKUP_PROMPT,
 } from "@/lib/elevenlabs/default-voices";
-import {
-  ELEVENLABS_PLATFORM_VOICE_PERSONA,
-  ELEVENLABS_PHONE_OUTBOUND_RULES,
-} from "@/lib/elevenlabs/voice-platform-prompt";
+import { ELEVENLABS_PHONE_OUTBOUND_RULES } from "@/lib/elevenlabs/voice-platform-prompt";
 import { buildVoiceAccentPromptSection } from "@/lib/voice-accent-profile";
 
 export function isOutboundVoicePurpose(purposeId: string): boolean {
@@ -34,7 +31,11 @@ export const ELEVENLABS_SPANISH_ONLY_RULES = `
 - Si el cliente dice "hello" o palabras sueltas en inglés, responde en español colombiano.
 - Las instrucciones internas del prompt pueden estar en cualquier idioma; tu SALIDA DE VOZ es siempre español.`;
 
-/** Prompt completo para agente ElevenLabs (sync + override en llamada). */
+/**
+ * Orden del prompt en llamada:
+ * 1. Identidad y reglas técnicas → 2. Plantilla del agente (conducta + protocolo) →
+ * 3. Acento → 4. Contexto de marca (al final, referencia) → 5. Telefonía saliente/cierre.
+ */
 export function buildElevenLabsAgentSystemPrompt(input: {
   prompt: string;
   purposeId: string;
@@ -47,9 +48,10 @@ export function buildElevenLabsAgentSystemPrompt(input: {
   const outboundPurpose = isOutboundVoicePurpose(input.purposeId);
   const phoneOutbound = input.phoneOutbound === true;
   const identity = buildPremiumAgentIdentityBlock(input.agentName, input.companyName);
-  const merged = mergeCompanyContext(
-    input.prompt.trim(),
-    input.companyContextText?.trim() ?? ""
+  const agentPrompt = input.prompt.trim();
+  const companyContext = buildVoiceCompanyContextSection(
+    input.companyName,
+    input.companyContextText
   );
 
   const phoneOutboundBlocks =
@@ -59,5 +61,5 @@ export function buildElevenLabsAgentSystemPrompt(input: {
 
   const accentSection = buildVoiceAccentPromptSection(input.purposeId);
 
-  return `${identity}\n\n${ELEVENLABS_SPANISH_ONLY_RULES}\n\n${ELEVENLABS_PLATFORM_VOICE_PERSONA}\n\n${ELEVENLABS_TEMPORAL_PROMPT_BLOCK}\n\n${merged}\n\n${accentSection}${phoneOutboundBlocks}${PREMIUM_CALL_ENDING_PROMPT}`;
+  return `${identity}\n\n${ELEVENLABS_SPANISH_ONLY_RULES}\n\n${ELEVENLABS_TEMPORAL_PROMPT_BLOCK}\n\n${agentPrompt}${companyContext}\n\n${accentSection}${phoneOutboundBlocks}${PREMIUM_CALL_ENDING_PROMPT}`;
 }

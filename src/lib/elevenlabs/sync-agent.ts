@@ -8,6 +8,7 @@ import {
   DEFAULT_ELEVENLABS_VOICE_ID,
   PREMIUM_END_CALL_TOOL,
   PREMIUM_VOICEMAIL_DETECTION_TOOL,
+  buildOutboundPhoneFirstMessage,
   buildPremiumFirstMessage,
 } from "@/lib/elevenlabs/default-voices";
 import { listCuratedPremiumVoices } from "@/lib/elevenlabs/premium-voices";
@@ -60,9 +61,9 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
 
   return {
     agent: {
-      // Outbound telefónico: vacío → ElevenLabs espera el "aló" del cliente.
+      // Telefonía saliente: saludo proactivo al conectar (no esperar silencio / ruido de fondo).
       first_message: outbound
-        ? ""
+        ? buildOutboundPhoneFirstMessage(agentName, companyName)
         : buildPremiumFirstMessage(agentName, companyName),
       language: "es",
       // Evita que ruido o "aló" corten el saludo inicial.
@@ -81,7 +82,7 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
     tts: {
       voice_id: voiceId,
       model_id: ELEVENLABS_TTS_MODEL_ID,
-      optimize_streaming_latency: 3,
+      optimize_streaming_latency: 4,
       stability: 0.72,
       similarity_boost: 0.78,
     },

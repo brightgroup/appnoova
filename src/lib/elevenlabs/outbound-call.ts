@@ -3,6 +3,7 @@ import { isVoicemailUtterance } from "@/lib/voice-voicemail-detection";
 import { CAMPAIGN_ELEVENLABS_OUTBOUND_TOOLS } from "@/lib/elevenlabs/campaign-outbound-prompt";
 import { getElevenLabsPhoneNumberId } from "@/lib/elevenlabs/config";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
+import { buildOutboundPhoneFirstMessage } from "@/lib/elevenlabs/default-voices";
 import { buildPremiumTurnOverride } from "@/lib/elevenlabs/voice-platform-prompt";
 
 export interface ElevenLabsOutboundCallResult {
@@ -17,8 +18,12 @@ export async function placeElevenLabsOutboundCall(input: {
   systemPromptOverride?: string;
   /** Campaña saliente: herramientas de buzón + end_call. */
   campaignOutbound?: boolean;
-  /** Tras AMD humano: saludo inmediato al conectar (sin esperar "aló"). */
+  /** Saludo al conectar. Si se omite, se arma con agentName + companyName (recomendado). */
   firstMessage?: string;
+  agentName?: string;
+  companyName?: string;
+  /** Solo para pruebas: esperar "aló" (no usar en producción — falla con ruido de fondo). */
+  waitForPickup?: boolean;
 }): Promise<ElevenLabsOutboundCallResult> {
   const phoneNumberId =
     input.agentPhoneNumberId?.trim() || getElevenLabsPhoneNumberId();
@@ -28,7 +33,15 @@ export async function placeElevenLabsOutboundCall(input: {
     );
   }
 
-  const firstMessage = input.firstMessage?.trim() ?? "";
+  const firstMessage = input.waitForPickup
+    ? ""
+    : (
+        input.firstMessage?.trim()
+        || buildOutboundPhoneFirstMessage(
+          input.agentName ?? "",
+          input.companyName ?? ""
+        )
+      );
 
   const data = await elevenLabsFetch<{
     conversation_id?: string;

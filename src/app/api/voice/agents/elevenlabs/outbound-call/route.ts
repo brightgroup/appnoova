@@ -148,6 +148,8 @@ export async function POST(req: NextRequest) {
       toE164: test.e164,
       agentPhoneNumberId: line.phoneNumberId,
       systemPromptOverride,
+      agentName: loaded.agentName,
+      companyName: loaded.companyName,
     });
 
     const fromE164 = line.e164 ?? phone.e164;

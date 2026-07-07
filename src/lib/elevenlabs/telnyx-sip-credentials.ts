@@ -1,6 +1,13 @@
 /** Resuelve credenciales SIP Telnyx para ElevenLabs (env o API Telnyx). */
 
-interface TelnyxCredentialConnection {
+import {
+  buildTelnyxNoiseSuppressionPatch,
+  resolveTelnyxNoiseSuppressionConfig,
+  telnyxNoiseSuppressionMatches,
+  type TelnyxCredentialConnectionNoise,
+} from "@/lib/elevenlabs/telnyx-noise-suppression";
+
+interface TelnyxCredentialConnection extends TelnyxCredentialConnectionNoise {
   id: string;
   user_name: string;
   password?: string;
@@ -91,6 +98,25 @@ async function pickCredentialConnectionId(): Promise<string> {
   return active[0].id;
 }
 
+/** Asegura Krisp/Quail en inbound para aislar al que contesta (voces de fondo). */
+async function ensureNoiseSuppression(connection: TelnyxCredentialConnection): Promise<void> {
+  const desired = resolveTelnyxNoiseSuppressionConfig();
+  if (!desired) return;
+  if (telnyxNoiseSuppressionMatches(connection, desired)) return;
+
+  await telnyxAdminFetch(`/credential_connections/${connection.id}`, {
+    method: "PATCH",
+    json: buildTelnyxNoiseSuppressionPatch(desired),
+  });
+
+  console.info(
+    "[telnyx] noise suppression activado:",
+    desired.direction,
+    desired.engine,
+    `attenuation=${desired.attenuationLimit}`
+  );
+}
+
 /** Asegura que la conexión SIP tenga perfil saliente (requerido para outbound vía ElevenLabs). */
 async function ensureOutboundVoiceProfile(connection: TelnyxCredentialConnection): Promise<void> {
   const profileId = await resolveOutboundVoiceProfileId();
@@ -106,6 +132,13 @@ async function ensureOutboundVoiceProfile(connection: TelnyxCredentialConnection
   });
 }
 
+async function applyNoiseSuppressionForConnection(connectionId: string): Promise<void> {
+  const desired = resolveTelnyxNoiseSuppressionConfig();
+  if (!desired) return;
+  const connection = await loadCredentialConnection(connectionId);
+  await ensureNoiseSuppression(connection);
+}
+
 /** Credenciales digest Telnyx para trunk ElevenLabs → sip.telnyx.com */
 export async function resolveTelnyxSipCredentials(): Promise<{
   username: string;
@@ -115,10 +148,18 @@ export async function resolveTelnyxSipCredentials(): Promise<{
   const envUser = process.env.ELEVENLABS_SIP_USERNAME?.trim();
   const envPass = process.env.ELEVENLABS_SIP_PASSWORD?.trim();
   if (envUser && envPass) {
+    const connectionId = process.env.TELNYX_SIP_CONNECTION_ID?.trim();
+    if (connectionId && process.env.TELNYX_API_KEY?.trim()) {
+      try {
+        await applyNoiseSuppressionForConnection(connectionId);
+      } catch (err) {
+        console.warn("[telnyx] noise suppression:", err);
+      }
+    }
     return {
       username: envUser,
       password: envPass,
-      connectionId: process.env.TELNYX_SIP_CONNECTION_ID?.trim() || "env",
+      connectionId: connectionId || "env",
     };
   }
 
@@ -129,6 +170,7 @@ export async function resolveTelnyxSipCredentials(): Promise<{
   let connection = await loadCredentialConnection(connectionId);
   await ensureOutboundVoiceProfile(connection);
   connection = await loadCredentialConnection(connectionId);
+  await ensureNoiseSuppression(connection);
 
   const username = connection.user_name?.trim();
   const password = connection.password?.trim();

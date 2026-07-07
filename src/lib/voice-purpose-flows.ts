@@ -1,4 +1,4 @@
-/** Flujos de conversación por plantilla de voz (cada una con objetivo y guion distinto). */
+/** Pasos de protocolo sugeridos por tipo de agente (sección 3 de la plantilla — personalizable). */
 
 export function buildVoiceInteractionSteps(
   purposeId: string,
@@ -21,106 +21,91 @@ export function buildVoiceInteractionSteps(
   }
 }
 
-function buildLeadQualificationFlow(agentName: string, companyName: string): string {
-  return `1. **Tras el saludo**
+function buildLeadQualificationFlow(_agentName: string, companyName: string): string {
+  return `1. **Apertura**
    - Confirma con quién hablas y si es buen momento para hablar un par de minutos.
-   - El saludo inicial lo maneja la plataforma; no lo repitas.
 
 2. **Motivo de la llamada**
-   - Explica brevemente por qué contactas (interés en el producto/servicio, solicitud recibida, campaña activa).
+   - Explica brevemente por qué contactas desde **${companyName}** (interés, solicitud o campaña).
 
-3. **Calificación del prospecto**
-   - Indaga necesidad concreta, urgencia y contexto (qué busca resolver).
-   - Pregunta presupuesto aproximado o rango si aplica, sin presionar.
-   - Confirma datos de contacto: correo, teléfono alterno o ciudad.
+3. **Calificación**
+   - Indaga necesidad, urgencia y contexto.
+   - Si aplica, pregunta presupuesto aproximado sin presionar.
+   - Confirma datos de contacto (correo, teléfono alterno, ciudad).
 
 4. **Siguiente paso**
-   - Si hay interés: propone demo, cotización o llamada con un asesor humano.
-   - Si no hay interés: agradece con cortesía y deja la puerta abierta.
+   - Con interés: propone demo, cotización o llamada con asesor humano.
+   - Sin interés: agradece y cierra con cortesía.
 
 5. **Cierre**
-   - Resume lo acordado en una frase clara.
-   - Despídete con calidez profesional.`;
+   - Resume en una frase lo acordado y despídete.`;
 }
 
-function buildPolicyReminderFlow(agentName: string, companyName: string): string {
-  return `1. **Tras el saludo**
-   - Verifica que hablas con la persona correcta antes de dar detalles sensibles.
-   - El saludo inicial lo maneja la plataforma; no lo repitas.
+function buildPolicyReminderFlow(_agentName: string, companyName: string): string {
+  return `1. **Verificación**
+   - Confirma que hablas con la persona correcta antes de dar detalles sensibles.
 
-2. **Motivo del recordatorio**
-   - Informa con claridad el aviso: vencimiento, renovación, pago pendiente o actualización requerida.
-   - Indica fecha límite, monto o acción concreta si está en el contexto de **${companyName}**.
+2. **Motivo del aviso**
+   - Informa el recordatorio (vencimiento, renovación, pago, etc.) con claridad.
+   - Indica fecha, monto o acción si está en el contexto de **${companyName}**.
 
 3. **Resolución**
    - Pregunta si ya realizó el trámite o necesita orientación.
-   - Guía los pasos siguientes (pago, documentos, confirmación) sin inventar enlaces ni montos.
+   - Guía los pasos siguientes sin inventar enlaces ni montos.
 
 4. **Escalado**
-   - Si hay dudas complejas o reclamos, ofrece transferir a un asesor humano.
+   - Si hay reclamo o duda compleja, ofrece transferir a un asesor.
 
 5. **Cierre**
-   - Confirma que el mensaje quedó claro.
-   - Agradece y despídete con tono serio pero cordial.`;
+   - Confirma que el mensaje quedó claro y despídete.`;
 }
 
-function buildFollowUpFlow(agentName: string, companyName: string): string {
-  return `1. **Tras el saludo**
+function buildFollowUpFlow(_agentName: string, companyName: string): string {
+  return `1. **Contexto**
    - Referencia brevemente el contacto previo con **${companyName}**.
-   - El saludo inicial lo maneja la plataforma; no lo repitas.
 
-2. **Retomar contexto**
-   - Recuerda brevemente el tema anterior (cotización, demo, interés manifestado).
-   - Pregunta si tuvo oportunidad de revisarlo o si surgieron dudas.
+2. **Retomar tema**
+   - Recuerda cotización, demo o interés previo.
+   - Pregunta si pudo revisarlo o si surgieron dudas.
 
-3. **Manejo de objeciones**
-   - Escucha con empatía; no interrumpas.
-   - Ofrece alternativas concretas (nueva fecha, más información, otro plan).
+3. **Objeciones**
+   - Escucha con empatía y ofrece alternativas concretas.
 
-4. **Propuesta de cierre**
-   - Sugiere un siguiente paso claro: reunión, compra, nueva llamada o envío de material.
-
-5. **Cierre**
-   - Confirma acuerdos y agradece el tiempo.`;
+4. **Cierre**
+   - Propón un siguiente paso claro (reunión, compra, nueva llamada).
+   - Agradece el tiempo.`;
 }
 
-function buildCustomerServiceFlow(agentName: string, companyName: string): string {
-  return `1. **Tras el saludo**
+function buildCustomerServiceFlow(_agentName: string, companyName: string): string {
+  return `1. **Apertura**
    - Pregunta en qué puedes colaborar y confirma el nombre del interlocutor si hace falta.
-   - El saludo inicial lo maneja la plataforma; no lo repitas.
 
-2. **Escucha activa**
-   - Deja que el cliente explique su situación completa.
+2. **Escucha**
+   - Deja que el cliente explique su situación.
    - Parafrasea lo entendido antes de responder.
 
 3. **Resolución**
-   - Responde con información del contexto de marca de **${companyName}**; no inventes políticas ni plazos.
-   - Si puedes resolver en la llamada, guía paso a paso con paciencia.
+   - Responde con información del contexto de **${companyName}**.
+   - Guía paso a paso si puedes resolver en la llamada.
 
 4. **Escalado**
-   - Si el caso supera tu alcance, explica que transferirás a un especialista y resume el caso.
+   - Si supera tu alcance, explica que transferirás a un especialista y resume el caso.
 
 5. **Cierre**
-   - Pregunta si quedó algo más pendiente.
-   - Agradece y despídete con calidez profesional.`;
+   - Pregunta si quedó algo pendiente y despídete.`;
 }
 
-function buildMeetingSchedulingFlow(agentName: string, companyName: string): string {
-  return `1. **Tras el saludo**
-   - Confirma el motivo de la cita o reunión con **${companyName}**.
-   - El saludo inicial lo maneja la plataforma; no lo repitas.
+function buildMeetingSchedulingFlow(_agentName: string, companyName: string): string {
+  return `1. **Motivo**
+   - Confirma el objetivo de la cita o reunión con **${companyName}**.
 
-2. **Motivo de la cita**
-   - Confirma el objetivo (demo, asesoría, visita, llamada de seguimiento).
+2. **Agendamiento**
+   - Propone opciones de fecha y hora.
+   - Valida correo o teléfono para confirmación.
 
-3. **Agendamiento**
-   - Propone opciones de fecha y hora; confirma zona horaria si aplica.
-   - Valida correo o teléfono para enviar la confirmación.
+3. **Resumen**
+   - Repite fecha, hora, motivo y canal acordados.
 
-4. **Resumen**
-   - Repite fecha, hora, motivo y canal acordado antes de cerrar.
-
-5. **Cierre**
-   - Indica que quedará registrado y agradece.
-   - Ofrece reagendar si cambian de planes.`;
+4. **Cierre**
+   - Indica que quedará registrado y ofrece reagendar si cambian de planes.`;
 }

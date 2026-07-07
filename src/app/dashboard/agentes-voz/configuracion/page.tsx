@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Save, Loader2, CheckCircle2, Phone, Settings2,
-  BarChart3, History, Radio, LayoutGrid
+  BarChart3, History, Radio, LayoutGrid, RefreshCw
 } from "lucide-react";
 import { btnPrimary, tabActive, tabIdle } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
@@ -13,7 +13,7 @@ import { getTemplateMeta } from "@/lib/voice-agent-templates";
 import { normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
 import { GEMINI_VOICES, VOICE_MODELS, LLM_MODELS } from "@/lib/voice-agent-options";
 import { DEFAULT_ELEVENLABS_VOICE_ID, ELEVENLABS_DEFAULT_VOICES } from "@/lib/elevenlabs/default-voices";
-import { VOICE_BUSINESS_PROMPT_GUIDE } from "@/lib/elevenlabs/voice-business-prompt";
+import { VOICE_AGENT_PROMPT_GUIDE, buildDefaultVoiceBusinessPrompt } from "@/lib/elevenlabs/voice-business-prompt";
 import { VOICE_CREDITS_PER_MINUTE, VOICE_PREMIUM_CREDITS_PER_MINUTE } from "@/lib/billing/pricing";
 import { usePricingCatalog } from "@/hooks/usePricingCatalog";
 import type { VoiceAgentFormData, VoiceAgentRecord } from "@/types/voice-agent";
@@ -171,6 +171,26 @@ function ConfigContent() {
     setSaving(false);
   };
 
+  const restoreTemplate = () => {
+    const empresa = companyName.trim() || "Mi empresa";
+    if (
+      !window.confirm(
+        "¿Reemplazar el prompt con la plantilla predeterminada? Se perderán los cambios manuales en el texto del prompt."
+      )
+    ) {
+      return;
+    }
+    setForm(f => ({
+      ...f,
+      prompt: buildDefaultVoiceBusinessPrompt({
+        purposeId: f.source_template,
+        agentName: f.name,
+        companyName: empresa,
+      }),
+    }));
+    setSaved(false);
+  };
+
   const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
     { id: "probar", label: "Probar agente", icon: Phone },
     { id: "config", label: "Configuración", icon: Settings2 },
@@ -315,8 +335,8 @@ function ConfigContent() {
                 />
                 <p className="text-[10px] text-gray-500 mt-1.5">
                   {assignedContext
-                    ? `Vinculada: ${assignedContext.name} (${companyContextText.trim().length.toLocaleString()} caracteres). Se inyecta en cada llamada automáticamente.`
-                    : "Productos, servicios y políticas de la empresa. Se inyectan solos en cada llamada; no hace falta repetirlos en el prompt."}
+                    ? `Marca: ${assignedContext.name} (${companyContextText.trim().length.toLocaleString()} caracteres) — se añade al final de cada llamada.`
+                    : "Asigna una marca para inyectar productos, servicios y políticas al final de cada llamada."}
                 </p>
                 <Link
                   href="/dashboard/contextos"
@@ -438,8 +458,16 @@ function ConfigContent() {
               </div>
             </div>
 
-            <div className="px-5 py-2 border-b border-white/[.06] bg-[#5b5bf6]/5">
-              <p className="text-[11px] text-[#a5a5ff]/90 leading-relaxed">{VOICE_BUSINESS_PROMPT_GUIDE}</p>
+            <div className="px-5 py-2 border-b border-white/[.06] bg-[#5b5bf6]/5 flex items-start justify-between gap-3">
+              <p className="text-[11px] text-[#a5a5ff]/90 leading-relaxed flex-1">{VOICE_AGENT_PROMPT_GUIDE}</p>
+              <button
+                type="button"
+                onClick={restoreTemplate}
+                disabled={callActive}
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#5b5bf6]/30 bg-[#5b5bf6]/15 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-[#5b5bf6]/25 disabled:opacity-50"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Restaurar plantilla
+              </button>
             </div>
 
             <div className="flex-1 p-5 overflow-hidden">
