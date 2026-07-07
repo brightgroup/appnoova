@@ -12,6 +12,7 @@ import {
 } from "@/lib/elevenlabs/default-voices";
 import { listCuratedPremiumVoices } from "@/lib/elevenlabs/premium-voices";
 import { ELEVENLABS_DEFAULT_LLM, ELEVENLABS_TTS_MODEL_ID } from "@/lib/elevenlabs/config";
+import { buildPremiumTurnConfig } from "@/lib/elevenlabs/voice-platform-prompt";
 
 export interface ElevenLabsSyncInput {
   name: string;
@@ -55,44 +56,7 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
     ? [PREMIUM_VOICEMAIL_DETECTION_TOOL, PREMIUM_END_CALL_TOOL]
     : [PREMIUM_END_CALL_TOOL];
 
-  const turn = outbound
-    ? {
-        turn_timeout: 15,
-        turn_eagerness: "eager" as const,
-        mode: "turn" as const,
-        speculative_turn: true,
-        turn_model: "turn_v3" as const,
-        transcribe_on_disabled_interruptions: true,
-        interruption_ignore_terms: [
-          "aló",
-          "alo",
-          "bueno",
-          "eh",
-          "pues",
-          "mm",
-          "mhm",
-          "este",
-          "o sea",
-        ],
-        soft_timeout_config: {
-          timeout_seconds: 5,
-          message: "Un momentico, ya le confirmo.",
-          use_llm_generated_message: false,
-        },
-      }
-    : {
-        turn_timeout: 7,
-        turn_eagerness: "normal" as const,
-        mode: "turn" as const,
-        speculative_turn: true,
-        turn_model: "turn_v3" as const,
-        transcribe_on_disabled_interruptions: true,
-        soft_timeout_config: {
-          timeout_seconds: 5,
-          message: "Un momentico, ya le confirmo.",
-          use_llm_generated_message: false,
-        },
-      };
+  const turn = buildPremiumTurnConfig(outbound);
 
   return {
     agent: {

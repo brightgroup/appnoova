@@ -65,13 +65,14 @@ export async function GET(req: NextRequest) {
     const temporal = buildColombiaTemporalContext();
     const outbound =
       loaded && isOutboundVoicePurpose(loaded.config.source_template);
-    const promptOverride = outbound
+    const promptOverride = loaded
       ? buildElevenLabsAgentSystemPrompt({
           prompt: loaded.config.prompt,
           purposeId: loaded.config.source_template,
           agentName: loaded.agentName,
           companyName: loaded.companyName,
           companyContextText: loaded.companyContextText,
+          phoneOutbound: outbound,
         })
       : undefined;
 

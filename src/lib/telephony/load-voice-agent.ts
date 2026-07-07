@@ -1,4 +1,5 @@
 import { resolveCompanyDisplayName } from "@/lib/company-context-resolve";
+import { loadCompanyContextById } from "@/lib/company-context-load";
 import { adminClient } from "@/lib/voice-agents-server";
 import { normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
 import type { VoiceAgentFormData } from "@/types/voice-agent";
@@ -8,41 +9,39 @@ export interface LoadedVoiceAgent {
   companyContextText: string;
   companyName: string;
   agentName: string;
+  organizationId: string | null;
   callsCount: number;
 }
 
 export async function loadVoiceAgentForCall(
   voiceAgentId: string,
-  userId: string
+  userId: string,
+  organizationId?: string | null
 ): Promise<LoadedVoiceAgent | null> {
   const db = adminClient();
-  const { data: agent, error } = await db
-    .from("voice_agents")
-    .select("*")
-    .eq("id", voiceAgentId)
-    .eq("user_id", userId)
-    .maybeSingle();
+  let query = db.from("voice_agents").select("*").eq("id", voiceAgentId);
+  const orgId = organizationId?.trim();
+  if (orgId) {
+    query = query.eq("organization_id", orgId);
+  } else {
+    query = query.eq("user_id", userId);
+  }
+
+  const { data: agent, error } = await query.maybeSingle();
 
   if (error || !agent) return null;
 
-  let companyContextText = "";
-  let companyName = resolveCompanyDisplayName(null);
-  if (agent.company_context_id) {
-    const { data: ctx } = await db
-      .from("company_contexts")
-      .select("name, content")
-      .eq("id", agent.company_context_id)
-      .eq("user_id", userId)
-      .maybeSingle();
-    companyContextText = ctx?.content?.trim() ?? "";
-    companyName = resolveCompanyDisplayName(ctx?.name);
-  }
+  const ctx = await loadCompanyContextById(db, agent.company_context_id, {
+    organizationId: agent.organization_id,
+    userId,
+  });
 
   return {
     config: normalizeVoiceAgentForm(agent),
-    companyContextText,
-    companyName,
+    companyContextText: ctx.content,
+    companyName: ctx.name,
     agentName: agent.name,
-    callsCount: Number(agent.calls_count) || 0
+    organizationId: agent.organization_id ? String(agent.organization_id) : null,
+    callsCount: Number(agent.calls_count) || 0,
   };
 }

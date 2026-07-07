@@ -1,37 +1,21 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { resolveCompanyDisplayName, resolveCompanyNameForAgent } from "@/lib/company-context-resolve";
+import { loadCompanyContextById } from "@/lib/company-context-load";
 import { syncElevenLabsAgent } from "@/lib/elevenlabs/sync-agent";
 import type { VoiceAgentFormData } from "@/types/voice-agent";
 
-export { resolveCompanyNameForAgent };
-
-async function loadCompanyContextForAgent(
-  db: SupabaseClient,
-  userId: string,
-  companyContextId?: string | null
-): Promise<{ name: string; content: string }> {
-  if (!companyContextId) {
-    return { name: resolveCompanyDisplayName(null), content: "" };
-  }
-  const { data } = await db
-    .from("company_contexts")
-    .select("name, content")
-    .eq("id", companyContextId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  return {
-    name: resolveCompanyDisplayName(data?.name),
-    content: data?.content?.trim() ?? "",
-  };
-}
+export { resolveCompanyNameForAgent } from "@/lib/company-context-resolve";
 
 export async function syncVoiceAgentToElevenLabs(
   db: SupabaseClient,
   userId: string,
   form: VoiceAgentFormData,
-  existingAgentId?: string | null
+  existingAgentId?: string | null,
+  organizationId?: string | null
 ): Promise<{ elevenlabs_agent_id: string; elevenlabs_voice_id: string }> {
-  const ctx = await loadCompanyContextForAgent(db, userId, form.company_context_id);
+  const ctx = await loadCompanyContextById(db, form.company_context_id, {
+    organizationId,
+    userId,
+  });
   const result = await syncElevenLabsAgent({
     name: form.name,
     prompt: form.prompt,

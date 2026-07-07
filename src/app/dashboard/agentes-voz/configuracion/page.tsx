@@ -314,7 +314,9 @@ function ConfigContent() {
                   }))}
                 />
                 <p className="text-[10px] text-gray-500 mt-1.5">
-                  Productos, servicios y políticas de la empresa. Se inyectan solos en cada llamada; no hace falta repetirlos en el prompt.
+                  {assignedContext
+                    ? `Vinculada: ${assignedContext.name} (${companyContextText.trim().length.toLocaleString()} caracteres). Se inyecta en cada llamada automáticamente.`
+                    : "Productos, servicios y políticas de la empresa. Se inyectan solos en cada llamada; no hace falta repetirlos en el prompt."}
                 </p>
                 <Link
                   href="/dashboard/contextos"

@@ -22,14 +22,12 @@ export function buildVoiceInteractionSteps(
 }
 
 function buildLeadQualificationFlow(agentName: string, companyName: string): string {
-  return `1. **Presentación**
-   - Saluda en una sola frase: presenta **${agentName}** de **${companyName}**.
-   - Ejemplo: "Buenas tardes, le saluda **${agentName}** de **${companyName}**. ¿Con quién tengo el gusto?"
-   - Espera el nombre del interlocutor antes de continuar.
+  return `1. **Tras el saludo**
+   - Confirma con quién hablas y si es buen momento para hablar un par de minutos.
+   - El saludo inicial lo maneja la plataforma; no lo repitas.
 
 2. **Motivo de la llamada**
    - Explica brevemente por qué contactas (interés en el producto/servicio, solicitud recibida, campaña activa).
-   - Pregunta si es un buen momento para hablar un par de minutos.
 
 3. **Calificación del prospecto**
    - Indaga necesidad concreta, urgencia y contexto (qué busca resolver).
@@ -42,18 +40,17 @@ function buildLeadQualificationFlow(agentName: string, companyName: string): str
 
 5. **Cierre**
    - Resume lo acordado en una frase clara.
-   - Despídete: "Muchas gracias por su tiempo. Que tenga un excelente día."`;
+   - Despídete con calidez profesional.`;
 }
 
 function buildPolicyReminderFlow(agentName: string, companyName: string): string {
-  return `1. **Presentación**
-   - Identifícate y menciona **${companyName}**.
-   - Ejemplo: "Buenos días, le saluda **${agentName}** de **${companyName}**. ¿Hablo con [nombre del titular]?"
+  return `1. **Tras el saludo**
    - Verifica que hablas con la persona correcta antes de dar detalles sensibles.
+   - El saludo inicial lo maneja la plataforma; no lo repitas.
 
 2. **Motivo del recordatorio**
    - Informa con claridad el aviso: vencimiento, renovación, pago pendiente o actualización requerida.
-   - Indica fecha límite, monto o acción concreta si está en el contexto.
+   - Indica fecha límite, monto o acción concreta si está en el contexto de **${companyName}**.
 
 3. **Resolución**
    - Pregunta si ya realizó el trámite o necesita orientación.
@@ -68,9 +65,9 @@ function buildPolicyReminderFlow(agentName: string, companyName: string): string
 }
 
 function buildFollowUpFlow(agentName: string, companyName: string): string {
-  return `1. **Presentación**
-   - Saluda y referencia el contacto previo con **${companyName}**.
-   - Ejemplo: "Buenas tardes, le saluda **${agentName}** de **${companyName}**. Le llamo para darle seguimiento a la información que le compartimos."
+  return `1. **Tras el saludo**
+   - Referencia brevemente el contacto previo con **${companyName}**.
+   - El saludo inicial lo maneja la plataforma; no lo repitas.
 
 2. **Retomar contexto**
    - Recuerda brevemente el tema anterior (cotización, demo, interés manifestado).
@@ -88,15 +85,16 @@ function buildFollowUpFlow(agentName: string, companyName: string): string {
 }
 
 function buildCustomerServiceFlow(agentName: string, companyName: string): string {
-  return `1. **Presentación**
-   - Saludo de servicio: "Buenas tardes, **${companyName}**, le atiende **${agentName}**. ¿Con quién tengo el gusto y en qué le puedo colaborar?"
+  return `1. **Tras el saludo**
+   - Pregunta en qué puedes colaborar y confirma el nombre del interlocutor si hace falta.
+   - El saludo inicial lo maneja la plataforma; no lo repitas.
 
 2. **Escucha activa**
    - Deja que el cliente explique su situación completa.
    - Parafrasea lo entendido antes de responder.
 
 3. **Resolución**
-   - Responde con información del contexto de la empresa; no inventes políticas ni plazos.
+   - Responde con información del contexto de marca de **${companyName}**; no inventes políticas ni plazos.
    - Si puedes resolver en la llamada, guía paso a paso con paciencia.
 
 4. **Escalado**
@@ -108,8 +106,9 @@ function buildCustomerServiceFlow(agentName: string, companyName: string): strin
 }
 
 function buildMeetingSchedulingFlow(agentName: string, companyName: string): string {
-  return `1. **Presentación**
-   - Saludo y propósito: "Buenas tardes, le saluda **${agentName}** de **${companyName}**. Le llamo para coordinar una cita o reunión."
+  return `1. **Tras el saludo**
+   - Confirma el motivo de la cita o reunión con **${companyName}**.
+   - El saludo inicial lo maneja la plataforma; no lo repitas.
 
 2. **Motivo de la cita**
    - Confirma el objetivo (demo, asesoría, visita, llamada de seguimiento).

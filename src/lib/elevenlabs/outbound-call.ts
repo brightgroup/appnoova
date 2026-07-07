@@ -3,6 +3,7 @@ import { isVoicemailUtterance } from "@/lib/voice-voicemail-detection";
 import { CAMPAIGN_ELEVENLABS_OUTBOUND_TOOLS } from "@/lib/elevenlabs/campaign-outbound-prompt";
 import { getElevenLabsPhoneNumberId } from "@/lib/elevenlabs/config";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
+import { buildPremiumTurnOverride } from "@/lib/elevenlabs/voice-platform-prompt";
 
 export interface ElevenLabsOutboundCallResult {
   conversationId: string;
@@ -28,7 +29,6 @@ export async function placeElevenLabsOutboundCall(input: {
   }
 
   const firstMessage = input.firstMessage?.trim() ?? "";
-  const speakFirst = firstMessage.length > 0;
 
   const data = await elevenLabsFetch<{
     conversation_id?: string;
@@ -45,7 +45,7 @@ export async function placeElevenLabsOutboundCall(input: {
         conversation_config_override: {
           agent: {
             first_message: firstMessage,
-            disable_first_message_interruptions: speakFirst,
+            disable_first_message_interruptions: true,
             ...(input.systemPromptOverride
               ? {
                   prompt: {
@@ -57,14 +57,7 @@ export async function placeElevenLabsOutboundCall(input: {
                 }
               : {}),
           },
-          ...(speakFirst
-            ? {
-                turn: {
-                  turn_eagerness: "eager",
-                  transcribe_on_disabled_interruptions: true,
-                },
-              }
-            : {}),
+          turn: buildPremiumTurnOverride(),
         },
       },
     },

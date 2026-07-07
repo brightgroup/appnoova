@@ -59,11 +59,9 @@ export function buildOutboundCampaignFirstMessage(agentName: string, companyName
  */
 export const PREMIUM_OUTBOUND_PICKUP_PROMPT = `
 
-## Apertura en llamada saliente (obligatorio)
-- Si la persona acaba de decir "aló", "bueno", "dígame", "hola" o "sí": responde DE INMEDIATO en UNA sola frase breve (tu nombre y el nombre exacto de la empresa). No esperes más silencio.
-- Si aún no ha dicho nada audible, espera un instante breve; en cuanto hable, saluda al momento.
-- No des resumen de la empresa, pitch largo ni lista de servicios al abrir.
-- No repitas el saludo si ya saludaste.`;
+## Apertura en llamada saliente
+- Cuando la persona diga "aló", "bueno", "dígame" o "hola": saluda UNA sola vez (nombre + empresa) en una frase breve.
+- Después de ese primer saludo, si repiten "aló" solo di "Sí, le escucho" — NUNCA vuelvas a saludar.`;
 
 /** Instrucción de cierre — el agente debe usar end_call al despedirse. */
 export const PREMIUM_CALL_ENDING_PROMPT = `

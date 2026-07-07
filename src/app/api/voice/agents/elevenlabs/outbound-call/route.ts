@@ -140,6 +140,7 @@ export async function POST(req: NextRequest) {
       agentName: loaded.agentName,
       companyName: loaded.companyName,
       companyContextText: loaded.companyContextText,
+      phoneOutbound: true,
     });
 
     const { conversationId } = await placeElevenLabsOutboundCall({

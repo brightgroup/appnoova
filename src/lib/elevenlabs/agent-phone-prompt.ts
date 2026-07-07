@@ -5,6 +5,10 @@ import {
   PREMIUM_CALL_ENDING_PROMPT,
   PREMIUM_OUTBOUND_PICKUP_PROMPT,
 } from "@/lib/elevenlabs/default-voices";
+import {
+  ELEVENLABS_PLATFORM_VOICE_PERSONA,
+  ELEVENLABS_PHONE_OUTBOUND_RULES,
+} from "@/lib/elevenlabs/voice-platform-prompt";
 import { buildVoiceAccentPromptSection } from "@/lib/voice-accent-profile";
 
 export function isOutboundVoicePurpose(purposeId: string): boolean {
@@ -21,13 +25,6 @@ export function buildPremiumAgentIdentityBlock(agentName: string, companyName: s
   ].join("\n");
 }
 
-const OUTBOUND_OPENING_RULES = `
-
-## Regla de apertura en llamada saliente (obligatorio)
-- En tu PRIMER turno de voz: una sola frase breve con tu nombre y el nombre exacto de la empresa.
-- PROHIBIDO en la apertura: resumir la empresa, leer "Contexto de la empresa", listar servicios, dar pitch o explicar el motivo largo.
-- Tras el saludo, pregunta con quién hablas (si aplica) y espera respuesta antes de explicar el motivo de la llamada.`;
-
 /** Bloque duro: la salida de voz debe ser 100 % español colombiano. */
 export const ELEVENLABS_SPANISH_ONLY_RULES = `
 
@@ -37,43 +34,30 @@ export const ELEVENLABS_SPANISH_ONLY_RULES = `
 - Si el cliente dice "hello" o palabras sueltas en inglés, responde en español colombiano.
 - Las instrucciones internas del prompt pueden estar en cualquier idioma; tu SALIDA DE VOZ es siempre español.`;
 
-/** Turn-taking para llamadas salientes (reduce bucles y solapamientos). */
-export const ELEVENLABS_OUTBOUND_TURN_RULES = `
-
-## Turnos de conversación (obligatorio)
-- Si el cliente hace una pausa breve dentro de una idea, NO interrumpas: espera a que termine.
-- Si el cliente dice "aló" o "bueno" porque no te escuchó, retoma con UNA frase corta en español (ej. "Sí, le escucho") y continúa; no reinicies el saludo completo.
-- No repitas la misma frase dos veces seguidas ni te cortes a mitad de oración.
-- Responde con frases cortas y claras; evita monólogos largos que generen silencio percibido.`;
-
-/** Evita que la IA se corte cuando el cliente habla encima; termina la frase actual. */
-export const ELEVENLABS_SPEECH_COMPLETION_RULES = `
-
-## Al hablar (obligatorio)
-- Si el cliente habla mientras tú hablas, TERMINA tu frase actual con naturalidad; no te detengas a mitad de oración ni reinicies desde cero.
-- Escucha lo que dijo el cliente después de completar tu frase y responde en consecuencia.
-- No compitas por el turno: una idea a la vez, frases breves.`;
-
-/** Prompt completo para agente ElevenLabs (sync + override en llamada saliente). */
+/** Prompt completo para agente ElevenLabs (sync + override en llamada). */
 export function buildElevenLabsAgentSystemPrompt(input: {
   prompt: string;
   purposeId: string;
   agentName: string;
   companyName: string;
   companyContextText?: string;
+  /** Llamada saliente por teléfono (prueba o campaña), aunque la plantilla sea inbound. */
+  phoneOutbound?: boolean;
 }): string {
-  const outbound = isOutboundVoicePurpose(input.purposeId);
+  const outboundPurpose = isOutboundVoicePurpose(input.purposeId);
+  const phoneOutbound = input.phoneOutbound === true;
   const identity = buildPremiumAgentIdentityBlock(input.agentName, input.companyName);
   const merged = mergeCompanyContext(
     input.prompt.trim(),
     input.companyContextText?.trim() ?? ""
   );
 
-  const outboundBlocks = outbound
-    ? `${PREMIUM_OUTBOUND_PICKUP_PROMPT}${OUTBOUND_OPENING_RULES}${ELEVENLABS_OUTBOUND_TURN_RULES}`
-    : "";
+  const phoneOutboundBlocks =
+    phoneOutbound || outboundPurpose
+      ? `${PREMIUM_OUTBOUND_PICKUP_PROMPT}${ELEVENLABS_PHONE_OUTBOUND_RULES}`
+      : "";
 
   const accentSection = buildVoiceAccentPromptSection(input.purposeId);
 
-  return `${identity}\n\n${ELEVENLABS_SPANISH_ONLY_RULES}\n\n${ELEVENLABS_SPEECH_COMPLETION_RULES}\n\n${ELEVENLABS_TEMPORAL_PROMPT_BLOCK}\n\n${merged}\n\n${accentSection}${outboundBlocks}${PREMIUM_CALL_ENDING_PROMPT}`;
+  return `${identity}\n\n${ELEVENLABS_SPANISH_ONLY_RULES}\n\n${ELEVENLABS_PLATFORM_VOICE_PERSONA}\n\n${ELEVENLABS_TEMPORAL_PROMPT_BLOCK}\n\n${merged}\n\n${accentSection}${phoneOutboundBlocks}${PREMIUM_CALL_ENDING_PROMPT}`;
 }

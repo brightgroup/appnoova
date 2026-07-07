@@ -188,7 +188,8 @@ export async function POST(req: NextRequest) {
           db,
           userId,
           updateForm,
-          existingAgent.elevenlabs_agent_id
+          existingAgent.elevenlabs_agent_id,
+          orgId
         );
       } catch (e) {
         const message = e instanceof Error ? e.message : "Error al sincronizar agente premium";
@@ -221,7 +222,7 @@ export async function POST(req: NextRequest) {
   let elevenlabsFields: { elevenlabs_agent_id?: string | null; elevenlabs_voice_id?: string | null } = {};
   if (form.voice_provider === "elevenlabs") {
     try {
-      elevenlabsFields = await syncVoiceAgentToElevenLabs(db, userId, form);
+      elevenlabsFields = await syncVoiceAgentToElevenLabs(db, userId, form, undefined, orgId);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Error al sincronizar agente premium";
       return NextResponse.json({ error: message }, { status: 502 });

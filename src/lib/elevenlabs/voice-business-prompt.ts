@@ -1,9 +1,8 @@
-import { getPurposeMeta } from "@/lib/agent-purpose-catalog";
 import { buildVoiceInteractionSteps } from "@/lib/voice-purpose-flows";
 
 /** Texto de ayuda en UI: qué va en el prompt del agente vs qué maneja Noova. */
-export const VOICE_BUSINESS_PROMPT_GUIDE = `Escribe solo protocolo y reglas de tu negocio (identidad del rol, pasos de la llamada, restricciones).
-El contexto de marca, idioma, turnos, apertura/cierre y acento los añade Noova automáticamente desde la marca asignada al agente.`;
+export const VOICE_BUSINESS_PROMPT_GUIDE = `Escribe solo protocolo y reglas de tu negocio. El saludo, tono humano, idioma y turnos los maneja Noova.
+El contexto de marca (arriba en "Marca / contexto") se inyecta solo en cada llamada.`;
 
 export interface VoiceBusinessPromptInput {
   purposeId: string;
@@ -37,16 +36,23 @@ function businessRestrictions(companyName: string): string {
 - Respeta objeciones: no insistas más de dos veces si dice que no está interesado.`;
 }
 
+/** Protocolo sugerido completo (opcional — para cargar manualmente en el editor). */
+export function buildSuggestedVoiceProtocol(
+  purposeId: string,
+  agentName: string,
+  companyName: string
+): string {
+  return buildVoiceInteractionSteps(purposeId, agentName, companyName);
+}
+
 /**
- * Prompt corto solo con contenido de negocio (identidad, protocolo, reglas).
- * La plataforma añade idioma, turnos, apertura/cierre y acento en sync ElevenLabs.
+ * Plantilla mínima al crear agente: solo identidad + espacio para protocolo.
+ * Noova añade saludo, tono, idioma, turnos, acento y contexto de marca.
  */
 export function buildDefaultVoiceBusinessPrompt(input: VoiceBusinessPromptInput): string {
   const agentName = input.agentName.trim() || "Asistente";
   const companyName = input.companyName.trim() || "Mi empresa";
-  const purpose = getPurposeMeta("voice", input.purposeId);
   const objective = purposeObjective(input.purposeId, companyName);
-  const protocol = buildVoiceInteractionSteps(input.purposeId, agentName, companyName);
   const extra = input.extraInstructions?.trim()
     ? `\n## Instrucciones adicionales\n${input.extraInstructions.trim()}`
     : "";
@@ -54,10 +60,10 @@ export function buildDefaultVoiceBusinessPrompt(input: VoiceBusinessPromptInput)
   return `## Identidad
 Eres **${agentName}**, agente de voz de **${companyName}**.
 **Objetivo:** ${objective}
-**Tipo de agente:** ${purpose.label}
 
 ## Protocolo de la llamada
-${protocol}
+(Personaliza aquí el guion de tu negocio: pasos, preguntas y cierre.
+El saludo, conducta telefónica y contexto de marca los maneja Noova automáticamente.)
 
 ${businessRestrictions(companyName)}${extra}`;
 }

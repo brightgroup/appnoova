@@ -61,6 +61,7 @@ export async function connectCampaignElevenLabsAfterAmd(input: {
     agentName: input.agent.agentName,
     companyName: input.agent.companyName,
     companyContextText: input.agent.companyContextText,
+    phoneOutbound: true,
   });
 
   const firstMessage = buildOutboundCampaignFirstMessage(
