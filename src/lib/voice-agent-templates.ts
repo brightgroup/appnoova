@@ -1,7 +1,7 @@
 import type { VoiceAgentFormData } from "@/types/voice-agent";
 import { DEFAULT_LIVE_MODEL } from "@/lib/voice-agent-options";
 import { resolvePurposeId, getPurposeMeta } from "@/lib/agent-purpose-catalog";
-import { generateAgentPrompt } from "@/lib/agent-prompt-generator";
+import { buildDefaultVoiceBusinessPrompt } from "@/lib/elevenlabs/voice-business-prompt";
 import {
   suggestTemperatureForPurpose,
   suggestVoiceForPurpose,
@@ -19,12 +19,10 @@ export interface VoiceTemplateMeta {
 
 function buildMeta(purposeId: string): VoiceTemplateMeta {
   const purpose = getPurposeMeta("voice", purposeId);
-  const prompt = generateAgentPrompt({
-    channel: "voice",
-    agentName: "Asistente",
+  const prompt = buildDefaultVoiceBusinessPrompt({
     purposeId,
+    agentName: "Asistente",
     companyName: "Mi empresa",
-    companyDescription: "",
   });
   return {
     name: purpose.label,

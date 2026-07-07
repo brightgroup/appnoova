@@ -1,8 +1,8 @@
 import { buildElevenLabsAgentSystemPrompt } from "@/lib/elevenlabs/agent-phone-prompt";
 import {
-  CAMPAIGN_ELEVENLABS_OUTBOUND_TOOLS,
-  CAMPAIGN_OUTBOUND_VOICEMAIL_BLOCK,
+  CAMPAIGN_POST_AMD_CONTEXT,
 } from "@/lib/elevenlabs/campaign-outbound-prompt";
+import { buildOutboundCampaignFirstMessage } from "@/lib/elevenlabs/default-voices";
 import { placeElevenLabsOutboundCall } from "@/lib/elevenlabs/outbound-call";
 import { resolveElevenLabsPhoneLine } from "@/lib/elevenlabs/phone-line";
 import { resolvePlatformSipConfig } from "@/lib/elevenlabs/sip-config";
@@ -56,12 +56,17 @@ export async function connectCampaignElevenLabsAfterAmd(input: {
   if (!destination) throw new Error("Destino no definido");
 
   const systemPromptOverride = buildElevenLabsAgentSystemPrompt({
-    prompt: promptOverride + CAMPAIGN_OUTBOUND_VOICEMAIL_BLOCK,
+    prompt: promptOverride + CAMPAIGN_POST_AMD_CONTEXT,
     purposeId: input.agent.config.source_template,
     agentName: input.agent.agentName,
     companyName: input.agent.companyName,
     companyContextText: input.agent.companyContextText,
   });
+
+  const firstMessage = buildOutboundCampaignFirstMessage(
+    input.agent.agentName,
+    input.agent.companyName
+  );
 
   const { conversationId } = await placeElevenLabsOutboundCall({
     agentId: input.elevenlabsAgentId,
@@ -69,6 +74,7 @@ export async function connectCampaignElevenLabsAfterAmd(input: {
     agentPhoneNumberId: line.phoneNumberId,
     systemPromptOverride,
     campaignOutbound: true,
+    firstMessage,
   });
 
   const now = new Date().toISOString();

@@ -45,15 +45,24 @@ export function resolvePremiumVoiceSubtitle(voiceId?: string | null): string {
 }
 
 /**
- * Llamadas salientes por teléfono: el humano contesta con "aló"/"bueno" antes de que hable la IA.
- * Se combina con first_message vacío en outbound-call (ElevenLabs espera al usuario).
+ * Saludo inmediato en campaña tras AMD humano (la persona ya contestó).
+ */
+export function buildOutboundCampaignFirstMessage(agentName: string, companyName: string): string {
+  const name = agentName.trim() || "su asesor";
+  const empresa = companyName.trim() || "Mi empresa";
+  return `Buenas tardes, le saluda ${name} de ${empresa}. ¿Con quién tengo el gusto?`;
+}
+
+/**
+ * Llamadas salientes directas (sin AMD previo): espera "aló" del cliente.
+ * En campañas con AMD, la plataforma envía first_message y saluda al conectar.
  */
 export const PREMIUM_OUTBOUND_PICKUP_PROMPT = `
 
 ## Apertura en llamada saliente (obligatorio)
-- Tú iniciaste la llamada; la persona acaba de contestar. NO hables hasta que diga algo ("aló", "bueno", "dígame", "hola", "sí", etc.).
-- Cuando responda, saluda en UNA sola frase breve (tu nombre y el nombre exacto de la empresa) y continúa el guion.
-- No des resumen de la empresa, pitch largo ni lista de servicios al abrir. No hables encima de la persona.
+- Si la persona acaba de decir "aló", "bueno", "dígame", "hola" o "sí": responde DE INMEDIATO en UNA sola frase breve (tu nombre y el nombre exacto de la empresa). No esperes más silencio.
+- Si aún no ha dicho nada audible, espera un instante breve; en cuanto hable, saluda al momento.
+- No des resumen de la empresa, pitch largo ni lista de servicios al abrir.
 - No repitas el saludo si ya saludaste.`;
 
 /** Instrucción de cierre — el agente debe usar end_call al despedirse. */

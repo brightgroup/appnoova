@@ -16,6 +16,8 @@ export async function placeElevenLabsOutboundCall(input: {
   systemPromptOverride?: string;
   /** Campaña saliente: herramientas de buzón + end_call. */
   campaignOutbound?: boolean;
+  /** Tras AMD humano: saludo inmediato al conectar (sin esperar "aló"). */
+  firstMessage?: string;
 }): Promise<ElevenLabsOutboundCallResult> {
   const phoneNumberId =
     input.agentPhoneNumberId?.trim() || getElevenLabsPhoneNumberId();
@@ -24,6 +26,9 @@ export async function placeElevenLabsOutboundCall(input: {
       "Sin línea premium sincronizada — asigna una línea Telnyx al agente en Canales"
     );
   }
+
+  const firstMessage = input.firstMessage?.trim() ?? "";
+  const speakFirst = firstMessage.length > 0;
 
   const data = await elevenLabsFetch<{
     conversation_id?: string;
@@ -39,7 +44,8 @@ export async function placeElevenLabsOutboundCall(input: {
         dynamic_variables: buildColombiaTemporalContext().dynamicVariables,
         conversation_config_override: {
           agent: {
-            first_message: "",
+            first_message: firstMessage,
+            disable_first_message_interruptions: speakFirst,
             ...(input.systemPromptOverride
               ? {
                   prompt: {
@@ -51,6 +57,14 @@ export async function placeElevenLabsOutboundCall(input: {
                 }
               : {}),
           },
+          ...(speakFirst
+            ? {
+                turn: {
+                  turn_eagerness: "eager",
+                  transcribe_on_disabled_interruptions: true,
+                },
+              }
+            : {}),
         },
       },
     },

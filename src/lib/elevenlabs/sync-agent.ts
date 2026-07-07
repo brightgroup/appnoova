@@ -58,10 +58,11 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
   const turn = outbound
     ? {
         turn_timeout: 15,
-        turn_eagerness: "normal" as const,
+        turn_eagerness: "eager" as const,
         mode: "turn" as const,
         speculative_turn: true,
         turn_model: "turn_v3" as const,
+        transcribe_on_disabled_interruptions: true,
         interruption_ignore_terms: [
           "aló",
           "alo",
@@ -85,6 +86,7 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
         mode: "turn" as const,
         speculative_turn: true,
         turn_model: "turn_v3" as const,
+        transcribe_on_disabled_interruptions: true,
         soft_timeout_config: {
           timeout_seconds: 5,
           message: "Un momentico, ya le confirmo.",
@@ -99,8 +101,8 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
         ? ""
         : buildPremiumFirstMessage(agentName, companyName),
       language: "es",
-      // Solo inbound/web: no interrumpir el saludo inicial por ruido ambiente.
-      disable_first_message_interruptions: !outbound,
+      // Evita que ruido o "aló" corten el saludo inicial.
+      disable_first_message_interruptions: true,
       prompt: {
         prompt: systemPrompt,
         llm: ELEVENLABS_DEFAULT_LLM,

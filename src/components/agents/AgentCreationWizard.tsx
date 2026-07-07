@@ -7,6 +7,7 @@ import {
 import { btnPrimary, btnGhost } from "@/lib/brand-ui";
 import { TEXT_AGENT_PURPOSES, VOICE_AGENT_PURPOSES, type AgentChannel } from "@/lib/agent-purpose-catalog";
 import { generateAgentPrompt } from "@/lib/agent-prompt-generator";
+import { buildDefaultVoiceBusinessPrompt } from "@/lib/elevenlabs/voice-business-prompt";
 import { getPurposeMeta } from "@/lib/agent-purpose-catalog";
 import { getPurposeIcon } from "@/lib/agent-purpose-icons";
 import { GEMINI_VOICES } from "@/lib/voice-agent-options";
@@ -180,15 +181,22 @@ export function AgentCreationWizard({
 
   const generatedPrompt = useMemo(
     () =>
-      generateAgentPrompt({
-        channel,
-        agentName: resolvedAgentName,
-        purposeId,
-        companyName: resolvedCompanyName,
-        companyDescription: companyDescription.trim(),
-        extraInstructions,
-      }),
-    [channel, resolvedAgentName, purposeId, resolvedCompanyName, companyDescription, extraInstructions]
+      isVoice
+        ? buildDefaultVoiceBusinessPrompt({
+            purposeId,
+            agentName: resolvedAgentName,
+            companyName: resolvedCompanyName,
+            extraInstructions,
+          })
+        : generateAgentPrompt({
+            channel,
+            agentName: resolvedAgentName,
+            purposeId,
+            companyName: resolvedCompanyName,
+            companyDescription: companyDescription.trim(),
+            extraInstructions,
+          }),
+    [isVoice, channel, resolvedAgentName, purposeId, resolvedCompanyName, companyDescription, extraInstructions]
   );
 
   const purposeMeta = getPurposeMeta(channel, purposeId);

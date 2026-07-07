@@ -5,6 +5,7 @@ import {
   PREMIUM_CALL_ENDING_PROMPT,
   PREMIUM_OUTBOUND_PICKUP_PROMPT,
 } from "@/lib/elevenlabs/default-voices";
+import { buildVoiceAccentPromptSection } from "@/lib/voice-accent-profile";
 
 export function isOutboundVoicePurpose(purposeId: string): boolean {
   return getPurposeMeta("voice", purposeId).tag === "Outbound";
@@ -45,6 +46,14 @@ export const ELEVENLABS_OUTBOUND_TURN_RULES = `
 - No repitas la misma frase dos veces seguidas ni te cortes a mitad de oración.
 - Responde con frases cortas y claras; evita monólogos largos que generen silencio percibido.`;
 
+/** Evita que la IA se corte cuando el cliente habla encima; termina la frase actual. */
+export const ELEVENLABS_SPEECH_COMPLETION_RULES = `
+
+## Al hablar (obligatorio)
+- Si el cliente habla mientras tú hablas, TERMINA tu frase actual con naturalidad; no te detengas a mitad de oración ni reinicies desde cero.
+- Escucha lo que dijo el cliente después de completar tu frase y responde en consecuencia.
+- No compitas por el turno: una idea a la vez, frases breves.`;
+
 /** Prompt completo para agente ElevenLabs (sync + override en llamada saliente). */
 export function buildElevenLabsAgentSystemPrompt(input: {
   prompt: string;
@@ -64,5 +73,7 @@ export function buildElevenLabsAgentSystemPrompt(input: {
     ? `${PREMIUM_OUTBOUND_PICKUP_PROMPT}${OUTBOUND_OPENING_RULES}${ELEVENLABS_OUTBOUND_TURN_RULES}`
     : "";
 
-  return `${identity}\n\n${ELEVENLABS_SPANISH_ONLY_RULES}\n\n${ELEVENLABS_TEMPORAL_PROMPT_BLOCK}\n\n${merged}${outboundBlocks}${PREMIUM_CALL_ENDING_PROMPT}`;
+  const accentSection = buildVoiceAccentPromptSection(input.purposeId);
+
+  return `${identity}\n\n${ELEVENLABS_SPANISH_ONLY_RULES}\n\n${ELEVENLABS_SPEECH_COMPLETION_RULES}\n\n${ELEVENLABS_TEMPORAL_PROMPT_BLOCK}\n\n${merged}\n\n${accentSection}${outboundBlocks}${PREMIUM_CALL_ENDING_PROMPT}`;
 }

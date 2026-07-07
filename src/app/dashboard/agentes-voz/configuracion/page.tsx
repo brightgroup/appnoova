@@ -13,6 +13,7 @@ import { getTemplateMeta } from "@/lib/voice-agent-templates";
 import { normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
 import { GEMINI_VOICES, VOICE_MODELS, LLM_MODELS } from "@/lib/voice-agent-options";
 import { DEFAULT_ELEVENLABS_VOICE_ID, ELEVENLABS_DEFAULT_VOICES } from "@/lib/elevenlabs/default-voices";
+import { VOICE_BUSINESS_PROMPT_GUIDE } from "@/lib/elevenlabs/voice-business-prompt";
 import { VOICE_CREDITS_PER_MINUTE, VOICE_PREMIUM_CREDITS_PER_MINUTE } from "@/lib/billing/pricing";
 import { usePricingCatalog } from "@/hooks/usePricingCatalog";
 import type { VoiceAgentFormData, VoiceAgentRecord } from "@/types/voice-agent";
@@ -312,6 +313,9 @@ function ConfigContent() {
                     label: `${c.name}${c.is_default ? " · predeterminada" : ""}`
                   }))}
                 />
+                <p className="text-[10px] text-gray-500 mt-1.5">
+                  Productos, servicios y políticas de la empresa. Se inyectan solos en cada llamada; no hace falta repetirlos en el prompt.
+                </p>
                 <Link
                   href="/dashboard/contextos"
                   className="inline-block mt-2 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]"
@@ -430,6 +434,10 @@ function ConfigContent() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="px-5 py-2 border-b border-white/[.06] bg-[#5b5bf6]/5">
+              <p className="text-[11px] text-[#a5a5ff]/90 leading-relaxed">{VOICE_BUSINESS_PROMPT_GUIDE}</p>
             </div>
 
             <div className="flex-1 p-5 overflow-hidden">

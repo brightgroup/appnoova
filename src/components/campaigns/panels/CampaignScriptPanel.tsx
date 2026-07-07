@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Link2, Link2Off, RefreshCw, AlertCircle } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { CampaignPromptEditor } from "@/components/campaigns/CampaignPromptEditor";
+import { VOICE_BUSINESS_PROMPT_GUIDE } from "@/lib/elevenlabs/voice-business-prompt";
 import { campaignVariables, buildRowVariables } from "@/lib/campaigns/render-prompt";
 import type { VoiceCampaignRecord } from "@/types/voice-campaign";
 import type { DataTableColumn } from "@/types/data-table";
@@ -89,6 +90,7 @@ export function CampaignScriptPanel({ campaign, onChange }: CampaignScriptPanelP
               : "Sin agente asignado. "}
             Las variables se reemplazan con los datos de cada contacto en la llamada.
           </p>
+          <p className="text-xs text-[#a5a5ff]/80 mt-2">{VOICE_BUSINESS_PROMPT_GUIDE}</p>
         </div>
 
         {!campaign.voice_agent_id ? (
