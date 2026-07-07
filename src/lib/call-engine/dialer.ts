@@ -2,7 +2,7 @@ import { resolveElevenLabsPhoneLine } from "@/lib/elevenlabs/phone-line";
 import { resolvePlatformSipConfig } from "@/lib/elevenlabs/sip-config";
 import { billingBlockedMessage, checkBillingForOrg } from "@/lib/billing/meter";
 import { releaseStuckCampaignRows } from "@/lib/call-engine/campaign-audience-status";
-import { syncOpenElevenLabsCampaignCalls, syncStuckCampaignScreeningCalls } from "@/lib/elevenlabs/sync-open-campaign-calls";
+import { syncOpenElevenLabsCampaignCalls, syncStuckCampaignScreeningCalls, reconcileFinalizedInProgressCampaignCalls, reconcileStaleInProgressCampaignCalls } from "@/lib/elevenlabs/sync-open-campaign-calls";
 import {
   bindCampaignCallControlId,
   cancelReservedCampaignCall,
@@ -339,6 +339,8 @@ async function executeCampaignDialerTick(): Promise<DialerTickResult> {
 
   const releasedStuck = await releaseStuckCampaignRows(3);
   const releasedScreening = await syncStuckCampaignScreeningCalls(4);
+  const reconciledFinalized = await reconcileFinalizedInProgressCampaignCalls();
+  const reconciledStale = await reconcileStaleInProgressCampaignCalls(20);
   await syncOpenElevenLabsCampaignCalls();
   const activeCalls = await countActiveCampaignCalls(db);
   const available = rules.max_concurrent - activeCalls;

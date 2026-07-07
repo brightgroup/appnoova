@@ -5,6 +5,93 @@ import { isMachineAmdResult, type OutboundCallOutcome } from "@/lib/telephony/ca
 import { adminClient } from "@/lib/voice-agents-server";
 
 /**
+ * Cierra registros atascados: metadata.finalized pero status in_progress.
+ * Esas filas bloquean el cupo global del marcador (max_concurrent).
+ */
+export async function reconcileFinalizedInProgressCampaignCalls(): Promise<number> {
+  const db = adminClient();
+  const { data: rows, error } = await db
+    .from("voice_agent_calls")
+    .select("id, duration_sec, metadata")
+    .eq("status", "in_progress")
+    .not("campaign_id", "is", null);
+
+  if (error || !rows?.length) return 0;
+
+  let fixed = 0;
+  for (const row of rows) {
+    const meta = (row.metadata ?? {}) as Record<string, unknown>;
+    if (!meta.finalized) continue;
+
+    const outcome = String(meta.outcome ?? "").trim();
+    const isVoicemail = meta.voicemail_detected === true || outcome === "voicemail";
+    const duration = Number(row.duration_sec) || 0;
+    const hadConversation = duration > 0 || Boolean(meta.answered_at);
+
+    const status = isVoicemail ? "voicemail" : hadConversation ? "ended_success" : "missed";
+
+    const { error: upErr } = await db
+      .from("voice_agent_calls")
+      .update({
+        status,
+        metadata: { ...meta, phase: "ended" },
+      })
+      .eq("id", row.id)
+      .eq("status", "in_progress");
+
+    if (!upErr) fixed += 1;
+  }
+
+  if (fixed > 0) {
+    console.info("[reconcile-finalized-campaign-calls] liberadas:", fixed);
+  }
+  return fixed;
+}
+
+/** Cierra llamadas de campaña muy antiguas aún en in_progress (zombies sin finalized). */
+export async function reconcileStaleInProgressCampaignCalls(stuckMinutes = 20): Promise<number> {
+  const db = adminClient();
+  const cutoff = new Date(Date.now() - stuckMinutes * 60_000).toISOString();
+  const { data: rows, error } = await db
+    .from("voice_agent_calls")
+    .select("id, metadata")
+    .eq("status", "in_progress")
+    .not("campaign_id", "is", null)
+    .lt("created_at", cutoff);
+
+  if (error || !rows?.length) return 0;
+
+  let fixed = 0;
+  const now = new Date().toISOString();
+  for (const row of rows) {
+    const meta = (row.metadata ?? {}) as Record<string, unknown>;
+    if (meta.finalized) continue;
+
+    const { error: upErr } = await db
+      .from("voice_agent_calls")
+      .update({
+        status: "missed",
+        metadata: {
+          ...meta,
+          finalized: true,
+          phase: "ended",
+          outcome: "no_answer",
+          ended_at: now,
+        },
+      })
+      .eq("id", row.id)
+      .eq("status", "in_progress");
+
+    if (!upErr) fixed += 1;
+  }
+
+  if (fixed > 0) {
+    console.info("[reconcile-stale-campaign-calls] liberadas:", fixed);
+  }
+  return fixed;
+}
+
+/**
  * Finaliza llamadas ElevenLabs de campaña que quedaron en in_progress
  * (el marcador no hace polling como la prueba telefónica).
  */

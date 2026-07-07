@@ -178,16 +178,25 @@ export async function updatePhoneTestCallSession(
     patch.voicemail_detected === true ||
     metadata.voicemail_detected === true ||
     outcome === "voicemail";
-  const status =
-    isVoicemail
-      ? "voicemail"
-      : metadata.finalized && (outcome === "no_answer" || outcome === "busy" || outcome === "failed")
-        ? "missed"
-        : metadata.phase === "ended"
-          ? "ended_success"
-          : metadata.phase === "failed"
-            ? "missed"
-            : "in_progress";
+
+  let status: string;
+  if (isVoicemail) {
+    status = "voicemail";
+  } else if (metadata.finalized) {
+    // Nunca dejar in_progress si ya se marcó finalized en metadata.
+    status =
+      metadata.phase === "ended" || metadata.answered_at
+        ? "ended_success"
+        : outcome === "no_answer" || outcome === "busy" || outcome === "failed"
+          ? "missed"
+          : "missed";
+  } else if (metadata.phase === "ended") {
+    status = "ended_success";
+  } else if (metadata.phase === "failed") {
+    status = "missed";
+  } else {
+    status = "in_progress";
+  }
 
   const db = adminClient();
   await db
