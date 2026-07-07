@@ -14,6 +14,10 @@ import {
   withFieldKeys,
   isContactLinkCompatible,
 } from "../src/lib/campaigns/output-fields";
+import {
+  computeScheduledCallAt,
+  resolveAudienceRowQueueStatus,
+} from "../src/lib/campaigns/audience-rows";
 import type { CampaignOutputField } from "../src/types/voice-campaign";
 
 function assert(cond: boolean, label: string) {
@@ -116,5 +120,18 @@ assert(defaultCrmConfig("prospeccion").create_leads === "on_interest", "prospecc
 assert(defaultCrmConfig("seguimiento").create_leads === "on_import", "seguimiento → leads al importar");
 assert(defaultCrmConfig("encuesta").create_leads === "never", "encuesta → nunca");
 assert(defaultCrmConfig("notificacion").create_leads === "never", "notificación → nunca");
+
+console.log("\n— Programación de filas de audiencia —");
+const onActivate = computeScheduledCallAt({}, { phone_column: "t", name_column: "n" }, { type: "on_activate" });
+assert(onActivate === null, "on_activate → sin hora fija (inmediata)");
+
+const onActivateStatus = resolveAudienceRowQueueStatus({ type: "on_activate" }, null);
+assert(onActivateStatus === "pending", "on_activate → pendiente aunque no haya scheduled_call_at");
+
+const badExcel = resolveAudienceRowQueueStatus(
+  { type: "excel_date", column_key: "fecha" },
+  null
+);
+assert(badExcel === "skipped", "excel_date sin fecha válida → excluida");
 
 console.log("\nListo.");

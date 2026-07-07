@@ -1,4 +1,4 @@
-import type { CampaignFieldMapping, CampaignTriggerRule } from "@/types/voice-campaign";
+import type { CampaignCallStatus, CampaignFieldMapping, CampaignTriggerRule } from "@/types/voice-campaign";
 import type { DataTableColumn } from "@/types/data-table";
 import { resolveMappedCellValue } from "@/lib/campaigns/column-mapping";
 import { toE164 } from "@/lib/telephony/e164";
@@ -32,38 +32,46 @@ function applyOffset(date: Date, offsetDays: number): Date {
   return d;
 }
 
-function defaultCallTime(): Date {
-  const d = new Date();
+function morningCallTime(date: Date): Date {
+  const d = new Date(date);
   d.setHours(9, 0, 0, 0);
   return d;
 }
 
+/** null = marcar en cuanto el dialer tenga cupo (sin hora futura fija). */
 export function computeScheduledCallAt(
   row: Record<string, string | number | boolean | null>,
   mapping: CampaignFieldMapping,
   trigger: CampaignTriggerRule
 ): Date | null {
   if (trigger.type === "on_activate") {
-    return defaultCallTime();
+    return null;
   }
 
   if (trigger.type === "fixed_datetime" && trigger.fixed_at) {
     const fixed = new Date(trigger.fixed_at);
-    return Number.isNaN(fixed.getTime()) ? defaultCallTime() : fixed;
+    return Number.isNaN(fixed.getTime()) ? null : fixed;
   }
 
   if (trigger.type === "excel_date") {
     const col = mapping.call_date_column || trigger.column_key;
-    if (!col) return defaultCallTime();
+    if (!col) return null;
     const parsed = parseDateValue(resolveMappedCellValue(row, col, undefined));
     if (!parsed) return null;
     const offset = trigger.offset_days ?? 0;
-    const scheduled = applyOffset(parsed, offset);
-    scheduled.setHours(9, 0, 0, 0);
-    return scheduled;
+    return morningCallTime(applyOffset(parsed, offset));
   }
 
-  return defaultCallTime();
+  return null;
+}
+
+/** Solo se excluye de la cola cuando la fecha del Excel no se pudo interpretar. */
+export function resolveAudienceRowQueueStatus(
+  trigger: CampaignTriggerRule,
+  scheduled: Date | null
+): CampaignCallStatus {
+  if (trigger.type === "excel_date" && !scheduled) return "skipped";
+  return "pending";
 }
 
 function cellToPhoneString(raw: unknown): string {

@@ -60,3 +60,16 @@ export function formatScheduledCol(iso: string | null): string {
     hour12: false,
   }).format(d);
 }
+
+/** Próxima llamada en tabla de audiencia — oculta horas pasadas si aún está en cola. */
+export function formatNextCallCol(
+  iso: string | null,
+  callStatus: string
+): string {
+  const queued = callStatus === "pending" || callStatus === "retry";
+  if (!iso) return queued ? "Inmediata" : "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  if (queued && d.getTime() <= Date.now()) return "Inmediata";
+  return formatScheduledCol(iso);
+}

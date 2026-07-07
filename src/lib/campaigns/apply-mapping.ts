@@ -1,6 +1,6 @@
 import type { CampaignFieldMapping, CampaignTriggerRule } from "@/types/voice-campaign";
 import type { DataTableColumn } from "@/types/data-table";
-import { computeScheduledCallAt, extractRowContactFields } from "@/lib/campaigns/audience-rows";
+import { computeScheduledCallAt, extractRowContactFields, resolveAudienceRowQueueStatus } from "@/lib/campaigns/audience-rows";
 
 export async function applyAudienceMapping(
   db: ReturnType<typeof import("@/lib/voice-agents-server").adminClient>,
@@ -53,7 +53,7 @@ export async function applyAudienceMapping(
         phone_e164,
         contact_name,
         scheduled_call_at: scheduled_call_at?.toISOString() ?? null,
-        call_status: scheduled_call_at ? "pending" : "skipped",
+        call_status: resolveAudienceRowQueueStatus(trigger, scheduled_call_at),
         updated_at: now,
       })
       .eq("id", row.id);

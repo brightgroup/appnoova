@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/voice-agents-server";
 import { requireOrgModule } from "@/lib/module-auth";
 import { toVoiceCampaignRecord } from "@/lib/campaigns/record";
+import { applyAudienceMapping } from "@/lib/campaigns/apply-mapping";
 import { triggerCampaignDialerOnActivation } from "@/lib/call-engine/dialer-scheduler";
 import {
   mergeOutputFieldsRespectingLock,
@@ -161,11 +162,26 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const record = toVoiceCampaignRecord(data);
+
   if (body.status === "active" && existing.status !== "active") {
+    if (
+      record.audience_table_id &&
+      record.field_mapping?.phone_column &&
+      record.field_mapping?.name_column
+    ) {
+      await applyAudienceMapping(
+        db,
+        record.audience_table_id,
+        auth.organizationId,
+        record.field_mapping,
+        record.trigger_rule
+      );
+    }
     triggerCampaignDialerOnActivation();
   }
 
-  return NextResponse.json({ campaign: toVoiceCampaignRecord(data) });
+  return NextResponse.json({ campaign: record });
 }
 
 export async function DELETE(_req: NextRequest, ctx: RouteCtx) {

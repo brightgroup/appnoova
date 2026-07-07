@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Plus, Trash2, Check, X, Columns3, Users, Upload } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
-import { formatScheduledCol } from "@/lib/format-datetime";
+import { formatNextCallCol } from "@/lib/format-datetime";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import type { ExportColumn } from "@/lib/export-table";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
@@ -131,7 +131,7 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
       { header: "Teléfono", value: r => r.phone_e164 ?? "" },
       { header: "Resultado", value: r => CAMPAIGN_CALL_STATUS_LABELS[r.call_status] },
       { header: "Intentos", value: r => r.total_attempts },
-      { header: "Próxima llamada", value: r => formatScheduledCol(r.scheduled_call_at) },
+      { header: "Próxima llamada", value: r => formatNextCallCol(r.scheduled_call_at, r.call_status) },
       ...columns
         .filter(c => c.display !== false)
         .map<ExportColumn<CampaignAudienceRowRecord>>(c => ({
@@ -597,7 +597,7 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
                           {row.total_attempts}
                         </td>
                         <td className={`${registryTableCell} text-xs text-gray-400 whitespace-nowrap`}>
-                          {formatScheduledCol(row.scheduled_call_at)}
+                          {formatNextCallCol(row.scheduled_call_at, row.call_status)}
                         </td>
                         {displayCols.map(c => {
                           const isEditing =
