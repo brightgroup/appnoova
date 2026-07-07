@@ -15,7 +15,13 @@ const CAPTURE_SYSTEM = `Eres un analista que extrae datos estructurados de llama
 Responde SOLO JSON válido con la forma { "campos": { "<key>": <valor> }, "no_volver_a_llamar": true|false }.
 Reglas:
 - Usa exclusivamente lo dicho en la conversación. Si un dato no se mencionó, omite la key (no inventes).
-- Para campos tipo lista, responde EXACTAMENTE una de las opciones dadas. Si ninguna encaja pero hay información, responde tu mejor interpretación textual.
+- Los campos obligatorios SIEMPRE deben aparecer en "campos".
+- La tipificación principal (campo is_primary) refleja el RESULTADO COMERCIAL, no problemas técnicos.
+- Problemas de comunicación, "no se escuchó", cortes o "aló" repetidos NO son una tipificación: clasifica según el interés comercial real.
+- Si solo hubo saludo/confirmación de identidad sin desarrollar el motivo de la llamada → tipificación "No interesado".
+- Si el cliente mostró interés, pidió información, agendó o aceptó seguimiento → tipificación "Interesado".
+- Para campos tipo lista, responde EXACTAMENTE una de las opciones dadas.
+- En campos de resumen/texto: prioriza motivo de la llamada y resultado comercial; los problemas de audio van al final en una frase breve, no como tema principal.
 - Booleanos: true/false. Fechas: YYYY-MM-DD. Horas: HH:MM (24h). Números: sin texto.
 - "no_volver_a_llamar" es true SOLO si la persona pidió explícitamente que no la vuelvan a llamar o que la eliminen de la lista.`;
 
@@ -30,9 +36,48 @@ function fieldSpecLines(fields: CampaignOutputField[]): string {
   return fields
     .map(f => {
       const opts = f.field_type === "select" ? ` Opciones: [${f.options.join(" | ")}]` : "";
-      return `- key: "${f.key}" · tipo: ${f.field_type} · nombre: "${f.label}".${opts} Instrucción: ${f.ai_instruction}`;
+      const req = f.required || f.is_primary ? " OBLIGATORIO." : "";
+      const primary = f.is_primary ? " Es la TIPIFICACIÓN PRINCIPAL (resultado comercial)." : "";
+      return `- key: "${f.key}" · tipo: ${f.field_type} · nombre: "${f.label}".${opts}${req}${primary} Instrucción: ${f.ai_instruction}`;
     })
     .join("\n");
+}
+
+const INTEREST_HINTS =
+  /\b(interesad|cotiz|informaci[oó]n|agend|visita|demo|compr|financ|modelo|veh[ií]culo|carro|suv|precio|asesor|env[ií]e|foto|ficha|seguimiento)\b/i;
+const NO_INTEREST_HINTS =
+  /\b(no interes|no me interesa|no llam|ocupad|ahora no|m[aá]s adelante sin|finca ra[ií]z|no quiero|basta|retir)\b/i;
+
+/** Infiere tipificación principal si la IA no la devolvió. */
+function inferPrimaryValue(
+  primary: CampaignOutputField,
+  dialogue: string,
+  captured: Record<string, unknown>,
+  optOut: boolean
+): string | null {
+  if (primary.field_type !== "select" || primary.options.length === 0) return null;
+  const notInterested =
+    primary.options.find(o => /no interes/i.test(o)) ?? primary.options[primary.options.length - 1];
+  const interested = primary.options.find(o => /interes/i.test(o) && !/no interes/i.test(o));
+
+  if (optOut) return notInterested;
+
+  const resumen = String(captured.r ?? captured.resumen ?? "").toLowerCase();
+  const text = `${dialogue}\n${resumen}`.toLowerCase();
+
+  if (NO_INTEREST_HINTS.test(text) && !INTEREST_HINTS.test(text)) return notInterested;
+  if (INTEREST_HINTS.test(text) && interested) return interested;
+
+  const userLines = dialogue
+    .split("\n")
+    .filter(l => l.startsWith("Cliente:"))
+    .map(l => l.slice("Cliente:".length).trim())
+    .filter(Boolean);
+  if (userLines.length <= 2 && userLines.every(l => l.length < 40 || /^(al[oó]|bueno|s[ií]|hello|hola|d[ií]game)\b/i.test(l))) {
+    return notInterested;
+  }
+  if (INTEREST_HINTS.test(text) && interested) return interested;
+  return notInterested;
 }
 
 function normalizeCapturedValue(
@@ -304,6 +349,12 @@ export async function captureCampaignCallResults(input: {
     return;
   }
 
+  const primary = primaryOutputField(fields);
+  if (primary && !(primary.key in captured)) {
+    const inferred = inferPrimaryValue(primary, dialogue, captured, optOut);
+    if (inferred) captured[primary.key] = inferred;
+  }
+
   const prevResults = (row.results ?? {}) as Record<string, CellValue>;
   const prevMeta = (row.results_meta ?? {}) as Record<string, unknown>;
   const results: Record<string, CellValue> = { ...prevResults };
@@ -322,7 +373,6 @@ export async function captureCampaignCallResults(input: {
     }
   }
 
-  const primary = primaryOutputField(fields);
   const primaryValue =
     primary && typeof results[primary.key] === "string" ? String(results[primary.key]) : null;
 

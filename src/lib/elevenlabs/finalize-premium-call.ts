@@ -28,6 +28,15 @@ function managedMetadataFlags(kind: "test" | "crm" | "campaign") {
   };
 }
 
+function campaignOutcomeLabel(transcript: TranscriptEntry[], durationSec: number): string {
+  if (!userHadLiveConversation(transcript)) return "Campaña — Sin conversación";
+  const userTurns = transcript.filter(t => t.role === "user" && t.text.trim().length > 8).length;
+  const agentTurns = transcript.filter(t => t.role === "agent" && t.text.trim().length > 8).length;
+  if (userTurns >= 2 && agentTurns >= 2 && durationSec >= 45) return "Campaña — Llamada exitosa";
+  if (userTurns >= 1 && agentTurns >= 1) return "Campaña — Conversación incompleta";
+  return "Campaña — Sin desarrollo";
+}
+
 async function finalizeAsVoicemail(input: {
   session: NonNullable<Awaited<ReturnType<typeof getPhoneTestCallSession>>>;
   agent: NonNullable<Awaited<ReturnType<typeof loadVoiceAgentForCall>>>;
@@ -174,7 +183,7 @@ export async function finalizeElevenLabsPremiumCall(input: {
 
   const successLabel =
     kind === "campaign"
-      ? "Campaña — Llamada exitosa"
+      ? campaignOutcomeLabel(transcript, billedDuration)
       : kind === "crm"
         ? "Llamada IA — Finalizada"
         : "Prueba premium - Finalizada";

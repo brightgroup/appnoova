@@ -122,8 +122,9 @@ export async function analyzeCallTranscript(
         parts: [{
           text: `Analiza esta llamada de un agente de voz comercial (español colombiano).
 Responde SOLO JSON válido, sin markdown. El campo extracted_data es obligatorio y no puede ir vacío.
+Enfócate en el resultado comercial. Si hubo problemas de comunicación pero también conversación de negocio, el resumen debe priorizar el negocio.
 {
-  "summary": "2-3 oraciones claras sobre qué pasó y el resultado",
+  "summary": "2-3 oraciones claras sobre el motivo de la llamada y el resultado comercial",
   "user_sentiment": "Positivo|Neutral|Negativo",
   "extracted_data": {
     "intencion_usuario": "qué buscaba o necesitaba el usuario",
