@@ -2,15 +2,12 @@ import { getPurposeMeta, type AgentChannel } from "@/lib/agent-purpose-catalog";
 import { appendVoiceAccentToPrompt } from "@/lib/voice-accent-profile";
 import { buildVoiceInteractionSteps } from "@/lib/voice-purpose-flows";
 
-export type AgentLanguage = "es" | "en" | "multi";
-
 export interface GenerateAgentPromptInput {
   channel: AgentChannel;
   agentName: string;
   purposeId: string;
   companyName: string;
   companyDescription: string;
-  language?: AgentLanguage;
   extraInstructions?: string;
 }
 
@@ -55,7 +52,6 @@ function purposeObjective(purposeId: string, channel: AgentChannel, companyName:
 function interactionSteps(purposeId: string, channel: AgentChannel, agentName: string, companyName: string): string {
   const isVoice = channel === "voice";
   const greetEs = `“¡Hola! Soy *${agentName}*, tu asistente de **${companyName}**. ¿En qué puedo ayudarte hoy?”`;
-  const greetEn = `"Hello! I'm *${agentName}*, your assistant from **${companyName}**. How can I help you today?"`;
 
   const intentBlock =
     purposeId === "lead-qualification"
@@ -71,8 +67,7 @@ function interactionSteps(purposeId: string, channel: AgentChannel, agentName: s
               : `- **Consulta general** → responder con base en el contexto de la empresa.\n  - **Soporte** → resolver lo posible y escalar si hace falta.\n  - **Captura de lead** → registrar nombre, contacto y motivo si hay interés comercial.`;
 
   return `1. **Saludo inicial**
-  - Español: ${greetEs}
-  - Inglés: ${greetEn}
+  - ${greetEs}
 2. **Detección de intención**
   - Analiza el primer mensaje${isVoice ? " o respuesta" : ""} del usuario para clasificar la intención:
   ${intentBlock}
@@ -86,26 +81,13 @@ function interactionSteps(purposeId: string, channel: AgentChannel, agentName: s
 5. **Escalado a humano**
   - Si el usuario lo pide o el caso supera tu alcance, transfiere con un mensaje cordial.
 6. **Cierre de conversación**
-  - Español: “Gracias por comunicarte con **${companyName}**. Si necesitas más ayuda, aquí estaré.”
-  - Inglés: “Thank you for contacting **${companyName}**. If you need anything else, I'm here to help.”`;
+  - “Gracias por comunicarte con **${companyName}**. Si necesitas más ayuda, aquí estaré.”`;
 }
 
-function languageSection(language: AgentLanguage, agentName: string, companyName: string, channel: AgentChannel): string {
-  if (language === "es") {
-    return channel === "voice"
-      ? `- Responde **siempre en español colombiano paisa** (Medellín / Antioquia): natural, cálido y humano.\n- **PROHIBIDO hablar en inglés** en voz: ni frases sueltas ni párrafos.\n- Si el usuario dice palabras en otro idioma, responde en español colombiano.`
-      : `- Responde **siempre en español colombiano**.\n- Si el usuario escribe en otro idioma, responde en español y ofrece continuar en ese idioma si lo prefiere.`;
-  }
-  if (language === "en") {
-    return `- Responde **siempre en inglés**.\n- Si el usuario escribe en español, responde en inglés y ofrece cambiar de idioma si lo prefiere.`;
-  }
-  return `| Situación         | Español                                          | Inglés                                            |
-| ----------------- | ------------------------------------------------ | ------------------------------------------------- |
-| Saludo            | “¡Hola! Soy *${agentName}*…”                     | “Hello! I'm *${agentName}*…”                      |
-| Confirmación      | “¿Confirmas que la información es correcta?”     | “Do you confirm the information is correct?”      |
-| Cierre            | “Gracias por comunicarte con **${companyName}**.” | “Thank you for contacting **${companyName}**.”    |
-
-Detecta el idioma del usuario y mantén la conversación en ese idioma, salvo que pida cambiarlo.`;
+function languageSection(channel: AgentChannel): string {
+  return channel === "voice"
+    ? `- Responde **siempre en español colombiano paisa** (Medellín / Antioquia): natural, cálido y humano.\n- **PROHIBIDO hablar en inglés** en voz: ni frases sueltas ni párrafos.\n- Si el usuario dice palabras en otro idioma, responde en español colombiano.`
+    : `- Responde **siempre en español colombiano**.\n- **PROHIBIDO responder en inglés** u otro idioma.\n- Si el usuario escribe en otro idioma, responde en español colombiano.`;
 }
 
 function buildPromptBody(input: GenerateAgentPromptInput): string {
@@ -115,7 +97,6 @@ function buildPromptBody(input: GenerateAgentPromptInput): string {
     purposeId,
     companyName,
     companyDescription,
-    language = channel === "voice" ? "es" : "multi",
     extraInstructions = "",
   } = input;
 
@@ -126,7 +107,7 @@ function buildPromptBody(input: GenerateAgentPromptInput): string {
     channel === "voice"
       ? buildVoiceInteractionSteps(purposeId, agentName, companyName)
       : interactionSteps(purposeId, channel, agentName, companyName);
-  const langBlock = languageSection(language, agentName, companyName, channel);
+  const langBlock = languageSection(channel);
   const companyBlurb = companyDescription.trim() || `Empresa que utiliza ${companyName} para automatizar atención y ventas con IA.`;
 
   const extraBlock = extraInstructions.trim()
@@ -201,17 +182,12 @@ export function generateShortAgentPrompt(input: GenerateAgentPromptInput): strin
     purposeId,
     companyName,
     companyDescription,
-    language = channel === "voice" ? "es" : "multi",
   } = input;
   const purpose = getPurposeMeta(channel, purposeId);
   const langRule =
-    language === "es"
-      ? channel === "voice"
-        ? "RESPONDE SIEMPRE EN ESPAÑOL COLOMBIANO PAISA (Medellín / Antioquia). PROHIBIDO HABLAR EN INGLÉS."
-        : "RESPONDE SIEMPRE EN ESPAÑOL COLOMBIANO."
-      : language === "en"
-        ? "ALWAYS RESPOND IN ENGLISH."
-        : "DETECTA EL IDIOMA DEL USUARIO Y RESPONDE EN ESE IDIOMA (español o inglés).";
+    channel === "voice"
+      ? "RESPONDE SIEMPRE EN ESPAÑOL COLOMBIANO PAISA (Medellín / Antioquia). PROHIBIDO HABLAR EN INGLÉS."
+      : "RESPONDE SIEMPRE EN ESPAÑOL COLOMBIANO. PROHIBIDO RESPONDER EN INGLÉS.";
 
   const medium = channel === "text" ? "chat de texto" : "llamada de voz";
 

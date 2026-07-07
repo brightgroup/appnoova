@@ -25,7 +25,6 @@ function buildMeta(purposeId: string): VoiceTemplateMeta {
     purposeId,
     companyName: "Mi empresa",
     companyDescription: "",
-    language: "es",
   });
   return {
     name: purpose.label,

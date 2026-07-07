@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { btnPrimary, btnGhost } from "@/lib/brand-ui";
 import { TEXT_AGENT_PURPOSES, VOICE_AGENT_PURPOSES, type AgentChannel } from "@/lib/agent-purpose-catalog";
-import { generateAgentPrompt, type AgentLanguage } from "@/lib/agent-prompt-generator";
+import { generateAgentPrompt } from "@/lib/agent-prompt-generator";
 import { getPurposeMeta } from "@/lib/agent-purpose-catalog";
 import { getPurposeIcon } from "@/lib/agent-purpose-icons";
 import { GEMINI_VOICES } from "@/lib/voice-agent-options";
@@ -40,12 +40,6 @@ const STEPS: { id: WizardStep; label: string }[] = [
   { id: "company", label: "Empresa" },
 ];
 
-const LANGUAGE_OPTIONS: { value: AgentLanguage; label: string }[] = [
-  { value: "es", label: "Español — Colombia" },
-  { value: "en", label: "English" },
-  { value: "multi", label: "Multi-idioma" },
-];
-
 export function AgentCreationWizard({
   channel,
   open,
@@ -59,7 +53,6 @@ export function AgentCreationWizard({
   const [step, setStep] = useState<WizardStep>("agent");
   const [purposeId, setPurposeId] = useState(purposes[0].id);
   const [agentName, setAgentName] = useState("");
-  const [language, setLanguage] = useState<AgentLanguage>(isVoice ? "es" : "multi");
   const [extraInstructions, setExtraInstructions] = useState("");
   const [showExtra, setShowExtra] = useState(false);
   const [contextMode, setContextMode] = useState<"existing" | "new">("existing");
@@ -86,7 +79,6 @@ export function AgentCreationWizard({
     setStep("agent");
     setPurposeId(purposes[0].id);
     setAgentName("");
-    setLanguage(isVoice ? "es" : "multi");
     setExtraInstructions("");
     setShowExtra(false);
     setContextMode("existing");
@@ -194,10 +186,9 @@ export function AgentCreationWizard({
         purposeId,
         companyName: resolvedCompanyName,
         companyDescription: companyDescription.trim(),
-        language,
         extraInstructions,
       }),
-    [channel, resolvedAgentName, purposeId, resolvedCompanyName, companyDescription, language, extraInstructions]
+    [channel, resolvedAgentName, purposeId, resolvedCompanyName, companyDescription, extraInstructions]
   );
 
   const purposeMeta = getPurposeMeta(channel, purposeId);
@@ -449,20 +440,7 @@ export function AgentCreationWizard({
                       )}
                     </div>
                   )
-                ) : (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1.5">Idioma</label>
-                    <select
-                      value={language}
-                      onChange={e => setLanguage(e.target.value as AgentLanguage)}
-                      className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
-                    >
-                      {LANGUAGE_OPTIONS.map(o => (
-                        <option key={o.value} value={o.value} className="bg-[#232329]">{o.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                ) : null}
               </div>
 
               <button

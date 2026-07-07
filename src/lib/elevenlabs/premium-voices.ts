@@ -28,7 +28,7 @@ export async function listCuratedPremiumVoices(): Promise<PremiumVoiceOption[]> 
     }>("/voices");
     availableIds = new Set((data.voices ?? []).map(v => v.voice_id).filter(Boolean));
   } catch {
-    return CURATED_PREMIUM_VOICES.map(v => ({
+    return CURATED_PREMIUM_VOICES.filter(v => v.region === "colombia").map(v => ({
       id: v.id,
       label: v.label,
       region: v.region,
@@ -36,6 +36,7 @@ export async function listCuratedPremiumVoices(): Promise<PremiumVoiceOption[]> 
   }
 
   return CURATED_PREMIUM_VOICES
+    .filter(v => v.region === "colombia")
     .filter(v => availableIds.has(v.id))
     .sort((a, b) => REGION_ORDER[a.region] - REGION_ORDER[b.region])
     .map(v => ({ id: v.id, label: v.label, region: v.region }));

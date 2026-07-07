@@ -19,7 +19,6 @@ function buildMeta(purposeId: string): TextTemplateMeta {
     purposeId,
     companyName: "Mi empresa",
     companyDescription: "",
-    language: "es",
   });
   return {
     name: purpose.label,

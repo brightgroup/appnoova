@@ -23,7 +23,7 @@ export const CURATED_PREMIUM_VOICES: CuratedPremiumVoice[] = [
 
 export const DEFAULT_ELEVENLABS_VOICE_ID = CURATED_PREMIUM_VOICES[0].id;
 
-export const ELEVENLABS_DEFAULT_VOICES = CURATED_PREMIUM_VOICES.map(v => ({
+export const ELEVENLABS_DEFAULT_VOICES = CURATED_PREMIUM_VOICES.filter(v => v.region === "colombia").map(v => ({
   id: v.id,
   label: v.label,
 }));
