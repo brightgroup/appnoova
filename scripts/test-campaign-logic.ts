@@ -122,7 +122,8 @@ assert(defaultCrmConfig("encuesta").create_leads === "never", "encuesta → nunc
 assert(defaultCrmConfig("notificacion").create_leads === "never", "notificación → nunca");
 
 console.log("\n— Programación de filas de audiencia —");
-const onActivate = computeScheduledCallAt({}, { phone_column: "t", name_column: "n" }, { type: "on_activate" });
+const testMapping = { phone_column: "t", name_column: "n", custom_fields: [] };
+const onActivate = computeScheduledCallAt({}, testMapping, { type: "on_activate" });
 assert(onActivate === null, "on_activate → sin hora fija (inmediata)");
 
 const onActivateStatus = resolveAudienceRowQueueStatus({ type: "on_activate" }, null);
