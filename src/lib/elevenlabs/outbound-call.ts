@@ -58,7 +58,10 @@ export async function placeElevenLabsOutboundCall(input: {
         conversation_config_override: {
           agent: {
             first_message: firstMessage,
-            disable_first_message_interruptions: true,
+            // false: si la persona responde al saludo de inmediato (muy común),
+            // el agente la atiende sin esperar el turn_timeout completo. Con
+            // true se reintrodujo el bug de silencios largos tras "aló".
+            disable_first_message_interruptions: false,
             ...(input.systemPromptOverride
               ? {
                   prompt: {

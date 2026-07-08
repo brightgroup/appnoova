@@ -16,6 +16,10 @@ import { toVoiceCampaignRecord } from "@/lib/campaigns/record";
 import { tryAutoCompleteActiveCampaigns } from "@/lib/call-engine/campaign-completion";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import { telnyxPlaceCall } from "@/lib/telephony/telnyx-call-control";
+import { buildElevenLabsAgentSystemPrompt } from "@/lib/elevenlabs/agent-phone-prompt";
+import { CAMPAIGN_POST_AMD_CONTEXT } from "@/lib/elevenlabs/campaign-outbound-prompt";
+import { buildOutboundCampaignFirstMessage } from "@/lib/elevenlabs/default-voices";
+import { placeElevenLabsOutboundCall } from "@/lib/elevenlabs/outbound-call";
 import { adminClient } from "@/lib/voice-agents-server";
 import {
   contactSuppressedForCalls,
@@ -263,6 +267,54 @@ async function placeCampaignCall(input: {
     });
   };
 
+  if (loaded.config.voice_provider === "elevenlabs") {
+    if (!agentRow.elevenlabs_agent_id) {
+      throw new Error("Agente premium sin sincronizar");
+    }
+    await resolvePlatformSipConfig();
+    const line = await resolveElevenLabsPhoneLine(phone, {
+      elevenlabsAgentId: agentRow.elevenlabs_agent_id,
+      resync: !phone.elevenlabs_phone_number_id,
+    });
+    if (!line.configured || !line.phoneNumberId) {
+      throw new Error(line.syncError ?? "Línea premium no configurada");
+    }
+
+    // Una sola llamada: ElevenLabs conecta desde el inicio y detecta buzón con
+    // su propia herramienta (recomendación oficial de ElevenLabs para SIP
+    // trunks — no confiar en el AMD del carrier). Antes se hacía una llamada de
+    // verificación AMD por Telnyx, se colgaba, y se volvía a llamar: eso
+    // producía DOBLE TIMBRE en el teléfono del contacto (humano o buzón) y no
+    // ahorraba costo real, porque ~25% de los buzones igual se colaban como
+    // "humano" en el AMD y terminaban conectando a ElevenLabs de todas formas.
+    const systemPromptOverride = buildElevenLabsAgentSystemPrompt({
+      prompt: campaignPrompt + CAMPAIGN_POST_AMD_CONTEXT,
+      purposeId: loaded.config.source_template,
+      agentName: loaded.agentName,
+      companyName: loaded.companyName,
+      companyContextText: loaded.companyContextText,
+      phoneOutbound: true,
+    });
+    const firstMessage = buildOutboundCampaignFirstMessage(loaded.agentName, loaded.companyName);
+
+    const callId = await reserveSession("elevenlabs", phone.e164);
+    try {
+      const { conversationId } = await placeElevenLabsOutboundCall({
+        agentId: agentRow.elevenlabs_agent_id,
+        toE164: destination,
+        agentPhoneNumberId: line.phoneNumberId,
+        systemPromptOverride,
+        campaignOutbound: true,
+        firstMessage,
+      });
+      await bindCampaignCallControlId(callId, conversationId);
+    } catch (err) {
+      await cancelReservedCampaignCall(callId);
+      throw err;
+    }
+    return;
+  }
+
   const telnyx = (phone.voice_config as { telnyx?: { connection_id?: string; call_control_app_id?: string } })
     ?.telnyx;
   const connectionId =
@@ -281,39 +333,6 @@ async function placeCampaignCall(input: {
     campaign_audience_row_id: row.id,
     destination_e164: destination,
   };
-
-  if (loaded.config.voice_provider === "elevenlabs") {
-    if (!agentRow.elevenlabs_agent_id) {
-      throw new Error("Agente premium sin sincronizar");
-    }
-    await resolvePlatformSipConfig();
-    const line = await resolveElevenLabsPhoneLine(phone, {
-      elevenlabsAgentId: agentRow.elevenlabs_agent_id,
-      resync: !phone.elevenlabs_phone_number_id,
-    });
-    if (!line.configured || !line.phoneNumberId) {
-      throw new Error(line.syncError ?? "Línea premium no configurada");
-    }
-
-    // AMD Telnyx primero: buzón de voz no conecta ElevenLabs (sin cobro premium).
-    const callId = await reserveSession("elevenlabs", phone.e164, { elDeferredAmd: true });
-    try {
-      const { callControlId } = await telnyxPlaceCall({
-        connectionId,
-        from: phone.e164,
-        to: destination,
-        clientState,
-        timeoutSecs: rules.ring_timeout_seconds,
-        amdMode: "premium",
-        amdProfile: "campaign_strict",
-      });
-      await bindCampaignCallControlId(callId, callControlId);
-    } catch (err) {
-      await cancelReservedCampaignCall(callId);
-      throw err;
-    }
-    return;
-  }
 
   const callId = await reserveSession("google", phone.e164);
   try {
