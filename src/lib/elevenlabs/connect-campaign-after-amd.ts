@@ -78,8 +78,10 @@ export async function connectCampaignElevenLabsAfterAmd(input: {
     firstMessage,
   });
 
-  const now = new Date().toISOString();
-  await db
+  // OJO: voice_agent_calls NO tiene columna updated_at. Incluirla hacía que este
+  // UPDATE fallara en silencio y el conversation_id nunca se guardara → el webhook
+  // post-llamada de ElevenLabs no podía enlazar transcripción/audio/resultados.
+  const { error: linkError } = await db
     .from("voice_agent_calls")
     .update({
       status_label: "Campaña — Conectando agente premium",
@@ -95,9 +97,15 @@ export async function connectCampaignElevenLabsAfterAmd(input: {
         last_event: "elevenlabs.post_amd_connect",
         voice_provider: "elevenlabs",
       },
-      updated_at: now,
     })
     .eq("id", input.session.id);
+
+  if (linkError) {
+    console.error("[campaign-el-amd] no se pudo enlazar conversation_id:", linkError.message, {
+      callId: input.screeningCallControlId,
+      conversationId,
+    });
+  }
 
   try {
     await telnyxHangup(input.screeningCallControlId);
