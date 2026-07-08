@@ -27,6 +27,13 @@ const VOICEMAIL_PATTERNS: RegExp[] = [
   /\bllamada ha sido transferida\b/i,
   /\bno contesta\b/i,
   /\bresponda cuando suene\b/i,
+  // Menús / avisos de contestadora (vistos en grabaciones reales de campaña).
+  /\bla grabaci[oó]n\b.*\b(tono|tiempo|l[ií]mite|mensaje)\b/i,
+  /\bgrabaci[oó]n lleg[oó]\b/i,
+  /\btiempo l[ií]mite\b/i,
+  /\bpara (editar|enviar|reenviar|borrar|escuchar)\b.*\bmarque\b/i,
+  /\bmarque\b\s*(uno|dos|tres|cuatro|1|2|3|4)\b/i,
+  /\bopciones de entrega\b/i,
 ];
 
 const VOICEMAIL_GREETING_ONLY =

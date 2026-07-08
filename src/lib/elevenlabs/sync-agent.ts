@@ -53,9 +53,10 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
     companyContextText: input.companyContextText,
   });
 
-  const outboundTools = outbound
-    ? [PREMIUM_VOICEMAIL_DETECTION_TOOL, PREMIUM_END_CALL_TOOL]
-    : [PREMIUM_END_CALL_TOOL];
+  // voicemail_detection va en TODOS los agentes: cualquier agente puede salir en
+  // campaña (aunque su plantilla sea "inbound") y las herramientas NO se pueden
+  // overridear por llamada — deben estar horneadas en el agente sincronizado.
+  const outboundTools = [PREMIUM_VOICEMAIL_DETECTION_TOOL, PREMIUM_END_CALL_TOOL];
 
   const turn = buildPremiumTurnConfig(outbound);
 

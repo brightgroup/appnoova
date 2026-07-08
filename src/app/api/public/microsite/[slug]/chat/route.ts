@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { makeVisitorLabel } from "@/lib/inbox-utils";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
+import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 import { resolveMicrositeAgentForChat } from "@/lib/microsite-server";
 import { resolveWidgetAgentForChat } from "@/lib/widget-server";
 import { isLandingWidgetPreview } from "@/lib/landing-widget";
@@ -162,7 +163,8 @@ export async function POST(
 
   const billingEventType = channel === WEB_EMBED_CHANNEL ? "widget" : "milink";
 
-  const systemInstruction = mergeCompanyContext(String(agent.prompt), companyContextText);
+  const temporal = buildColombiaTemporalContext();
+  const systemInstruction = `${temporal.promptBlock}\n\n${mergeCompanyContext(String(agent.prompt), companyContextText)}`;
   const temperature = geminiTextTemperature(Number(agent.temperature) || 0.7);
   const maxOutputTokens = Number(agent.max_output_tokens) || 2048;
 

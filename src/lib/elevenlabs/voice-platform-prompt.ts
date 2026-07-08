@@ -25,43 +25,43 @@ export const ELEVENLABS_INTERRUPTION_IGNORE_TERMS = [
 
 /** Turn-taking compartido para todos los agentes premium. */
 export function buildPremiumTurnConfig(outboundPhone = false) {
-  const soft_timeout_config = {
-    timeout_seconds: 2,
-    message: "Un momentico, ya le confirmo.",
-    additional_soft_timeout_messages: [
-      "Sí, le escucho.",
-      "Disculpe, un segundito.",
-    ],
-    use_llm_generated_message: false,
-    max_soft_timeouts_per_generation: 3,
-  };
-
+  // Sin soft_timeout: los "fillers" ("un momentico, ya le confirmo") se disparaban
+  // en cada silencio y hacían sonar al agente como robot. El re-enganche natural del
+  // modelo (turn_timeout) es suficiente y suena humano.
   if (outboundPhone) {
     return {
-      turn_timeout: 6,
-      // Si por algún motivo no hay first_message, no esperar 7+ s con ruido de fondo.
-      initial_wait_time: 1,
-      turn_eagerness: "eager" as const,
+      // Espera antes de re-enganchar al usuario (una sola vez, luego cuelga por silencio).
+      turn_timeout: 10,
+      // Da 2 s al inicio para captar si es un buzón antes de comprometerse.
+      initial_wait_time: 2,
+      // "normal" evita que el agente salte sobre ruido de fondo o se corte solo.
+      turn_eagerness: "normal" as const,
+      // Cuelga si hay 15 s de silencio total (buzón mudo, línea muerta).
+      silence_end_call_timeout: 15,
       spelling_patience: "off" as const,
-      retranscribe_on_turn_timeout: true,
-      mode: "turn" as const,
       speculative_turn: true,
       turn_model: "turn_v3" as const,
       transcribe_on_disabled_interruptions: true,
       interruption_ignore_terms: ELEVENLABS_INTERRUPTION_IGNORE_TERMS,
-      soft_timeout_config,
+      // timeout_seconds: -1 DESACTIVA los fillers ("un momentico, ya le confirmo").
+      // Debe enviarse explícito porque el PATCH fusiona y no borra el previo.
+      soft_timeout_config: { timeout_seconds: -1 },
     };
   }
 
   return {
-    turn_timeout: 8,
+    turn_timeout: 10,
     turn_eagerness: "normal" as const,
-    mode: "turn" as const,
+    // Cuelga tras 15 s de silencio (buzón mudo / línea muerta). Aplica también a
+    // agentes de encuesta que salen en campaña aunque su plantilla sea "inbound".
+    silence_end_call_timeout: 15,
     speculative_turn: true,
     turn_model: "turn_v3" as const,
     transcribe_on_disabled_interruptions: true,
     interruption_ignore_terms: ELEVENLABS_INTERRUPTION_IGNORE_TERMS,
-    soft_timeout_config,
+    // timeout_seconds: -1 DESACTIVA los fillers ("un momentico, ya le confirmo").
+    // Debe enviarse explícito porque el PATCH fusiona y no borra el previo.
+    soft_timeout_config: { timeout_seconds: -1 },
   };
 }
 

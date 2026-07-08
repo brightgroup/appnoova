@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getOriApiKey } from "@/lib/google-ai";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
+import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 import { buildDataTableContext } from "@/lib/data-tables/retrieve";
 import { mergeDataTableContext } from "@/lib/data-tables/format-context";
 import { geminiTextTemperature } from "@/lib/text-agent-form";
@@ -103,7 +104,9 @@ export async function POST(req: NextRequest) {
     dataTableContext || null,
     { tableLinked: Boolean(agent.data_table_id) }
   );
-  const systemInstruction = mergeCompanyContext(promptWithCatalog, companyContextText);
+  const mergedPrompt = mergeCompanyContext(promptWithCatalog, companyContextText);
+  const temporal = buildColombiaTemporalContext();
+  const systemInstruction = `${temporal.promptBlock}\n\n${mergedPrompt}`;
   const model = String(agent.llm_model || "gemini-2.5-flash");
   const temperature = geminiTextTemperature(Number(agent.temperature) || 0.7);
   const maxOutputTokens = Number(agent.max_output_tokens) || 2048;

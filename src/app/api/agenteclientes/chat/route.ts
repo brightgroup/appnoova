@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getOriApiKey, getOriModel } from "@/lib/google-ai";
 import { ORI_SYSTEM_PROMPT } from "@/lib/ori-prompt";
+import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -27,6 +28,8 @@ export async function POST(req: NextRequest) {
 
   const model = getOriModel();
   const ai = new GoogleGenAI({ apiKey });
+  const temporal = buildColombiaTemporalContext();
+  const systemInstruction = `${temporal.promptBlock}\n\n${ORI_SYSTEM_PROMPT}`;
 
   const contents = messages.map(m => ({
     role: m.role === "assistant" ? ("model" as const) : ("user" as const),
@@ -38,7 +41,7 @@ export async function POST(req: NextRequest) {
       model,
       contents,
       config: {
-        systemInstruction: ORI_SYSTEM_PROMPT,
+        systemInstruction,
         temperature: 0.7,
         maxOutputTokens: 2048
       }
