@@ -13,7 +13,7 @@ import {
 } from "@/lib/billing/meter";
 import type { TranscriptEntry, VoiceAgentCallRecord } from "@/types/voice-agent-call";
 import { getElevenLabsConversation } from "@/lib/elevenlabs/outbound-call";
-import { syncOpenElevenLabsCampaignCalls } from "@/lib/elevenlabs/sync-open-campaign-calls";
+import { syncOpenElevenLabsCampaignCalls, backfillMissingCampaignAudio } from "@/lib/elevenlabs/sync-open-campaign-calls";
 import {
   getElevenLabsConversationAudioWithRetry,
   waitForElevenLabsConversationReady,
@@ -219,6 +219,7 @@ export async function GET(req: NextRequest) {
   if (campaignId) {
     try {
       await syncOpenElevenLabsCampaignCalls();
+      await backfillMissingCampaignAudio(8);
     } catch (err) {
       console.warn("[calls] sync campaign EL:", err);
     }

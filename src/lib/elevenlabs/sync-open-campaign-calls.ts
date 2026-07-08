@@ -2,6 +2,8 @@ import { getElevenLabsConversation, mapElevenLabsStatusToPhase } from "@/lib/ele
 import { finalizeElevenLabsPremiumCall } from "@/lib/elevenlabs/finalize-premium-call";
 import { finalizeOutboundShortCall } from "@/lib/telephony/finalize-outbound-short-call";
 import { isMachineAmdResult, type OutboundCallOutcome } from "@/lib/telephony/call-outcome";
+import { getElevenLabsConversationAudioWithRetry } from "@/lib/elevenlabs/premium-voices";
+import { uploadCallRecording } from "@/lib/voice-call-storage";
 import { adminClient } from "@/lib/voice-agents-server";
 
 /**
@@ -148,6 +150,75 @@ export async function syncStuckCampaignScreeningCalls(stuckMinutes = 4): Promise
     console.info("[sync-stuck-screening] liberadas:", synced);
   }
   return synced;
+}
+
+/**
+ * Baja de ElevenLabs las grabaciones que no se guardaron al finalizar (el audio
+ * no estaba renderizado en ese instante y el webhook post-llamada está apagado).
+ * Cubre también buzones. Se ejecuta unos minutos después, cuando el audio ya existe.
+ */
+export async function backfillMissingCampaignAudio(limit = 8): Promise<number> {
+  const db = adminClient();
+  // Ventana: entre 30 s (dar tiempo a renderizar) y 3 h atrás.
+  const minAge = new Date(Date.now() - 30_000).toISOString();
+  const maxAge = new Date(Date.now() - 3 * 3600_000).toISOString();
+  const { data: rows, error } = await db
+    .from("voice_agent_calls")
+    .select("id, user_id, metadata, created_at")
+    .not("campaign_id", "is", null)
+    .is("audio_url", null)
+    .in("status", ["ended_success", "voicemail"])
+    .lt("created_at", minAge)
+    .gte("created_at", maxAge)
+    .order("created_at", { ascending: false })
+    .limit(60);
+
+  if (error || !rows?.length) return 0;
+
+  let saved = 0;
+  for (const row of rows) {
+    if (saved >= limit) break;
+    const meta = (row.metadata ?? {}) as Record<string, unknown>;
+    const conversationId = String(meta.conversation_id ?? "").trim();
+    if (!conversationId.startsWith("conv_")) continue;
+    if (Number(meta.audio_backfill_attempts ?? 0) >= 5) continue;
+
+    try {
+      const audio = await getElevenLabsConversationAudioWithRetry(conversationId, {
+        maxAttempts: 2,
+        delayMs: 1000,
+      });
+      if (audio?.buffer.length) {
+        const audioUrl = await uploadCallRecording(
+          db,
+          row.user_id,
+          row.id,
+          audio.buffer,
+          audio.contentType || "audio/mpeg"
+        );
+        if (audioUrl) {
+          await db
+            .from("voice_agent_calls")
+            .update({ audio_url: audioUrl })
+            .eq("id", row.id);
+          saved += 1;
+          continue;
+        }
+      }
+      // Marca el intento para no reintentar indefinidamente audios que nunca llegan.
+      await db
+        .from("voice_agent_calls")
+        .update({
+          metadata: { ...meta, audio_backfill_attempts: Number(meta.audio_backfill_attempts ?? 0) + 1 },
+        })
+        .eq("id", row.id);
+    } catch (err) {
+      console.warn("[backfill-audio]", conversationId, err instanceof Error ? err.message : err);
+    }
+  }
+
+  if (saved > 0) console.info("[backfill-audio] grabaciones recuperadas:", saved);
+  return saved;
 }
 
 export async function syncOpenElevenLabsCampaignCalls(): Promise<number> {
