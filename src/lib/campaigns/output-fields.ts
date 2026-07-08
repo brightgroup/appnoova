@@ -160,6 +160,124 @@ export function primaryOutputField(fields: CampaignOutputField[]): CampaignOutpu
   return fields.find(f => f.is_primary) ?? null;
 }
 
+const IMPORT_VALID_TYPES: CampaignOutputFieldType[] = [
+  "select",
+  "text",
+  "boolean",
+  "date",
+  "time",
+  "number",
+];
+
+/** Ejemplo de JSON para importar campos de salida (se muestra en la UI). */
+export const OUTPUT_FIELDS_IMPORT_EXAMPLE = `[
+  {
+    "label": "Satisfacción general",
+    "field_type": "select",
+    "options": ["Muy satisfecho", "Satisfecho", "Neutral", "Insatisfecho"],
+    "ai_instruction": "Clasifica la satisfacción general según lo que exprese la persona.",
+    "required": true,
+    "is_primary": true
+  },
+  {
+    "label": "¿Recomendaría el servicio?",
+    "field_type": "boolean",
+    "ai_instruction": "Marca Sí si la persona dice que recomendaría el servicio, No en caso contrario."
+  },
+  {
+    "label": "Comentario final",
+    "field_type": "text",
+    "ai_instruction": "Resume en una frase el comentario libre del cliente."
+  }
+]`;
+
+/**
+ * Parsea un JSON pegado por el usuario a campos de salida. Es tolerante:
+ * acepta sinónimos de claves (title/nombre, type/tipo, instruction/instruccion),
+ * ignora tipos inválidos (→ texto) y garantiza una sola tipificación principal.
+ */
+export function parseOutputFieldsImport(raw: string): {
+  fields: CampaignOutputField[];
+  error: string | null;
+} {
+  const trimmed = raw.trim();
+  if (!trimmed) return { fields: [], error: "Pega el JSON con los campos." };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return { fields: [], error: "El JSON no es válido. Revisa comas, corchetes y comillas." };
+  }
+
+  const arr = Array.isArray(parsed)
+    ? parsed
+    : parsed && typeof parsed === "object" && Array.isArray((parsed as Record<string, unknown>).fields)
+      ? ((parsed as Record<string, unknown>).fields as unknown[])
+      : null;
+
+  if (!arr) return { fields: [], error: "El JSON debe ser una lista de campos (array)." };
+
+  const fields: CampaignOutputField[] = [];
+  let primarySeen = false;
+
+  for (const item of arr) {
+    if (!item || typeof item !== "object") continue;
+    const f = item as Record<string, unknown>;
+    const label = String(f.label ?? f.title ?? f.nombre ?? "").trim();
+    if (!label) continue;
+
+    const rawType = String(f.field_type ?? f.type ?? f.tipo ?? "text").trim().toLowerCase();
+    const field_type = (IMPORT_VALID_TYPES as string[]).includes(rawType)
+      ? (rawType as CampaignOutputFieldType)
+      : "text";
+
+    const options = Array.isArray(f.options)
+      ? f.options.map(String).map(s => s.trim()).filter(Boolean)
+      : [];
+    const ai_instruction = String(
+      f.ai_instruction ?? f.instruction ?? f.instruccion ?? ""
+    ).trim();
+
+    let is_primary = Boolean(f.is_primary ?? f.primary) && field_type === "select";
+    if (is_primary && primarySeen) is_primary = false;
+    if (is_primary) primarySeen = true;
+
+    fields.push(
+      newOutputField({
+        label,
+        field_type,
+        options,
+        ai_instruction,
+        required: Boolean(f.required ?? f.obligatorio),
+        is_primary,
+      })
+    );
+  }
+
+  if (fields.length === 0) {
+    return { fields: [], error: "No se encontró ningún campo con nombre en el JSON." };
+  }
+
+  return { fields: withFieldKeys(fields), error: null };
+}
+
+/** Combina campos existentes con importados garantizando una sola tipificación principal. */
+export function mergeImportedOutputFields(
+  existing: CampaignOutputField[],
+  imported: CampaignOutputField[]
+): CampaignOutputField[] {
+  let primarySet = false;
+  const combined = [...existing, ...imported].map(f => {
+    if (f.is_primary && f.field_type === "select" && !primarySet) {
+      primarySet = true;
+      return f;
+    }
+    return { ...f, is_primary: false };
+  });
+  return withFieldKeys(combined);
+}
+
 export function defaultCrmConfig(type: CampaignType): CampaignCrmConfig {
   switch (type) {
     case "prospeccion":

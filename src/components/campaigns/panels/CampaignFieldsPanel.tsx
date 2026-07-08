@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { GripVertical, Lock, Plus, Star, Trash2, Link2 } from "lucide-react";
+import { GripVertical, Lock, Plus, Star, Trash2, Link2, FileJson, X } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import {
   CampaignInput,
@@ -11,7 +11,10 @@ import {
 import {
   contactLinkTargets,
   isCampaignConfigLocked,
+  mergeImportedOutputFields,
   newOutputField,
+  OUTPUT_FIELDS_IMPORT_EXAMPLE,
+  parseOutputFieldsImport,
   withFieldKeys,
 } from "@/lib/campaigns/output-fields";
 import { slugifyVariableKey } from "@/lib/campaigns/render-prompt";
@@ -35,8 +38,23 @@ const FIELD_TYPES = Object.entries(CAMPAIGN_OUTPUT_FIELD_TYPE_LABELS) as [
 
 export function CampaignFieldsPanel({ campaign, onChange }: CampaignFieldsPanelProps) {
   const [properties, setProperties] = useState<CrmPropertyDefinition[]>([]);
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importError, setImportError] = useState<string | null>(null);
   const locked = isCampaignConfigLocked(campaign);
   const fields = campaign.output_fields;
+
+  const importFields = () => {
+    const { fields: imported, error } = parseOutputFieldsImport(importText);
+    if (error) {
+      setImportError(error);
+      return;
+    }
+    onChange({ output_fields: mergeImportedOutputFields(fields, imported) });
+    setImportText("");
+    setImportError(null);
+    setShowImport(false);
+  };
 
   useEffect(() => {
     void (async () => {
@@ -84,12 +102,80 @@ export function CampaignFieldsPanel({ campaign, onChange }: CampaignFieldsPanelP
               es literalmente lo que la IA usa para saber qué poner ahí.
             </p>
           </div>
-          {locked && (
+          {locked ? (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-300 shrink-0">
               <Lock className="w-3 h-3" /> Estructura congelada
             </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setShowImport(v => !v);
+                setImportError(null);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/[.12] bg-white/[.04] px-2.5 py-1.5 text-xs text-white hover:bg-white/[.08] shrink-0"
+            >
+              <FileJson className="w-3.5 h-3.5" /> Importar JSON
+            </button>
           )}
         </div>
+
+        {showImport && !locked && (
+          <div className="rounded-xl border border-[#5b5bf6]/25 bg-[#5b5bf6]/[.04] p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-white">Importar campos desde JSON</p>
+                <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
+                  Pega una lista de campos. Se agregan a los existentes. Tipos válidos:{" "}
+                  <code className="text-gray-300">select, text, boolean, date, time, number</code>.
+                  Solo una tipificación principal (<code className="text-gray-300">is_primary</code>,
+                  debe ser <code className="text-gray-300">select</code>).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImport(false);
+                  setImportError(null);
+                }}
+                className="p-1 text-gray-500 hover:text-white shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <CampaignTextarea
+              value={importText}
+              onChange={e => {
+                setImportText(e.target.value);
+                setImportError(null);
+              }}
+              placeholder={OUTPUT_FIELDS_IMPORT_EXAMPLE}
+              className="min-h-[160px] text-xs font-mono"
+            />
+
+            {importError && (
+              <p className="text-xs text-red-400">{importError}</p>
+            )}
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={importFields}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#5b5bf6] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#4a4ae0]"
+              >
+                <FileJson className="w-3.5 h-3.5" /> Cargar campos
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportText(OUTPUT_FIELDS_IMPORT_EXAMPLE)}
+                className="text-xs text-gray-400 hover:text-white"
+              >
+                Rellenar con ejemplo
+              </button>
+            </div>
+          </div>
+        )}
 
         {locked && (
           <p className="text-[11px] text-gray-500 leading-relaxed">
