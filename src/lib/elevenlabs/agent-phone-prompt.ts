@@ -27,9 +27,10 @@ export const ELEVENLABS_SPANISH_ONLY_RULES = `
 
 ## IDIOMA (REGLA ABSOLUTA — PRIORIDAD MÁXIMA)
 - Habla ÚNICAMENTE en español colombiano. Cada palabra que pronuncies debe estar en español.
-- PROHIBIDO hablar en inglés: ni párrafos, ni frases sueltas ("I understand", "Thank you", "Hello", "Sure"), ni mezcla de idiomas.
+- PROHIBIDO hablar en inglés: ni párrafos, ni frases sueltas ("I understand", "Thank you", "Hello", "Sure", "okay", "right"), ni mezcla de idiomas.
 - Si el cliente dice "hello" o palabras sueltas en inglés, responde en español colombiano.
-- Las instrucciones internas del prompt pueden estar en cualquier idioma; tu SALIDA DE VOZ es siempre español.`;
+- Si en algún momento te descubres escribiendo o diciendo una palabra en inglés, DETENTE y dila en español. Jamás continúes una frase en inglés.
+- Las instrucciones internas del prompt pueden estar en cualquier idioma; tu SALIDA DE VOZ es siempre español, en TODO momento de la llamada.`;
 
 /**
  * Orden del prompt en llamada:

@@ -31,7 +31,7 @@ export function buildPremiumTurnConfig(outboundPhone = false) {
   if (outboundPhone) {
     return {
       // Espera antes de re-enganchar al usuario (una sola vez, luego cuelga por silencio).
-      turn_timeout: 10,
+      turn_timeout: 7,
       // Da 2 s al inicio para captar si es un buzón antes de comprometerse.
       initial_wait_time: 2,
       // "normal" evita que el agente salte sobre ruido de fondo o se corte solo.
@@ -50,7 +50,7 @@ export function buildPremiumTurnConfig(outboundPhone = false) {
   }
 
   return {
-    turn_timeout: 10,
+    turn_timeout: 7,
     turn_eagerness: "normal" as const,
     // Cuelga tras 15 s de silencio (buzón mudo / línea muerta). Aplica también a
     // agentes de encuesta que salen en campaña aunque su plantilla sea "inbound".

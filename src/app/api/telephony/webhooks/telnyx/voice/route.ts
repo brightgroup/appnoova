@@ -400,7 +400,15 @@ export async function POST(req: NextRequest) {
     "call.hangup": "ended"
   };
 
-  if (testCall && phaseByEvent[eventType]) {
+  // Si ElevenLabs ya tomó la conversación (en otra pierna SIP), los eventos de la
+  // pierna Telnyx de sondeo NO deben tocar el registro: si lo marcan "ended" el
+  // sondeo (que solo mira in_progress) nunca lo finaliza y se pierde la grabación.
+  const sessionMetaEarly = session?.metadata as unknown as Record<string, unknown> | undefined;
+  const isScreeningLegPostEl =
+    Boolean(sessionMetaEarly?.el_connected) &&
+    String(sessionMetaEarly?.screening_call_id ?? "") === callId;
+
+  if (testCall && phaseByEvent[eventType] && !isScreeningLegPostEl) {
     await updatePhoneTestCallSession(callId, {
       phase: phaseByEvent[eventType],
       last_event: eventType,

@@ -67,8 +67,10 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
         ? buildOutboundPhoneFirstMessage(agentName, companyName)
         : buildPremiumFirstMessage(agentName, companyName),
       language: "es",
-      // Evita que ruido o "aló" corten el saludo inicial.
-      disable_first_message_interruptions: true,
+      // false: si la persona responde al saludo (muy común), el agente la atiende
+      // de inmediato. Con true su turno se ignoraba y el agente esperaba turn_timeout
+      // (10s de silencio muerto) antes de reaccionar → la gente colgaba.
+      disable_first_message_interruptions: false,
       prompt: {
         prompt: systemPrompt,
         llm: ELEVENLABS_DEFAULT_LLM,
