@@ -12,7 +12,8 @@ import {
   buildPremiumFirstMessage,
 } from "@/lib/elevenlabs/default-voices";
 import { listCuratedPremiumVoices } from "@/lib/elevenlabs/premium-voices";
-import { ELEVENLABS_DEFAULT_LLM, ELEVENLABS_TTS_MODEL_ID } from "@/lib/elevenlabs/config";
+import { ELEVENLABS_TTS_MODEL_ID } from "@/lib/elevenlabs/config";
+import { resolveElevenLabsLlm } from "@/lib/elevenlabs/llm-models";
 import { buildPremiumTurnConfig } from "@/lib/elevenlabs/voice-platform-prompt";
 
 export interface ElevenLabsSyncInput {
@@ -24,6 +25,8 @@ export interface ElevenLabsSyncInput {
   existingAgentId?: string | null;
   companyName?: string;
   companyContextText?: string;
+  /** Modelo LLM del agente (id nativo de ElevenLabs). Cae al recomendado si no aplica. */
+  llm?: string | null;
 }
 
 /** Permite anular first_message y prompt en cada llamada (SIP / web). */
@@ -73,7 +76,7 @@ function buildConversationConfig(input: ElevenLabsSyncInput, companyName: string
       disable_first_message_interruptions: false,
       prompt: {
         prompt: systemPrompt,
-        llm: ELEVENLABS_DEFAULT_LLM,
+        llm: resolveElevenLabsLlm(input.llm),
         temperature,
         tools: outboundTools,
       },

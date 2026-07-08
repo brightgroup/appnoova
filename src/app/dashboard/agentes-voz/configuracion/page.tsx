@@ -13,6 +13,7 @@ import { getTemplateMeta } from "@/lib/voice-agent-templates";
 import { normalizeVoiceAgentForm } from "@/lib/voice-agent-audio";
 import { GEMINI_VOICES, VOICE_MODELS, LLM_MODELS } from "@/lib/voice-agent-options";
 import { DEFAULT_ELEVENLABS_VOICE_ID, ELEVENLABS_DEFAULT_VOICES } from "@/lib/elevenlabs/default-voices";
+import { ELEVENLABS_LLM_MODELS, ELEVENLABS_RECOMMENDED_LLM, isElevenLabsLlm } from "@/lib/elevenlabs/llm-models";
 import { VOICE_AGENT_PROMPT_GUIDE, buildDefaultVoiceBusinessPrompt } from "@/lib/elevenlabs/voice-business-prompt";
 import { VOICE_CREDITS_PER_MINUTE, VOICE_PREMIUM_CREDITS_PER_MINUTE } from "@/lib/billing/pricing";
 import { usePricingCatalog } from "@/hooks/usePricingCatalog";
@@ -80,6 +81,14 @@ function ConfigContent() {
   const voicePremCredits = pricingCatalog?.voice_premium_per_min ?? VOICE_PREMIUM_CREDITS_PER_MINUTE;
 
   const isPremium = form.voice_provider === "elevenlabs";
+
+  // Agentes premium usan modelos nativos de ElevenLabs. Si viene un modelo de
+  // Google Live (agente antiguo) o vacío, normaliza al recomendado.
+  useEffect(() => {
+    if (isPremium && !isElevenLabsLlm(form.llm_model)) {
+      setForm(f => ({ ...f, llm_model: ELEVENLABS_RECOMMENDED_LLM }));
+    }
+  }, [isPremium, form.llm_model]);
 
   const meta = getTemplateMeta(form.source_template);
   const assignedContext = contexts.find(c => c.id === form.company_context_id);
@@ -410,6 +419,21 @@ function ConfigContent() {
                 />
               </Field>
               </>
+              )}
+
+              {isPremium && (
+                <Field label="Modelo de IA (LLM)">
+                  <NoovaSelect
+                    value={isElevenLabsLlm(form.llm_model) ? form.llm_model : ELEVENLABS_RECOMMENDED_LLM}
+                    onChange={v => setForm(f => ({ ...f, llm_model: v }))}
+                    allowEmpty={false}
+                    options={ELEVENLABS_LLM_MODELS.map(m => ({ value: m.id, label: m.label }))}
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1.5">
+                    Modelo que razona y conversa en la llamada. Claude Haiku 4.5 es el recomendado
+                    (rápido y sin errores de idioma). Al cambiarlo, guarda para aplicarlo.
+                  </p>
+                </Field>
               )}
 
               <SliderField

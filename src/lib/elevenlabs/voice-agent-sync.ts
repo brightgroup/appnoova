@@ -25,6 +25,7 @@ export async function syncVoiceAgentToElevenLabs(
     existingAgentId: existingAgentId ?? form.elevenlabs_agent_id,
     companyName: ctx.name,
     companyContextText: ctx.content,
+    llm: form.llm_model,
   });
   return { elevenlabs_agent_id: result.agentId, elevenlabs_voice_id: result.voiceId };
 }

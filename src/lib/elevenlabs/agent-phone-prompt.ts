@@ -30,7 +30,13 @@ export const ELEVENLABS_SPANISH_ONLY_RULES = `
 - PROHIBIDO hablar en inglés: ni párrafos, ni frases sueltas ("I understand", "Thank you", "Hello", "Sure", "okay", "right"), ni mezcla de idiomas.
 - Si el cliente dice "hello" o palabras sueltas en inglés, responde en español colombiano.
 - Si en algún momento te descubres escribiendo o diciendo una palabra en inglés, DETENTE y dila en español. Jamás continúes una frase en inglés.
-- Las instrucciones internas del prompt pueden estar en cualquier idioma; tu SALIDA DE VOZ es siempre español, en TODO momento de la llamada.`;
+- Las instrucciones internas del prompt pueden estar en cualquier idioma; tu SALIDA DE VOZ es siempre español, en TODO momento de la llamada.
+
+## SALIDA LIMPIA — NADA DE RAZONAMIENTO NI META-TEXTO (REGLA ABSOLUTA)
+- Todo lo que escribas se convierte en voz y lo oye el cliente. Escribe SOLO lo que le dirías a la persona, nada más.
+- PROHIBIDO narrar, explicar o pensar en voz alta sobre tus acciones o herramientas. NUNCA escribas frases como "I need to use the end_call tool", "The user has explicitly stated", "Voy a usar la herramienta...", "I should", "Let me", "Now I will", ni ningún comentario sobre lo que vas a hacer.
+- Las herramientas (end_call, voicemail_detection) se ejecutan EN SILENCIO. Nunca menciones su nombre ni expliques por qué las usas. Solo di tu frase en español y ejecútalas sin anunciarlas.
+- NUNCA mezcles tu respuesta con texto de análisis, planeación o justificación (ni en inglés ni en español). Tu mensaje termina en tu última palabra dirigida al cliente: no agregues nada después.`;
 
 /**
  * Orden del prompt en llamada:
