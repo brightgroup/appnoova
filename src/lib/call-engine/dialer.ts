@@ -89,6 +89,29 @@ function rowEligibleForDial(
   return true;
 }
 
+/**
+ * Números que YA tienen una llamada en curso (en cualquier campaña): filas de
+ * audiencia en "calling" o llamadas premium "in_progress". Sirve para no marcar
+ * dos veces el mismo número cuando una persona está repetida en varios lotes.
+ */
+async function loadInFlightNumbers(db: ReturnType<typeof adminClient>): Promise<Set<string>> {
+  const set = new Set<string>();
+  const { data: rows } = await db
+    .from("campaign_audience_rows")
+    .select("phone_e164")
+    .eq("call_status", "calling");
+  for (const r of rows ?? []) if (r.phone_e164) set.add(String(r.phone_e164));
+
+  const { data: calls } = await db
+    .from("voice_agent_calls")
+    .select("phone_number")
+    .eq("status", "in_progress")
+    .not("campaign_id", "is", null);
+  for (const c of calls ?? []) if (c.phone_number) set.add(String(c.phone_number));
+
+  return set;
+}
+
 async function claimAudienceRow(
   db: ReturnType<typeof adminClient>,
   rowId: string
@@ -446,11 +469,19 @@ async function executeCampaignDialerTick(): Promise<DialerTickResult> {
   let placed = 0;
   const errors: DialerTickResult["errors"] = [];
 
+  // Candado por número: nunca dos llamadas en curso al mismo número a la vez
+  // (aunque la persona esté repetida en varios lotes/campañas).
+  const inFlightNumbers = await loadInFlightNumbers(db);
+
   for (const { campaign, row, table } of candidates) {
     if (placed >= batchLimit) break;
 
     const slotsNow = await countActiveCampaignCalls(db);
     if (slotsNow >= rules.max_concurrent) break;
+
+    // Si ese número ya tiene una llamada en curso, se salta este tick y se
+    // reintentará en el siguiente (queda en pending/retry, no se consume intento).
+    if (row.phone_e164 && inFlightNumbers.has(String(row.phone_e164))) continue;
 
     // Regla: "no contactar" se revisa antes de cada llamada, no solo al importar.
     const suppressed = await contactSuppressedForCalls({
@@ -486,6 +517,7 @@ async function executeCampaignDialerTick(): Promise<DialerTickResult> {
     try {
       await placeCampaignCall({ campaign, row: claimed, audienceTable: table, rules });
       placed += 1;
+      if (claimed.phone_e164) inFlightNumbers.add(String(claimed.phone_e164));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error al marcar";
       console.error("[campaign-dialer] place failed:", { campaignId: campaign.id, rowId: row.id, message });
