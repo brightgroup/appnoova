@@ -11,6 +11,7 @@ import { InviteMemberModal } from "@/components/equipo/InviteMemberModal";
 import { EditMemberModal, type EditMemberValues } from "@/components/equipo/EditMemberModal";
 import { NoovaAnchoredMenu } from "@/components/ui/NoovaAnchoredMenu";
 import { NoovaListMenuItem } from "@/components/ui/NoovaSelect";
+import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import {
   registryPage, registryToolbar, registryContent,
   registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
@@ -50,11 +51,11 @@ interface RoleOption {
   name: string;
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  active: "bg-green-500/20 text-green-400 border-green-500/30",
-  suspended: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  invited: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  disabled: "bg-red-500/20 text-red-400 border-red-500/30",
+const STATUS_BADGE: Record<string, BadgeVariant> = {
+  active: "emerald",
+  suspended: "amber",
+  invited: "blue",
+  disabled: "danger",
 };
 
 function formatDate(iso: string) {
@@ -360,15 +361,12 @@ export default function EquipoPage() {
                         </div>
                       </td>
                       <td className={registryTableCell}>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border border-white/[.08] text-gray-300">
-                          {m.is_owner ? <Shield className="w-3 h-3 text-[#5b5bf6]" /> : null}
+                        <Badge variant="neutral" icon={m.is_owner ? Shield : undefined}>
                           {roleLabel}
-                        </span>
+                        </Badge>
                       </td>
                       <td className={registryTableCell}>
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs border ${badge}`}>
-                          {m.status === "active" ? "Activo" : m.status}
-                        </span>
+                        <Badge variant={badge}>{m.status === "active" ? "Activo" : m.status}</Badge>
                       </td>
                       <td className={registryTableCellMuted}>{formatDate(m.joined_at)}</td>
                       {canManage && (

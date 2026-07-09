@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Save, Loader2, CheckCircle2, Phone, Settings2,
-  BarChart3, History, Radio, LayoutGrid, RefreshCw
+  BarChart3, History, Radio, LayoutGrid, RefreshCw, Cpu, FileCode2
 } from "lucide-react";
 import { btnPrimary, tabActive, tabIdle } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
@@ -23,6 +23,7 @@ import { AgentTestPanel } from "@/components/voice/AgentTestPanel";
 import { CallRegistryPanel } from "@/components/voice/CallRegistryPanel";
 import { AgentPhoneChannelPanel } from "@/components/telephony/AgentPhoneChannelPanel";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
+import { InfoBox } from "@/components/ui/InfoBox";
 
 type TabId = "probar" | "config" | "analisis" | "registro" | "metrica" | "canales";
 
@@ -318,15 +319,14 @@ function ConfigContent() {
             <h2 className="text-sm font-semibold text-gray-300 mb-4">Configuración de voz</h2>
 
             <div className="space-y-4">
-              <div className="p-3 rounded-xl border border-[var(--nv-hubspot-teal)]/30 bg-[var(--nv-hubspot-teal-soft)]">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">Motor</p>
-                <p className="text-xs text-white font-medium">
-                  {isPremium ? "Voz premium" : "Voz estándar"}
-                </p>
-                <p className="text-[10px] text-gray-500 mt-1">
-                  El proveedor se elige al crear el agente.
-                </p>
-              </div>
+              <InfoBox
+                icon={Cpu}
+                label="Motor"
+                title={isPremium ? "Voz premium" : "Voz estándar"}
+                variant="accent"
+              >
+                El proveedor se elige al crear el agente.
+              </InfoBox>
 
               <Field label="Marca / contexto">
                 <NoovaSelect
@@ -447,12 +447,14 @@ function ConfigContent() {
               />
             </div>
 
-            <div className="mt-6 p-3 rounded-xl bg-[#5b5bf6]/10 border border-[#5b5bf6]/20">
-              <p className="text-[10px] text-[#a5a5ff] font-semibold uppercase tracking-wider mb-1">Plantilla base</p>
-              <p className="text-xs text-gray-400 leading-relaxed">
-                Los cambios aquí son solo para tu cuenta. La plantilla original no se modifica.
-              </p>
-            </div>
+            <InfoBox
+              icon={FileCode2}
+              label="Plantilla base"
+              variant="accent"
+              className="mt-6"
+            >
+              Los cambios aquí son solo para tu cuenta. La plantilla original no se modifica.
+            </InfoBox>
           </div>
 
           {/* Right: prompt editor */}
@@ -482,17 +484,23 @@ function ConfigContent() {
               </div>
             </div>
 
-            <div className="px-5 py-2 border-b border-white/[.06] bg-[#5b5bf6]/5 flex items-start justify-between gap-3">
-              <p className="text-[11px] text-[#a5a5ff]/90 leading-relaxed flex-1">{VOICE_AGENT_PROMPT_GUIDE}</p>
-              <button
-                type="button"
-                onClick={restoreTemplate}
-                disabled={callActive}
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#5b5bf6]/30 bg-[#5b5bf6]/15 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-[#5b5bf6]/25 disabled:opacity-50"
-              >
-                <RefreshCw className="w-3.5 h-3.5" /> Restaurar plantilla
-              </button>
-            </div>
+            <InfoBox
+              layout="row"
+              variant="accent"
+              className="mx-5 mt-3 mb-1"
+              action={
+                <button
+                  type="button"
+                  onClick={restoreTemplate}
+                  disabled={callActive}
+                  className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#5b5bf6]/30 bg-[#5b5bf6]/15 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-[#5b5bf6]/25 disabled:opacity-50"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Restaurar plantilla
+                </button>
+              }
+            >
+              {VOICE_AGENT_PROMPT_GUIDE}
+            </InfoBox>
 
             <div className="flex-1 p-5 overflow-hidden">
               {editorMode === "markdown" ? (

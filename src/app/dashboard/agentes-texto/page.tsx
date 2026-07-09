@@ -23,10 +23,11 @@ import { supabase } from "@/lib/supabase";
 import {
   formatCostPerResult,
   formatCostUsd,
-  qualityBadgeClass,
+  qualityBadgeVariant,
   formatMessagesPerConversation
 } from "@/lib/text-agent-display";
 import { getTextTemplateMeta } from "@/lib/text-agent-templates";
+import { Badge } from "@/components/ui/Badge";
 import { AgentCreationWizard } from "@/components/agents/AgentCreationWizard";
 import type { TextAgentListItem } from "@/types/text-agent";
 
@@ -255,9 +256,7 @@ export default function AgentesTextoPage() {
                       {formatCostPerResult(agent.cost_usd, agent.goals_achieved)}
                     </td>
                     <td className={registryTableCellRight}>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${qualityBadgeClass(agent.quality_label)}`}>
-                        {agent.quality_label}
-                      </span>
+                      <Badge variant={qualityBadgeVariant(agent.quality_label)}>{agent.quality_label}</Badge>
                     </td>
                     <td className={`${registryTableCell} text-center`} onClick={e => e.stopPropagation()}>
                       <NoovaAnchoredMenu

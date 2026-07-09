@@ -8,8 +8,9 @@ import { supabase } from "@/lib/supabase";
 import { NoovaLogo } from "@/components/brand/NoovaLogo";
 import { authFetch } from "@/lib/telephony-api";
 import {
-  sidebarNavActive, sidebarNavIdle, sidebarBadge, sidebarPlanCard
+  sidebarNavActive, sidebarNavIdle, sidebarPlanCard
 } from "@/lib/brand-ui";
+import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { CANALES_NAV } from "@/lib/canales-nav";
 import { AGENTES_VOZ_NAV } from "@/lib/agentes-voz-nav";
 import { AGENTES_TEXTO_NAV } from "@/lib/agentes-texto-nav";
@@ -418,7 +419,7 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
                 <Bot className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.ori}`} />
                 <div className="flex-1 flex items-center gap-2">
                   <span>ORI</span>
-                  <span className={sidebarBadge}>Copiloto</span>
+                  <Badge variant="accent">Copiloto</Badge>
                 </div>
               </>
             ) : (
@@ -479,11 +480,11 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
           {sidebarOpen && permFlags.can_view_billing && (() => {
             const pct   = billing?.usedPct ?? 0;
             const st    = billing?.status ?? "active";
-            const badge =
-              st === "active"    ? "bg-green-500/20 text-green-400"  :
-              st === "trialing"  ? "bg-blue-500/20 text-blue-400"    :
-              st === "past_due"  ? "bg-amber-500/20 text-amber-400"  :
-              "bg-gray-500/20 text-gray-400";
+            const badgeVariant: BadgeVariant =
+              st === "active"    ? "emerald" :
+              st === "trialing"  ? "sky"     :
+              st === "past_due"  ? "amber"   :
+              st === "suspended" ? "danger"  : "neutral";
             const badgeLabel =
               st === "active"    ? "Activo"     :
               st === "trialing"  ? "En prueba"  :
@@ -497,9 +498,7 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
                 {/* Fila 1: etiqueta + badge */}
                 <div className="flex items-center justify-between mb-1.5">
                   <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-widest">Plan actual</p>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${badge}`}>
-                    {badgeLabel}
-                  </span>
+                  <Badge variant={badgeVariant}>{badgeLabel}</Badge>
                 </div>
 
                 {/* Fila 2: nombre del plan */}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { tagNeonAmber } from "@/lib/brand-ui";
+import { InfoBox } from "@/components/ui/InfoBox";
 import { FileText, Loader2, MessageCircle, Send } from "lucide-react";
 import type { WhatsAppTemplateRecord } from "@/types/whatsapp-template";
 
@@ -36,9 +36,9 @@ export function InboxTemplateComposer({
 
   return (
     <div className="mx-auto max-w-2xl space-y-3">
-      <p className={`rounded-lg px-3 py-1.5 text-xs ${tagNeonAmber}`}>
+      <InfoBox layout="row" variant="warning">
         Ventana de 24 h cerrada — elige una plantilla aprobada y completa las variables.
-      </p>
+      </InfoBox>
 
       <div className="space-y-2">
         <p className="text-[11px] font-medium uppercase tracking-wider text-white/35">Plantillas disponibles</p>

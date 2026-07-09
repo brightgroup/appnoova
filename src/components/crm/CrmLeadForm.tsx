@@ -3,9 +3,12 @@
 import Link from "next/link";
 import {
   CRM_LEAD_OUTCOME_LABELS,
+  crmOutcomeBadgeVariant,
+  crmTemperaturaBadgeVariant,
   filterPipelineStages,
   formatLeadValue
 } from "@/lib/crm-record";
+import { Badge } from "@/components/ui/Badge";
 import {
   CRM_MOTIVO_PERDIDA_LABELS,
   CRM_TEMPERATURA_LABELS
@@ -36,19 +39,6 @@ function FieldGroup({ title, children }: { title: string; children: React.ReactN
       {children}
     </section>
   );
-}
-
-function outcomeBadgeClass(outcome: CrmLeadOutcome): string {
-  if (outcome === "won") return "bg-emerald-500/15 text-emerald-300";
-  if (outcome === "lost") return "bg-gray-500/15 text-gray-400";
-  return "bg-[#5b5bf6]/15 text-[#a5a5ff]";
-}
-
-function temperaturaBadgeClass(temp: CrmLeadTemperatura | null | undefined): string {
-  if (temp === "caliente") return "bg-[var(--nv-accent)]/15 text-[var(--nv-hubspot-teal)]";
-  if (temp === "tibio") return "bg-[var(--nv-hubspot-teal)]/15 text-[var(--nv-hubspot-teal)]";
-  if (temp === "frio") return "bg-sky-500/15 text-sky-300";
-  return "bg-white/[.06] text-gray-400";
 }
 
 interface CrmLeadFormProps {
@@ -250,9 +240,9 @@ export function CrmLeadForm({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${outcomeBadgeClass(outcome)}`}>
+          <Badge variant={crmOutcomeBadgeVariant(outcome)} uppercase>
             {CRM_LEAD_OUTCOME_LABELS[outcome]}
-          </span>
+          </Badge>
           {stage && (
             <span className="inline-flex items-center gap-1.5 text-xs text-gray-400">
               <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: stage.color }} />
@@ -263,9 +253,9 @@ export function CrmLeadForm({
             </span>
           )}
           {draft.temperatura && (
-            <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${temperaturaBadgeClass(draft.temperatura)}`}>
+            <Badge variant={crmTemperaturaBadgeVariant(draft.temperatura)}>
               {CRM_TEMPERATURA_LABELS[draft.temperatura]}
-            </span>
+            </Badge>
           )}
           <span className="text-[#a5a5ff] font-semibold tabular-nums ml-auto text-sm">
             {formatLeadValue(draft.value_amount ?? null, draft.currency ?? "COP")}

@@ -22,9 +22,10 @@ import {
   formatContactedLine,
   formatCostPerResult,
   formatCostUsd,
-  qualityBadgeClass
+  qualityBadgeVariant
 } from "@/lib/voice-agent-display";
 import { getTemplateMeta } from "@/lib/voice-agent-templates";
+import { Badge } from "@/components/ui/Badge";
 import { AgentCreationWizard } from "@/components/agents/AgentCreationWizard";
 import type { VoiceAgentListItem } from "@/types/voice-agent";
 
@@ -247,9 +248,7 @@ export default function AgentesVozPage() {
                       {formatCostPerResult(agent.cost_usd, agent.goals_achieved)}
                     </td>
                     <td className={registryTableCellRight}>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${qualityBadgeClass(agent.quality_label)}`}>
-                        {agent.quality_label}
-                      </span>
+                      <Badge variant={qualityBadgeVariant(agent.quality_label)}>{agent.quality_label}</Badge>
                     </td>
                     <td className={`${registryTableCell} text-center`} onClick={e => e.stopPropagation()}>
                       <NoovaAnchoredMenu

@@ -1,43 +1,37 @@
 import { Code2, Link2, MessageCircle, MessageSquare, Phone, type LucideIcon } from "lucide-react";
-import {
-  tagNeonAmber,
-  tagNeonEmerald,
-  tagNeonOrange,
-  tagNeonSky,
-  tagNeonViolet,
-} from "@/lib/brand-ui";
+import type { BadgeVariant } from "@/components/ui/Badge";
 
 export interface InboxChannelStyle {
   icon: LucideIcon;
   label: string;
-  badgeClass: string;
+  variant: BadgeVariant;
 }
 
 const STYLES: Record<string, InboxChannelStyle> = {
   whatsapp: {
     icon: MessageCircle,
     label: "WhatsApp",
-    badgeClass: tagNeonEmerald,
+    variant: "emerald",
   },
   web_widget: {
     icon: Link2,
     label: "Mi Link",
-    badgeClass: tagNeonViolet,
+    variant: "violet",
   },
   web_embed: {
     icon: Code2,
     label: "Widget",
-    badgeClass: tagNeonSky,
+    variant: "sky",
   },
   web_test: {
     icon: MessageSquare,
     label: "API",
-    badgeClass: tagNeonAmber,
+    variant: "amber",
   },
   voice_test: {
     icon: Phone,
     label: "Voz",
-    badgeClass: tagNeonOrange,
+    variant: "orange",
   },
 };
 

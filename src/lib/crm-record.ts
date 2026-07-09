@@ -4,6 +4,7 @@ import {
   parseSupresiones
 } from "@/lib/crm-contactability";
 import { enrichCrmLead, scoreToTemperatura } from "@/lib/crm-lead-utils";
+import type { BadgeVariant } from "@/components/ui/Badge";
 import type {
   CrmContact,
   CrmContactActions,
@@ -64,6 +65,21 @@ export const DEFAULT_CRM_STAGES: Omit<CrmPipelineStage, "id" | "user_id" | "crea
 /** Etapas activas del pipeline (excluye legacy ganado/perdido). */
 export function filterPipelineStages(stages: CrmPipelineStage[]): CrmPipelineStage[] {
   return stages.filter(s => !s.is_won && !s.is_lost);
+}
+
+export function crmOutcomeBadgeVariant(outcome: CrmLeadOutcome): BadgeVariant {
+  if (outcome === "won") return "emerald";
+  if (outcome === "lost") return "neutral";
+  return "accent";
+}
+
+export function crmTemperaturaBadgeVariant(
+  temp: CrmLeadTemperatura | null | undefined
+): BadgeVariant {
+  if (temp === "caliente") return "orange";
+  if (temp === "tibio") return "amber";
+  if (temp === "frio") return "sky";
+  return "neutral";
 }
 
 export const CRM_LEAD_OUTCOME_LABELS: Record<CrmLeadOutcome, string> = {

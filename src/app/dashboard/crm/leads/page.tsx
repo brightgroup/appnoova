@@ -14,6 +14,7 @@ import {
 } from "@/lib/brand-ui";
 import {
   CRM_LEAD_OUTCOME_LABELS,
+  crmOutcomeBadgeVariant,
   formatLeadValue
 } from "@/lib/crm-record";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
@@ -23,13 +24,8 @@ import { ExportMenu } from "@/components/ui/ExportMenu";
 import type { ExportColumn } from "@/lib/export-table";
 import { CrmLeadsKanban } from "@/components/crm/CrmLeadsKanban";
 import { useModuleWriteAccess } from "@/components/layout/DashboardRouteGuard";
+import { Badge } from "@/components/ui/Badge";
 import type { CrmLead, CrmLeadFilter, CrmLeadsView, CrmPipelineStage } from "@/types/crm";
-
-function outcomeBadge(outcome: CrmLead["outcome"]) {
-  if (outcome === "won") return "bg-emerald-500/15 text-emerald-300";
-  if (outcome === "lost") return "bg-gray-500/15 text-gray-400";
-  return "bg-white/[.06] text-gray-300";
-}
 
 export default function CrmLeadsPage() {
   const router = useRouter();
@@ -231,9 +227,9 @@ export default function CrmLeadsPage() {
                       </span>
                     </td>
                     <td className={registryTableCell}>
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${outcomeBadge(lead.outcome)}`}>
+                      <Badge variant={crmOutcomeBadgeVariant(lead.outcome)} uppercase>
                         {CRM_LEAD_OUTCOME_LABELS[lead.outcome]}
-                      </span>
+                      </Badge>
                     </td>
                     <td className={`${registryTableCell} text-xs text-gray-400 max-w-[200px]`}>
                       <span className="line-clamp-2">{lead.categoria_interes ?? "—"}</span>

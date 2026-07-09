@@ -32,11 +32,9 @@ import type { WhatsAppTemplateRecord } from "@/types/whatsapp-template";
 import { renderTemplatePreview } from "@/lib/whatsapp/template-record";
 import { InboxTemplateComposer } from "@/components/inbox/InboxTemplateComposer";
 import { NoovaListMenu, NoovaListMenuItem } from "@/components/ui/NoovaSelect";
-import {
-  inputSearch,
-  tagNeonAmber,
-  tagNeonEmerald,
-} from "@/lib/brand-ui";
+import { Badge } from "@/components/ui/Badge";
+import { InfoBox } from "@/components/ui/InfoBox";
+import { inputSearch } from "@/lib/brand-ui";
 
 type AssignValue = "ai" | "me";
 
@@ -51,14 +49,10 @@ function AgentAvatar({ name }: { name: string }) {
 
 function ChannelBadge({ channel }: { channel: string }) {
   const style = inboxChannelStyle(channel);
-  const Icon = style.icon;
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-semibold whitespace-nowrap shrink-0 ${style.badgeClass}`}
-    >
-      <Icon className="h-3.5 w-3.5 shrink-0" />
+    <Badge variant={style.variant} icon={style.icon}>
       {style.label}
-    </span>
+    </Badge>
   );
 }
 
@@ -695,15 +689,17 @@ function InboxPageInner() {
               detail.channel === "whatsapp" &&
               detail.whatsapp_compliance_notice &&
               !showTemplateComposer && (
-                <div
-                  className={`mx-4 mt-2 rounded-lg px-3 py-1.5 text-xs lg:mx-6 ${
+                <InfoBox
+                  layout="row"
+                  variant={
                     detail.whatsapp_session_open === false || detail.whatsapp_opted_out
-                      ? tagNeonAmber
-                      : tagNeonEmerald
-                  }`}
+                      ? "warning"
+                      : "success"
+                  }
+                  className="mx-4 mt-2 lg:mx-6"
                 >
                   {detail.whatsapp_compliance_notice}
-                </div>
+                </InfoBox>
               )}
 
             <div

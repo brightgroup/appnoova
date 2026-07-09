@@ -8,12 +8,14 @@ import {
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import {
-  btnFilterGroup, btnFilterActive, btnFilterIdle, btnGhost, btnPrimary, noticeWarning, promoCard,
+  btnFilterGroup, btnFilterActive, btnFilterIdle, btnGhost, btnPrimary, promoCard,
   registryTable, registryTableHead, registryTableHeadRow, registryTableHeadCell,
   registryTableRow, registryTableCell, registryTableCellFirst,
   registryTableEmpty, registryTableFooter, registrySearchRow,
   registryTableArea, inputSearch, btnIcon, textMuted
 } from "@/lib/brand-ui";
+import { Badge, type BadgeVariant } from "@/components/ui/Badge";
+import { InfoBox } from "@/components/ui/InfoBox";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { usePricingCatalog } from "@/hooks/usePricingCatalog";
@@ -101,18 +103,18 @@ const USAGE_FILTERS = [
   { id: "Cotizaciones",    label: "Cotizaciones" },
 ];
 
-const INVOICE_STATUS: Record<string, { label: string; cls: string }> = {
-  pending: { label: "Pendiente", cls: "bg-amber-500/15 text-amber-300" },
-  paid:    { label: "Pagada",    cls: "bg-green-500/15 text-green-300" },
-  overdue: { label: "Vencida",   cls: "bg-red-500/15 text-red-300" },
-  void:    { label: "Anulada",   cls: "bg-gray-500/15 text-gray-400" },
+const INVOICE_STATUS: Record<string, { label: string; variant: BadgeVariant }> = {
+  pending: { label: "Pendiente", variant: "amber" },
+  paid:    { label: "Pagada",    variant: "emerald" },
+  overdue: { label: "Vencida",   variant: "danger" },
+  void:    { label: "Anulada",   variant: "neutral" },
 };
-const SUB_STATUS: Record<string, { label: string; cls: string }> = {
-  trialing:  { label: "En prueba",      cls: "bg-[#5b5bf6]/15 text-[#a5a5ff]" },
-  active:    { label: "Activa",         cls: "bg-green-500/15 text-green-300" },
-  past_due:  { label: "Pago pendiente", cls: "bg-amber-500/15 text-amber-300" },
-  suspended: { label: "Suspendida",     cls: "bg-red-500/15 text-red-300" },
-  canceled:  { label: "Cancelada",      cls: "bg-gray-500/15 text-gray-400" },
+const SUB_STATUS: Record<string, { label: string; variant: BadgeVariant }> = {
+  trialing:  { label: "En prueba",      variant: "accent" },
+  active:    { label: "Activa",         variant: "emerald" },
+  past_due:  { label: "Pago pendiente", variant: "amber" },
+  suspended: { label: "Suspendida",     variant: "danger" },
+  canceled:  { label: "Cancelada",      variant: "neutral" },
 };
 
 const PLAN_COPY: Record<string, { tagline: string; features: string[]; ideal: string }> = {
@@ -395,7 +397,7 @@ export default function FacturacionPage() {
                     <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">Plan actual</p>
                     <p className="text-2xl font-bold capitalize">{planName}</p>
                     <div className="flex flex-wrap items-center gap-2 mt-2">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${sBadge.cls}`}>{sBadge.label}</span>
+                      <Badge variant={sBadge.variant}>{sBadge.label}</Badge>
                       {planPromo?.label && (
                         <span className="text-[10px] text-[#a5a5ff] bg-[#5b5bf6]/10 px-2 py-0.5 rounded-md font-medium">
                           {planPromo.label}
@@ -684,10 +686,9 @@ export default function FacturacionPage() {
                               <td className={`${registryTableCell} capitalize text-gray-300`}>{inv.plan_id ?? planName}</td>
                               <td className={`${registryTableCell} text-gray-400`}>{fmtDate(inv.due_date)}</td>
                               <td className={registryTableCell}>
-                                <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-semibold ${s.cls}`}>
-                                  {inv.status === "paid" && <CheckCircle2 className="w-2.5 h-2.5" />}
+                                <Badge variant={s.variant} icon={inv.status === "paid" ? CheckCircle2 : undefined}>
                                   {s.label}
-                                </span>
+                                </Badge>
                               </td>
                               <td className={registryTableCell}>
                                 <p className="text-sm font-bold text-white">${inv.amount_usd.toFixed(2)}</p>
@@ -746,19 +747,33 @@ export default function FacturacionPage() {
                       >
                         {/* Badges */}
                         {p.id === "crecimiento" && !isActive && (
-                          <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#5b5bf6] text-white">
+                          <Badge
+                            variant="accent"
+                            uppercase
+                            className="absolute -top-2.5 left-1/2 -translate-x-1/2"
+                          >
                             Más popular
-                          </span>
+                          </Badge>
                         )}
                         {isActive && (
-                          <span className="absolute -top-2.5 left-4 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-green-600 text-white flex items-center gap-1">
-                            <Star className="w-2 h-2" /> Plan actual
-                          </span>
+                          <Badge
+                            variant="emerald"
+                            uppercase
+                            icon={Star}
+                            className="absolute -top-2.5 left-4"
+                          >
+                            Plan actual
+                          </Badge>
                         )}
                         {isActive && planPromo?.label && (
-                          <span className="absolute -top-2.5 right-4 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#5b5bf6] text-white max-w-[140px] truncate" title={planPromo.label}>
+                          <Badge
+                            variant="accent"
+                            uppercase
+                            title={planPromo.label}
+                            className="absolute -top-2.5 right-4 max-w-[140px] truncate"
+                          >
                             {planPromo.label}
-                          </span>
+                          </Badge>
                         )}
 
                         <div className="p-5 flex-1 space-y-4">
@@ -983,16 +998,13 @@ export default function FacturacionPage() {
               <div className="max-w-2xl space-y-5">
 
                 {/* Banner "próximamente" */}
-                <div className={`${noticeWarning} flex items-start gap-3`}>
-                  <Info className="w-4 h-4 text-[var(--nv-hubspot-teal)] shrink-0 mt-0.5" />
-                  <p>
-                    Esta funcionalidad estará disponible al integrar la pasarela de pago.
-                    Por ahora, las recargas se coordinan con tu asesor en{" "}
-                    <a href="mailto:info@bgsoluciones.com.co" className="hover:underline font-semibold">
-                      info@bgsoluciones.com.co
-                    </a>.
-                  </p>
-                </div>
+                <InfoBox layout="row" variant="warning" icon={Info}>
+                  Esta funcionalidad estará disponible al integrar la pasarela de pago.
+                  Por ahora, las recargas se coordinan con tu asesor en{" "}
+                  <a href="mailto:info@bgsoluciones.com.co" className="hover:underline font-semibold">
+                    info@bgsoluciones.com.co
+                  </a>.
+                </InfoBox>
 
                 <div className={promoCard}>
                   <div className="flex items-center justify-between mb-4">

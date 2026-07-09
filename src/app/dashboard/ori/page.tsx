@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
 import type { CompanyContext } from "@/types/company-context";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
-import { copilotBadge } from "@/lib/brand-ui";
+import { Badge } from "@/components/ui/Badge";
 
 interface Message {
   id: string;
@@ -153,9 +153,7 @@ export default function OriCopilotoPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[15px] font-semibold tracking-tight text-white nv-ori-title">Ori</span>
-            <span className={copilotBadge}>
-              Copiloto
-            </span>
+            <Badge variant="accent">Copiloto</Badge>
           </div>
         </div>
         <div className="flex items-center gap-3">

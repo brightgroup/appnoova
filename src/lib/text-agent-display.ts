@@ -2,7 +2,7 @@ export {
   deriveQualityLabel as deriveTextQualityLabel,
   formatCostUsd,
   formatCostPerResult,
-  qualityBadgeClass
+  qualityBadgeVariant
 } from "@/lib/voice-agent-display";
 
 export function formatMessagesPerConversation(messages: number, conversations: number): string {

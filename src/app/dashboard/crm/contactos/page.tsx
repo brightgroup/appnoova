@@ -32,6 +32,7 @@ import {
   registryTableEmpty
 } from "@/lib/brand-ui";
 import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
+import { Badge } from "@/components/ui/Badge";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { formatCrmDateTime } from "@/components/crm/CrmFieldInput";
@@ -394,9 +395,7 @@ export default function CrmContactsPage() {
                   </div>
                 </td>
                 <td className={`${registryTableCell} text-xs`}>
-                  <span className="inline-flex px-2 py-0.5 rounded-full bg-white/[.06] text-gray-300 whitespace-nowrap">
-                    {TIPO_RELACION_LABELS[c.tipo_relacion] ?? c.tipo_relacion}
-                  </span>
+                  <Badge variant="neutral">{TIPO_RELACION_LABELS[c.tipo_relacion] ?? c.tipo_relacion}</Badge>
                 </td>
                 <td className={`${registryTableCell} text-xs`}>
                   {c.whatsapp ? (

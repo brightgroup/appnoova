@@ -5,8 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Save, Loader2, CheckCircle2, MessageSquare, Settings2,
-  History, Radio, BarChart3
+  History, Radio, BarChart3, FileCode2
 } from "lucide-react";
+import { InfoBox } from "@/components/ui/InfoBox";
 import { btnPrimary, tabActive, tabIdle } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { getTextTemplateMeta } from "@/lib/text-agent-templates";
@@ -334,12 +335,14 @@ function ConfigContent() {
               </Field>
             </div>
 
-            <div className="mt-6 p-3 rounded-xl bg-[#5b5bf6]/10 border border-[#5b5bf6]/20">
-              <p className="text-[10px] text-[#a5a5ff] font-semibold uppercase tracking-wider mb-1">Plantilla base</p>
-              <p className="text-xs text-gray-400 leading-relaxed">
-                Los cambios aquí son solo para tu cuenta. La plantilla original no se modifica.
-              </p>
-            </div>
+            <InfoBox
+              icon={FileCode2}
+              label="Plantilla base"
+              variant="accent"
+              className="mt-6"
+            >
+              Los cambios aquí son solo para tu cuenta. La plantilla original no se modifica.
+            </InfoBox>
           </div>
 
           <div className="flex-1 flex flex-col min-w-0">

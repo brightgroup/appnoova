@@ -1,4 +1,4 @@
-import { tagNeonAmber, tagNeonBlue, tagNeonEmerald } from "@/lib/brand-ui";
+import type { BadgeVariant } from "@/components/ui/Badge";
 
 const AGENT_COLOR_GRADIENTS: Record<string, [string, string]> = {
   "from-[#1d4ed8] to-[#38bdf8]": ["#1d4ed8", "#38bdf8"],
@@ -65,13 +65,13 @@ export function formatContactedLine(contacted: number, contacts: number): string
   return `${contacted} (${pct.toFixed(1)}%)`;
 }
 
-export function qualityBadgeClass(label: string): string {
+export function qualityBadgeVariant(label: string): BadgeVariant {
   switch (label) {
     case "Estable":
-      return tagNeonEmerald;
+      return "emerald";
     case "Mejorando":
-      return tagNeonBlue;
+      return "blue";
     default:
-      return tagNeonAmber;
+      return "amber";
   }
 }

@@ -72,12 +72,6 @@ export const sidebarNavIdle =
 
 export const sidebarIconActive = "text-[#5b5bf6]";
 
-export const sidebarBadge =
-  "nv-tag-neon nv-tag-neon-accent border-0 text-[10px] px-2.5 py-1 rounded-full font-semibold leading-none";
-
-export const copilotBadge =
-  "nv-tag-neon nv-tag-neon-accent border-0 text-[11px] px-3 py-1.5 rounded-full font-semibold leading-none";
-
 export const sidebarPlanCard =
   "nv-sidebar-plan-card rounded-xl p-3.5 border transition-all duration-150";
 

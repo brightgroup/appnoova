@@ -10,6 +10,7 @@ import { numberUsageLabel } from "@/lib/telephony/number-type-labels";
 import type { PhoneNumberRecord } from "@/types/phone-number";
 import type { VoiceAgentListItem } from "@/types/voice-agent";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
+import { InfoBox } from "@/components/ui/InfoBox";
 
 export function LinePhoneConfigPanel({ lineId }: { lineId: string }) {
   const [line, setLine] = useState<PhoneNumberRecord | null>(null);
@@ -135,18 +136,20 @@ export function LinePhoneConfigPanel({ lineId }: { lineId: string }) {
         </div>
 
         {assignedAgent && saved && !dirty && (
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-3">
-            <div>
-              <p className="text-[11px] uppercase tracking-wide text-emerald-300/80 mb-0.5">Actualmente asignado</p>
-              <p className="text-sm font-medium text-white">{assignedAgent.name}</p>
-            </div>
-            <Link
-              href={`/dashboard/agentes-voz/configuracion?id=${assignedAgent.id}`}
-              className="inline-flex items-center gap-1 text-[11px] text-emerald-300 hover:text-emerald-200 shrink-0"
-            >
-              Ver agente <ExternalLink className="w-3 h-3" />
-            </Link>
-          </div>
+          <InfoBox
+            layout="row"
+            variant="success"
+            label="Actualmente asignado"
+            title={assignedAgent.name}
+            action={
+              <Link
+                href={`/dashboard/agentes-voz/configuracion?id=${assignedAgent.id}`}
+                className="inline-flex items-center gap-1 text-[11px] text-emerald-300 hover:text-emerald-200 shrink-0"
+              >
+                Ver agente <ExternalLink className="w-3 h-3" />
+              </Link>
+            }
+          />
         )}
 
         {error && (
