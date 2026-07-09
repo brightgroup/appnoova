@@ -28,6 +28,11 @@ export const CAMPAIGN_OUTBOUND_VOICEMAIL_BLOCK = `
 - PROHIBIDO decir en voz alta que detectaste buzón; solo ejecuta la herramienta y cuelga.
 - Solo continúa el guion si una persona REAL responde con "aló", "bueno", "dígame" o similar conversacional.`;
 
+// NOTA: se probó un modo "escucha antes de saludar" (first_message vacío +
+// initial_wait_time) y se descartó — el pipeline STT+LLM+TTS toma ~3s en
+// reaccionar al "aló" del usuario, reproduciendo el mismo problema de
+// silencios/repeticiones que el saludo instantáneo evita por completo.
+
 export const CAMPAIGN_ELEVENLABS_OUTBOUND_TOOLS = [
   PREMIUM_VOICEMAIL_DETECTION_TOOL,
   PREMIUM_END_CALL_TOOL,

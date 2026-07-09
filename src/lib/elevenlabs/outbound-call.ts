@@ -22,7 +22,14 @@ export async function placeElevenLabsOutboundCall(input: {
   firstMessage?: string;
   agentName?: string;
   companyName?: string;
-  /** Solo para pruebas: esperar "aló" (no usar en producción — falla con ruido de fondo). */
+  /**
+   * Deja el saludo inicial vacío para que el agente "escuche" antes de
+   * hablar. PROBADO Y DESCARTADO (jul 2026): aunque el tope es corto
+   * (initial_wait_time=2s), el pipeline STT+LLM+TTS tarda ~3s en reaccionar
+   * al primer "aló", y el usuario repite "aló" mientras tanto — mismo
+   * síntoma que el saludo instantáneo evita por completo. No usar en
+   * producción.
+   */
   waitForPickup?: boolean;
 }): Promise<ElevenLabsOutboundCallResult> {
   const phoneNumberId =
