@@ -1,0 +1,107 @@
+# Backup diario de Supabase (schema public) subido a Google Drive.
+#
+# Corre en GitHub Actions (no depende de que ninguna máquina local esté encendida).
+# Es la única red de seguridad de la base de datos mientras el plan de Supabase sea Free
+# (no incluye backups automáticos — eso es desde el plan Pro).
+#
+# Requisitos en GitHub → Settings → Secrets and variables → Actions:
+#   SUPABASE_DB_PASSWORD      = contraseña de la base de datos (misma que .env.local)
+#   NEXT_PUBLIC_SUPABASE_URL  = https://<project-ref>.supabase.co
+#   RCLONE_CONF_B64           = contenido de la sección [gdrive] de rclone.conf, en base64
+#
+# Los backups quedan en Google Drive, carpeta "appnoova-backups/", y se purgan
+# automáticamente pasados 30 días.
+
+name: Backup DB to Drive
+
+on:
+  schedule:
+    - cron: '30 8 * * *' # 08:30 UTC (~03:30 hora Colombia)
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-db-drive
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Instalar cliente Postgres (PGDG, última versión)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Generar dump del schema public
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_DB_PASSWORD:-}" ] || [ -z "${SUPABASE_URL:-}" ]; then
+            echo "Faltan secrets SUPABASE_DB_PASSWORD / NEXT_PUBLIC_SUPABASE_URL." >&2
+            exit 1
+          fi
+
+          PROJECT_REF=$(echo "$SUPABASE_URL" | sed -E 's#https://([^.]+)\..*#\1#')
+          ENCODED_PASS=$(python3 -c "import urllib.parse,os; print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))")
+          echo "::add-mask::$ENCODED_PASS"
+
+          TIMESTAMP=$(date -u +%Y-%m-%d_%H-%M-%S)
+          OUT_FILE="supabase-${PROJECT_REF}-${TIMESTAMP}.sql"
+          echo "OUT_FILE=$OUT_FILE" >> "$GITHUB_ENV"
+
+          URLS=(
+            "postgresql://postgres.${PROJECT_REF}:${ENCODED_PASS}@aws-1-us-east-1.pooler.supabase.com:5432/postgres"
+            "postgresql://postgres.${PROJECT_REF}:${ENCODED_PASS}@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
+            "postgresql://postgres:${ENCODED_PASS}@db.${PROJECT_REF}.supabase.co:5432/postgres"
+          )
+
+          success=false
+          for url in "${URLS[@]}"; do
+            echo "::add-mask::$url"
+            echo "Probando conexión..."
+            if PGSSLMODE=require pg_dump "$url" --schema=public --no-owner --no-acl --format=plain --file "$OUT_FILE"; then
+              success=true
+              break
+            fi
+            echo "Conexión falló, probando la siguiente URL..."
+          done
+
+          if [ "$success" != "true" ]; then
+            echo "No se pudo conectar a la base de datos con ninguna URL." >&2
+            exit 1
+          fi
+
+          echo "Dump generado: $OUT_FILE ($(du -h "$OUT_FILE" | cut -f1))"
+
+      - name: Instalar rclone
+        run: curl https://rclone.org/install.sh | sudo bash
+
+      - name: Configurar rclone (Google Drive)
+        env:
+          RCLONE_CONF_B64: ${{ secrets.RCLONE_CONF_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RCLONE_CONF_B64:-}" ]; then
+            echo "Falta el secret RCLONE_CONF_B64." >&2
+            exit 1
+          fi
+          mkdir -p ~/.config/rclone
+          echo "$RCLONE_CONF_B64" | base64 -d > ~/.config/rclone/rclone.conf
+
+      - name: Subir backup a Google Drive
+        run: rclone copy "$OUT_FILE" gdrive:appnoova-backups/ --progress
+
+      - name: Purgar backups de más de 30 días en Drive
+        run: rclone delete gdrive:appnoova-backups --min-age 30d
+
+      - name: Limpiar dump local del runner
+        if: always()
+        run: rm -f "$OUT_FILE" || true
