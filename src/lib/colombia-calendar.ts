@@ -111,6 +111,13 @@ export function buildColombiaTemporalContext(
   }).format(now);
 
   const isoDate = formatDateKey(now);
+  const hora_24_colombia = new Intl.DateTimeFormat("en-GB", {
+    timeZone: BOGOTA_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(now);
   const allSpecialEvents = [...COLOMBIA_SPECIAL_EVENTS, ...(overrides.extraEvents ?? [])];
   const festivo =
     isColombiaHoliday(now) || allSpecialEvents.some(e => e.date === isoDate);
@@ -143,11 +150,14 @@ export function buildColombiaTemporalContext(
   const promptBlock = [
     "## Contexto temporal Colombia (OBLIGATORIO — no inventes fecha ni hora)",
     `- Ahora en Colombia (America/Bogota, UTC-5): ${fecha_hora_colombia}`,
+    `- Fecha ISO (YYYY-MM-DD): ${isoDate}`,
+    `- Hora 24h: ${hora_24_colombia}`,
     `- Día: ${dia_semana_colombia}`,
     `- ¿Festivo hoy?: ${es_festivo_colombia}`,
     `- Calendario: ${calendario_colombia}`,
     `- Notas del día: ${notas}`,
     "- Si el usuario pregunta la hora o fecha, responde EXACTAMENTE con los valores anteriores.",
+    "- No uses tu conocimiento interno de fecha; ignora cualquier otra fecha del historial si contradice este bloque.",
   ].join("\n");
 
   return {

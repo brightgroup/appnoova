@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getOriApiKey } from "@/lib/google-ai";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
+import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 import { buildDataTableContext } from "@/lib/data-tables/retrieve";
 import { mergeDataTableContext } from "@/lib/data-tables/format-context";
 import { geminiTextTemperature } from "@/lib/text-agent-form";
@@ -411,7 +412,9 @@ export async function processTwilioWhatsAppInbound(
     dataTableContext || null,
     { tableLinked: Boolean(agent.data_table_id) }
   );
-  const systemInstruction = mergeCompanyContext(promptWithCatalog, companyContextText);
+  const mergedPrompt = mergeCompanyContext(promptWithCatalog, companyContextText);
+  const temporal = buildColombiaTemporalContext();
+  const systemInstruction = `${temporal.promptBlock}\n\n${mergedPrompt}`;
   const ai = new GoogleGenAI({ apiKey });
 
   let reply: string;
