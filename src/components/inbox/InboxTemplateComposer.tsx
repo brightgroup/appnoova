@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { InfoBox } from "@/components/ui/InfoBox";
-import { FileText, Loader2, MessageCircle, Send } from "lucide-react";
+import { FileText, Loader2, MessageCircle, Send, Sparkles } from "lucide-react";
 import type { WhatsAppTemplateRecord } from "@/types/whatsapp-template";
 
 interface InboxTemplateComposerProps {
@@ -11,6 +11,9 @@ interface InboxTemplateComposerProps {
   onSelectTemplate: (id: string) => void;
   variableValues: string[];
   onVariableChange: (index: number, value: string) => void;
+  onAutofillFromContact?: () => void;
+  /** Cuántas variables se pueden resolver desde el contacto CRM */
+  autofilledCount?: number;
   previewText: string;
   sending: boolean;
   onSend: () => void;
@@ -23,6 +26,8 @@ export function InboxTemplateComposer({
   onSelectTemplate,
   variableValues,
   onVariableChange,
+  onAutofillFromContact,
+  autofilledCount = 0,
   previewText,
   sending,
   onSend,
@@ -33,11 +38,14 @@ export function InboxTemplateComposer({
     !selected ||
     selected.variable_labels.length === 0 ||
     selected.variable_labels.length === variableValues.filter(v => v.trim()).length;
+  const filledNow = variableValues.filter(v => v.trim()).length;
+  const canAutofill = Boolean(onAutofillFromContact && autofilledCount > 0 && selected);
 
   return (
     <div className="mx-auto max-w-2xl space-y-3">
       <InfoBox layout="row" variant="warning">
-        Ventana de 24 h cerrada — elige una plantilla aprobada y completa las variables.
+        Ventana de 24 h cerrada — elige una plantilla aprobada. Las variables se rellenan
+        solas desde el contacto cuando hay datos.
       </InfoBox>
 
       <div className="space-y-2">
@@ -71,7 +79,25 @@ export function InboxTemplateComposer({
 
       {selected && selected.variable_labels.length > 0 && (
         <div className="rounded-2xl border border-[var(--nv-border)] bg-[var(--nv-bg-elevated)] p-4 space-y-3">
-          <p className="text-xs font-medium text-[var(--nv-text-muted)]">Variables del mensaje</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-medium text-[var(--nv-text-muted)]">Variables del mensaje</p>
+            {canAutofill && (
+              <button
+                type="button"
+                onClick={onAutofillFromContact}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#5b5bf6]/30 bg-[#5b5bf6]/10 px-2.5 py-1 text-[11px] font-medium text-[#c4c4ff] hover:bg-[#5b5bf6]/20"
+              >
+                <Sparkles className="h-3 w-3" />
+                Rellenar desde contacto
+              </button>
+            )}
+          </div>
+          {filledNow > 0 && autofilledCount > 0 && (
+            <p className="text-[11px] text-emerald-400/90">
+              {filledNow} de {selected.variable_labels.length} campos con datos del contacto.
+              Puedes editarlos antes de enviar.
+            </p>
+          )}
           <div className="grid gap-3 sm:grid-cols-2">
             {selected.variable_labels.map((label, i) => (
               <div key={`${label}-${i}`}>

@@ -27,6 +27,73 @@ import {
   getOrgTextAgentIds,
   loadOrgTextAgentNames
 } from "@/lib/inbox-org-scope";
+import type { WhatsAppTemplateVariableContext } from "@/lib/whatsapp/template-variable-context";
+
+function looksLikePhone(value: string): boolean {
+  const compact = value.replace(/[\s().-]/g, "");
+  return /^\+?\d{10,15}$/.test(compact);
+}
+
+async function buildTemplateContext(input: {
+  db: ReturnType<typeof textAgentsAdminClient>;
+  organizationId: string;
+  metadata: Record<string, unknown>;
+  contactLabel: string;
+  displayTitle: string;
+}): Promise<WhatsAppTemplateVariableContext> {
+  const phone =
+    (input.metadata.whatsapp_contact_e164
+      ? String(input.metadata.whatsapp_contact_e164).trim()
+      : "") ||
+    (looksLikePhone(input.contactLabel) ? input.contactLabel.trim() : "");
+
+  let contactName = "";
+  const titleName = input.displayTitle.split(" · ")[0]?.trim() || "";
+  if (titleName && !looksLikePhone(titleName) && titleName !== "WhatsApp") {
+    contactName = titleName;
+  } else if (input.contactLabel && !looksLikePhone(input.contactLabel)) {
+    contactName = input.contactLabel.trim();
+  }
+
+  let companyName = "";
+  let email = "";
+  let city = "";
+
+  const crmContactId = input.metadata.crm_contact_id
+    ? String(input.metadata.crm_contact_id).trim()
+    : "";
+
+  if (crmContactId) {
+    const { data: contact } = await input.db
+      .from("crm_contacts")
+      .select("name, organizacion, company, email, ciudad, whatsapp, telefono")
+      .eq("id", crmContactId)
+      .maybeSingle();
+    if (contact) {
+      if (contact.name?.trim()) contactName = String(contact.name).trim();
+      companyName = String(contact.organizacion ?? contact.company ?? "").trim();
+      email = String(contact.email ?? "").trim();
+      city = String(contact.ciudad ?? "").trim();
+    }
+  }
+
+  if (!companyName) {
+    const { data: org } = await input.db
+      .from("organizations")
+      .select("name")
+      .eq("id", input.organizationId)
+      .maybeSingle();
+    if (org?.name?.trim()) companyName = String(org.name).trim();
+  }
+
+  return {
+    contact_name: contactName || null,
+    company_name: companyName || null,
+    phone: phone || null,
+    email: email || null,
+    city: city || null
+  };
+}
 
 function parseFilter(raw: string | null): InboxFilter {
   if (raw === "mine" || raw === "unassigned") return raw;
@@ -83,16 +150,17 @@ export async function GET(req: NextRequest) {
     const messagesWithMedia = isWhatsApp
       ? await signWhatsAppMessageMedia(db, mediaOwnerId, record.messages)
       : record.messages;
+    const displayTitle = formatInboxDisplayTitle(
+      record.contact_label,
+      record.channel,
+      record.id,
+      record.metadata
+    );
     const detail: InboxDetail = {
       kind: "text",
       id: record.id,
       contact_label: record.contact_label,
-      display_title: formatInboxDisplayTitle(
-        record.contact_label,
-        record.channel,
-        record.id,
-        record.metadata
-      ),
+      display_title: displayTitle,
       channel: record.channel,
       channel_label: inboxDetailChannelLabel(record.channel),
       agent_id: record.text_agent_id,
@@ -109,7 +177,14 @@ export async function GET(req: NextRequest) {
             whatsapp_session_open: isWhatsAppSessionOpen(waMeta.lastInboundAt),
             whatsapp_session_expires_at: whatsAppSessionExpiresAt(waMeta.lastInboundAt),
             whatsapp_opted_out: waMeta.optedOut,
-            whatsapp_compliance_notice: whatsAppComplianceNotice(record.metadata, record.messages)
+            whatsapp_compliance_notice: whatsAppComplianceNotice(record.metadata, record.messages),
+            template_context: await buildTemplateContext({
+              db,
+              organizationId: orgCtx.organizationId,
+              metadata: record.metadata,
+              contactLabel: record.contact_label,
+              displayTitle
+            })
           }
         : {})
     };

@@ -30,6 +30,10 @@ import type { InboxFilter, InboxListItem, InboxTextDetail } from "@/types/inbox"
 import type { TextChatMessage } from "@/types/text-agent-conversation";
 import type { WhatsAppTemplateRecord } from "@/types/whatsapp-template";
 import { renderTemplatePreview } from "@/lib/whatsapp/template-record";
+import {
+  countFilledTemplateVariables,
+  resolveTemplateVariableValues
+} from "@/lib/whatsapp/template-variable-context";
 import { InboxTemplateComposer } from "@/components/inbox/InboxTemplateComposer";
 import { NoovaListMenu, NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 import { Badge } from "@/components/ui/Badge";
@@ -244,8 +248,9 @@ function InboxPageInner() {
       setTemplateVars([]);
       return;
     }
-    setTemplateVars(tpl.variable_labels.map(() => ""));
-  }, [selectedTemplateId, waTemplates]);
+    const ctx = detail?.kind === "text" ? detail.template_context : null;
+    setTemplateVars(resolveTemplateVariableValues(tpl.variable_labels, ctx));
+  }, [selectedTemplateId, waTemplates, detail]);
 
   useEffect(() => {
     stickToBottomRef.current = true;
@@ -761,6 +766,23 @@ function InboxPageInner() {
                         next[i] = v;
                         setTemplateVars(next);
                       }}
+                      onAutofillFromContact={() => {
+                        const tpl = waTemplates.find(t => t.id === selectedTemplateId);
+                        if (!tpl || detail?.kind !== "text") return;
+                        setTemplateVars(
+                          resolveTemplateVariableValues(tpl.variable_labels, detail.template_context)
+                        );
+                      }}
+                      autofilledCount={
+                        selectedTemplate
+                          ? countFilledTemplateVariables(
+                              resolveTemplateVariableValues(
+                                selectedTemplate.variable_labels,
+                                detail?.kind === "text" ? detail.template_context : null
+                              )
+                            )
+                          : 0
+                      }
                       previewText={templatePreview}
                       sending={sending}
                       onSend={sendTemplate}

@@ -44,6 +44,14 @@ export interface InboxTextDetail {
   whatsapp_session_expires_at?: string | null;
   whatsapp_opted_out?: boolean;
   whatsapp_compliance_notice?: string | null;
+  /** Datos del contacto/CRM para autorellenar variables de plantilla */
+  template_context?: {
+    contact_name?: string | null;
+    company_name?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    city?: string | null;
+  } | null;
 }
 
 export interface InboxVoiceDetail {

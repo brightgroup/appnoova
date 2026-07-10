@@ -245,7 +245,8 @@ export function mergeInboxTextDetail(
     prev.whatsapp_compliance_notice === next.whatsapp_compliance_notice &&
     prev.status === next.status &&
     prev.display_title === next.display_title &&
-    prev.contact_label === next.contact_label;
+    prev.contact_label === next.contact_label &&
+    JSON.stringify(prev.template_context ?? null) === JSON.stringify(next.template_context ?? null);
 
   const messages = prev.messages.map((oldMsg, index) => {
     const newMsg = next.messages[index];
