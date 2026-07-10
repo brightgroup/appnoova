@@ -30,14 +30,7 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      - name: Instalar cliente Postgres (PGDG, última versión)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-common
-          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
-          sudo apt-get install -y postgresql-client-17
-
-      - name: Generar dump del schema public
+      - name: Generar dump del schema public (pg_dump 17 vía Docker)
         env:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -60,14 +53,14 @@ jobs:
           URLS=(
             "postgresql://postgres.${PROJECT_REF}:${ENCODED_PASS}@aws-1-us-east-1.pooler.supabase.com:5432/postgres"
             "postgresql://postgres.${PROJECT_REF}:${ENCODED_PASS}@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
-            "postgresql://postgres:${ENCODED_PASS}@db.${PROJECT_REF}.supabase.co:5432/postgres"
           )
 
           success=false
           for url in "${URLS[@]}"; do
             echo "::add-mask::$url"
             echo "Probando conexión..."
-            if PGSSLMODE=require pg_dump "$url" --schema=public --no-owner --no-acl --format=plain --file "$OUT_FILE"; then
+            if docker run --rm -v "$PWD":/backup postgres:17 \
+                 pg_dump "$url?sslmode=require" --schema=public --no-owner --no-acl --format=plain --file "/backup/$OUT_FILE"; then
               success=true
               break
             fi
