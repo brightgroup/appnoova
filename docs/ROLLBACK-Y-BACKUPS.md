@@ -49,7 +49,7 @@ El workflow `.github/workflows/backup-db-drive.yml` es la única red de segurida
 - Corre **todos los días a las 08:30 UTC (~03:30 Colombia)** en GitHub Actions —
   no depende de que tu Mac ni ninguna máquina esté encendida.
 - Hace `pg_dump` del schema `public` y lo sube a **Google Drive**, carpeta
-  `appnoova-backups/` (retiene 30 días, borra los más viejos).
+  `appnoova-backups/` (retiene 90 días, borra los más viejos).
 - También copia los buckets de Storage (`whatsapp-media`,
   `voice-call-recordings`) a `appnoova-backups/storage/` en Drive — estos
   **no se borran nunca automáticamente** (crecen con el tiempo, revisa tu

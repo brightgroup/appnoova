@@ -12,7 +12,7 @@
 #   SUPABASE_S3_SECRET_ACCESS_KEY = Secret Access Key (misma sección)
 #
 # Los backups quedan en Google Drive, carpeta "appnoova-backups/", y se purgan
-# automáticamente pasados 30 días (el dump de la BD; los buckets de Storage se
+# automáticamente pasados 90 días (el dump de la BD; los buckets de Storage se
 # copian sin borrar nada — ver nota de crecimiento en el paso correspondiente).
 
 name: Backup DB to Drive
@@ -95,8 +95,11 @@ jobs:
       - name: Subir backup a Google Drive
         run: rclone copy "$OUT_FILE" gdrive:appnoova-backups/ --progress
 
-      - name: Purgar backups de más de 30 días en Drive
-        run: rclone delete gdrive:appnoova-backups --min-age 30d
+      - name: Purgar dumps de BD con más de 90 días en Drive
+        # --max-depth 1: solo archivos directos en appnoova-backups/ (los .sql
+        # de la BD), sin recursar en appnoova-backups/storage/ — esos nunca
+        # se purgan automáticamente.
+        run: rclone delete gdrive:appnoova-backups --max-depth 1 --min-age 90d
 
       - name: Configurar remote S3 de Supabase Storage
         env:
