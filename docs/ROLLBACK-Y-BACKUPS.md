@@ -41,9 +41,27 @@ Hard refresh en el navegador: **Cmd + Shift + R**.
 
 ---
 
-## 2. Backup de Supabase (desde ya)
+## 2. Backup de Supabase (automático, GitHub Actions)
 
-### Manual (cuando quieras)
+**Plan actual: Supabase Free — no incluye backups automáticos** (eso es desde Pro).
+El workflow `.github/workflows/backup-db-drive.yml` es la única red de seguridad real:
+
+- Corre **todos los días a las 08:30 UTC (~03:30 Colombia)** en GitHub Actions —
+  no depende de que tu Mac ni ninguna máquina esté encendida.
+- Hace `pg_dump` del schema `public` y lo sube a **Google Drive**, carpeta
+  `appnoova-backups/` (retiene 30 días, borra los más viejos).
+- También copia los buckets de Storage (`whatsapp-media`,
+  `voice-call-recordings`) a `appnoova-backups/storage/` en Drive — estos
+  **no se borran nunca automáticamente** (crecen con el tiempo, revisa tu
+  cuota de Drive de vez en cuando).
+- Se puede disparar manualmente: GitHub → Actions → "Backup DB to Drive" →
+  **Run workflow** (útil antes de una migración grande).
+
+Secrets usados (GitHub → Settings → Secrets and variables → Actions):
+`SUPABASE_DB_PASSWORD`, `NEXT_PUBLIC_SUPABASE_URL`, `RCLONE_CONF_B64`,
+`SUPABASE_S3_ACCESS_KEY_ID`, `SUPABASE_S3_SECRET_ACCESS_KEY`.
+
+### Backup manual desde tu Mac (opcional, complementario)
 
 ```bash
 npm run backup:db
@@ -53,37 +71,35 @@ npm run backup:db
 - Requiere `SUPABASE_DB_PASSWORD` en `.env.local`
 - **No se sube a GitHub** (contiene datos de clientes)
 
-### Automático en tu Mac (LaunchAgent, 03:30 diario)
-
-Instalar o reinstalar:
+### Restaurar la base de datos
 
 ```bash
-chmod +x scripts/run-backup-daily.sh
-cp scripts/com.appnoova.backup-db.plist ~/Library/LaunchAgents/
-launchctl unload ~/Library/LaunchAgents/com.appnoova.backup-db.plist 2>/dev/null || true
-launchctl load ~/Library/LaunchAgents/com.appnoova.backup-db.plist
-launchctl list | grep appnoova.backup
+npm run restore:db -- --from-drive          # el más reciente de Drive
+npm run restore:db -- --date 2026-07-08     # uno de una fecha específica
+npm run restore:db -- backups/supabase-xxx.sql   # un archivo local
 ```
 
-- Log: `backups/backup.log`
-- Retiene backups `.sql` de los últimos **30 días** (borra los más viejos)
-- La Mac debe estar encendida a las 03:30 (si está apagada, corre al despertar si `RunAtLoad` no aplica — para eso usa también backup manual antes de migraciones)
+El script (`scripts/restore-supabase.mjs`):
+1. Descarga el backup elegido (si viene de Drive) y muestra fecha/tamaño.
+2. Pide escribir `RESTAURAR` explícitamente antes de tocar nada.
+3. Hace un backup de último momento del estado actual (por si acaso).
+4. Borra y recrea el schema `public`, aplica el dump, y reaplica los grants
+   estándar de Supabase para `anon`/`authenticated`/`service_role` (el dump
+   se genera con `--no-acl`, así que esos permisos no vienen incluidos).
 
-### Manual desde Supabase Dashboard
+⚠️ Es destructivo: reemplaza todo lo que haya en `public` en ese momento.
 
-1. [Dashboard → tu proyecto](https://supabase.com/dashboard/project/fsdvvxdbbcxbtgjmwkkq)
-2. **Database → Backups** (backups diarios automáticos en plan Pro)
-3. **Database → Migrations / SQL Editor** — para cambios puntuales
-
-### Restaurar un backup SQL
+### Restaurar Storage (archivos e imágenes/audios)
 
 ```bash
-# Solo schema public (agentes, contextos, etc.)
-/opt/homebrew/opt/libpq/bin/psql "postgresql://postgres.[REF]:[PASSWORD]@aws-1-us-east-1.pooler.supabase.com:5432/postgres" \
-  -f backups/supabase-XXXX.sql
+npm run restore:storage -- whatsapp-media
+npm run restore:storage -- voice-call-recordings
+npm run restore:storage -- all
 ```
 
-⚠️ Restaurar **sobrescribe** tablas existentes. Haz backup nuevo antes de restaurar.
+Requiere `SUPABASE_S3_ACCESS_KEY_ID` / `SUPABASE_S3_SECRET_ACCESS_KEY` en
+`.env.local` (Supabase → Settings → Storage → S3 Connection). También pide
+confirmación explícita — deja el bucket idéntico al respaldo en Drive.
 
 ---
 

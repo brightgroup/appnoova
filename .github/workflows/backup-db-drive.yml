@@ -5,12 +5,15 @@
 # (no incluye backups automáticos — eso es desde el plan Pro).
 #
 # Requisitos en GitHub → Settings → Secrets and variables → Actions:
-#   SUPABASE_DB_PASSWORD      = contraseña de la base de datos (misma que .env.local)
-#   NEXT_PUBLIC_SUPABASE_URL  = https://<project-ref>.supabase.co
-#   RCLONE_CONF_B64           = contenido de la sección [gdrive] de rclone.conf, en base64
+#   SUPABASE_DB_PASSWORD          = contraseña de la base de datos (misma que .env.local)
+#   NEXT_PUBLIC_SUPABASE_URL      = https://<project-ref>.supabase.co
+#   RCLONE_CONF_B64               = contenido de la sección [gdrive] de rclone.conf, en base64
+#   SUPABASE_S3_ACCESS_KEY_ID     = Access Key ID (Supabase → Settings → Storage → S3 Connection)
+#   SUPABASE_S3_SECRET_ACCESS_KEY = Secret Access Key (misma sección)
 #
 # Los backups quedan en Google Drive, carpeta "appnoova-backups/", y se purgan
-# automáticamente pasados 30 días.
+# automáticamente pasados 30 días (el dump de la BD; los buckets de Storage se
+# copian sin borrar nada — ver nota de crecimiento en el paso correspondiente).
 
 name: Backup DB to Drive
 
@@ -94,6 +97,37 @@ jobs:
 
       - name: Purgar backups de más de 30 días en Drive
         run: rclone delete gdrive:appnoova-backups --min-age 30d
+
+      - name: Configurar remote S3 de Supabase Storage
+        env:
+          SUPABASE_S3_ACCESS_KEY_ID: ${{ secrets.SUPABASE_S3_ACCESS_KEY_ID }}
+          SUPABASE_S3_SECRET_ACCESS_KEY: ${{ secrets.SUPABASE_S3_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_S3_ACCESS_KEY_ID:-}" ] || [ -z "${SUPABASE_S3_SECRET_ACCESS_KEY:-}" ]; then
+            echo "Faltan secrets SUPABASE_S3_ACCESS_KEY_ID / SUPABASE_S3_SECRET_ACCESS_KEY." >&2
+            exit 1
+          fi
+          cat <<EOF | sed -E 's/^[[:space:]]+//' >> ~/.config/rclone/rclone.conf
+          [supabase-s3]
+          type = s3
+          provider = Other
+          access_key_id = ${SUPABASE_S3_ACCESS_KEY_ID}
+          secret_access_key = ${SUPABASE_S3_SECRET_ACCESS_KEY}
+          region = us-east-1
+          endpoint = https://fsdvvxdbbcxbtgjmwkkq.storage.supabase.co/storage/v1/s3
+          force_path_style = true
+          EOF
+
+      - name: Respaldar buckets de Storage a Drive
+        run: |
+          set -euo pipefail
+          # Nota: usa "copy" (no "sync") a propósito — nunca borra en Drive algo
+          # que haya desaparecido del bucket origen, para no perder respaldo si
+          # un archivo se borra por error en producción. Esto hace que la carpeta
+          # de Drive crezca con el tiempo; revisa tu cuota de Drive de vez en cuando.
+          rclone copy supabase-s3:whatsapp-media gdrive:appnoova-backups/storage/whatsapp-media --fast-list --progress
+          rclone copy supabase-s3:voice-call-recordings gdrive:appnoova-backups/storage/voice-call-recordings --fast-list --progress
 
       - name: Limpiar dump local del runner
         if: always()

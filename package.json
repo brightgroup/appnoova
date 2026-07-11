@@ -10,6 +10,8 @@
     "lint": "next lint",
     "db:migrate": "node scripts/apply-all-migrations.mjs",
     "backup:db": "node scripts/backup-supabase.mjs",
+    "restore:db": "node scripts/restore-supabase.mjs",
+    "restore:storage": "node scripts/restore-storage.mjs",
     "email:test": "node scripts/test-resend-email.mjs",
     "email:configure-supabase": "node scripts/configure-supabase-resend-smtp.mjs"
   },
