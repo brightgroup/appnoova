@@ -36,6 +36,7 @@ next-env.d.ts
 backups/*.sql
 backups/*.dump
 backups/*.log
+backups/restore-tmp/
 !backups/.gitkeep
 
 # Supabase CLI (estado local al hacer `supabase link`; no commitear)

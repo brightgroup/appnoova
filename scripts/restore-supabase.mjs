@@ -89,9 +89,12 @@ function preRestoreBackup() {
 }
 
 function restore(filePath, dbUrl) {
-  console.log("\nBorrando y recreando schema public...");
+  // Solo DROP: el dump ya incluye su propio "CREATE SCHEMA public;" (pg_dump
+  // lo genera por defecto). Recrearlo aquí antes causa "schema already
+  // exists" y corta la restauración a medias.
+  console.log("\nBorrando schema public...");
   sh(PSQL, [dbUrl, "-v", "ON_ERROR_STOP=1", "-c",
-    "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+    "DROP SCHEMA public CASCADE;"
   ], { stdio: "inherit", env: { ...process.env, PGSSLMODE: "require" } });
 
   console.log("Aplicando dump...");
