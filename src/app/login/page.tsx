@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ArrowRight, Loader2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { NoovaLogo } from "@/components/brand/NoovaLogo";
 import { DesktopOnlyGate } from "@/components/layout/DesktopOnlyGate";
+import { getMarketingSiteUrl } from "@/lib/marketing-site-url";
 
 export default function LoginPage() {
   const router = useRouter();
+  const marketingUrl = getMarketingSiteUrl();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -65,20 +66,20 @@ export default function LoginPage() {
     >
       <div className="login-page-glow" aria-hidden />
 
-      <Link href="/" className="relative z-10 mb-10 flex items-center">
+      <a href={marketingUrl} className="relative z-10 mb-10 flex items-center">
         <NoovaLogo width={180} height={44} priority />
-      </Link>
+      </a>
 
       <div
         className="relative z-10 w-full max-w-[420px] rounded-3xl border border-[var(--nv-border-strong)] bg-[var(--nv-bg-surface)] p-8 sm:p-10 shadow-nv-lg"
       >
-        <Link
-          href="/"
+        <a
+          href={marketingUrl}
           className="absolute top-6 right-6 p-1.5 rounded-lg border border-[var(--nv-border)] bg-[var(--nv-hover)] hover:bg-[var(--nv-hover-strong)] text-[var(--nv-text-faint)] hover:text-[var(--nv-text)] transition-all"
-          aria-label="Cerrar"
+          aria-label="Ir al sitio"
         >
           <X className="w-5 h-5" />
-        </Link>
+        </a>
 
         <div className="mb-8 text-center">
           <h1 className="text-xl font-bold text-[var(--nv-text)]">Bienvenido de vuelta</h1>
@@ -149,12 +150,12 @@ export default function LoginPage() {
 
         <p className="mt-6 text-center text-xs text-[var(--nv-text-muted)] leading-relaxed">
           ¿Aún no tiene acceso?{" "}
-          <Link
-            href="/?solicitar=acceso"
+          <a
+            href={`${marketingUrl}/?solicitar=acceso`}
             className="text-[var(--nv-accent-text)] hover:text-[#5b5bf6] transition-colors font-semibold"
           >
             Solicitar acceso
-          </Link>
+          </a>
         </p>
       </div>
 

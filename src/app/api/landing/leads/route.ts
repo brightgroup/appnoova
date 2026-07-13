@@ -6,6 +6,7 @@ import {
   type LandingLeadPayload
 } from "@/lib/landing-leads";
 import { adminClient } from "@/lib/voice-agents-server";
+import { corsPreflight, withCors } from "@/lib/marketing-cors";
 
 const VALID_SIZES = new Set<string>(COMPANY_SIZE_OPTIONS.map(o => o.value));
 
@@ -17,12 +18,16 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+export async function OPTIONS(req: NextRequest) {
+  return corsPreflight(req);
+}
+
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+    return withCors(req, NextResponse.json({ error: "JSON inválido" }, { status: 400 }));
   }
 
   const payload: LandingLeadPayload = {
@@ -37,16 +42,28 @@ export async function POST(req: NextRequest) {
   };
 
   if (!payload.company_name) {
-    return NextResponse.json({ error: "Nombre de empresa requerido" }, { status: 400 });
+    return withCors(
+      req,
+      NextResponse.json({ error: "Nombre de empresa requerido" }, { status: 400 })
+    );
   }
   if (!payload.contact_name) {
-    return NextResponse.json({ error: "Nombre de contacto requerido" }, { status: 400 });
+    return withCors(
+      req,
+      NextResponse.json({ error: "Nombre de contacto requerido" }, { status: 400 })
+    );
   }
   if (!payload.email || !isValidEmail(payload.email)) {
-    return NextResponse.json({ error: "Email corporativo inválido" }, { status: 400 });
+    return withCors(
+      req,
+      NextResponse.json({ error: "Email corporativo inválido" }, { status: 400 })
+    );
   }
   if (!VALID_SIZES.has(payload.company_size)) {
-    return NextResponse.json({ error: "Seleccione el tamaño de su empresa" }, { status: 400 });
+    return withCors(
+      req,
+      NextResponse.json({ error: "Seleccione el tamaño de su empresa" }, { status: 400 })
+    );
   }
 
   const db = adminClient();
@@ -71,7 +88,10 @@ export async function POST(req: NextRequest) {
 
   if (error || !data) {
     console.error("[landing/leads] insert:", error);
-    return NextResponse.json({ error: "No se pudo registrar la solicitud" }, { status: 500 });
+    return withCors(
+      req,
+      NextResponse.json({ error: "No se pudo registrar la solicitud" }, { status: 500 })
+    );
   }
 
   const emailResult = await notifyLandingLead(data);
@@ -81,10 +101,13 @@ export async function POST(req: NextRequest) {
       ? { email_reason: emailResult.reason, email_detail: emailResult.detail }
       : {};
 
-  return NextResponse.json({
-    ok: true,
-    id: data.id,
-    email_sent: emailResult.sent,
-    ...devEmailDebug
-  });
+  return withCors(
+    req,
+    NextResponse.json({
+      ok: true,
+      id: data.id,
+      email_sent: emailResult.sent,
+      ...devEmailDebug
+    })
+  );
 }

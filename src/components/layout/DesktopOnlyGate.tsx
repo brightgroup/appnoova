@@ -1,20 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { Monitor } from "lucide-react";
 import { NoovaLogo } from "@/components/brand/NoovaLogo";
 import { DESKTOP_MEDIA_QUERY, DESKTOP_MIN_WIDTH_PX } from "@/lib/desktop-viewport";
+import { getMarketingSiteUrl } from "@/lib/marketing-site-url";
 
 function DesktopOnlyMessage({ neutralBranding }: { neutralBranding?: boolean }) {
+  const marketingUrl = getMarketingSiteUrl();
   return (
     <div className="login-page-bg relative flex min-h-screen flex-col items-center justify-center px-6 py-12 text-center">
       <div className="login-page-glow" aria-hidden />
 
       {!neutralBranding && (
-        <Link href="/" className="relative z-10 mb-8">
+        <a href={marketingUrl} className="relative z-10 mb-8">
           <NoovaLogo width={160} height={40} priority />
-        </Link>
+        </a>
       )}
 
       {neutralBranding && (
@@ -31,12 +32,12 @@ function DesktopOnlyMessage({ neutralBranding }: { neutralBranding?: boolean }) 
             : `Noova 360 requiere una pantalla de escritorio (mínimo ${DESKTOP_MIN_WIDTH_PX}px de ancho) para mostrar todos los módulos con claridad. Accede desde tu PC o laptop.`}
         </p>
         {!neutralBranding && (
-          <Link
-            href="/"
+          <a
+            href={marketingUrl}
             className="mt-6 inline-flex text-xs font-semibold text-[var(--nv-accent-text)] hover:text-[#5b5bf6] transition-colors"
           >
-            Volver al inicio
-          </Link>
+            Volver al sitio
+          </a>
         )}
       </div>
     </div>

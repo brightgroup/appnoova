@@ -3,15 +3,18 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Lock } from "lucide-react";
+import { getMarketingSiteUrl, marketingPath } from "@/lib/marketing-site-url";
 
 export default function SignupPage() {
+  const marketingUrl = getMarketingSiteUrl();
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#06070d] px-4 py-12">
-      <Link href="/" className="mb-10 flex items-center">
+      <a href={marketingUrl} className="mb-10 flex items-center">
         <div className="relative h-14 w-14">
           <Image src="/logo-noova.png" alt="Noova 360" fill className="object-contain object-center" />
         </div>
-      </Link>
+      </a>
 
       <div
         className="w-full max-w-[420px] rounded-3xl p-8 sm:p-10 text-center"
@@ -31,13 +34,13 @@ export default function SignupPage() {
           creará su cuenta manualmente.
         </p>
 
-        <Link
-          href="/?solicitar=acceso"
+        <a
+          href={marketingPath("/?solicitar=acceso")}
           className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#5b5bf6] py-3 text-sm font-semibold text-white transition-all hover:bg-[#7070f8]"
         >
           Solicitar acceso
           <ArrowRight className="h-4 w-4" />
-        </Link>
+        </a>
 
         <Link
           href="/login"

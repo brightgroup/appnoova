@@ -24,6 +24,23 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }]
       }
     ];
+  },
+  async redirects() {
+    const marketing =
+      process.env.NEXT_PUBLIC_MARKETING_URL?.replace(/\/$/, "").trim() ||
+      "https://noova360.com";
+    return [
+      {
+        source: "/iaseguros",
+        destination: `${marketing}/iaseguros`,
+        permanent: true
+      },
+      {
+        source: "/iaseguros/:path*",
+        destination: `${marketing}/iaseguros/:path*`,
+        permanent: true
+      }
+    ];
   }
 };
 

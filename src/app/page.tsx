@@ -1,12 +1,6 @@
-import type { Metadata } from "next";
-import NoovaLandingPage from "@/components/landing/NoovaLandingPage";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Noova 360 — Plataforma de IA empresarial",
-  description:
-    "Agentes de ia en voz, WhatsApp y web para cualquier empresa. Atención 24/7, captación de leads, CRM e inbox omnicanal en una sola plataforma."
-};
-
+/** app.noova360.com → ingreso a la plataforma (landing vive en noova360.com). */
 export default function HomePage() {
-  return <NoovaLandingPage />;
+  redirect("/login");
 }

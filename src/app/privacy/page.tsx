@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { getMarketingSiteUrl } from "@/lib/marketing-site-url";
 
 export const metadata: Metadata = {
   title: "Política de Privacidad – Noova 360",
@@ -248,10 +249,11 @@ const SECTIONS = [
 ] as const;
 
 export default function PrivacyPolicyPage() {
+  const marketingUrl = getMarketingSiteUrl();
   return (
     <div className="min-h-screen bg-[#06070d] text-white flex flex-col">
       <header className="sticky top-0 z-50 flex items-center justify-between h-14 px-6 bg-[#06070d]/90 backdrop-blur-xl border-b border-white/[.06]">
-        <Link href="/" className="relative h-8 w-28 sm:w-32 flex-shrink-0">
+        <a href={marketingUrl} className="relative h-8 w-28 sm:w-32 flex-shrink-0">
           <Image
             src="/logo-noova.png"
             alt="Noova 360"
@@ -259,7 +261,7 @@ export default function PrivacyPolicyPage() {
             className="object-contain object-left"
             priority
           />
-        </Link>
+        </a>
         <Link
           href="/login"
           className="inline-flex items-center justify-center h-9 px-4 rounded-lg border border-white/[.1] text-sm font-medium text-white hover:bg-white/[.05] transition-all"

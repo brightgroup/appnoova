@@ -1,4 +1,4 @@
-/** Slug del widget embebido en la landing de seguros (/iaseguros) */
+/** Slug del widget embebido en la landing de marketing (noova360.com). */
 export function getLandingWidgetSlug(): string {
   return process.env.NEXT_PUBLIC_LANDING_WIDGET_SLUG?.trim() || "noova";
 }
