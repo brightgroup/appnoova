@@ -10,3 +10,5 @@ terminals
 .cursor
 agent-transcripts
 services/pipecat-voice
+export
+scripts/tmp-*.mjs
