@@ -792,13 +792,14 @@ function InboxPageInner() {
                     <div className="mx-auto flex max-w-lg flex-col items-stretch gap-2.5 rounded-xl border border-[var(--nv-border)] bg-[var(--nv-bg-control)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-xs text-white/60">
                         <span className="font-medium text-white/80">Ventana de 24 h cerrada.</span>{" "}
-                        Crea una plantilla para recontactar.
+                        No hay plantillas aprobadas para esta línea. Aprueba una en Canales → WhatsApp →
+                        Plantillas (debe estar ligada a este número).
                       </p>
                       <Link
-                        href="/dashboard/canales/whatsapp/plantillas/nueva"
+                        href="/dashboard/canales/whatsapp/plantillas"
                         className="inline-flex shrink-0 items-center justify-center rounded-lg bg-white px-3 py-2 text-xs font-medium text-black transition-colors hover:bg-white/90"
                       >
-                        Crear plantilla
+                        Ver plantillas
                       </Link>
                     </div>
                   )

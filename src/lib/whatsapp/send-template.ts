@@ -55,7 +55,6 @@ export async function sendWhatsAppTemplateForConversation(input: {
     .from("whatsapp_templates")
     .select("*")
     .eq("id", input.templateId)
-    .eq("user_id", input.userId)
     .eq("whatsapp_channel_id", channelId)
     .in("status", ["approved", "active"])
     .maybeSingle();
