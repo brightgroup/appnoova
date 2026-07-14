@@ -21,6 +21,9 @@ export async function GET(req: NextRequest) {
   const channelId = req.nextUrl.searchParams.get("whatsapp_channel_id");
 
   if (conversationId) {
+    // Traer aprobaciones de Twilio antes de listar (si sigue en pending en BD).
+    await syncPendingWhatsAppTemplates(db);
+
     const { data: conv, error: convErr } = await db
       .from("text_agent_conversations")
       .select("channel, metadata")

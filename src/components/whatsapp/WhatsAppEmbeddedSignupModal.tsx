@@ -280,8 +280,14 @@ export function WhatsAppEmbeddedSignupModal({
       setError("Conexión automática no disponible — contacta a soporte Noova");
       return;
     }
-    if (config.provider === "twilio" && !config.solutionId) {
-      setError("WhatsApp aún no está habilitado en esta instancia — contacta a soporte");
+    if (config.provider !== "twilio") {
+      setError(
+        "Esta instancia aún usa onboarding Meta directo (sin Partner Solution de Twilio). Revisa WHATSAPP_DEFAULT_PROVIDER=twilio y NEXT_PUBLIC_TWILIO_WHATSAPP_SOLUTION_ID en Coolify, luego redeploy."
+      );
+      return;
+    }
+    if (!config.solutionId) {
+      setError("Falta NEXT_PUBLIC_TWILIO_WHATSAPP_SOLUTION_ID en esta instancia — contacta a soporte");
       return;
     }
     if (!window.FB || !sdkReady) {
@@ -377,6 +383,14 @@ export function WhatsAppEmbeddedSignupModal({
           </div>
 
           <div className="p-6 space-y-4">
+            {config && (config.provider !== "twilio" || !config.solutionId) && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-100/90 leading-relaxed">
+                Onboarding actual: <strong className="text-amber-50">{config.provider}</strong>
+                {config.solutionId ? "" : " · sin Solution ID"}. Para ver logos Noova + Twilio usa{" "}
+                <code className="text-amber-50">WHATSAPP_DEFAULT_PROVIDER=twilio</code>, el Config ID de Embedded Signup
+                y <code className="text-amber-50">NEXT_PUBLIC_TWILIO_WHATSAPP_SOLUTION_ID</code>, luego redeploy.
+              </div>
+            )}
             {!reconnectChannel && step === "setup" && !showFallbackPhone && (
               <>
                 <p className="text-sm text-gray-400">
