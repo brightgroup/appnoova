@@ -8,6 +8,8 @@ import {
   PMV_BROKER_TEMPLATE_PRESETS
 } from "@/lib/whatsapp/template-server";
 import { syncPendingWhatsAppTemplates } from "@/lib/whatsapp/template-sync";
+import { requireOrgModule } from "@/lib/module-auth";
+import { conversationBelongsToOrg } from "@/lib/inbox-org-scope";
 
 /** GET: inbox (conversation_id) o gestión (whatsapp_channel_id / listado). POST: crear plantilla. */
 export async function GET(req: NextRequest) {
@@ -21,14 +23,21 @@ export async function GET(req: NextRequest) {
   const channelId = req.nextUrl.searchParams.get("whatsapp_channel_id");
 
   if (conversationId) {
+    const orgCtx = await requireOrgModule(req, "inbox", "view");
+    if (orgCtx instanceof NextResponse) return orgCtx;
+
     // Traer aprobaciones de Twilio antes de listar (si sigue en pending en BD).
     await syncPendingWhatsAppTemplates(db);
 
+    const belongs = await conversationBelongsToOrg(db, conversationId, orgCtx.organizationId);
+    if (!belongs) {
+      return NextResponse.json({ error: "Conversación no encontrada" }, { status: 404 });
+    }
+
     const { data: conv, error: convErr } = await db
       .from("text_agent_conversations")
-      .select("channel, metadata")
+      .select("channel, metadata, user_id")
       .eq("id", conversationId)
-      .eq("user_id", userId)
       .maybeSingle();
 
     if (convErr || !conv) {
@@ -43,10 +52,23 @@ export async function GET(req: NextRequest) {
     const waChannelId = meta.whatsapp_channel_id ? String(meta.whatsapp_channel_id) : "";
     if (!waChannelId) return NextResponse.json({ templates: [] });
 
+    const { data: channel } = await db
+      .from("whatsapp_channels")
+      .select("id, organization_id")
+      .eq("id", waChannelId)
+      .maybeSingle();
+
+    if (
+      !channel ||
+      (channel.organization_id && String(channel.organization_id) !== orgCtx.organizationId)
+    ) {
+      return NextResponse.json({ templates: [] });
+    }
+
+    // Plantillas de la línea (canal), no del usuario actual — el inbox es org-scoped.
     const { data, error } = await db
       .from("whatsapp_templates")
       .select("*")
-      .eq("user_id", userId)
       .eq("whatsapp_channel_id", waChannelId)
       .in("status", ["approved", "active"])
       .order("template_name");
