@@ -1,0 +1,25 @@
+export/marketing-site/
+  README.md                          Guía de migración + sync de precios
+  MANIFEST.txt                       Este listado
+  .env.example
+  public/logo-noova.png
+
+  src/app/page.tsx                   Landing principal
+  src/app/iaseguros/page.tsx
+  src/app/iaseguros/layout.tsx
+
+  src/components/landing/
+    NoovaLandingPage.tsx
+    IaSegurosLandingPage.tsx
+    PricingSection.tsx               ← lee /api/pricing/catalog
+    LeadCaptureButton.tsx
+    LeadCaptureModal.tsx             ← POST leads
+    LeadCaptureProvider.tsx
+    LandingWidgetEmbed.tsx
+
+  src/components/ui/NoovaSelect.tsx
+  src/hooks/usePricingCatalog.ts     ← adaptado a APP_API_URL
+  src/lib/marketing-api.ts           ← base URL app
+  src/lib/landing-leads.ts
+  src/lib/landing-widget.ts
+  src/lib/brand-ui.ts                ← tokens usados por NoovaSelect
