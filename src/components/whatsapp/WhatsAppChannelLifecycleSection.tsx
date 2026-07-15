@@ -94,7 +94,7 @@ export function WhatsAppChannelLifecycleSection({
             </button>
           )}
 
-          {disconnected && embeddedSignupEnabled && (
+          {disconnected && (
             <button type="button" onClick={onReconnect} className={btnPrimary}>
               <Link2 className="w-4 h-4" /> Reconectar
             </button>

@@ -122,6 +122,31 @@ export default function WhatsAppListPage() {
     setConnectOpen(true);
   };
 
+  const reconnectOrOpenSignup = async (channel: WhatsAppChannelRecord) => {
+    setMenuChannelId(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/whatsapp/channels/${channel.id}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ action: "reconnect" })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo reconectar");
+      if (data.mode === "needs_embedded_signup") {
+        if (!embeddedSignupEnabled) {
+          window.alert("Esta línea necesita Embedded Signup y aún no está habilitado.");
+          return;
+        }
+        openConnect(channel);
+        return;
+      }
+      await load();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "No se pudo reconectar");
+    }
+  };
+
   const closeConnect = () => {
     setConnectOpen(false);
     setReconnectChannel(null);
@@ -367,11 +392,10 @@ export default function WhatsAppListPage() {
                     <NoovaListMenuItem onClick={() => router.push(`/dashboard/canales/whatsapp/${ch.id}`)}>
                       Abrir configuración
                     </NoovaListMenuItem>
-                    {embeddedSignupEnabled && disconnected && (
+                    {disconnected && (
                       <NoovaListMenuItem
                         onClick={() => {
-                          setMenuChannelId(null);
-                          openConnect(ch);
+                          void reconnectOrOpenSignup(ch);
                         }}
                       >
                         <span className="flex items-center gap-2">

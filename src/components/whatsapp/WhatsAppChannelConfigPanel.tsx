@@ -150,6 +150,36 @@ export function WhatsAppChannelConfigPanel({ channelId }: { channelId: string })
     }
   };
 
+  const handleReconnect = async () => {
+    if (!channel) return;
+    setActionLoading(true);
+    setError("");
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/whatsapp/channels/${channel.id}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ action: "reconnect" })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "No se pudo reconectar");
+        return;
+      }
+      if (data.mode === "needs_embedded_signup") {
+        if (!embeddedSignupEnabled) {
+          setError("Esta línea necesita Embedded Signup y aún no está habilitado.");
+          return;
+        }
+        setConnectOpen(true);
+        return;
+      }
+      if (data.channel) setChannel(data.channel);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-gray-400 text-sm py-8">
@@ -257,7 +287,7 @@ export function WhatsAppChannelConfigPanel({ channelId }: { channelId: string })
         disconnecting={actionLoading && confirmAction === "disconnect"}
         deleting={actionLoading && confirmAction === "delete"}
         onDisconnect={() => setConfirmAction("disconnect")}
-        onReconnect={() => setConnectOpen(true)}
+        onReconnect={() => void handleReconnect()}
         onDelete={() => setConfirmAction("delete")}
       />
 

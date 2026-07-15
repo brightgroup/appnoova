@@ -103,7 +103,7 @@ export async function syncTwilioWhatsAppChannel(
   const isOnline = senderStatus === "ONLINE";
   const priorMeta =
     channel.metadata && typeof channel.metadata === "object" && !Array.isArray(channel.metadata)
-      ? channel.metadata
+      ? { ...channel.metadata }
       : {};
 
   const updates: Record<string, unknown> = {
@@ -118,15 +118,25 @@ export async function syncTwilioWhatsAppChannel(
   };
 
   if (senderSid) updates.twilio_sender_sid = senderSid;
-  if (isOnline && channel.status === "pending") {
+
+  const userDisconnected =
+    channel.status === "suspended" && Boolean(priorMeta.disconnected_at) && !priorMeta.billing_suspended_at;
+
+  if (isOnline && (channel.status === "pending" || userDisconnected)) {
     updates.status = "active";
+    if (userDisconnected) {
+      const nextMeta = updates.metadata as Record<string, unknown>;
+      delete nextMeta.disconnected_at;
+      delete nextMeta.disconnected_by;
+      nextMeta.reconnected_at = new Date().toISOString();
+    }
   }
 
   await db.from("whatsapp_channels").update(updates).eq("id", channelId);
 
   return {
     senderStatus,
-    activated: isOnline && channel.status === "pending",
+    activated: Boolean(isOnline && (channel.status === "pending" || userDisconnected)),
     webhookConfigured,
   };
 }

@@ -5,6 +5,7 @@ import { canDeleteWhatsAppChannel } from "@/lib/whatsapp/channel-status";
 import { getWhatsAppChannelById } from "@/lib/whatsapp-server";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
 import { requireOrgModule } from "@/lib/module-auth";
+import { reconnectWhatsAppChannel } from "@/lib/whatsapp/reconnect-channel";
 
 export async function GET(
   req: NextRequest,
@@ -38,6 +39,22 @@ export async function PATCH(
   const existing = await getWhatsAppChannelById(db, orgCtx.organizationId, id);
   if (!existing) {
     return NextResponse.json({ error: "Línea no encontrada" }, { status: 404 });
+  }
+
+  if (body.action === "reconnect") {
+    try {
+      const result = await reconnectWhatsAppChannel(db, existing);
+      return NextResponse.json({
+        channel: result.channel,
+        mode: result.mode,
+        sender_status: result.senderStatus ?? null
+      });
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "No se pudo reconectar" },
+        { status: 500 }
+      );
+    }
   }
 
   const updates: Record<string, unknown> = {
