@@ -13,6 +13,8 @@ import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
 import { resolvePublicChatChannel } from "@/lib/widget-channel";
 import { getOriApiKey } from "@/lib/google-ai";
+import { buildDataTableContext } from "@/lib/data-tables/retrieve";
+import { mergeDataTableContext } from "@/lib/data-tables/format-context";
 import {
   checkBillingForUser,
   readGeminiUsage,
@@ -163,8 +165,22 @@ export async function POST(
 
   const billingEventType = channel === WEB_EMBED_CHANNEL ? "widget" : "milink";
 
+  let dataTableContext = "";
+  if (agent.data_table_id) {
+    dataTableContext = await buildDataTableContext(
+      db,
+      String(agent.data_table_id),
+      lastUser.content.trim(),
+      billing.organizationId
+    );
+  }
+  const promptWithCatalog = mergeDataTableContext(
+    String(agent.prompt),
+    dataTableContext || null,
+    { tableLinked: Boolean(agent.data_table_id) }
+  );
   const temporal = buildColombiaTemporalContext();
-  const systemInstruction = `${temporal.promptBlock}\n\n${mergeCompanyContext(String(agent.prompt), companyContextText)}`;
+  const systemInstruction = `${temporal.promptBlock}\n\n${mergeCompanyContext(promptWithCatalog, companyContextText)}`;
   const temperature = geminiTextTemperature(Number(agent.temperature) || 0.7);
   const maxOutputTokens = Number(agent.max_output_tokens) || 2048;
 
