@@ -12,6 +12,12 @@ import {
   persistUserMessageOnly
 } from "@/lib/text-conversation-persist";
 import {
+  detectAssistantHandoffOffer,
+  detectUserHandoffIntent,
+  escalateConversationToHuman,
+  HANDOFF_VISITOR_REPLY
+} from "@/lib/text-handoff";
+import {
   allConversationMessagesForGemini,
   buildWhatsAppContactLabel,
   findWhatsAppConversation
@@ -348,6 +354,87 @@ export async function processTwilioWhatsAppInbound(
     }
   }
 
+  // —— Cliente pide asesor humano: cola sin asignar + aviso al equipo ——
+  if (detectUserHandoffIntent(userDisplay)) {
+    const userPersist = await persistUserMessageOnly({
+      db,
+      userId: channel.user_id,
+      agentId: String(agent.id),
+      agentName: String(agent.name),
+      conversationId: existing?.id ?? null,
+      userMessage: userDisplay,
+      llmModel: model,
+      channel: WHATSAPP_CONVERSATION_CHANNEL,
+      contactLabel: existing ? undefined : contactLabel,
+      bumpUnread: true,
+      handoffMode: "human",
+      statusLabel: "Esperando asesor",
+      ...persistOpts
+    });
+
+    if (userPersist.error) return { ok: false, error: userPersist.error };
+
+    await updateWhatsAppConversationMetadata(
+      db,
+      userPersist.conversationId,
+      channel.user_id,
+      existing?.metadata,
+      metaPatch
+    );
+
+    await persistAssistantReplyOnly({
+      db,
+      userId: channel.user_id,
+      conversationId: userPersist.conversationId,
+      assistantReply: HANDOFF_VISITOR_REPLY,
+      llmModel: model
+    });
+
+    await escalateConversationToHuman({
+      db,
+      userId: channel.user_id,
+      conversationId: userPersist.conversationId,
+      organizationId: orgId,
+      reason: "user_request",
+      channel: WHATSAPP_CONVERSATION_CHANNEL,
+      agentName: String(agent.name),
+      contactLabel: existing?.contact_label ? String(existing.contact_label) : contactLabel,
+      visitorMessage: userDisplay
+    });
+
+    await syncAndEnrichCrmFromInbound(db, channel, userPersist.conversationId, inbound, nowIso, optedOutAfter);
+
+    const sendResult = await sendWhatsAppIfAllowed(
+      db,
+      channel,
+      inbound.fromE164,
+      HANDOFF_VISITOR_REPLY,
+      nowIso,
+      optedOutAfter
+    );
+
+    if (!sendResult.ok) {
+      console.error("[whatsapp/inbound] handoff send:", sendResult.error);
+    }
+
+    if (orgId) {
+      await recordUsageSafe({
+        db,
+        organizationId: orgId,
+        userId: channel.user_id,
+        eventType: "whatsapp_manual",
+        channel: WHATSAPP_CONVERSATION_CHANNEL,
+        provider: "twilio",
+        twilioMessages: sendResult.ok ? 2 : 1,
+        referenceType: "text_agent_conversation",
+        referenceId: userPersist.conversationId,
+        idempotencyKey: `wa_handoff_${inbound.messageSid}`
+      });
+    }
+
+    return { ok: true };
+  }
+
   let companyContextText = "";
   if (agent.company_context_id) {
     const { data: ctx } = await db
@@ -450,6 +537,20 @@ export async function processTwilioWhatsAppInbound(
 
   if (!assistantPersist.ok) {
     return { ok: false, error: assistantPersist.error };
+  }
+
+  if (detectAssistantHandoffOffer(reply)) {
+    await escalateConversationToHuman({
+      db,
+      userId: channel.user_id,
+      conversationId: userPersist.conversationId,
+      organizationId: orgId,
+      reason: "ai_escalation",
+      channel: WHATSAPP_CONVERSATION_CHANNEL,
+      agentName: String(agent.name),
+      contactLabel: existing?.contact_label ? String(existing.contact_label) : contactLabel,
+      visitorMessage: userDisplay
+    });
   }
 
   void enrichCrmLeadForConversationId(db, channel.user_id, userPersist.conversationId).catch(err =>

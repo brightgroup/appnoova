@@ -16,6 +16,12 @@ import { getOriApiKey } from "@/lib/google-ai";
 import { buildDataTableContext } from "@/lib/data-tables/retrieve";
 import { mergeDataTableContext } from "@/lib/data-tables/format-context";
 import {
+  detectAssistantHandoffOffer,
+  detectUserHandoffIntent,
+  escalateConversationToHuman,
+  HANDOFF_VISITOR_REPLY
+} from "@/lib/text-handoff";
+import {
   checkBillingForUser,
   readGeminiUsage,
   recordUsageSafe
@@ -163,6 +169,43 @@ export async function POST(
     });
   }
 
+  const visitorText = lastUser.content.trim();
+  if (detectUserHandoffIntent(visitorText)) {
+    const contactLabel = conversationId ? undefined : makeVisitorLabel();
+    const persisted = await persistChatTurn({
+      db,
+      userId,
+      agentId: String(agent.id),
+      agentName: String(agent.name),
+      conversationId,
+      userMessage: visitorText,
+      assistantReply: HANDOFF_VISITOR_REPLY,
+      llmModel: model,
+      channel,
+      contactLabel
+    });
+    const savedId = persisted.conversationId || conversationId || null;
+    if (savedId) {
+      await escalateConversationToHuman({
+        db,
+        userId,
+        conversationId: savedId,
+        organizationId: billing.organizationId,
+        reason: "user_request",
+        channel,
+        agentName: String(agent.name),
+        contactLabel: contactLabel ?? null,
+        visitorMessage: visitorText
+      });
+    }
+    return NextResponse.json({
+      reply: HANDOFF_VISITOR_REPLY,
+      handoff: true,
+      handoff_mode: "human",
+      conversation_id: savedId
+    });
+  }
+
   const billingEventType = channel === WEB_EMBED_CHANNEL ? "widget" : "milink";
 
   let dataTableContext = "";
@@ -170,7 +213,7 @@ export async function POST(
     dataTableContext = await buildDataTableContext(
       db,
       String(agent.data_table_id),
-      lastUser.content.trim(),
+      visitorText,
       billing.organizationId
     );
   }
@@ -211,7 +254,7 @@ export async function POST(
         agentId: String(agent.id),
         agentName: String(agent.name),
         conversationId,
-        userMessage: lastUser.content.trim(),
+        userMessage: visitorText,
         assistantReply: reply,
         llmModel: model,
         channel,
@@ -220,6 +263,21 @@ export async function POST(
       if (persisted.conversationId) savedConversationId = persisted.conversationId;
     } catch (err) {
       console.error("[public/microsite/chat] persist:", err);
+    }
+
+    const aiHandoff = detectAssistantHandoffOffer(reply);
+    if (aiHandoff && savedConversationId) {
+      await escalateConversationToHuman({
+        db,
+        userId,
+        conversationId: savedConversationId,
+        organizationId: billing.organizationId,
+        reason: "ai_escalation",
+        channel,
+        agentName: String(agent.name),
+        contactLabel: contactLabel ?? null,
+        visitorMessage: visitorText
+      });
     }
 
     if (billing.organizationId) {
@@ -239,7 +297,8 @@ export async function POST(
 
     return NextResponse.json({
       reply,
-      conversation_id: savedConversationId
+      conversation_id: savedConversationId,
+      ...(aiHandoff ? { handoff: true, handoff_mode: "human" as const } : {})
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Error al consultar el agente";

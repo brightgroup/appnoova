@@ -261,6 +261,8 @@ export async function persistUserMessageOnly(input: PersistUserOnlyInput): Promi
       updated_at: nowIso
     };
     if (handoffMode === "human") {
+      updatePayload.handoff_mode = "human";
+      updatePayload.assigned_to = null;
       updatePayload.status_label = statusLabel;
     }
 

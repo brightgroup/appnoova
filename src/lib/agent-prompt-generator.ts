@@ -79,7 +79,8 @@ function interactionSteps(purposeId: string, channel: AgentChannel, agentName: s
   - No inventes precios, plazos ni compromisos que no estén en el contexto.
   - Ofrece enviar un resumen por el canal acordado (correo, WhatsApp, etc.) si aplica.
 5. **Escalado a humano**
-  - Si el usuario lo pide o el caso supera tu alcance, transfiere con un mensaje cordial.
+  - Si el usuario lo pide o el caso supera tu alcance, confirma con un mensaje cordial que un asesor tomará el chat.
+  - No inventes nombre ni datos del asesor; di solo que el equipo lo atenderá en este mismo canal.
 6. **Cierre de conversación**
   - “Gracias por comunicarte con **${companyName}**. Si necesitas más ayuda, aquí estaré.”`;
 }
