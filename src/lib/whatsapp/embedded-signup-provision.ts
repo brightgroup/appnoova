@@ -3,6 +3,9 @@ import { createTwilioSubaccount } from "@/lib/telephony/twilio-subaccounts";
 import { resolveEmbeddedSignupPhone } from "@/lib/whatsapp/resolve-embedded-signup-phone";
 import {
   configureTwilioWhatsAppSenderWebhook,
+  findTwilioSenderByE164,
+  linkedWabaIdFromSenders,
+  listTwilioWhatsAppSenders,
   registerTwilioWhatsAppSender,
   waitForTwilioWhatsAppSenderOnline
 } from "@/lib/whatsapp/twilio-senders";
@@ -137,13 +140,6 @@ export async function provisionWhatsAppFromEmbeddedSignup(
   const resolved = await resolveEmbeddedSignupPhone(db, input);
   const e164 = resolved.e164;
   const phoneNumberId = resolved.phoneNumberId || input.phoneNumberId || null;
-  // Twilio exige profile.name = nombre verificado de Meta, NO el alias de Noova ("Ventas").
-  const twilioProfileName = resolved.verifiedName?.trim() || null;
-  if (!twilioProfileName) {
-    throw new Error(
-      "Meta no devolvió el nombre verificado del negocio (verified_name). Revisa el perfil del número en WhatsApp Manager e inténtalo de nuevo."
-    );
-  }
 
   const { data: org, error: orgErr } = await db
     .from("organizations")
@@ -167,39 +163,80 @@ export async function provisionWhatsAppFromEmbeddedSignup(
     }
   }
 
-  const subaccount = await ensureTwilioSubaccountForOrg(db, org as OrgRow);
+  let subaccount = await ensureTwilioSubaccountForOrg(db, org as OrgRow);
+
+  // Una subcuenta Twilio = un solo WABA. Si ya hay otro WABA, abrimos subcuenta dedicada.
+  const existingSenders = await listTwilioWhatsAppSenders({
+    accountSid: subaccount.sid,
+    authToken: subaccount.authToken
+  }).catch(err => {
+    console.warn("[whatsapp/provision] list senders:", err);
+    return [];
+  });
+
+  const already = findTwilioSenderByE164(existingSenders, e164);
+  const linkedWaba = linkedWabaIdFromSenders(existingSenders);
+
+  if (!already && linkedWaba && linkedWaba !== wabaId) {
+    const dedicated = await createTwilioSubaccount(
+      `Noova - ${org.name || org.id.slice(0, 8)} - ${wabaId.slice(-6)}`
+    );
+    subaccount = { sid: dedicated.sid, authToken: dedicated.authToken, reused: false };
+  }
 
   const existing = await findWhatsAppChannelForProvision(db, input, e164);
 
   let senderSid: string;
   let senderStatus: string;
 
-  try {
-    const registered = await registerTwilioWhatsAppSender({
+  if (already?.sid) {
+    const configured = await configureTwilioWhatsAppSenderWebhook({
       e164,
-      wabaId,
       accountSid: subaccount.sid,
-      authToken: subaccount.authToken,
-      profileName: twilioProfileName
+      authToken: subaccount.authToken
     });
-    senderSid = registered.senderSid;
-    senderStatus = registered.status;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (/already exists|duplicate|already registered/i.test(message)) {
-      const configured = await configureTwilioWhatsAppSenderWebhook({
+    senderSid = configured.senderSid;
+    senderStatus = already.status === "ONLINE" ? "ONLINE" : (already.status ?? "CREATING");
+  } else {
+    try {
+      // BYO Meta: sin profile.name (Twilio Tech Provider doc).
+      const registered = await registerTwilioWhatsAppSender({
         e164,
+        wabaId,
         accountSid: subaccount.sid,
         authToken: subaccount.authToken
       });
-      senderSid = configured.senderSid;
-      senderStatus = "ONLINE";
-    } else if (/validation error/i.test(message)) {
-      throw new Error(
-        `Twilio rechazó el registro del número (validation error). Suele ser el nombre de perfil o que el número ya está en otro proveedor. Nombre enviado a Twilio: "${twilioProfileName}". Detalle: ${message}`
-      );
-    } else {
-      throw err;
+      senderSid = registered.senderSid;
+      senderStatus = registered.status;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (/already exists|duplicate|already registered/i.test(message)) {
+        const configured = await configureTwilioWhatsAppSenderWebhook({
+          e164,
+          accountSid: subaccount.sid,
+          authToken: subaccount.authToken
+        });
+        senderSid = configured.senderSid;
+        senderStatus = "ONLINE";
+      } else if (/63102|already linked to another WABA/i.test(message)) {
+        throw new Error(
+          "Esta subcuenta Twilio ya está ligada a otra cuenta WhatsApp (WABA). En Noova se creará una subcuenta nueva; vuelve a intentar o contacta soporte."
+        );
+      } else if (/63110|already registered on WhatsApp/i.test(message)) {
+        throw new Error(
+          "Ese número sigue registrado en WhatsApp/API de otro proveedor. Libéralo en Meta (o espera la propagación) y vuelve a conectar."
+        );
+      } else if (/63101|WABA ID provided is not valid/i.test(message)) {
+        throw new Error(
+          "Twilio no pudo usar ese WABA. Confirma que el Embedded Signup mostró el Partner Solution de Twilio (logos Noova+Twilio) y que META/TWILIO Solution ID está bien en Coolify."
+        );
+      } else if (/validation error/i.test(message)) {
+        throw new Error(
+          `Twilio rechazó el registro (validation error). Número ${e164}, WABA ${wabaId}. Detalle: ${message}`
+        );
+      } else {
+        throw err;
+      }
     }
   }
 

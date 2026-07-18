@@ -21,12 +21,64 @@ interface TwilioSenderWebhook {
 
 export type TwilioSenderStatus = "CREATING" | "ONLINE" | "OFFLINE" | "FAILED" | string;
 
-interface TwilioSender {
+export interface TwilioSender {
   sid: string;
   sender_id: string;
   status?: TwilioSenderStatus;
   webhook?: TwilioSenderWebhook | null;
   configuration?: { waba_id?: string | null } | null;
+}
+
+function formatTwilioError(
+  context: string,
+  status: number,
+  json: { message?: string; code?: number | string; more_info?: string; details?: unknown }
+): string {
+  const bits = [
+    json.message,
+    json.code != null ? `code ${json.code}` : null,
+    typeof json.details === "string" ? json.details : null,
+    json.more_info ? String(json.more_info) : null
+  ].filter(Boolean);
+  console.error(`[twilio/senders] ${context}:`, status, JSON.stringify(json).slice(0, 1200));
+  return bits.join(" — ") || `${context} HTTP ${status}`;
+}
+
+/** Lista WhatsApp Senders de la cuenta/subcuenta. */
+export async function listTwilioWhatsAppSenders(input: {
+  accountSid: string;
+  authToken: string;
+}): Promise<TwilioSender[]> {
+  const auth = authHeader(input.accountSid, input.authToken);
+  const listRes = await fetch(
+    `https://messaging.twilio.com/v2/Channels/Senders?Channel=whatsapp&PageSize=50`,
+    { headers: { Authorization: auth } }
+  );
+  const listJson = (await listRes.json().catch(() => ({}))) as {
+    senders?: TwilioSender[];
+    message?: string;
+    code?: number | string;
+  };
+
+  if (!listRes.ok) {
+    throw new Error(formatTwilioError("list", listRes.status, listJson));
+  }
+
+  return listJson.senders ?? [];
+}
+
+export function findTwilioSenderByE164(senders: TwilioSender[], e164: string): TwilioSender | null {
+  const senderId = whatsAppSenderId(e164);
+  return senders.find(row => row.sender_id === senderId) ?? null;
+}
+
+/** WABA ya vinculado a esta subcuenta (si hay senders). */
+export function linkedWabaIdFromSenders(senders: TwilioSender[]): string | null {
+  for (const sender of senders) {
+    const id = sender.configuration?.waba_id?.trim();
+    if (id) return id;
+  }
+  return null;
 }
 
 /** Configura webhook inbound en el WhatsApp Sender de Twilio (Senders API v2). */
@@ -40,20 +92,8 @@ export async function configureTwilioWhatsAppSenderWebhook(input: {
   const webhookUrl = twilioWhatsAppWebhookUrl();
   const statusUrl = twilioWhatsAppStatusWebhookUrl();
 
-  const listRes = await fetch(
-    `https://messaging.twilio.com/v2/Channels/Senders?Channel=whatsapp&PageSize=50`,
-    { headers: { Authorization: auth } }
-  );
-  const listJson = (await listRes.json().catch(() => ({}))) as {
-    senders?: TwilioSender[];
-    message?: string;
-  };
-
-  if (!listRes.ok) {
-    throw new Error(listJson.message || `Twilio Senders list error ${listRes.status}`);
-  }
-
-  const sender = listJson.senders?.find(row => row.sender_id === senderId);
+  const senders = await listTwilioWhatsAppSenders(input);
+  const sender = senders.find(row => row.sender_id === senderId);
   if (!sender?.sid) {
     throw new Error(
       `No se encontró WhatsApp Sender ${senderId} en la subcuenta. Completa el onboarding en Twilio primero.`
@@ -79,9 +119,12 @@ export async function configureTwilioWhatsAppSenderWebhook(input: {
     }
   );
 
-  const updateJson = (await updateRes.json().catch(() => ({}))) as { message?: string };
+  const updateJson = (await updateRes.json().catch(() => ({}))) as {
+    message?: string;
+    code?: number | string;
+  };
   if (!updateRes.ok && updateRes.status !== 202) {
-    throw new Error(updateJson.message || `Twilio Senders update error ${updateRes.status}`);
+    throw new Error(formatTwilioError("webhook update", updateRes.status, updateJson));
   }
 
   return { senderSid: sender.sid, webhookUrl };
@@ -100,20 +143,8 @@ export async function detachTwilioWhatsAppSenderWebhook(input: {
   const senderId = whatsAppSenderId(input.e164);
   const auth = authHeader(input.accountSid, input.authToken);
 
-  const listRes = await fetch(
-    `https://messaging.twilio.com/v2/Channels/Senders?Channel=whatsapp&PageSize=50`,
-    { headers: { Authorization: auth } }
-  );
-  const listJson = (await listRes.json().catch(() => ({}))) as {
-    senders?: TwilioSender[];
-    message?: string;
-  };
-
-  if (!listRes.ok) {
-    throw new Error(listJson.message || `Twilio Senders list error ${listRes.status}`);
-  }
-
-  const sender = listJson.senders?.find(row => row.sender_id === senderId);
+  const senders = await listTwilioWhatsAppSenders(input);
+  const sender = senders.find(row => row.sender_id === senderId);
   if (!sender?.sid) {
     throw new Error(`No se encontró WhatsApp Sender ${senderId}`);
   }
@@ -137,26 +168,40 @@ export async function detachTwilioWhatsAppSenderWebhook(input: {
     }
   );
 
-  const updateJson = (await updateRes.json().catch(() => ({}))) as { message?: string };
+  const updateJson = (await updateRes.json().catch(() => ({}))) as {
+    message?: string;
+    code?: number | string;
+  };
   if (!updateRes.ok && updateRes.status !== 202) {
-    throw new Error(updateJson.message || `Twilio Senders detach error ${updateRes.status}`);
+    throw new Error(formatTwilioError("webhook detach", updateRes.status, updateJson));
   }
 
   return { senderSid: sender.sid };
 }
 
-/** Registra un WhatsApp Sender en Twilio (Embedded Signup + Tech Provider). */
+/**
+ * Registra un WhatsApp Sender (Tech Provider / Embedded Signup).
+ * Para números propios (no Twilio SMS), NO enviar profile.name: Twilio usa el de Meta
+ * y mandar otro nombre suele provocar "validation error" (doc Tech Provider).
+ */
 export async function registerTwilioWhatsAppSender(input: {
   e164: string;
   wabaId: string;
   accountSid: string;
   authToken: string;
+  /** Solo para números Twilio SMS. En Embedded Signup BYO dejar vacío. */
   profileName?: string | null;
 }): Promise<{ senderSid: string; status: TwilioSenderStatus }> {
   const senderId = whatsAppSenderId(input.e164);
   const auth = authHeader(input.accountSid, input.authToken);
   const webhookUrl = twilioWhatsAppWebhookUrl();
   const statusUrl = twilioWhatsAppStatusWebhookUrl();
+
+  if (!webhookUrl.startsWith("https://")) {
+    throw new Error(
+      `Webhook WhatsApp inválido (${webhookUrl}). Configura NOOVA_APP_URL o NOOVA_WEBHOOK_BASE_URL con HTTPS público.`
+    );
+  }
 
   const body: Record<string, unknown> = {
     sender_id: senderId,
@@ -189,13 +234,10 @@ export async function registerTwilioWhatsAppSender(input: {
     details?: unknown;
   };
   if (!res.ok) {
-    const bits = [
-      json.message,
-      json.code != null ? `code ${json.code}` : null,
-      typeof json.details === "string" ? json.details : null
-    ].filter(Boolean);
-    console.error("[twilio/senders] create failed:", res.status, JSON.stringify(json).slice(0, 800));
-    throw new Error(bits.join(" — ") || `Twilio Senders create error ${res.status}`);
+    const detail = formatTwilioError("create", res.status, json);
+    throw new Error(
+      `${detail} | sender=${senderId} waba=${input.wabaId} webhook=${webhookUrl}`
+    );
   }
 
   if (!json.sid) {
@@ -216,9 +258,12 @@ export async function fetchTwilioWhatsAppSender(input: {
     `https://messaging.twilio.com/v2/Channels/Senders/${input.senderSid}`,
     { headers: { Authorization: auth } }
   );
-  const json = (await res.json().catch(() => ({}))) as TwilioSender & { message?: string };
+  const json = (await res.json().catch(() => ({}))) as TwilioSender & {
+    message?: string;
+    code?: number | string;
+  };
   if (!res.ok) {
-    throw new Error(json.message || `Twilio Senders fetch error ${res.status}`);
+    throw new Error(formatTwilioError("fetch", res.status, json));
   }
   return json;
 }
