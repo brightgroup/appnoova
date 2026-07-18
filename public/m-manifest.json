@@ -1,0 +1,18 @@
+{
+  "id": "/m",
+  "name": "Noova360",
+  "short_name": "Noova360",
+  "description": "Chats y facturación de tu negocio, en un solo lugar.",
+  "start_url": "/m",
+  "scope": "/m",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0b0d",
+  "theme_color": "#141518",
+  "lang": "es",
+  "icons": [
+    { "src": "/icons/m-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/m-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/m-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
