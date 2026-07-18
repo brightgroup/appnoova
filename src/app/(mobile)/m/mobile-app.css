@@ -189,7 +189,8 @@ html:has(.nv-m-app .nv-m-onboarding) body {
 
 .nv-m-app.nv-m-chat-mode { background: var(--chat-bg); }
 
-.nv-m-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.nv-m-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
+.nv-m-app .pull-indicator { display: flex; align-items: center; justify-content: center; overflow: hidden; color: var(--muted); flex: none; }
 .nv-m-scroll::-webkit-scrollbar { width: 0; }
 
 /* ---- screen header (chats/billing/settings) ---- */

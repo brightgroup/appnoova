@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { authFetch } from "@/lib/telephony-api";
 import { useMobileTheme } from "../../../useMobileTheme";
-import { ReceiptIcon, ChevronRightIcon, MoonIcon, LogoutIcon } from "../../../icons";
+import { ReceiptIcon, ChevronRightIcon, MoonIcon, BellIcon, LogoutIcon } from "../../../icons";
 import { formatShortDate, initialsOf } from "../../../format";
+import { isPushSupported, isSubscribedToPush, subscribeToPush, unsubscribeFromPush } from "../../../push";
 
 interface OrgMeResponse {
   organization: { id: string; name: string } | null;
@@ -36,9 +37,22 @@ export default function MobileCuentaPage() {
   const [email, setEmail] = useState("");
   const [org, setOrg] = useState<OrgMeResponse | null>(null);
   const [billing, setBilling] = useState<BillingSummary | null>(null);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+
+    (async () => {
+      const supported = isPushSupported();
+      if (cancelled) return;
+      setPushSupported(supported);
+      if (supported) {
+        const subscribed = await isSubscribedToPush();
+        if (!cancelled) setPushEnabled(subscribed);
+      }
+    })();
 
     supabase.auth.getUser().then(({ data }) => {
       if (cancelled || !data.user) return;
@@ -72,6 +86,22 @@ export default function MobileCuentaPage() {
   async function handleLogout() {
     await supabase.auth.signOut();
     router.replace("/m/login");
+  }
+
+  async function handleTogglePush() {
+    if (pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (pushEnabled) {
+        await unsubscribeFromPush();
+        setPushEnabled(false);
+      } else {
+        const ok = await subscribeToPush();
+        setPushEnabled(ok);
+      }
+    } finally {
+      setPushBusy(false);
+    }
   }
 
   const roleName = org?.membership?.role_name || "Agente";
@@ -127,6 +157,21 @@ export default function MobileCuentaPage() {
                 onClick={toggle}
               />
             </div>
+            {pushSupported ? (
+              <div className="set-item">
+                <BellIcon />
+                <span className="lbl">Notificaciones</span>
+                <button
+                  type="button"
+                  className="switch"
+                  role="switch"
+                  aria-checked={pushEnabled}
+                  aria-label="Alternar notificaciones"
+                  onClick={handleTogglePush}
+                  disabled={pushBusy}
+                />
+              </div>
+            ) : null}
           </div>
 
           <div className="set-group">

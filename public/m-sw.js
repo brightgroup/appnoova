@@ -36,3 +36,41 @@ self.addEventListener("fetch", (event) => {
       .catch(() => caches.match(event.request))
   );
 });
+
+// ── Web Push ────────────────────────────────────────────────────────────
+self.addEventListener("push", (event) => {
+  let data = { title: "Noova360", body: "Tienes una notificación nueva.", url: "/m/chats" };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch (e) {
+    /* payload no era JSON válido, se usa el default */
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "/icons/m-icon-192.png",
+      badge: "/icons/m-icon-192.png",
+      tag: data.tag || "noova-m",
+      data: { url: data.url || "/m/chats" }
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data && event.notification.data.url ? event.notification.data.url : "/m/chats";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url.includes("/m") && "focus" in client) {
+          client.focus();
+          if ("navigate" in client) client.navigate(url);
+          return;
+        }
+      }
+      return clients.openWindow(url);
+    })
+  );
+});

@@ -7,6 +7,7 @@ import type { InboxListItem } from "@/types/inbox";
 import { SearchIcon, WhatsAppIcon, MiLinkIcon, ChannelGenericIcon } from "../../../icons";
 import { formatListTime, initialsOf } from "../../../format";
 import { AppLoader } from "../../../AppLoader";
+import { usePullToRefresh } from "../../../usePullToRefresh";
 
 function ChannelIcon({ channel }: { channel: string }) {
   if (channel === "whatsapp") return <WhatsAppIcon />;
@@ -67,6 +68,17 @@ export default function MobileChatsPage() {
   });
 
   const unreadTotal = (items ?? []).reduce((sum, it) => sum + (it.unread_count || 0), 0);
+  const { scrollRef, pull, refreshing, handlers } = usePullToRefresh(() => load(true));
+
+  useEffect(() => {
+    const nav = navigator as Navigator & {
+      setAppBadge?: (n?: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    if (items === null) return;
+    if (unreadTotal > 0) nav.setAppBadge?.(unreadTotal).catch(() => {});
+    else nav.clearAppBadge?.().catch(() => {});
+  }, [items, unreadTotal]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -89,7 +101,10 @@ export default function MobileChatsPage() {
         </div>
       </div>
 
-      <div className="nv-m-scroll">
+      <div className="nv-m-scroll" ref={scrollRef} {...handlers}>
+        <div className="pull-indicator" style={{ height: pull }}>
+          <span className="spinner" />
+        </div>
         <div className="chat-list">
           {items === null ? (
             <div className="loading-block">

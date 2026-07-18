@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { notifyOrgHandoff, type HandoffNotifyContext } from "@/lib/email/notify-handoff";
+import { notifyOrgHandoff, channelLabel, type HandoffNotifyContext } from "@/lib/email/notify-handoff";
+import { notifyPushForOrg } from "@/lib/push/send";
 
 /** Mensaje al visitante al pasar a cola humana (sin nombre de asesor). */
 export const HANDOFF_VISITOR_REPLY =
@@ -106,14 +107,25 @@ export async function escalateConversationToHuman(
     return { escalated: true, emailSent: false };
   }
 
+  const contactLabel = input.contactLabel ?? (row.contact_label ? String(row.contact_label) : null);
+  const channel = input.channel || String(row.channel ?? "");
+
   const result = await notifyOrgHandoff({
     organizationId: input.organizationId,
     conversationId: input.conversationId,
-    channel: input.channel || String(row.channel ?? ""),
+    channel,
     agentName: input.agentName ?? null,
-    contactLabel: input.contactLabel ?? (row.contact_label ? String(row.contact_label) : null),
+    contactLabel,
     visitorMessage: input.visitorMessage ?? null,
     reason: input.reason
+  });
+
+  // Push a todo el equipo con acceso al inbox — no bloquea ni depende del email.
+  void notifyPushForOrg(input.organizationId, {
+    title: "Nueva conversación esperando asesor",
+    body: `${contactLabel || "Visitante"} · ${channelLabel(channel)}`,
+    url: `/m/chats/${input.conversationId}`,
+    tag: `handoff-${input.conversationId}`
   });
 
   if (!result.sent) {

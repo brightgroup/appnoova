@@ -23,6 +23,7 @@ import {
   findWhatsAppConversation
 } from "@/lib/whatsapp/conversation-thread";
 import { mergeWhatsAppMetadata } from "@/lib/whatsapp/conversation-meta";
+import { notifyPushForOrg } from "@/lib/push/send";
 import { syncCrmContactFromWhatsAppInbound } from "@/lib/crm-contact-sync";
 import { enrichCrmContactFromWhatsAppConversation } from "@/lib/crm-contact-enrich";
 import { enrichCrmLeadForConversationId } from "@/lib/crm-lead-enrich";
@@ -314,6 +315,14 @@ export async function processTwilioWhatsAppInbound(
         referenceType: "text_agent_conversation",
         referenceId: persisted.conversationId,
         idempotencyKey: `wa_in_${inbound.messageSid}`
+      });
+
+      // Mensaje nuevo en cola humana — avisa al equipo (no bloquea la respuesta al webhook).
+      void notifyPushForOrg(orgId, {
+        title: contactLabel || "Nuevo mensaje",
+        body: userDisplay.length > 120 ? `${userDisplay.slice(0, 120)}…` : userDisplay,
+        url: `/m/chats/${persisted.conversationId}`,
+        tag: `msg-${persisted.conversationId}`
       });
     }
 

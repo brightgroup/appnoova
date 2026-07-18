@@ -24,8 +24,10 @@ import {
 import {
   checkBillingForUser,
   readGeminiUsage,
-  recordUsageSafe
+  recordUsageSafe,
+  resolveOrgIdForUser
 } from "@/lib/billing/meter";
+import { notifyPushForOrg } from "@/lib/push/send";
 
 const PUBLIC_BILLING_FALLBACK =
   "¡Gracias por tu mensaje! En este momento no puedo responder automáticamente, pero un asesor te contactará muy pronto.";
@@ -131,6 +133,18 @@ export async function POST(
 
       if (persisted.error) {
         return NextResponse.json({ error: persisted.error }, { status: 500 });
+      }
+
+      // Mensaje nuevo en cola humana — avisa al equipo (no bloquea la respuesta al widget).
+      const pushOrgId = await resolveOrgIdForUser(db, userId);
+      if (pushOrgId) {
+        const preview = lastUser.content.trim();
+        void notifyPushForOrg(pushOrgId, {
+          title: "Nuevo mensaje",
+          body: preview.length > 120 ? `${preview.slice(0, 120)}…` : preview,
+          url: `/m/chats/${persisted.conversationId || conversationId}`,
+          tag: `msg-${persisted.conversationId || conversationId}`
+        });
       }
 
       // Sin reply: un asesor ya atiende; el visitante verá respuestas vía polling (rol human).

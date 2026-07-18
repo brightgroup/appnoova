@@ -1,7 +1,7 @@
 import { adminClient } from "@/lib/voice-agents-server";
 import { getAppBaseUrl } from "@/lib/telephony/app-url";
 import { sendEmail, type SendEmailResult } from "@/lib/email/send";
-import { PERMISSION_LEVEL_RANK, type PermissionLevel } from "@/types/rbac";
+import { getOrgInboxTeamUserIds } from "@/lib/push/team";
 
 export interface HandoffNotifyContext {
   organizationId: string;
@@ -13,23 +13,6 @@ export interface HandoffNotifyContext {
   reason: "user_request" | "ai_escalation";
 }
 
-type RolePermRow = { module_key: string; level: PermissionLevel };
-type MemberRoleJoin = {
-  role_permissions?: RolePermRow[] | null;
-} | null;
-
-function memberHasInboxAccess(role: MemberRoleJoin | MemberRoleJoin[]): boolean {
-  const roles = Array.isArray(role) ? role : role ? [role] : [];
-  for (const r of roles) {
-    const perms = r?.role_permissions ?? [];
-    for (const p of perms) {
-      if (p.module_key !== "inbox") continue;
-      if (PERMISSION_LEVEL_RANK[p.level] >= PERMISSION_LEVEL_RANK.view) return true;
-    }
-  }
-  return false;
-}
-
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -38,7 +21,7 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function channelLabel(channel: string): string {
+export function channelLabel(channel: string): string {
   const map: Record<string, string> = {
     whatsapp: "WhatsApp",
     web_embed: "Widget web",
@@ -59,21 +42,12 @@ async function getOrgTeamEmails(organizationId: string): Promise<{
   organizationName: string | null;
 }> {
   const db = adminClient();
-  const [{ data: org }, { data: members }] = await Promise.all([
-    db.from("organizations").select("name").eq("id", organizationId).maybeSingle(),
-    db
-      .from("organization_members")
-      .select("user_id, roles(role_permissions(module_key, level))")
-      .eq("organization_id", organizationId)
-      .eq("status", "active")
-  ]);
-
   // Solo quienes pueden ver/usar el inbox (roles con módulo inbox ≥ view).
   // No es el usuario “con sesión”: en WhatsApp/widget no hay sesión de asesor.
-  const userIds = (members ?? [])
-    .filter(m => memberHasInboxAccess(m.roles as MemberRoleJoin | MemberRoleJoin[]))
-    .map(m => String(m.user_id))
-    .filter(Boolean);
+  const [{ data: org }, userIds] = await Promise.all([
+    db.from("organizations").select("name").eq("id", organizationId).maybeSingle(),
+    getOrgInboxTeamUserIds(organizationId)
+  ]);
 
   if (!userIds.length) {
     return { emails: [], organizationName: org?.name ? String(org.name) : null };

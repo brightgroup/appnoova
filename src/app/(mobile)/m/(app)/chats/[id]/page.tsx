@@ -93,6 +93,19 @@ export default function MobileConversationPage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const threadRef = useRef<HTMLDivElement | null>(null);
   const lastMsgCount = useRef(0);
+  // GET /api/inbox?id= vuelve a firmar media_url en cada poll (token nuevo,
+  // misma media) — si se lo pasamos tal cual a <audio>/<video>, el src cambia
+  // cada 2s y el navegador reinicia la reproducción a la mitad. La firma dura
+  // 1h, así que basta con quedarse con la primera URL vista por mensaje.
+  const mediaUrlCache = useRef<Map<string, string>>(new Map());
+
+  function stableMediaUrl(key: string, freshUrl: string | null | undefined): string | undefined {
+    if (!freshUrl) return undefined;
+    const cached = mediaUrlCache.current.get(key);
+    if (cached) return cached;
+    mediaUrlCache.current.set(key, freshUrl);
+    return freshUrl;
+  }
 
   const load = useCallback(
     async (silent = false) => {
@@ -227,8 +240,10 @@ export default function MobileConversationPage() {
           const prev = arr[i - 1];
           const showDaySep = !prev || !isSameDay(prev.created_at, msg.created_at);
           const isVisitor = msg.role === "user";
+          const msgKey = `${msg.created_at}-${i}`;
+          const msg2 = msg.media_url ? { ...msg, media_url: stableMediaUrl(msgKey, msg.media_url) } : msg;
           return (
-            <div key={`${msg.created_at}-${i}`}>
+            <div key={msgKey}>
               {showDaySep ? (
                 <div className="day-sep">
                   <span>{formatDayLabel(msg.created_at)}</span>
@@ -240,7 +255,7 @@ export default function MobileConversationPage() {
                     {msg.media_url && msg.media_label && msg.media_type !== "audio" && msg.media_type !== "document" ? (
                       <span className="media-label">{msg.media_label}</span>
                     ) : null}
-                    <MessageMedia msg={msg} />
+                    <MessageMedia msg={msg2} />
                     {msg.content.trim()
                       ? msg.content
                       : !msg.media_url
@@ -250,7 +265,7 @@ export default function MobileConversationPage() {
                 ) : (
                   <>
                     <div className="agent-label">{messageLabel(msg, detail.assigned_to)}</div>
-                    <MessageMedia msg={msg} />
+                    <MessageMedia msg={msg2} />
                     {msg.content.trim() ? (
                       <div className="agent-text">{msg.content}</div>
                     ) : !msg.media_url ? (
