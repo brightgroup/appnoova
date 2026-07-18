@@ -137,6 +137,13 @@ export async function provisionWhatsAppFromEmbeddedSignup(
   const resolved = await resolveEmbeddedSignupPhone(db, input);
   const e164 = resolved.e164;
   const phoneNumberId = resolved.phoneNumberId || input.phoneNumberId || null;
+  // Twilio exige profile.name = nombre verificado de Meta, NO el alias de Noova ("Ventas").
+  const twilioProfileName = resolved.verifiedName?.trim() || null;
+  if (!twilioProfileName) {
+    throw new Error(
+      "Meta no devolvió el nombre verificado del negocio (verified_name). Revisa el perfil del número en WhatsApp Manager e inténtalo de nuevo."
+    );
+  }
 
   const { data: org, error: orgErr } = await db
     .from("organizations")
@@ -173,13 +180,13 @@ export async function provisionWhatsAppFromEmbeddedSignup(
       wabaId,
       accountSid: subaccount.sid,
       authToken: subaccount.authToken,
-      profileName: input.friendlyName
+      profileName: twilioProfileName
     });
     senderSid = registered.senderSid;
     senderStatus = registered.status;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    if (/already exists|duplicate/i.test(message)) {
+    if (/already exists|duplicate|already registered/i.test(message)) {
       const configured = await configureTwilioWhatsAppSenderWebhook({
         e164,
         accountSid: subaccount.sid,
@@ -187,6 +194,10 @@ export async function provisionWhatsAppFromEmbeddedSignup(
       });
       senderSid = configured.senderSid;
       senderStatus = "ONLINE";
+    } else if (/validation error/i.test(message)) {
+      throw new Error(
+        `Twilio rechazó el registro del número (validation error). Suele ser el nombre de perfil o que el número ya está en otro proveedor. Nombre enviado a Twilio: "${twilioProfileName}". Detalle: ${message}`
+      );
     } else {
       throw err;
     }

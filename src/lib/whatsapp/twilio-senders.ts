@@ -182,9 +182,20 @@ export async function registerTwilioWhatsAppSender(input: {
     body: JSON.stringify(body)
   });
 
-  const json = (await res.json().catch(() => ({}))) as TwilioSender & { message?: string };
+  const json = (await res.json().catch(() => ({}))) as TwilioSender & {
+    message?: string;
+    code?: number | string;
+    more_info?: string;
+    details?: unknown;
+  };
   if (!res.ok) {
-    throw new Error(json.message || `Twilio Senders create error ${res.status}`);
+    const bits = [
+      json.message,
+      json.code != null ? `code ${json.code}` : null,
+      typeof json.details === "string" ? json.details : null
+    ].filter(Boolean);
+    console.error("[twilio/senders] create failed:", res.status, JSON.stringify(json).slice(0, 800));
+    throw new Error(bits.join(" — ") || `Twilio Senders create error ${res.status}`);
   }
 
   if (!json.sid) {

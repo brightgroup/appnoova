@@ -53,6 +53,8 @@ export interface MetaWabaPhoneNumber {
   id: string;
   e164: string;
   displayPhoneNumber: string | null;
+  /** Nombre de negocio aprobado en Meta (el que Twilio exige en profile.name). */
+  verifiedName: string | null;
 }
 
 /** Lista números del WABA (fallback cuando Embedded Signup no envía display_phone_number). */
@@ -66,7 +68,7 @@ export async function fetchMetaWabaPhoneNumbers(
   );
 
   const json = (await res.json().catch(() => ({}))) as {
-    data?: Array<{ id?: string; display_phone_number?: string }>;
+    data?: Array<{ id?: string; display_phone_number?: string; verified_name?: string }>;
     error?: { message?: string };
   };
 
@@ -81,7 +83,12 @@ export async function fetchMetaWabaPhoneNumbers(
     if (!id) continue;
     const e164 = display ? normalizeWhatsAppE164(display) : "";
     if (!e164) continue;
-    rows.push({ id, e164, displayPhoneNumber: display });
+    rows.push({
+      id,
+      e164,
+      displayPhoneNumber: display,
+      verifiedName: row.verified_name?.trim() || null
+    });
   }
 
   return rows;
@@ -91,13 +98,14 @@ export async function fetchMetaWabaPhoneNumbers(
 export async function fetchMetaPhoneNumberDetails(
   phoneNumberId: string,
   accessToken: string
-): Promise<{ e164: string; displayPhoneNumber: string | null }> {
+): Promise<{ e164: string; displayPhoneNumber: string | null; verifiedName: string | null }> {
   const res = await fetch(`${metaGraphBaseUrl()}/${phoneNumberId}?fields=display_phone_number,verified_name`, {
     headers: { Authorization: `Bearer ${accessToken}` }
   });
 
   const json = (await res.json().catch(() => ({}))) as {
     display_phone_number?: string;
+    verified_name?: string;
     error?: { message?: string };
   };
 
@@ -111,5 +119,9 @@ export async function fetchMetaPhoneNumberDetails(
     throw new Error("No se pudo resolver el número E.164 desde Meta Graph API");
   }
 
-  return { e164, displayPhoneNumber: display };
+  return {
+    e164,
+    displayPhoneNumber: display,
+    verifiedName: json.verified_name?.trim() || null
+  };
 }

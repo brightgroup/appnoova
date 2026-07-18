@@ -408,7 +408,7 @@ export function WhatsAppEmbeddedSignupModal({
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
-                    Nombre de la línea
+                    Nombre de la línea (solo en Noova)
                   </label>
                   <input
                     type="text"
@@ -417,6 +417,9 @@ export function WhatsAppEmbeddedSignupModal({
                     onChange={e => setFriendlyName(e.target.value)}
                     className={`w-full px-3 py-2 rounded-lg bg-white/[.04] border border-white/[.08] text-white text-sm ${accentFocus}`}
                   />
+                  <p className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
+                    Alias interno. El nombre que ven los clientes en WhatsApp es el aprobado en Meta; Noova lo toma automáticamente.
+                  </p>
                 </div>
 
                 <div>
