@@ -8,7 +8,21 @@ import { authFetch } from "@/lib/telephony-api";
 import { useMobileTheme } from "../../../useMobileTheme";
 import { ReceiptIcon, ChevronRightIcon, MoonIcon, BellIcon, LogoutIcon } from "../../../icons";
 import { formatShortDate, initialsOf } from "../../../format";
-import { isPushSupported, isSubscribedToPush, subscribeToPush, unsubscribeFromPush } from "../../../push";
+import {
+  isPushSupported,
+  isSubscribedToPush,
+  subscribeToPush,
+  unsubscribeFromPush,
+  type SubscribeResult
+} from "../../../push";
+
+const PUSH_ERROR_LABELS: Record<string, string> = {
+  unsupported: "Este navegador no soporta notificaciones push.",
+  no_vapid_key: "Notificaciones no configuradas todavía en este servidor.",
+  permission_denied: "Bloqueaste el permiso de notificaciones — actívalo desde los ajustes del navegador/teléfono.",
+  server_rejected: "El servidor rechazó la suscripción. Intenta de nuevo en un momento.",
+  subscribe_failed: "No se pudo activar. Intenta de nuevo."
+};
 
 interface OrgMeResponse {
   organization: { id: string; name: string } | null;
@@ -40,6 +54,7 @@ export default function MobileCuentaPage() {
   const [pushSupported, setPushSupported] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,13 +106,23 @@ export default function MobileCuentaPage() {
   async function handleTogglePush() {
     if (pushBusy) return;
     setPushBusy(true);
+    setPushError(null);
     try {
       if (pushEnabled) {
         await unsubscribeFromPush();
         setPushEnabled(false);
       } else {
-        const ok = await subscribeToPush();
-        setPushEnabled(ok);
+        const result: SubscribeResult = await subscribeToPush();
+        if (result.ok) {
+          setPushEnabled(true);
+        } else {
+          setPushEnabled(false);
+          // tsconfig del proyecto tiene "strict": false → sin strictNullChecks,
+          // TS no estrecha uniones discriminadas aquí (confirmado de forma
+          // aislada); se afirma el tipo en vez de depender de la estrechada.
+          const reason = (result as { reason: string }).reason;
+          setPushError(PUSH_ERROR_LABELS[reason] ?? "No se pudo activar. Intenta de nuevo.");
+        }
       }
     } finally {
       setPushBusy(false);
@@ -173,6 +198,7 @@ export default function MobileCuentaPage() {
               </div>
             ) : null}
           </div>
+          {pushError ? <p className="form-error">{pushError}</p> : null}
 
           <div className="set-group">
             <button type="button" className="set-item danger" onClick={handleLogout}>

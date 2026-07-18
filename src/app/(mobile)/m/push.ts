@@ -26,30 +26,58 @@ export async function isSubscribedToPush(): Promise<boolean> {
   }
 }
 
-/** Pide permiso y suscribe este dispositivo. true si quedó activo. */
-export async function subscribeToPush(): Promise<boolean> {
-  if (!isPushSupported()) return false;
+export type SubscribeResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: "unsupported" | "no_vapid_key" | "permission_denied" | "subscribe_failed" | "server_rejected";
+      detail?: string;
+    };
+
+/** Pide permiso y suscribe este dispositivo. Nunca lanza — el motivo del fallo viene en el resultado. */
+export async function subscribeToPush(): Promise<SubscribeResult> {
+  if (!isPushSupported()) return { ok: false, reason: "unsupported" };
+
   const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  if (!vapidKey) return false;
-
-  const permission = await Notification.requestPermission();
-  if (permission !== "granted") return false;
-
-  const registration = await navigator.serviceWorker.ready;
-  let subscription = await registration.pushManager.getSubscription();
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource
-    });
+  if (!vapidKey) {
+    console.error("[push] falta NEXT_PUBLIC_VAPID_PUBLIC_KEY en este build");
+    return { ok: false, reason: "no_vapid_key" };
   }
 
-  const json = subscription.toJSON();
-  const res = await authFetch("/api/push/subscribe", {
-    method: "POST",
-    body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys })
-  });
-  return res.ok;
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") return { ok: false, reason: "permission_denied" };
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource
+      });
+    }
+
+    const json = subscription.toJSON();
+    const res = await authFetch("/api/push/subscribe", {
+      method: "POST",
+      body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys })
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      console.error("[push] el servidor rechazó la suscripción:", res.status, body);
+      return { ok: false, reason: "server_rejected", detail: body?.error };
+    }
+
+    return { ok: true };
+  } catch (err) {
+    console.error("[push] subscribe falló:", err);
+    return {
+      ok: false,
+      reason: "subscribe_failed",
+      detail: err instanceof Error ? err.message : String(err)
+    };
+  }
 }
 
 export async function unsubscribeFromPush(): Promise<void> {
