@@ -240,7 +240,7 @@ export async function provisionWhatsAppFromEmbeddedSignup(
         );
       } else if (/validation error|63100/i.test(message)) {
         throw new Error(
-          `Twilio rechazó el registro (63100). Número ${e164}, WABA ${wabaId}, profile="${profileName}". Si el nombre no cumple guías de Meta, cámbialo en WhatsApp Manager. Detalle: ${message}`
+          `Twilio rechazó el registro (63100). Número ${e164}, WABA ${wabaId}, profile="${profileName}". Si el número estaba conectado a otra app (ej. Chatwoot), debes eliminarlo primero desde WhatsApp Manager de Meta. También verifica que el nombre cumpla las guías. Detalle: ${message}`
         );
       } else {
         throw err;
