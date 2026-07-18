@@ -126,11 +126,15 @@
 
 .nv-m-app, .nv-m-app * { box-sizing: border-box; }
 .nv-m-app {
-  /* Alto FIJO (no min-height): es el techo que obliga a .thread/.nv-m-scroll a
-     recortar y hacer scroll interno en vez de estirar toda la página — sin esto,
-     el footer/composer termina flotando donde sea y queda un espacio muerto abajo. */
-  height: 100dvh;
-  width: 100%;
+  /* position:fixed + inset:0 en vez de height:100dvh: en iOS Safari, cuando la
+     barra de direcciones se colapsa/expande, 100dvh puede quedar un frame por
+     detrás de la barra de herramientas real y deja ver el fondo del <body> del
+     resto de la app (gris) por debajo. fixed+inset:0 siempre coincide con el
+     viewport visual real, sin ese hueco. También es el techo que obliga a
+     .thread/.nv-m-scroll a recortar y hacer scroll interno en vez de estirar
+     toda la página.  */
+  position: fixed;
+  inset: 0;
   overflow: hidden;
   font-family: var(--font-ui);
   color: var(--ink);
