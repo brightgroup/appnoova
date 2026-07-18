@@ -1,83 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  exchangeMetaEmbeddedSignupCode,
-  fetchMetaPhoneNumberDetails,
-  fetchMetaWabaPhoneNumbers,
-  subscribeMetaAppToWaba
-} from "@/lib/meta/oauth";
-import { normalizeWhatsAppE164 } from "@/lib/whatsapp-channel";
+import { exchangeMetaEmbeddedSignupCode, subscribeMetaAppToWaba } from "@/lib/meta/oauth";
+import { resolveEmbeddedSignupPhone } from "@/lib/whatsapp/resolve-embedded-signup-phone";
 import type { EmbeddedSignupCompleteInput, EmbeddedSignupCompleteResult } from "@/lib/whatsapp/embedded-signup-provision";
 import {
   buildEmbeddedSignupChannelMetadata,
   findWhatsAppChannelForProvision
 } from "@/lib/whatsapp/embedded-signup-provision";
-
-function normalizePhoneCandidate(raw: string | null | undefined): string {
-  if (!raw?.trim()) return "";
-  const normalized = normalizeWhatsAppE164(raw);
-  return normalized.length > 4 ? normalized : "";
-}
-
-async function resolveMetaEmbeddedSignupPhone(
-  db: SupabaseClient,
-  input: EmbeddedSignupCompleteInput & { displayPhoneNumber?: string | null },
-  accessToken: string,
-  wabaId: string
-): Promise<{ e164: string; phoneNumberId: string }> {
-  let phoneNumberId = input.phoneNumberId?.trim() || "";
-  let e164 = normalizePhoneCandidate(input.phoneE164) || normalizePhoneCandidate(input.displayPhoneNumber);
-
-  if (!e164 && phoneNumberId) {
-    try {
-      const details = await fetchMetaPhoneNumberDetails(phoneNumberId, accessToken);
-      e164 = details.e164;
-    } catch (err) {
-      console.warn("[whatsapp/meta-provision] phone fetch by id:", err);
-    }
-  }
-
-  if (!e164 || !phoneNumberId) {
-    try {
-      const phones = await fetchMetaWabaPhoneNumbers(wabaId, accessToken);
-      if (phoneNumberId) {
-        const match = phones.find(phone => phone.id === phoneNumberId);
-        if (match) e164 = match.e164;
-      } else if (phones.length === 1) {
-        phoneNumberId = phones[0].id;
-        e164 = phones[0].e164;
-      } else if (phones.length > 1 && e164) {
-        const match = phones.find(phone => phone.e164 === e164);
-        if (match) phoneNumberId = match.id;
-      }
-    } catch (err) {
-      console.warn("[whatsapp/meta-provision] WABA phone_numbers:", err);
-    }
-  }
-
-  if (!e164 && input.channelId?.trim()) {
-    const { data: channel } = await db
-      .from("whatsapp_channels")
-      .select("e164, meta_phone_number_id")
-      .eq("id", input.channelId.trim())
-      .eq("organization_id", input.organizationId)
-      .maybeSingle();
-
-    e164 = normalizePhoneCandidate(channel?.e164 ? String(channel.e164) : null);
-    if (!phoneNumberId && channel?.meta_phone_number_id) {
-      phoneNumberId = String(channel.meta_phone_number_id).trim();
-    }
-  }
-
-  if (!e164) {
-    throw new Error("Falta número de teléfono para vincular WhatsApp directo con Meta");
-  }
-
-  if (!phoneNumberId) {
-    throw new Error("phone_number_id requerido para Cloud API directa");
-  }
-
-  return { e164, phoneNumberId };
-}
 
 /** Aprovisiona canal WhatsApp directo (Cloud API) tras Embedded Signup — sin Twilio. */
 export async function provisionWhatsAppFromEmbeddedSignupMeta(
@@ -94,9 +22,21 @@ export async function provisionWhatsAppFromEmbeddedSignupMeta(
     throw new Error("auth_code requerido para vinculación directa Meta (código OAuth del flujo Embedded Signup)");
   }
 
-  const { accessToken } = await exchangeMetaEmbeddedSignupCode(input.authCode.trim());
+  const resolved = await resolveEmbeddedSignupPhone(db, input);
+  const e164 = resolved.e164;
+  const phoneNumberId = resolved.phoneNumberId;
 
-  const { e164, phoneNumberId } = await resolveMetaEmbeddedSignupPhone(db, input, accessToken, wabaId);
+  if (!phoneNumberId) {
+    throw new Error("phone_number_id requerido para Cloud API directa");
+  }
+
+  // El auth_code solo se canjea una vez. Si resolve ya lo usó, reutilizamos ese token;
+  // si Graph no hizo falta, canjeamos aquí para subscribed_apps y guardar el token.
+  let accessToken = resolved.accessToken;
+  if (!accessToken) {
+    const token = await exchangeMetaEmbeddedSignupCode(input.authCode.trim());
+    accessToken = token.accessToken;
+  }
 
   await subscribeMetaAppToWaba(wabaId, accessToken).catch(err => {
     console.warn("[whatsapp/meta-provision] subscribed_apps:", err);

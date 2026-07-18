@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
       phoneNumberId: body.phone_number_id ?? null,
       phoneE164: body.phone_e164 ?? null,
       displayPhoneNumber: body.display_phone_number ?? null,
+      authCode: body.auth_code ?? null,
       textAgentId: body.text_agent_id ?? null,
       friendlyName: body.friendly_name ?? null,
       channelId: body.channel_id ?? null
@@ -65,11 +66,7 @@ export async function POST(req: NextRequest) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const result = useTwilioWhatsAppProvisioning()
       ? await provisionWhatsAppFromEmbeddedSignup(db, input)
-      : await provisionWhatsAppFromEmbeddedSignupMeta(db, {
-          ...input,
-          authCode: body.auth_code ?? null,
-          displayPhoneNumber: body.display_phone_number ?? null
-        });
+      : await provisionWhatsAppFromEmbeddedSignupMeta(db, input);
 
     const { data: channelRow } = await db
       .from("whatsapp_channels")

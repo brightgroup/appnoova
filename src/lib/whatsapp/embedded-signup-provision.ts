@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createTwilioSubaccount } from "@/lib/telephony/twilio-subaccounts";
-import { normalizeWhatsAppE164 } from "@/lib/whatsapp-channel";
+import { resolveEmbeddedSignupPhone } from "@/lib/whatsapp/resolve-embedded-signup-phone";
 import {
   configureTwilioWhatsAppSenderWebhook,
   registerTwilioWhatsAppSender,
@@ -14,6 +14,8 @@ export interface EmbeddedSignupCompleteInput {
   phoneNumberId?: string | null;
   phoneE164?: string | null;
   displayPhoneNumber?: string | null;
+  /** Código OAuth del FB.login — sirve para resolver el número vía Graph si Meta no lo mandó en el postMessage. */
+  authCode?: string | null;
   textAgentId?: string | null;
   friendlyName?: string | null;
   /** Reutiliza la misma fila al reconectar una línea desconectada. */
@@ -93,18 +95,6 @@ interface OrgRow {
   twilio_subaccount_auth_token: string | null;
 }
 
-function resolvePhoneE164(input: EmbeddedSignupCompleteInput): string {
-  const candidates = [input.phoneE164, input.displayPhoneNumber];
-  for (const raw of candidates) {
-    if (!raw?.trim()) continue;
-    const normalized = normalizeWhatsAppE164(raw);
-    if (normalized.length > 4) return normalized;
-  }
-  throw new Error(
-    "No se recibió el número de teléfono. Completa el flujo de Meta o indica el número en formato E.164."
-  );
-}
-
 async function ensureTwilioSubaccountForOrg(
   db: SupabaseClient,
   org: OrgRow
@@ -144,7 +134,9 @@ export async function provisionWhatsAppFromEmbeddedSignup(
   const wabaId = input.wabaId.trim();
   if (!wabaId) throw new Error("waba_id requerido");
 
-  const e164 = resolvePhoneE164(input);
+  const resolved = await resolveEmbeddedSignupPhone(db, input);
+  const e164 = resolved.e164;
+  const phoneNumberId = resolved.phoneNumberId || input.phoneNumberId || null;
 
   const { data: org, error: orgErr } = await db
     .from("organizations")
@@ -221,7 +213,8 @@ export async function provisionWhatsAppFromEmbeddedSignup(
     provisioned_at: now,
     reconnected_at: existing ? now : undefined,
     sender_status: senderStatus,
-    subaccount_reused: subaccount.reused
+    subaccount_reused: subaccount.reused,
+    phone_resolved_via_graph: !input.phoneE164 && !input.displayPhoneNumber
   });
 
   if (existing?.id) {
@@ -232,7 +225,7 @@ export async function provisionWhatsAppFromEmbeddedSignup(
         text_agent_id: textAgentId,
         e164,
         waba_id: wabaId,
-        meta_phone_number_id: input.phoneNumberId || null,
+        meta_phone_number_id: phoneNumberId,
         twilio_sender_sid: senderSid,
         twilio_subaccount_sid: subaccount.sid,
         twilio_subaccount_auth_token: subaccount.authToken,
@@ -268,7 +261,7 @@ export async function provisionWhatsAppFromEmbeddedSignup(
       provider: "twilio",
       e164,
       waba_id: wabaId,
-      meta_phone_number_id: input.phoneNumberId || null,
+      meta_phone_number_id: phoneNumberId,
       twilio_sender_sid: senderSid,
       twilio_subaccount_sid: subaccount.sid,
       twilio_subaccount_auth_token: subaccount.authToken,

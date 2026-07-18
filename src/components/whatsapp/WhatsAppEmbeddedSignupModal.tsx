@@ -90,6 +90,8 @@ function parseEmbeddedSignupMessage(event: MessageEvent): EmbeddedSignupSession 
 
 function needsManualPhone(session: EmbeddedSignupSession, hasKnownPhone: boolean): boolean {
   if (hasKnownPhone) return false;
+  // phone_number_id solo no basta en UI: el E.164 lo resuelve el servidor vía Graph.
+  // Pedimos input manual solo si Meta no mandó ni id ni display.
   return !session.phoneNumberId && !session.displayPhoneNumber;
 }
 
@@ -190,16 +192,23 @@ export function WhatsAppEmbeddedSignupModal({
         } else {
           setStatus("Línea registrada — activando mensajería (puede tardar 1–2 minutos)…");
         }
+        pendingSessionRef.current = null;
+        setPendingSession(null);
         onSuccess();
         setTimeout(() => onClose(), 1400);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Error desconocido");
+        const message = err instanceof Error ? err.message : "Error desconocido";
+        setError(message);
         setStatus("");
         finalizeStartedRef.current = false;
+        // Si falta el número, mantenemos la sesión para que pueda escribirlo a mano
+        // sin repetir el popup de Meta.
+        if (/número de teléfono|E\.164|phone/i.test(message) && pendingSessionRef.current) {
+          setPendingSession(pendingSessionRef.current);
+          setStatus("Cuenta verificada en Meta — indica el número para terminar en Noova");
+        }
       } finally {
         setLoading(false);
-        pendingSessionRef.current = null;
-        setPendingSession(null);
       }
     },
     [onClose, onSuccess, reconnectChannel?.e164, reconnectChannel?.friendly_name, reconnectChannel?.id]
