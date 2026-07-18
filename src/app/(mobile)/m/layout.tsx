@@ -16,8 +16,21 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    // NO usar "black-translucent": bug de iOS reciente — dimensiona el web view
+    // en (pantalla - barra de estado) pero lo ancla arriba del todo, dejando un
+    // hueco muerto de 53pt en la parte inferior (medido con el panel de debug:
+    // inner 759 vs screen 812, envT 53). Con "black" la ventana se posiciona
+    // debajo de la barra de estado y sí llega hasta el borde inferior.
+    statusBarStyle: "black",
     title: "Noova360"
+  },
+  // Next 15.2 no emite apple-mobile-web-app-capable desde appleWebApp.capable
+  // (verificado en el HTML servido). Sin esa meta, iOS no concede pantalla
+  // completa real al instalar: reserva la franja del home indicator y la app
+  // queda "cortada" abajo. Se fuerza explícitamente.
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+    "mobile-web-app-capable": "yes"
   }
 };
 

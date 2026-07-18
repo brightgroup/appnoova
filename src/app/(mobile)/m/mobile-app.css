@@ -117,7 +117,7 @@
   --accent-text: #a5a5ff;
   --accent-soft: rgba(91, 91, 246, 0.16);
   --accent-ring: rgba(91, 91, 246, 0.35);
-  min-height: 100dvh;
+  min-height: 100%;
   background: var(--app-bg);
   color: var(--ink);
   display: flex;
@@ -125,16 +125,21 @@
 }
 
 .nv-m-app, .nv-m-app * { box-sizing: border-box; }
+
+/* Cadena de altura html→body→app con documento real (no position:fixed):
+   un documento de alto 0 hecho solo de elementos fixed es justo lo que
+   diferencia a esta app de cualquier PWA "normal" y contribuye al recorte
+   inferior en iOS standalone. height:100% + overflow:hidden da el mismo
+   contenimiento de scroll (las listas/hilo recortan y scrollean adentro). */
+html:has(.nv-m-app),
+html:has(.nv-m-app) body {
+  height: 100%;
+  overflow: hidden;
+}
 .nv-m-app {
-  /* position:fixed + inset:0 en vez de height:100dvh: en iOS standalone,
-     100dvh puede quedar corto del borde físico real y deja ver el fondo del
-     <body> del resto de la app (gris) por debajo. fixed+inset:0 es el techo
-     que obliga a .thread/.nv-m-scroll a recortar y hacer scroll interno en
-     vez de estirar toda la página.
-     OJO: sin overflow:hidden aquí a propósito — recortaba también el parche
-     de abajo (::after), que necesita poder pintar más allá de este borde. */
-  position: fixed;
-  inset: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
   font-family: var(--font-ui);
   color: var(--ink);
   background: var(--app-bg);
@@ -147,22 +152,34 @@
   transition: background .32s ease;
 }
 
-/* Parche del área segura inferior: en el modo standalone de iOS, position:fixed
-   + inset:0 a veces no llega hasta el borde físico real por un bug conocido de
-   WebKit con env(safe-area-inset-bottom) — deja un hueco donde se ve el fondo
-   del <body> del resto de la app (gris, de otra pantalla). Este pseudo-elemento
-   se pasa BASTANTE de más para taparlo siempre pase lo que pase, sin afectar el
-   alto real del layout (position:fixed, fuera del flujo flex). */
-.nv-m-app::after {
-  content: "";
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: -120px;
-  height: 160px;
-  background: var(--app-bg);
-  pointer-events: none;
-  z-index: 1;
+/* ── Fondo del lienzo (html/body) mientras /m está montada ─────────────────
+   Causa real de la "franja gris" en la PWA instalada en iOS: en modo
+   standalone, la zona del home indicator queda FUERA del viewport — ahí ningún
+   position:fixed puede pintar; WebKit solo muestra el background propagado de
+   <html>/<body>, que globals.css define en #212121 (el gris del dashboard).
+   Otras PWAs no lo muestran porque su body coincide con su diseño. Estas
+   reglas pintan el lienzo con el color de la pantalla visible de /m, y solo
+   aplican cuando .nv-m-app existe en el DOM (cero efecto sobre el dashboard). */
+html:has(.nv-m-app),
+html:has(.nv-m-app) body {
+  background: #141518 !important;
+}
+html:has(.nv-m-app[data-theme="light"]),
+html:has(.nv-m-app[data-theme="light"]) body {
+  background: #ffffff !important;
+}
+html:has(.nv-m-app .nv-m-chat-mode),
+html:has(.nv-m-app .nv-m-chat-mode) body {
+  background: #0a0a0a !important;
+}
+html:has(.nv-m-app[data-theme="light"] .nv-m-chat-mode),
+html:has(.nv-m-app[data-theme="light"] .nv-m-chat-mode) body {
+  background: #f4f6f8 !important;
+}
+/* Splash/Login/Instalar siempre oscuros, pisan incluso el tema claro */
+html:has(.nv-m-app .nv-m-onboarding),
+html:has(.nv-m-app .nv-m-onboarding) body {
+  background: #141518 !important;
 }
 .nv-m-app button { font-family: inherit; cursor: pointer; }
 .nv-m-app :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
@@ -195,7 +212,7 @@
 .nv-m-app .avatar { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 16px; font-weight: 600; letter-spacing: -0.02em; user-select: none; flex: none; }
 
 /* ============ CHATS LIST ============ */
-.nv-m-app .chat-list { padding: 4px 10px calc(94px + env(safe-area-inset-bottom)); }
+.nv-m-app .chat-list { padding: 4px 10px calc(70px + env(safe-area-inset-bottom, 0px)); }
 .nv-m-app .conv {
   display: flex; flex-direction: column; gap: 5px;
   padding: 12px 14px; border-radius: 16px; cursor: pointer; position: relative;
@@ -278,10 +295,17 @@
 .nv-m-app .agent-text { color: var(--agent-ink); font-size: 14.5px; line-height: 1.62; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; }
 .nv-m-app .msg-time { font-size: 10.5px; color: var(--faint); margin-top: 5px; font-variant-numeric: tabular-nums; }
 .nv-m-app .msg.agent .msg-time { align-self: flex-start; }
-.nv-m-app .msg-media { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
-.nv-m-app .msg-media img { max-width: 220px; border-radius: 12px; display: block; }
+/* multimedia dentro de mensajes (imagen / audio / video / documento) */
+.nv-m-app .media-label { display: block; font-size: 11px; font-weight: 550; color: var(--faint); margin-bottom: 4px; overflow-wrap: anywhere; }
+.nv-m-app .media-img { display: block; margin: 2px 0 4px; }
+.nv-m-app .media-img img { max-width: min(240px, 70vw); max-height: 260px; border-radius: 12px; display: block; object-fit: contain; background: rgba(0, 0, 0, 0.25); }
+.nv-m-app .media-audio { display: block; width: min(250px, 68vw); height: 40px; margin: 2px 0 4px; }
+.nv-m-app .media-video { display: block; max-width: min(240px, 70vw); max-height: 240px; border-radius: 12px; margin: 2px 0 4px; background: #000; }
+.nv-m-app .media-doc { display: inline-flex; align-items: center; gap: 7px; margin: 2px 0 4px; padding: 9px 12px; border-radius: 11px; background: var(--surface-2); border: 1px solid var(--border); color: var(--ink); text-decoration: none; font-size: 13px; font-weight: 550; max-width: 100%; overflow-wrap: anywhere; }
+.nv-m-app .media-doc svg { flex: none; color: var(--muted); }
+.nv-m-app .media-note { font-size: 12.5px; color: var(--muted); margin: 2px 0 4px; }
 
-.nv-m-app .cv-footer { flex: none; padding: 10px 16px calc(20px + env(safe-area-inset-bottom)); background: var(--chat-bg); }
+.nv-m-app .cv-footer { flex: none; padding: 10px 16px calc(14px + env(safe-area-inset-bottom, 0px)); background: var(--chat-bg); }
 .nv-m-app .handoff-banner { background: var(--surface-2); border: 1px solid var(--border); border-radius: 16px; padding: 13px 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
 .nv-m-app .handoff-banner p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
 .nv-m-app .assign-btn { border: none; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 620; padding: 9px 18px; border-radius: 11px; transition: background .15s ease; }
@@ -305,7 +329,7 @@
 .nv-m-app .back-row .back-btn { margin-left: -8px; }
 .nv-m-app .back-row .kicker { margin: 0; }
 .nv-m-app .back-row h1 { margin: 0; }
-.nv-m-app .bill-body { padding: 4px 18px calc(28px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 13px; }
+.nv-m-app .bill-body { padding: 4px 18px calc(24px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 13px; }
 .nv-m-app .card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 16px 17px; box-shadow: var(--shadow-card); }
 .nv-m-app .card-plan { display: flex; flex-direction: column; gap: 11px; }
 .nv-m-app .plan-top { display: flex; align-items: center; justify-content: space-between; }
@@ -343,7 +367,7 @@
 .nv-m-app .status.void { color: var(--void); background: var(--void-soft); } .nv-m-app .status.void .dot { background: var(--void); }
 
 /* ============ CUENTA ============ */
-.nv-m-app .set-body { padding: 6px 18px calc(100px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 16px; }
+.nv-m-app .set-body { padding: 6px 18px calc(76px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 16px; }
 .nv-m-app .id-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 16px; display: flex; align-items: center; gap: 13px; box-shadow: var(--shadow-card); }
 .nv-m-app .id-card .avatar { width: 52px; height: 52px; font-size: 17px; }
 .nv-m-app .id-who { min-width: 0; }
@@ -373,7 +397,7 @@
 /* ============ BOTTOM NAV ============ */
 .nv-m-app .tabbar {
   position: fixed;
-  left: 14px; right: 14px; bottom: calc(16px + env(safe-area-inset-bottom));
+  left: 14px; right: 14px; bottom: max(8px, calc(env(safe-area-inset-bottom, 0px) - 12px));
   max-width: 420px; margin: 0 auto;
   height: 66px;
   background: var(--nav-bg);
@@ -422,7 +446,7 @@
 .nv-m-app .link-muted { border: none; background: transparent; color: var(--muted); font-size: 12.5px; font-weight: 550; text-align: center; padding: 10px 4px 0; width: 100%; }
 .nv-m-app .login-foot { margin-top: auto; font-size: 11px; color: var(--faint); text-align: center; line-height: 1.5; padding-top: 18px; }
 
-.nv-m-app .install-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: calc(env(safe-area-inset-top) + 26px) 22px calc(22px + env(safe-area-inset-bottom)); }
+.nv-m-app .install-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: calc(env(safe-area-inset-top) + 26px) 22px calc(22px + env(safe-area-inset-bottom, 0px)); }
 .nv-m-app .install-icon { width: 50px; height: 50px; border-radius: 15px; background: var(--accent-soft); color: var(--accent-text); display: grid; place-items: center; margin-bottom: 16px; }
 .nv-m-app .install-body h1 { margin: 0 0 6px; font-size: 20px; font-weight: 680; letter-spacing: -0.02em; }
 .nv-m-app .install-body > p { margin: 0 0 20px; font-size: 13px; color: var(--muted); line-height: 1.5; }

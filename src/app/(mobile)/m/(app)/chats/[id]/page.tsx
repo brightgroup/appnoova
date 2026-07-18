@@ -36,6 +36,48 @@ function messageLabel(msg: TextChatMessage, assignedTo: string | null): string {
   return "IA";
 }
 
+/* Multimedia del mensaje — mismo comportamiento que la versión de escritorio
+   (src/app/dashboard/inbox/page.tsx): imagen ampliable, audio y video con
+   controles nativos, documento como enlace. media_url viene ya firmada por
+   GET /api/inbox?id=. */
+function MessageMedia({ msg }: { msg: TextChatMessage }) {
+  const url = msg.media_url?.trim();
+  const type = msg.media_type;
+  if (!type || type === "text") return null;
+
+  if (type === "video" && !url) {
+    return <div className="media-note">Archivo de video recibido</div>;
+  }
+  if (!url) return null;
+
+  if (type === "image") {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="media-img">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt={msg.media_label ?? "Imagen"} />
+      </a>
+    );
+  }
+  if (type === "audio") {
+    return <audio controls preload="metadata" src={url} className="media-audio" />;
+  }
+  if (type === "video") {
+    return <video controls preload="metadata" src={url} className="media-video" />;
+  }
+  if (type === "document") {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="media-doc">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" width={16} height={16}>
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+          <path d="M14 3v5h5" />
+        </svg>
+        {msg.media_label?.trim() || "Abrir documento"}
+      </a>
+    );
+  }
+  return null;
+}
+
 export default function MobileConversationPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -195,20 +237,27 @@ export default function MobileConversationPage() {
               <div className={`msg ${isVisitor ? "visitor" : "agent"}`}>
                 {isVisitor ? (
                   <div className="vbubble">
-                    {msg.content || (msg.media_label ?? "Adjunto")}
+                    {msg.media_url && msg.media_label && msg.media_type !== "audio" && msg.media_type !== "document" ? (
+                      <span className="media-label">{msg.media_label}</span>
+                    ) : null}
+                    <MessageMedia msg={msg} />
+                    {msg.content.trim()
+                      ? msg.content
+                      : !msg.media_url
+                        ? (msg.media_label ?? "Adjunto")
+                        : null}
                   </div>
                 ) : (
                   <>
                     <div className="agent-label">{messageLabel(msg, detail.assigned_to)}</div>
-                    <div className="agent-text">{msg.content || (msg.media_label ?? "Adjunto")}</div>
+                    <MessageMedia msg={msg} />
+                    {msg.content.trim() ? (
+                      <div className="agent-text">{msg.content}</div>
+                    ) : !msg.media_url ? (
+                      <div className="agent-text">{msg.media_label ?? "Adjunto"}</div>
+                    ) : null}
                   </>
                 )}
-                {msg.media_url && msg.media_type === "image" ? (
-                  <div className="msg-media">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={msg.media_url} alt={msg.media_label ?? "Imagen"} />
-                  </div>
-                ) : null}
                 <div className="msg-time">{formatMsgTime(msg.created_at)}</div>
               </div>
             </div>
