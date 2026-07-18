@@ -126,16 +126,15 @@
 
 .nv-m-app, .nv-m-app * { box-sizing: border-box; }
 .nv-m-app {
-  /* position:fixed + inset:0 en vez de height:100dvh: en iOS Safari, cuando la
-     barra de direcciones se colapsa/expande, 100dvh puede quedar un frame por
-     detrás de la barra de herramientas real y deja ver el fondo del <body> del
-     resto de la app (gris) por debajo. fixed+inset:0 siempre coincide con el
-     viewport visual real, sin ese hueco. También es el techo que obliga a
-     .thread/.nv-m-scroll a recortar y hacer scroll interno en vez de estirar
-     toda la página.  */
+  /* position:fixed + inset:0 en vez de height:100dvh: en iOS standalone,
+     100dvh puede quedar corto del borde físico real y deja ver el fondo del
+     <body> del resto de la app (gris) por debajo. fixed+inset:0 es el techo
+     que obliga a .thread/.nv-m-scroll a recortar y hacer scroll interno en
+     vez de estirar toda la página.
+     OJO: sin overflow:hidden aquí a propósito — recortaba también el parche
+     de abajo (::after), que necesita poder pintar más allá de este borde. */
   position: fixed;
   inset: 0;
-  overflow: hidden;
   font-family: var(--font-ui);
   color: var(--ink);
   background: var(--app-bg);
@@ -146,6 +145,24 @@
   display: flex;
   flex-direction: column;
   transition: background .32s ease;
+}
+
+/* Parche del área segura inferior: en el modo standalone de iOS, position:fixed
+   + inset:0 a veces no llega hasta el borde físico real por un bug conocido de
+   WebKit con env(safe-area-inset-bottom) — deja un hueco donde se ve el fondo
+   del <body> del resto de la app (gris, de otra pantalla). Este pseudo-elemento
+   se pasa BASTANTE de más para taparlo siempre pase lo que pase, sin afectar el
+   alto real del layout (position:fixed, fuera del flujo flex). */
+.nv-m-app::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: -120px;
+  height: 160px;
+  background: var(--app-bg);
+  pointer-events: none;
+  z-index: 1;
 }
 .nv-m-app button { font-family: inherit; cursor: pointer; }
 .nv-m-app :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
