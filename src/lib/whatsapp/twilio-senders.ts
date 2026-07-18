@@ -181,21 +181,26 @@ export async function detachTwilioWhatsAppSenderWebhook(input: {
 
 /**
  * Registra un WhatsApp Sender (Tech Provider / Embedded Signup).
- * Para números propios (no Twilio SMS), NO enviar profile.name: Twilio usa el de Meta
- * y mandar otro nombre suele provocar "validation error" (doc Tech Provider).
+ * Error 63100 exige profile.name aunque el número sea BYO (doc Tech Provider
+ * dice que Meta lo ignora/usa el suyo, pero la API igual lo valida como requerido).
  */
 export async function registerTwilioWhatsAppSender(input: {
   e164: string;
   wabaId: string;
   accountSid: string;
   authToken: string;
-  /** Solo para números Twilio SMS. En Embedded Signup BYO dejar vacío. */
-  profileName?: string | null;
+  /** Nombre de perfil WhatsApp (verified_name de Meta). Obligatorio para evitar 63100. */
+  profileName: string;
 }): Promise<{ senderSid: string; status: TwilioSenderStatus }> {
   const senderId = whatsAppSenderId(input.e164);
   const auth = authHeader(input.accountSid, input.authToken);
   const webhookUrl = twilioWhatsAppWebhookUrl();
   const statusUrl = twilioWhatsAppStatusWebhookUrl();
+  const profileName = input.profileName.trim();
+
+  if (!profileName) {
+    throw new Error("profile.name requerido para registrar el WhatsApp Sender en Twilio");
+  }
 
   if (!webhookUrl.startsWith("https://")) {
     throw new Error(
@@ -203,20 +208,17 @@ export async function registerTwilioWhatsAppSender(input: {
     );
   }
 
+  // Payload alineado al ejemplo Tech Provider: profile.name + waba_id + webhook inbound.
+  // status_callback se aplica después (update) para evitar rechazos 63100 por campos extra.
   const body: Record<string, unknown> = {
     sender_id: senderId,
     configuration: { waba_id: input.wabaId },
+    profile: { name: profileName },
     webhook: {
       callback_method: "POST",
-      callback_url: webhookUrl,
-      status_callback_method: "POST",
-      status_callback_url: statusUrl
+      callback_url: webhookUrl
     }
   };
-
-  if (input.profileName?.trim()) {
-    body.profile = { name: input.profileName.trim() };
-  }
 
   const res = await fetch("https://messaging.twilio.com/v2/Channels/Senders", {
     method: "POST",
@@ -236,12 +238,33 @@ export async function registerTwilioWhatsAppSender(input: {
   if (!res.ok) {
     const detail = formatTwilioError("create", res.status, json);
     throw new Error(
-      `${detail} | sender=${senderId} waba=${input.wabaId} webhook=${webhookUrl}`
+      `${detail} | sender=${senderId} waba=${input.wabaId} profile="${profileName}" webhook=${webhookUrl}`
     );
   }
 
   if (!json.sid) {
     throw new Error("Twilio no devolvió SID del sender");
+  }
+
+  // Best-effort: status callback (no bloquea el alta).
+  try {
+    await fetch(`https://messaging.twilio.com/v2/Channels/Senders/${json.sid}`, {
+      method: "POST",
+      headers: {
+        Authorization: auth,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        webhook: {
+          callback_method: "POST",
+          callback_url: webhookUrl,
+          status_callback_method: "POST",
+          status_callback_url: statusUrl
+        }
+      })
+    });
+  } catch (err) {
+    console.warn("[twilio/senders] status webhook update skipped:", err);
   }
 
   return { senderSid: json.sid, status: json.status ?? "CREATING" };

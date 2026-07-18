@@ -140,6 +140,14 @@ export async function provisionWhatsAppFromEmbeddedSignup(
   const resolved = await resolveEmbeddedSignupPhone(db, input);
   const e164 = resolved.e164;
   const phoneNumberId = resolved.phoneNumberId || input.phoneNumberId || null;
+  // 63100: profile.name es obligatorio en la Senders API. Usar verified_name de Meta
+  // (no el alias de Noova). Si Graph no lo trae, fallamos con mensaje claro.
+  const profileName = resolved.verifiedName?.trim() || "";
+  if (!profileName) {
+    throw new Error(
+      "Meta no devolvió el nombre verificado del negocio (verified_name). Ábrelo en WhatsApp Manager, confirma el nombre aprobado e inténtalo de nuevo."
+    );
+  }
 
   const { data: org, error: orgErr } = await db
     .from("organizations")
@@ -199,12 +207,12 @@ export async function provisionWhatsAppFromEmbeddedSignup(
     senderStatus = already.status === "ONLINE" ? "ONLINE" : (already.status ?? "CREATING");
   } else {
     try {
-      // BYO Meta: sin profile.name (Twilio Tech Provider doc).
       const registered = await registerTwilioWhatsAppSender({
         e164,
         wabaId,
         accountSid: subaccount.sid,
-        authToken: subaccount.authToken
+        authToken: subaccount.authToken,
+        profileName
       });
       senderSid = registered.senderSid;
       senderStatus = registered.status;
@@ -230,9 +238,9 @@ export async function provisionWhatsAppFromEmbeddedSignup(
         throw new Error(
           "Twilio no pudo usar ese WABA. Confirma que el Embedded Signup mostró el Partner Solution de Twilio (logos Noova+Twilio) y que META/TWILIO Solution ID está bien en Coolify."
         );
-      } else if (/validation error/i.test(message)) {
+      } else if (/validation error|63100/i.test(message)) {
         throw new Error(
-          `Twilio rechazó el registro (validation error). Número ${e164}, WABA ${wabaId}. Detalle: ${message}`
+          `Twilio rechazó el registro (63100). Número ${e164}, WABA ${wabaId}, profile="${profileName}". Si el nombre no cumple guías de Meta, cámbialo en WhatsApp Manager. Detalle: ${message}`
         );
       } else {
         throw err;
