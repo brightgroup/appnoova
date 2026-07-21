@@ -121,14 +121,19 @@ export async function POST(req: NextRequest) {
     color: form.color ?? defaults.color,
     company_context_id: form.company_context_id || null,
     data_table_id: form.data_table_id || null,
+    notify_rules: form.notify_rules ?? {},
     updated_at: new Date().toISOString()
   };
 
   if (body.id) {
     let { data, error } = await updateTextAgentRow(db, row, body.id, orgCtx.organizationId);
 
-    if (error?.message?.includes("company_context_id") || error?.message?.includes("data_table_id")) {
-      const { company_context_id: _c, data_table_id: _d, ...rest } = row;
+    if (
+      error?.message?.includes("company_context_id")
+      || error?.message?.includes("data_table_id")
+      || error?.message?.includes("notify_rules")
+    ) {
+      const { company_context_id: _c, data_table_id: _d, notify_rules: _n, ...rest } = row;
       ({ data, error } = await updateTextAgentRow(db, rest, body.id, orgCtx.organizationId));
     }
 
@@ -144,8 +149,12 @@ export async function POST(req: NextRequest) {
 
   let { data, error } = await insertTextAgentRow(db, row);
 
-  if (error?.message?.includes("company_context_id") || error?.message?.includes("data_table_id")) {
-    const { company_context_id: _c, data_table_id: _d, ...rest } = row;
+  if (
+    error?.message?.includes("company_context_id")
+    || error?.message?.includes("data_table_id")
+    || error?.message?.includes("notify_rules")
+  ) {
+    const { company_context_id: _c, data_table_id: _d, notify_rules: _n, ...rest } = row;
     ({ data, error } = await insertTextAgentRow(db, rest));
   }
 

@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
 import { getOriApiKey } from "@/lib/google-ai";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 import { buildDataTableContext } from "@/lib/data-tables/retrieve";
 import { mergeDataTableContext } from "@/lib/data-tables/format-context";
 import { geminiTextTemperature } from "@/lib/text-agent-form";
+import { generateTextAgentReply } from "@/lib/text-agent-generate";
 import { persistChatTurn } from "@/lib/text-conversation-persist";
 import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
-import {
-  checkBillingForUser,
-  readGeminiUsage,
-  recordUsageSafe
-} from "@/lib/billing/meter";
+import { checkBillingForUser, recordUsageSafe } from "@/lib/billing/meter";
+import { resolveOrgActiveWhatsAppChannel } from "@/lib/text-notify-team";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -110,28 +107,32 @@ export async function POST(req: NextRequest) {
   const model = String(agent.llm_model || "gemini-2.5-flash");
   const temperature = geminiTextTemperature(Number(agent.temperature) || 0.7);
   const maxOutputTokens = Number(agent.max_output_tokens) || 2048;
-
-  const ai = new GoogleGenAI({ apiKey });
-  const contents = messages.map(m => ({
-    role: m.role === "assistant" ? ("model" as const) : ("user" as const),
-    parts: [{ text: m.content }]
-  }));
+  const orgId = billing.organizationId || String(agent.organization_id || "");
+  const waChannel = orgId ? await resolveOrgActiveWhatsAppChannel(db, orgId) : null;
 
   try {
-    const response = await ai.models.generateContent({
+    const generated = await generateTextAgentReply({
       model,
-      contents,
-      config: {
-        systemInstruction,
-        temperature,
-        maxOutputTokens
+      systemInstruction,
+      messages: messages.map(m => ({
+        role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+        content: m.content
+      })),
+      temperature,
+      maxOutputTokens,
+      notifyRules: agent.notify_rules,
+      toolContext: {
+        db,
+        organizationId: orgId,
+        conversationId: conversationId ?? null,
+        channel: "web_test",
+        agentName: String(agent.name),
+        contactLabel: "Prueba web",
+        outboundWhatsAppChannel: waChannel
       }
     });
 
-    const reply = response.text?.trim();
-    if (!reply) {
-      return NextResponse.json({ error: "No se generó respuesta" }, { status: 502 });
-    }
+    const reply = generated.text;
 
     let savedConversationId = conversationId ?? null;
     try {
@@ -161,7 +162,7 @@ export async function POST(req: NextRequest) {
         channel: "web_test",
         provider: "google",
         model,
-        gemini: readGeminiUsage(response),
+        gemini: generated.usage,
         referenceType: "text_agent_conversation",
         referenceId: savedConversationId ?? undefined
       });
@@ -170,7 +171,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       reply,
       model,
-      conversation_id: savedConversationId
+      conversation_id: savedConversationId,
+      notify_team: generated.toolResults
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Error al consultar el agente";

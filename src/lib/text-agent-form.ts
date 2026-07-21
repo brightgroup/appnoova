@@ -1,6 +1,7 @@
 import type { TextAgentFormData } from "@/types/text-agent";
 import { DEFAULT_TEXT_MODEL } from "@/lib/text-agent-options";
 import { resolveBaseTextTemplateId } from "@/lib/text-agent-templates";
+import { normalizeNotifyTeamRules } from "@/lib/text-notify-rules";
 
 export function normalizeTextAgentForm(raw: Partial<TextAgentFormData>): TextAgentFormData {
   const temperature = Number(raw.temperature);
@@ -15,7 +16,8 @@ export function normalizeTextAgentForm(raw: Partial<TextAgentFormData>): TextAge
     temperature: Number.isFinite(temperature) ? Math.min(2, Math.max(0.1, temperature)) : 0.7,
     llm_model: String(raw.llm_model ?? DEFAULT_TEXT_MODEL).trim() || DEFAULT_TEXT_MODEL,
     max_output_tokens: Number.isFinite(maxOutput) ? Math.min(8192, Math.max(256, maxOutput)) : 2048,
-    color: raw.color ?? null
+    color: raw.color ?? null,
+    notify_rules: normalizeNotifyTeamRules(raw.notify_rules)
   };
 }
 

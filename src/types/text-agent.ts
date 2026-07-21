@@ -1,3 +1,5 @@
+import type { NotifyTeamRules } from "@/lib/text-notify-rules";
+
 export type TextSourceTemplateId =
   | "customer-assistant"
   | "lead-qualification"
@@ -24,6 +26,7 @@ export interface TextAgentFormData {
   llm_model: string;
   max_output_tokens: number;
   color?: string | null;
+  notify_rules?: NotifyTeamRules;
 }
 
 export interface TextAgentRecord extends TextAgentFormData, TextAgentStats {

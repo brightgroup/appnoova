@@ -18,7 +18,9 @@ import type { CompanyContext } from "@/types/company-context";
 import type { DataTableRecord } from "@/types/data-table";
 import { TextAgentTestPanel } from "@/components/text/TextAgentTestPanel";
 import { ChatRegistryPanel } from "@/components/text/ChatRegistryPanel";
+import { NotifyTeamRulesEditor } from "@/components/text/NotifyTeamRulesEditor";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
+import { defaultNotifyTeamRules } from "@/lib/text-notify-rules";
 
 type TabId = "probar" | "config" | "analisis" | "registro" | "canales";
 
@@ -63,7 +65,8 @@ function ConfigContent() {
     temperature: 0.7,
     llm_model: TEXT_LLM_MODELS[0].id,
     max_output_tokens: 2048,
-    color: null
+    color: null,
+    notify_rules: defaultNotifyTeamRules()
   });
 
   const [contexts, setContexts] = useState<CompanyContext[]>([]);
@@ -333,6 +336,13 @@ function ConfigContent() {
                   }))}
                 />
               </Field>
+            </div>
+
+            <div className="mt-6 pt-5 border-t border-white/[.08]">
+              <NotifyTeamRulesEditor
+                value={form.notify_rules}
+                onChange={notify_rules => setForm(f => ({ ...f, notify_rules }))}
+              />
             </div>
 
             <InfoBox

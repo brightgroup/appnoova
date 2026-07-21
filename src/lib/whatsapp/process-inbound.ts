@@ -1,4 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getOriApiKey } from "@/lib/google-ai";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
@@ -6,6 +5,7 @@ import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 import { buildDataTableContext } from "@/lib/data-tables/retrieve";
 import { mergeDataTableContext } from "@/lib/data-tables/format-context";
 import { geminiTextTemperature } from "@/lib/text-agent-form";
+import { generateTextAgentReply } from "@/lib/text-agent-generate";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import {
   persistAssistantReplyOnly,
@@ -511,26 +511,38 @@ export async function processTwilioWhatsAppInbound(
   const mergedPrompt = mergeCompanyContext(promptWithCatalog, companyContextText);
   const temporal = buildColombiaTemporalContext();
   const systemInstruction = `${temporal.promptBlock}\n\n${mergedPrompt}`;
-  const ai = new GoogleGenAI({ apiKey });
 
   let reply: string;
   let geminiUsage: ReturnType<typeof readGeminiUsage> | null = null;
   try {
-    const response = await ai.models.generateContent({
+    const generated = await generateTextAgentReply({
       model,
-      contents: geminiContents.map(m => ({
-        role: m.role === "assistant" ? ("model" as const) : ("user" as const),
-        parts: [{ text: m.content }]
+      systemInstruction,
+      messages: geminiContents.map(m => ({
+        role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+        content: m.content
       })),
-      config: {
-        systemInstruction,
-        temperature: geminiTextTemperature(Number(agent.temperature) || 0.7),
-        maxOutputTokens: Number(agent.max_output_tokens) || 2048
+      temperature: geminiTextTemperature(Number(agent.temperature) || 0.7),
+      maxOutputTokens: Number(agent.max_output_tokens) || 2048,
+      notifyRules: agent.notify_rules,
+      toolContext: {
+        db,
+        organizationId: orgId,
+        conversationId: userPersist.conversationId,
+        channel: WHATSAPP_CONVERSATION_CHANNEL,
+        agentName: String(agent.name),
+        contactLabel: existing?.contact_label ? String(existing.contact_label) : contactLabel,
+        outboundWhatsAppChannel: channel
       }
     });
-    reply = response.text?.trim() ?? "";
-    geminiUsage = readGeminiUsage(response);
-    if (!reply) return { ok: false, error: "IA sin respuesta" };
+    reply = generated.text;
+    geminiUsage = generated.usage;
+    if (generated.toolResults.length) {
+      console.info(
+        "[whatsapp/inbound] notify_team:",
+        JSON.stringify(generated.toolResults)
+      );
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error IA";
     return { ok: false, error: msg };

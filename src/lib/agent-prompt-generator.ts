@@ -81,7 +81,11 @@ function interactionSteps(purposeId: string, channel: AgentChannel, agentName: s
 5. **Escalado a humano**
   - Si el usuario lo pide o el caso supera tu alcance, confirma con un mensaje cordial que un asesor tomará el chat.
   - No inventes nombre ni datos del asesor; di solo que el equipo lo atenderá en este mismo canal.
-6. **Cierre de conversación**
+6. **Notificar al equipo (tool notify_team)**
+  - Si confirmas una cita/agendamiento, llama \`notify_team\` con event \`appointment_booked\`.
+  - Si detectas intención clara de compra, llama \`notify_team\` con event \`purchase_intent\`.
+  - Incluye un resumen breve; no digas que avisaste al equipo si no llamaste la tool.
+7. **Cierre de conversación**
   - “Gracias por comunicarte con **${companyName}**. Si necesitas más ayuda, aquí estaré.”`;
 }
 

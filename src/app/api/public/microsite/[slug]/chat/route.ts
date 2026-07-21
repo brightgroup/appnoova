@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
 import { makeVisitorLabel } from "@/lib/inbox-utils";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
@@ -8,6 +7,7 @@ import { resolveWidgetAgentForChat } from "@/lib/widget-server";
 import { isLandingWidgetPreview } from "@/lib/landing-widget";
 import { WEB_EMBED_CHANNEL } from "@/lib/widget-channel";
 import { geminiTextTemperature } from "@/lib/text-agent-form";
+import { generateTextAgentReply } from "@/lib/text-agent-generate";
 import { persistChatTurn, persistUserMessageOnly } from "@/lib/text-conversation-persist";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
@@ -23,11 +23,11 @@ import {
 } from "@/lib/text-handoff";
 import {
   checkBillingForUser,
-  readGeminiUsage,
   recordUsageSafe,
   resolveOrgIdForUser
 } from "@/lib/billing/meter";
 import { notifyPushForOrg } from "@/lib/push/send";
+import { resolveOrgActiveWhatsAppChannel } from "@/lib/text-notify-team";
 
 const PUBLIC_BILLING_FALLBACK =
   "¡Gracias por tu mensaje! En este momento no puedo responder automáticamente, pero un asesor te contactará muy pronto.";
@@ -240,27 +240,36 @@ export async function POST(
   const systemInstruction = `${temporal.promptBlock}\n\n${mergeCompanyContext(promptWithCatalog, companyContextText)}`;
   const temperature = geminiTextTemperature(Number(agent.temperature) || 0.7);
   const maxOutputTokens = Number(agent.max_output_tokens) || 2048;
-
-  const ai = new GoogleGenAI({ apiKey });
-  const contents = messages.map(m => ({
-    role: m.role === "user" ? ("user" as const) : ("model" as const),
-    parts: [{ text: m.content }]
-  }));
+  const contactLabel = conversationId ? undefined : makeVisitorLabel();
+  const waChannel = billing.organizationId
+    ? await resolveOrgActiveWhatsAppChannel(db, billing.organizationId)
+    : null;
 
   try {
-    const response = await ai.models.generateContent({
+    const generated = await generateTextAgentReply({
       model,
-      contents,
-      config: { systemInstruction, temperature, maxOutputTokens }
+      systemInstruction,
+      messages: messages.map(m => ({
+        role: m.role === "user" ? ("user" as const) : ("assistant" as const),
+        content: m.content
+      })),
+      temperature,
+      maxOutputTokens,
+      notifyRules: agent.notify_rules,
+      toolContext: {
+        db,
+        organizationId: billing.organizationId,
+        conversationId: conversationId ?? null,
+        channel,
+        agentName: String(agent.name),
+        contactLabel: contactLabel ?? null,
+        outboundWhatsAppChannel: waChannel
+      }
     });
 
-    const reply = response.text?.trim();
-    if (!reply) {
-      return NextResponse.json({ error: "No se generó respuesta" }, { status: 502 });
-    }
+    const reply = generated.text;
 
     let savedConversationId = conversationId ?? null;
-    const contactLabel = conversationId ? undefined : makeVisitorLabel();
     try {
       const persisted = await persistChatTurn({
         db,
@@ -303,7 +312,7 @@ export async function POST(
         channel,
         provider: "google",
         model,
-        gemini: readGeminiUsage(response),
+        gemini: generated.usage,
         referenceType: "text_agent_conversation",
         referenceId: savedConversationId ?? undefined
       });
