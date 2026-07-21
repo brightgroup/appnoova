@@ -218,14 +218,22 @@ export async function provisionWhatsAppFromEmbeddedSignup(
       senderStatus = registered.status;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      if (/already exists|duplicate|already registered/i.test(message)) {
+      if (/already exists|duplicate|already registered|20409|conflict/i.test(message)) {
+        // Sender ya creado (reintento o Embedded Signup). Adoptar y seguir al vínculo en Noova.
         const configured = await configureTwilioWhatsAppSenderWebhook({
           e164,
           accountSid: subaccount.sid,
           authToken: subaccount.authToken
         });
         senderSid = configured.senderSid;
-        senderStatus = "ONLINE";
+        const adopted = findTwilioSenderByE164(
+          await listTwilioWhatsAppSenders({
+            accountSid: subaccount.sid,
+            authToken: subaccount.authToken
+          }).catch(() => []),
+          e164
+        );
+        senderStatus = adopted?.status === "ONLINE" ? "ONLINE" : (adopted?.status ?? "CREATING");
       } else if (/63102|already linked to another WABA/i.test(message)) {
         throw new Error(
           "Esta subcuenta Twilio ya está ligada a otra cuenta WhatsApp (WABA). En Noova se creará una subcuenta nueva; vuelve a intentar o contacta soporte."

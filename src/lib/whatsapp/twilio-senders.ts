@@ -81,6 +81,14 @@ export function linkedWabaIdFromSenders(senders: TwilioSender[]): string | null 
   return null;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function isTwilioConflict(status: number, code?: number | string | null): boolean {
+  return status === 409 || code === 20409 || code === "20409";
+}
+
 /** Configura webhook inbound en el WhatsApp Sender de Twilio (Senders API v2). */
 export async function configureTwilioWhatsAppSenderWebhook(input: {
   e164: string;
@@ -100,34 +108,54 @@ export async function configureTwilioWhatsAppSenderWebhook(input: {
     );
   }
 
-  const updateRes = await fetch(
-    `https://messaging.twilio.com/v2/Channels/Senders/${sender.sid}`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: auth,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        webhook: {
-          callback_method: "POST",
-          callback_url: webhookUrl,
-          status_callback_method: "POST",
-          status_callback_url: statusUrl
-        }
-      })
-    }
-  );
-
-  const updateJson = (await updateRes.json().catch(() => ({}))) as {
-    message?: string;
-    code?: number | string;
-  };
-  if (!updateRes.ok && updateRes.status !== 202) {
-    throw new Error(formatTwilioError("webhook update", updateRes.status, updateJson));
+  // Si el inbound ya apunta a Noova, no hace falta forzar update (evita 20409 en CREATING).
+  const currentCallback = String(sender.webhook?.callback_url ?? "").trim();
+  if (currentCallback === webhookUrl) {
+    return { senderSid: sender.sid, webhookUrl };
   }
 
-  return { senderSid: sender.sid, webhookUrl };
+  const payload = {
+    webhook: {
+      callback_method: "POST",
+      callback_url: webhookUrl,
+      status_callback_method: "POST",
+      status_callback_url: statusUrl
+    }
+  };
+
+  // 20409: el sender aún no es modificable (p. ej. CREATING). Reintentar un rato.
+  let lastError = "";
+  for (let attempt = 0; attempt < 6; attempt++) {
+    if (attempt > 0) await sleep(2000 * attempt);
+
+    const updateRes = await fetch(
+      `https://messaging.twilio.com/v2/Channels/Senders/${sender.sid}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: auth,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      }
+    );
+
+    const updateJson = (await updateRes.json().catch(() => ({}))) as {
+      message?: string;
+      code?: number | string;
+    };
+
+    if (updateRes.ok || updateRes.status === 202) {
+      return { senderSid: sender.sid, webhookUrl };
+    }
+
+    lastError = formatTwilioError("webhook update", updateRes.status, updateJson);
+    if (!isTwilioConflict(updateRes.status, updateJson.code)) {
+      throw new Error(lastError);
+    }
+  }
+
+  throw new Error(lastError || "webhook update conflict (20409)");
 }
 
 /**
@@ -236,6 +264,23 @@ export async function registerTwilioWhatsAppSender(input: {
     details?: unknown;
   };
   if (!res.ok) {
+    // 20409: el sender ya existe o está en creación (reintento / Embedded Signup).
+    // Adoptamos el existente en vez de fallar el vínculo en Noova.
+    if (isTwilioConflict(res.status, json.code)) {
+      const existing = findTwilioSenderByE164(
+        await listTwilioWhatsAppSenders({
+          accountSid: input.accountSid,
+          authToken: input.authToken
+        }),
+        input.e164
+      );
+      if (existing?.sid) {
+        console.warn(
+          `[twilio/senders] create 20409 — adopting existing sender ${existing.sid} status=${existing.status}`
+        );
+        return { senderSid: existing.sid, status: existing.status ?? "CREATING" };
+      }
+    }
     const detail = formatTwilioError("create", res.status, json);
     throw new Error(
       `${detail} | sender=${senderId} waba=${input.wabaId} profile="${profileName}" webhook=${webhookUrl}`
@@ -246,25 +291,28 @@ export async function registerTwilioWhatsAppSender(input: {
     throw new Error("Twilio no devolvió SID del sender");
   }
 
-  // Best-effort: status callback (no bloquea el alta).
-  try {
-    await fetch(`https://messaging.twilio.com/v2/Channels/Senders/${json.sid}`, {
-      method: "POST",
-      headers: {
-        Authorization: auth,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        webhook: {
-          callback_method: "POST",
-          callback_url: webhookUrl,
-          status_callback_method: "POST",
-          status_callback_url: statusUrl
-        }
-      })
-    });
-  } catch (err) {
-    console.warn("[twilio/senders] status webhook update skipped:", err);
+  // Status callback solo cuando ya es modificable (ONLINE). En CREATING Twilio suele
+  // responder 20409; el inbound webhook del create ya alcanza para recibir mensajes.
+  if ((json.status ?? "").toUpperCase() === "ONLINE") {
+    try {
+      await fetch(`https://messaging.twilio.com/v2/Channels/Senders/${json.sid}`, {
+        method: "POST",
+        headers: {
+          Authorization: auth,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          webhook: {
+            callback_method: "POST",
+            callback_url: webhookUrl,
+            status_callback_method: "POST",
+            status_callback_url: statusUrl
+          }
+        })
+      });
+    } catch (err) {
+      console.warn("[twilio/senders] status webhook update skipped:", err);
+    }
   }
 
   return { senderSid: json.sid, status: json.status ?? "CREATING" };
@@ -289,10 +337,6 @@ export async function fetchTwilioWhatsAppSender(input: {
     throw new Error(formatTwilioError("fetch", res.status, json));
   }
   return json;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /** Espera a que el sender quede ONLINE (o timeout). */
