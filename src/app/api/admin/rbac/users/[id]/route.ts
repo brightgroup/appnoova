@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin, isProtectedUser } from "@/lib/admin-server";
-import { deleteUserCompletely } from "@/lib/admin-provisioning";
+import { deleteUserCompletely, updateOrgMemberProfile } from "@/lib/admin-provisioning";
 import { adminClient } from "@/lib/voice-agents-server";
 import type { AccountStatus } from "@/types/rbac";
 
 const VALID_STATUS = new Set<AccountStatus>(["active", "invited", "suspended", "disabled"]);
+const MIN_PASSWORD_LENGTH = 6;
 
-/** PATCH — editar usuario (nombre, estado) */
+/** PATCH — editar usuario (nombre, estado, contraseña) */
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -16,6 +17,15 @@ export async function PATCH(
 
   const { id: userId } = await params;
   const body = await req.json().catch(() => ({}));
+  const password =
+    typeof body.password === "string" ? body.password.trim() : "";
+
+  if (password && password.length < MIN_PASSWORD_LENGTH) {
+    return NextResponse.json(
+      { error: `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres` },
+      { status: 400 }
+    );
+  }
 
   if (await isProtectedUser(userId)) {
     if (body.status && body.status !== "active") {
@@ -31,23 +41,40 @@ export async function PATCH(
   const db = adminClient();
   const profileUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   const legacyUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  let hasProfileChange = false;
 
   if (typeof body.full_name === "string") {
     profileUpdates.full_name = body.full_name.trim() || null;
     legacyUpdates.nombre = body.full_name.trim() || null;
+    hasProfileChange = true;
   }
 
   if (body.status && VALID_STATUS.has(body.status) && !(await isProtectedUser(userId))) {
     profileUpdates.status = body.status;
     legacyUpdates.status = body.status;
+    hasProfileChange = true;
     await db
       .from("organization_members")
       .update({ status: body.status, updated_at: new Date().toISOString() })
       .eq("user_id", userId);
   }
 
-  if (Object.keys(profileUpdates).length <= 1) {
+  if (!hasProfileChange && !password) {
     return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
+  }
+
+  if (password) {
+    try {
+      await updateOrgMemberProfile(db, userId, { password });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Error al cambiar la contraseña";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
+
+  if (!hasProfileChange) {
+    const { data } = await db.from("profiles").select("*").eq("id", userId).maybeSingle();
+    return NextResponse.json({ user: data, password_updated: true });
   }
 
   const { data, error } = await db
@@ -61,7 +88,7 @@ export async function PATCH(
 
   await db.from("users").update(legacyUpdates).eq("id", userId);
 
-  return NextResponse.json({ user: data });
+  return NextResponse.json({ user: data, password_updated: Boolean(password) });
 }
 
 /** DELETE — eliminar usuario y sus organizaciones propias */

@@ -125,7 +125,19 @@ export function AdminUserModal({
               className="w-full px-4 py-2.5 rounded-xl bg-[#0d0e14] border border-white/[.12] text-sm text-white"
             />
           </div>
-          {!isEdit && (
+          {isEdit ? (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5">Nueva contraseña (opcional)</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Dejar vacío para no cambiar"
+                autoComplete="new-password"
+                className="w-full px-4 py-2.5 rounded-xl bg-[#0d0e14] border border-white/[.12] text-sm text-white placeholder:text-gray-600"
+              />
+            </div>
+          ) : (
             <>
               <div>
                 <label className="block text-xs text-gray-500 mb-1.5">Contraseña (opcional)</label>
@@ -203,7 +215,7 @@ export function AdminUserModal({
             </div>
           )}
           {protectedUser && (
-            <p className="text-xs text-amber-400/90">Usuario superadministrador protegido — solo puedes editar el nombre.</p>
+            <p className="text-xs text-amber-400/90">Usuario superadministrador protegido — puedes editar nombre y contraseña.</p>
           )}
         </div>
 

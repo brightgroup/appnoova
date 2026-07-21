@@ -127,9 +127,14 @@ export default function AdminUsers() {
         }
       } else alert(json.error ?? "Error");
     } else if (modal?.user) {
+      const body: Record<string, string> = {
+        full_name: values.full_name,
+        status: values.status,
+      };
+      if (values.password.trim()) body.password = values.password.trim();
       const res = await authFetch(`/api/admin/rbac/users/${modal.user.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ full_name: values.full_name, status: values.status }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         setModal(null);
