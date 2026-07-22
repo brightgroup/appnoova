@@ -3,6 +3,7 @@ export const sidebarNeonIcon = {
   voice: "",
   text: "",
   channels: "",
+  conectores: "",
   crm: "",
   campaigns: "",
   ori: "",

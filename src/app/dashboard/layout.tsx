@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LogOut, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, Building2, Loader2, Share2, Contact, Database } from "lucide-react";
+import { LogOut, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, Building2, Loader2, Share2, Contact, Database, Plug } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -12,6 +12,7 @@ import {
 } from "@/lib/brand-ui";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { CANALES_NAV } from "@/lib/canales-nav";
+import { CONECTORES_NAV } from "@/lib/conectores-nav";
 import { AGENTES_VOZ_NAV } from "@/lib/agentes-voz-nav";
 import { AGENTES_TEXTO_NAV } from "@/lib/agentes-texto-nav";
 import { CRM_NAV } from "@/lib/crm-nav";
@@ -108,6 +109,7 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
   const showTextoSection = textoNavItems.length > 0;
   const showVozSection = permFlags.can_view_voice_agents;
   const showCanalesSection = permFlags.can_view_channels;
+  const showConectoresSection = permFlags.can_view_conectores;
   const showCrmSection = permFlags.can_view_crm;
   const showCampaignsSection = permFlags.can_view_campaigns;
   const showContextsSection = permFlags.can_view_contexts;
@@ -156,6 +158,8 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
       pathname.startsWith("/dashboard/micrositio")
     ) {
       setExpandedMenu("canales");
+    } else if (pathname.startsWith("/dashboard/conectores")) {
+      setExpandedMenu("conectores");
     } else if (pathname.startsWith("/dashboard/crm")) {
       setExpandedMenu("crm");
     }
@@ -344,6 +348,34 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
             </button>
             {sidebarOpen && expandedMenu === "canales" && (
               <SidebarSubMenu pathname={pathname} items={CANALES_NAV} />
+            )}
+          </div>
+          )}
+
+          {/* Conectores */}
+          {showConectoresSection && (
+          <div>
+            <button
+              onClick={() => toggleMenu("conectores")}
+              className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-gray-300 ${
+                sidebarOpen ? "hover:text-white hover:bg-white/[.08]" : "hover:text-white"
+              } ${
+                expandedMenu === "conectores" && sidebarOpen ? "text-white bg-white/[.08]" : ""
+              }`}
+              title="Conectores"
+            >
+              {sidebarOpen ? (
+                <>
+                  <Plug className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.conectores}`} />
+                  <span className="flex-1 text-left">Conectores</span>
+                  <ChevronRight className={`w-4 h-4 transition-transform ml-2 ${expandedMenu === "conectores" ? "rotate-90" : ""}`} />
+                </>
+              ) : (
+                <Plug className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.conectores}`} />
+              )}
+            </button>
+            {sidebarOpen && expandedMenu === "conectores" && (
+              <SidebarSubMenu pathname={pathname} items={CONECTORES_NAV} />
             )}
           </div>
           )}

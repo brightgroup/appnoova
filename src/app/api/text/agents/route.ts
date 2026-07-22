@@ -122,6 +122,7 @@ export async function POST(req: NextRequest) {
     company_context_id: form.company_context_id || null,
     data_table_id: form.data_table_id || null,
     notify_rules: form.notify_rules ?? {},
+    scheduling_rules: form.scheduling_rules ?? {},
     updated_at: new Date().toISOString()
   };
 
@@ -132,8 +133,9 @@ export async function POST(req: NextRequest) {
       error?.message?.includes("company_context_id")
       || error?.message?.includes("data_table_id")
       || error?.message?.includes("notify_rules")
+      || error?.message?.includes("scheduling_rules")
     ) {
-      const { company_context_id: _c, data_table_id: _d, notify_rules: _n, ...rest } = row;
+      const { company_context_id: _c, data_table_id: _d, notify_rules: _n, scheduling_rules: _s, ...rest } = row;
       ({ data, error } = await updateTextAgentRow(db, rest, body.id, orgCtx.organizationId));
     }
 
@@ -153,8 +155,9 @@ export async function POST(req: NextRequest) {
     error?.message?.includes("company_context_id")
     || error?.message?.includes("data_table_id")
     || error?.message?.includes("notify_rules")
+    || error?.message?.includes("scheduling_rules")
   ) {
-    const { company_context_id: _c, data_table_id: _d, notify_rules: _n, ...rest } = row;
+    const { company_context_id: _c, data_table_id: _d, notify_rules: _n, scheduling_rules: _s, ...rest } = row;
     ({ data, error } = await insertTextAgentRow(db, rest));
   }
 

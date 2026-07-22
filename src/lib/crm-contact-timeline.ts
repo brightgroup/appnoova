@@ -136,6 +136,25 @@ export function timelineDaySummariesChanged(
   return JSON.stringify(before) !== JSON.stringify(after);
 }
 
+const APPOINTMENT_WHEN_FORMAT = new Intl.DateTimeFormat("es-CO", {
+  timeZone: "America/Bogota",
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true
+});
+
+export interface ContactAppointmentRow {
+  id: string;
+  created_at: string;
+  starts_at: string;
+  reason: string | null;
+  status: "confirmed" | "cancelled";
+  source_channel: string | null;
+}
+
 export async function buildContactTimeline(input: {
   contact: CrmContact;
   leads: CrmLead[];
@@ -148,6 +167,7 @@ export async function buildContactTimeline(input: {
     summary: string;
     status_label: string;
   }>;
+  appointments?: ContactAppointmentRow[];
 }): Promise<{
   events: CrmTimelineEvent[];
   daySummaries: Record<string, TimelineDaySummaryCache>;
@@ -187,6 +207,18 @@ export async function buildContactTimeline(input: {
       title: "Llamada de voz",
       body: call.summary || call.status_label,
       channel: "telefono"
+    });
+  }
+
+  for (const appt of input.appointments ?? []) {
+    const when = APPOINTMENT_WHEN_FORMAT.format(new Date(appt.starts_at));
+    events.push({
+      id: `appointment-${appt.id}`,
+      kind: "appointment",
+      at: appt.created_at,
+      title: appt.status === "cancelled" ? "Cita agendada (cancelada)" : "Cita agendada",
+      body: [`Para el ${when}`, appt.reason?.trim() || null].filter(Boolean).join(" · "),
+      channel: appt.source_channel ?? undefined
     });
   }
 

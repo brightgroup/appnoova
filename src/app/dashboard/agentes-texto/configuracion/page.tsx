@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Save, Loader2, CheckCircle2, MessageSquare, Settings2,
-  History, Radio, BarChart3, FileCode2
+  History, Radio, BarChart3, FileCode2, CalendarClock, Bell
 } from "lucide-react";
 import { InfoBox } from "@/components/ui/InfoBox";
 import { btnPrimary, tabActive, tabIdle } from "@/lib/brand-ui";
@@ -19,13 +19,17 @@ import type { DataTableRecord } from "@/types/data-table";
 import { TextAgentTestPanel } from "@/components/text/TextAgentTestPanel";
 import { ChatRegistryPanel } from "@/components/text/ChatRegistryPanel";
 import { NotifyTeamRulesEditor } from "@/components/text/NotifyTeamRulesEditor";
+import { SchedulingRulesEditor } from "@/components/scheduling/SchedulingRulesEditor";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
-import { defaultNotifyTeamRules } from "@/lib/text-notify-rules";
+import { defaultNotifyTeamRules, hasIncompleteWhatsAppNotifyRule } from "@/lib/text-notify-rules";
+import { defaultSchedulingRules } from "@/lib/scheduling/rules";
 
-type TabId = "probar" | "config" | "analisis" | "registro" | "canales";
+type TabId = "probar" | "config" | "agendamiento" | "notificaciones" | "analisis" | "registro" | "canales";
+
+const ENABLED_TABS: TabId[] = ["config", "probar", "registro", "agendamiento", "notificaciones"];
 
 function parseTab(tab: string | null): TabId {
-  if (tab === "probar" || tab === "config" || tab === "registro") return tab;
+  if (tab && (ENABLED_TABS as string[]).includes(tab)) return tab as TabId;
   return "config";
 }
 
@@ -66,7 +70,8 @@ function ConfigContent() {
     llm_model: TEXT_LLM_MODELS[0].id,
     max_output_tokens: 2048,
     color: null,
-    notify_rules: defaultNotifyTeamRules()
+    notify_rules: defaultNotifyTeamRules(),
+    scheduling_rules: defaultSchedulingRules()
   });
 
   const [contexts, setContexts] = useState<CompanyContext[]>([]);
@@ -157,9 +162,13 @@ function ConfigContent() {
     setSaving(false);
   };
 
-  const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
+  const notifyIncomplete = hasIncompleteWhatsAppNotifyRule(form.notify_rules ?? {});
+
+  const tabs: { id: TabId; label: string; icon: React.ElementType; warn?: boolean }[] = [
     { id: "probar", label: "Probar agente", icon: MessageSquare },
     { id: "config", label: "Configuración", icon: Settings2 },
+    { id: "agendamiento", label: "Agendamiento", icon: CalendarClock },
+    { id: "notificaciones", label: "Notificaciones", icon: Bell, warn: notifyIncomplete },
     { id: "analisis", label: "Análisis", icon: BarChart3 },
     { id: "registro", label: "Registro de chats", icon: History },
     { id: "canales", label: "Canales", icon: Radio }
@@ -222,14 +231,14 @@ function ConfigContent() {
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
-          const disabled = !["config", "probar", "registro"].includes(tab.id);
+          const disabled = !ENABLED_TABS.includes(tab.id);
 
           return (
             <button
               key={tab.id}
               disabled={disabled}
               onClick={() => !disabled && setTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+              className={`relative flex items-center gap-1.5 px-3 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
                 isActive
                   ? tabActive
                   : disabled
@@ -238,6 +247,12 @@ function ConfigContent() {
               }`}
             >
               <Icon className="w-3.5 h-3.5" /> {tab.label}
+              {tab.warn && (
+                <span
+                  className="w-1.5 h-1.5 rounded-full bg-red-400"
+                  title="Falta completar la configuración de WhatsApp"
+                />
+              )}
             </button>
           );
         })}
@@ -338,13 +353,6 @@ function ConfigContent() {
               </Field>
             </div>
 
-            <div className="mt-6 pt-5 border-t border-white/[.08]">
-              <NotifyTeamRulesEditor
-                value={form.notify_rules}
-                onChange={notify_rules => setForm(f => ({ ...f, notify_rules }))}
-              />
-            </div>
-
             <InfoBox
               icon={FileCode2}
               label="Plantilla base"
@@ -396,6 +404,24 @@ function ConfigContent() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === "agendamiento" && (
+        <div className="flex-1 overflow-y-auto p-6">
+          <SchedulingRulesEditor
+            value={form.scheduling_rules}
+            onChange={scheduling_rules => setForm(f => ({ ...f, scheduling_rules }))}
+          />
+        </div>
+      )}
+
+      {activeTab === "notificaciones" && (
+        <div className="flex-1 overflow-y-auto p-6">
+          <NotifyTeamRulesEditor
+            value={form.notify_rules}
+            onChange={notify_rules => setForm(f => ({ ...f, notify_rules }))}
+          />
         </div>
       )}
 

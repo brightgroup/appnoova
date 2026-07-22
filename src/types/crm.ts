@@ -192,7 +192,8 @@ export type CrmTimelineEventKind =
   | "call"
   | "lead"
   | "contact_created"
-  | "conversation_lapse";
+  | "conversation_lapse"
+  | "appointment";
 
 export interface CrmTimelineEvent {
   id: string;

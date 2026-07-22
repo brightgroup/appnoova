@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Propuestas UI · Agentes de voz Noova</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, sans-serif;
+      background: #09090b;
+      color: #f4f4f5;
+      padding: 40px 32px 64px;
+    }
+    h1 { font-size: 28px; letter-spacing: -0.03em; margin: 0 0 8px; }
+    .lead { color: #a1a1aa; max-width: 640px; line-height: 1.5; margin-bottom: 32px; font-size: 15px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    a.card {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      background: #121214;
+      border-radius: 16px;
+      padding: 22px;
+      border: 1px solid rgba(255,255,255,0.06);
+      transition: background 0.15s;
+    }
+    a.card:hover { background: #18181b; }
+    .tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #a5a5ff;
+      background: rgba(91,91,246,0.14);
+      padding: 3px 8px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+    }
+    a.card h2 { font-size: 18px; margin: 0 0 8px; }
+    a.card p { margin: 0; color: #a1a1aa; font-size: 13.5px; line-height: 1.5; }
+    ul { margin: 14px 0 0; padding-left: 18px; color: #d4d4d8; font-size: 13px; line-height: 1.55; }
+    .note {
+      margin-top: 28px;
+      font-size: 12px;
+      color: #71717a;
+    }
+  </style>
+</head>
+<body>
+  <h1>Propuestas de diseño — Agentes de voz</h1>
+  <p class="lead">
+    Mismas funciones que hoy (tabs, motor, contexto, voz, LLM, temperatura, editor Markdown, guardar).
+    Solo cambia la estética: menos marcos, más aire, jerarquía tipográfica.
+  </p>
+  <div class="grid">
+    <a class="card" href="01-elevenlabs-inspired.html">
+      <span class="tag">Propuesta A</span>
+      <h2>ElevenLabs + menú Noova arriba</h2>
+      <p>Look idéntico a ElevenLabs: tabs en la barra, Publicar blanco, esferas de voz.</p>
+      <ul>
+        <li>Menú Noova en la topbar (sin avatar del agente)</li>
+        <li>Scroll sin barra; solo línea separadora</li>
+        <li>Voz con esfera verde + componentes Noova a la derecha</li>
+      </ul>
+    </a>
+    <a class="card" href="02-noova-clean.html">
+      <span class="tag">Propuesta B</span>
+      <h2>Noova limpio</h2>
+      <p>Conserva tu layout actual (ajustes izq. + editor der.), sin cajas anidadas.</p>
+      <ul>
+        <li>Tabs con subrayado, no cajas</li>
+        <li>Campos sin border-box</li>
+        <li>Un solo canvas para el prompt</li>
+      </ul>
+    </a>
+  </div>
+  <p class="note">Solo mockups HTML · no modifican la app de producción.</p>
+</body>
+</html>

@@ -4,7 +4,8 @@ import {
   buildTeamEventWhatsAppBody,
   notifyOrgTeamEvent
 } from "@/lib/email/notify-team-event";
-import { sendWhatsAppTextMessage } from "@/lib/whatsapp/send-transport";
+import { sendWhatsAppTemplateMessage } from "@/lib/whatsapp/send-transport";
+import { getApprovedSingleVarTemplate } from "@/lib/whatsapp/notify-template";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import {
   isNotifyTeamEvent,
@@ -158,23 +159,31 @@ export async function executeNotifyTeamTool(
   let whatsappSent = 0;
   let whatsappFailed = 0;
   if (rule.whatsapp && rule.whatsapp_destinations.length && ctx.outboundWhatsAppChannel) {
-    const body = buildTeamEventWhatsAppBody(notifyCtx);
-    for (const toE164 of rule.whatsapp_destinations) {
-      try {
-        await sendWhatsAppTextMessage({
-          db: ctx.db,
-          channel: ctx.outboundWhatsAppChannel,
-          toE164,
-          body
-        });
-        whatsappSent += 1;
-      } catch (err) {
-        whatsappFailed += 1;
-        console.warn(
-          "[notify_team] whatsapp to",
-          toE164,
-          err instanceof Error ? err.message : err
-        );
+    const template = rule.whatsapp_template_id
+      ? await getApprovedSingleVarTemplate(ctx.db, rule.whatsapp_template_id, ctx.outboundWhatsAppChannel.id)
+      : null;
+
+    if (!template) {
+      console.warn("[notify_team] WhatsApp activo pero sin plantilla aprobada configurada");
+    } else {
+      const body = buildTeamEventWhatsAppBody(notifyCtx);
+      for (const toE164 of rule.whatsapp_destinations) {
+        try {
+          await sendWhatsAppTemplateMessage({
+            channel: ctx.outboundWhatsAppChannel,
+            toE164,
+            contentSid: template.contentSid,
+            contentVariables: { "1": body }
+          });
+          whatsappSent += 1;
+        } catch (err) {
+          whatsappFailed += 1;
+          console.warn(
+            "[notify_team] whatsapp to",
+            toE164,
+            err instanceof Error ? err.message : err
+          );
+        }
       }
     }
   } else if (rule.whatsapp && rule.whatsapp_destinations.length && !ctx.outboundWhatsAppChannel) {

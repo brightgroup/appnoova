@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Propuesta B — Layout Noova limpio · Agente de voz</title>
+  <style>
+    :root {
+      --bg: #0b0c10;
+      --panel: #0f1016;
+      --elevated: #14151c;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --faint: #6b7280;
+      --line: rgba(255,255,255,0.05);
+      --accent: #5b5bf6;
+      --accent-soft: rgba(91,91,246,0.12);
+      --font: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* Header — open, no box around title */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 28px 8px;
+    }
+    .header h1 {
+      font-size: 22px;
+      font-weight: 650;
+      letter-spacing: -0.03em;
+    }
+    .header .sub {
+      margin-top: 4px;
+      font-size: 12.5px;
+      color: var(--faint);
+      max-width: 560px;
+      line-height: 1.4;
+    }
+    .btn-save {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 16px;
+      border-radius: 10px;
+      cursor: default;
+    }
+
+    /* Tabs — underline only, no boxed pills cluster */
+    .tabs {
+      display: flex;
+      gap: 2px;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--line);
+      margin-top: 14px;
+    }
+    .tab {
+      position: relative;
+      font-size: 13px;
+      color: var(--faint);
+      padding: 12px 14px;
+      cursor: default;
+      background: none;
+      border: none;
+    }
+    .tab.active {
+      color: var(--text);
+      font-weight: 500;
+    }
+    .tab.active::after {
+      content: "";
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: -1px;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 2px 2px 0 0;
+    }
+
+    .body {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Left: settings as stacked fields — NO cards with borders */
+    .sidebar {
+      padding: 24px 22px 32px;
+      border-right: 1px solid var(--line);
+      overflow: auto;
+    }
+    .sidebar h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+    .field {
+      margin-bottom: 22px;
+    }
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .field .hint {
+      font-size: 11px;
+      color: var(--faint);
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+    .field a {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 12px;
+      color: #a5a5ff;
+      text-decoration: none;
+    }
+    .control {
+      width: 100%;
+      background: var(--elevated);
+      border: none;
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 13px;
+      padding: 11px 12px;
+    }
+    .slider {
+      width: 100%;
+      accent-color: var(--accent);
+      margin-top: 4px;
+    }
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--faint);
+      margin-top: 4px;
+    }
+    .engine-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--accent-soft);
+      color: #c4c4ff;
+      font-size: 13px;
+      font-weight: 500;
+      width: 100%;
+    }
+    .engine-pill small {
+      display: block;
+      font-weight: 400;
+      font-size: 11px;
+      color: var(--faint);
+      margin-top: 2px;
+    }
+
+    /* Editor — one soft surface, not nested boxes */
+    .editor {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      padding: 20px 28px 28px;
+    }
+    .editor-bar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .name-field { flex: 1; max-width: 360px; }
+    .name-field label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .name-field input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 500;
+      padding: 8px 0;
+      outline: none;
+    }
+    .mode-toggle {
+      display: flex;
+      background: var(--elevated);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 2px;
+    }
+    .mode-toggle button {
+      border: none;
+      background: transparent;
+      color: var(--faint);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 7px 12px;
+      border-radius: 8px;
+      cursor: default;
+    }
+    .mode-toggle button.on {
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .notice {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 0 16px;
+      margin-bottom: 4px;
+    }
+    .notice p {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.5;
+      max-width: 520px;
+    }
+    .notice button {
+      flex-shrink: 0;
+      background: transparent;
+      border: none;
+      color: #a5a5ff;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: default;
+      padding: 6px 0;
+    }
+
+    .canvas {
+      flex: 1;
+      background: var(--panel);
+      border-radius: 16px;
+      padding: 22px 24px;
+      min-height: 480px;
+    }
+    .canvas pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #d4d4d8;
+      white-space: pre-wrap;
+    }
+    .canvas .h {
+      color: #fafafa;
+      font-weight: 600;
+    }
+    .canvas .k { color: #a5a5ff; }
+
+    .proposal-banner {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #18181b;
+      color: #e4e4e7;
+      font-size: 12px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      z-index: 20;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <div>
+        <h1>Camila</h1>
+        <p class="sub">Plantilla: Outbound — Retoma contacto con leads y oportunidades sin respuesta · Premium (1378 cr/min)</p>
+      </div>
+      <button class="btn-save">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+        Guardar cambios
+      </button>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab">Probar agente</button>
+      <button class="tab active">Configuración</button>
+      <button class="tab">Análisis de llamadas</button>
+      <button class="tab">Registro de llamadas</button>
+      <button class="tab">Métricas</button>
+      <button class="tab">Canales</button>
+    </nav>
+
+    <div class="body">
+      <aside class="sidebar">
+        <h2>Configuración de voz</h2>
+
+        <div class="field">
+          <label>Motor</label>
+          <div class="engine-pill">
+            <div>
+              Voz premium
+              <small>Baja latencia · calidad natural</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Marca / contexto</label>
+          <select class="control" disabled><option>Ambacar</option></select>
+          <a href="#">Gestionar contextos de marca →</a>
+        </div>
+
+        <div class="field">
+          <label>Voz premium</label>
+          <select class="control" disabled><option>Marcela — Colombiana, natural</option></select>
+        </div>
+
+        <div class="field">
+          <label>Modelo de IA (LLM)</label>
+          <select class="control" disabled><option>Claude Haiku 4.5</option></select>
+        </div>
+
+        <div class="field">
+          <label>Temperatura</label>
+          <input class="slider" type="range" min="0.1" max="2" step="0.1" value="1" disabled />
+          <div class="slider-labels">
+            <span>preciso</span>
+            <span>1.00</span>
+            <span>más libre</span>
+          </div>
+          <p class="hint">Creatividad del modelo (0.1 = precisa · 2 = más libre)</p>
+        </div>
+      </aside>
+
+      <section class="editor">
+        <div class="editor-bar">
+          <div class="name-field">
+            <label>Nombre del agente</label>
+            <input value="Camila" readonly />
+          </div>
+          <div class="mode-toggle">
+            <button type="button">Vista previa</button>
+            <button type="button" class="on">Markdown</button>
+          </div>
+        </div>
+
+        <div class="notice">
+          <p>
+            Personaliza las secciones 3 y 4 con el tono y reglas de tu marca.
+            El resto del prompt viene de la plantilla Outbound.
+          </p>
+          <button type="button">Restaurar plantilla</button>
+        </div>
+
+        <div class="canvas">
+          <pre><span class="h"># Instrucciones Operativas — Camila</span>
+
+<span class="k">## 1. Identidad y Rol</span>
+Nombre: Camila
+Propósito: Retomar contacto con leads sin respuesta
+Afiliación: Ambacar
+Personalidad: Cálida, clara, orientada a acción
+
+<span class="k">## 2. Idioma</span>
+Responde siempre en español colombiano.
+No uses inglés en la llamada.
+
+<span class="k">## 3. Flujo de conversación</span>
+1. Saludo y verificación de identidad
+2. Contexto del último contacto
+3. Oferta de siguiente paso
+4. Escalado a humano si aplica
+
+<span class="k">## 4. Cierre</span>
+Agradece y confirma el acuerdo.</pre>
+        </div>
+      </section>
+    </div>
+  </div>
+  <div class="proposal-banner">Propuesta B · Mismo layout Noova, sin marcos · Mockup (no es la app)</div>
+</body>
+</html>

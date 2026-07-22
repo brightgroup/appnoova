@@ -142,16 +142,11 @@ export function buildTeamEventWhatsAppBody(ctx: TeamEventNotifyContext): string 
   const eventLabel = NOTIFY_TEAM_EVENT_META[ctx.event].label;
   const contact = ctx.contactLabel?.trim() || "Visitante";
   const when = ctx.whenLabel?.trim() ? `\n📅 ${ctx.whenLabel.trim()}` : "";
-  const hasConversation = Boolean(ctx.conversationId && ctx.conversationId !== "pending");
-  const inboxUrl = hasConversation
-    ? `${getAppBaseUrl()}/dashboard/inbox?id=${encodeURIComponent(ctx.conversationId)}`
-    : `${getAppBaseUrl()}/dashboard/inbox`;
   return (
     `🔔 *${eventLabel}*\n` +
     `👤 ${contact}\n` +
     `💬 ${channelLabel(ctx.channel)}\n` +
     `${when ? `${when}\n` : ""}` +
-    `\n${ctx.summary.trim().slice(0, 400)}\n` +
-    `\nInbox: ${inboxUrl}`
+    `\n${ctx.summary.trim().slice(0, 400)}`
   );
 }

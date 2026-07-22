@@ -188,14 +188,22 @@ export function templateStatusColor(status: WhatsAppTemplateStatus): string {
   }
 }
 
-export const PMV_BROKER_TEMPLATE_PRESETS: {
+export interface WhatsAppTemplatePreset {
+  label: string;
+  hint: string;
+  /** Nota adicional mostrada en el editor tras elegir este preset (aclaraciones de uso). */
+  note?: string;
   template_name: string;
   category: WhatsAppTemplateCategory;
   body_source: string;
   variable_labels: string[];
   variable_examples: string[];
-}[] = [
+}
+
+export const PMV_BROKER_TEMPLATE_PRESETS: WhatsAppTemplatePreset[] = [
   {
+    label: "Seguimiento de cotización",
+    hint: "Reactivar a un cliente que dejó una cotización a medias.",
     template_name: "seguimiento_cotizacion",
     category: "utility",
     body_source:
@@ -204,11 +212,27 @@ export const PMV_BROKER_TEMPLATE_PRESETS: {
     variable_examples: ["María", "Seguros Noova"]
   },
   {
+    label: "Recordatorio de documentos",
+    hint: "Pedirle a un cliente un documento pendiente para avanzar su trámite.",
     template_name: "recordatorio_documentos",
     category: "utility",
     body_source:
       "Hola {{contact_name}}, para continuar con tu póliza necesitamos {{document_name}}. Puedes enviarlo por este chat.",
     variable_labels: ["contact_name", "document_name"],
     variable_examples: ["Carlos", "copia de cédula"]
+  },
+  {
+    label: "Notificación al equipo (Noova)",
+    hint: "Para que tus agentes IA avisen a tu equipo por WhatsApp (agendamientos, intención de compra, derivación a asesor).",
+    note:
+      "Esta MISMA plantilla, una vez aprobada, sirve para los 3 eventos de notificación (cita agendada, intención de compra, derivación a asesor) — eliges cuáles activar y en cuáles usarla desde la config de cada agente. El ejemplo de abajo (una cita) es solo uno de los tres posibles; el contenido real cambia según qué evento haya ocurrido, Noova lo arma automáticamente.",
+    template_name: "notificacion_equipo_noova",
+    category: "utility",
+    body_source:
+      "🔔 Notificación automática de tu asistente Noova\n\n{{mensaje}}\n\nEste aviso se generó solo, sin intervención humana.",
+    variable_labels: ["mensaje"],
+    variable_examples: [
+      "Cita agendada — Juan Pérez, martes 22 de julio, 10:00 am. Motivo: asesoría inicial."
+    ]
   }
 ];

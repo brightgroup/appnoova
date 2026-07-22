@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
-import { getCrmUserId } from "@/lib/crm-auth";
+import { requireCrmAccess } from "@/lib/crm-auth";
+import { resolveOrgCrmTenantUserId } from "@/lib/org-crm-tenant";
 import {
   buildContactTimeline,
   mergeTimelineDaySummaries,
   readTimelineDaySummaries,
-  timelineDaySummariesChanged
+  timelineDaySummariesChanged,
+  type ContactAppointmentRow
 } from "@/lib/crm-contact-timeline";
 import { toCrmContact, toCrmLead } from "@/lib/crm-record";
 import type { TextChatMessage } from "@/types/text-agent-conversation";
@@ -18,8 +20,11 @@ function normalizeMessages(raw: unknown): TextChatMessage[] {
 }
 
 export async function GET(req: NextRequest, ctx: Ctx) {
-  const userId = await getCrmUserId(req, "view");
-  if (userId instanceof NextResponse) return userId;
+  const orgCtx = await requireCrmAccess(req, "view");
+  if (orgCtx instanceof NextResponse) return orgCtx;
+
+  const userId = await resolveOrgCrmTenantUserId(orgCtx.organizationId, orgCtx.userId);
+  const organizationId = orgCtx.organizationId;
 
   const { id } = await ctx.params;
   const db = textAgentsAdminClient();
@@ -36,7 +41,11 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   const contact = toCrmContact(contactRes.data);
   const phones = [contact.whatsapp, contact.telefono, contact.phone].filter(Boolean) as string[];
 
-  const [leadsRes, convRes, callsRes] = await Promise.all([
+  const appointmentFilters: string[] = phones.map(p => `contact_phone.eq.${p}`);
+  if (contact.email) appointmentFilters.push(`contact_email.eq.${contact.email}`);
+  if (contact.inbox_conversation_id) appointmentFilters.push(`conversation_id.eq.${contact.inbox_conversation_id}`);
+
+  const [leadsRes, convRes, callsRes, appointmentsRes] = await Promise.all([
     db
       .from("crm_leads")
       .select("*")
@@ -59,6 +68,15 @@ export async function GET(req: NextRequest, ctx: Ctx) {
           .in("phone_number", phones)
           .order("created_at", { ascending: false })
           .limit(30)
+      : Promise.resolve({ data: [], error: null }),
+    organizationId && appointmentFilters.length
+      ? db
+          .from("appointments")
+          .select("id, created_at, starts_at, reason, status, source_channel")
+          .eq("organization_id", organizationId)
+          .or(appointmentFilters.join(","))
+          .order("starts_at", { ascending: false })
+          .limit(30)
       : Promise.resolve({ data: [], error: null })
   ]);
 
@@ -76,13 +94,15 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     summary: string;
     status_label: string;
   }>;
+  const appointments = (appointmentsRes.data ?? []) as ContactAppointmentRow[];
 
   const { events, daySummaries: nextDaySummaries } = await buildContactTimeline({
     contact,
     leads,
     messages,
     daySummaries,
-    calls
+    calls,
+    appointments
   });
 
   if (

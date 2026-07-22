@@ -41,6 +41,8 @@ import {
   recordUsageSafe,
   resolveOrgIdForUser
 } from "@/lib/billing/meter";
+import { getActiveCalendarConnection } from "@/lib/google-calendar/connections-db";
+import { getOrgBusinessHours } from "@/lib/scheduling/business-hours-db";
 import { resolveTextAgentForChannel } from "@/lib/text-agent-resolve";
 import type { TwilioWhatsAppMediaItem } from "@/lib/whatsapp/twilio-media";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
@@ -408,7 +410,9 @@ export async function processTwilioWhatsAppInbound(
       channel: WHATSAPP_CONVERSATION_CHANNEL,
       agentName: String(agent.name),
       contactLabel: existing?.contact_label ? String(existing.contact_label) : contactLabel,
-      visitorMessage: userDisplay
+      visitorMessage: userDisplay,
+      notifyRules: agent.notify_rules,
+      outboundWhatsAppChannel: channel
     });
 
     await syncAndEnrichCrmFromInbound(db, channel, userPersist.conversationId, inbound, nowIso, optedOutAfter);
@@ -515,6 +519,8 @@ export async function processTwilioWhatsAppInbound(
   let reply: string;
   let geminiUsage: ReturnType<typeof readGeminiUsage> | null = null;
   try {
+    const calendarConnection = orgId ? await getActiveCalendarConnection(db, orgId) : null;
+    const businessHours = orgId ? await getOrgBusinessHours(db, orgId) : undefined;
     const generated = await generateTextAgentReply({
       model,
       systemInstruction,
@@ -525,11 +531,16 @@ export async function processTwilioWhatsAppInbound(
       temperature: geminiTextTemperature(Number(agent.temperature) || 0.7),
       maxOutputTokens: Number(agent.max_output_tokens) || 2048,
       notifyRules: agent.notify_rules,
+      schedulingRules: agent.scheduling_rules,
+      businessHours,
+      calendarConnection,
       toolContext: {
         db,
         organizationId: orgId,
         conversationId: userPersist.conversationId,
         channel: WHATSAPP_CONVERSATION_CHANNEL,
+        agentId: String(agent.id),
+        agentType: "text",
         agentName: String(agent.name),
         contactLabel: existing?.contact_label ? String(existing.contact_label) : contactLabel,
         outboundWhatsAppChannel: channel
@@ -570,7 +581,9 @@ export async function processTwilioWhatsAppInbound(
       channel: WHATSAPP_CONVERSATION_CHANNEL,
       agentName: String(agent.name),
       contactLabel: existing?.contact_label ? String(existing.contact_label) : contactLabel,
-      visitorMessage: userDisplay
+      visitorMessage: userDisplay,
+      notifyRules: agent.notify_rules,
+      outboundWhatsAppChannel: channel
     });
   }
 

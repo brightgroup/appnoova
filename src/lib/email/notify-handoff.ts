@@ -175,3 +175,17 @@ export async function notifyOrgHandoff(ctx: HandoffNotifyContext): Promise<SendE
     html: buildHtml(ctx, organizationName)
   });
 }
+
+export function buildHandoffWhatsAppBody(ctx: HandoffNotifyContext): string {
+  const contact = ctx.contactLabel?.trim() || "Visitante";
+  const preview = ctx.visitorMessage?.trim()
+    ? `\n\n${ctx.visitorMessage.trim().slice(0, 300)}`
+    : "";
+  return (
+    `🔔 *Conversación en espera de asesor*\n` +
+    `👤 ${contact}\n` +
+    `💬 ${channelLabel(ctx.channel)}\n` +
+    `📌 ${reasonLabel(ctx.reason)}` +
+    `${preview}`
+  );
+}

@@ -1,4 +1,5 @@
 import type { NotifyTeamRules } from "@/lib/text-notify-rules";
+import type { SchedulingRules } from "@/lib/scheduling/rules";
 
 export type TextSourceTemplateId =
   | "customer-assistant"
@@ -27,6 +28,7 @@ export interface TextAgentFormData {
   max_output_tokens: number;
   color?: string | null;
   notify_rules?: NotifyTeamRules;
+  scheduling_rules?: SchedulingRules;
 }
 
 export interface TextAgentRecord extends TextAgentFormData, TextAgentStats {

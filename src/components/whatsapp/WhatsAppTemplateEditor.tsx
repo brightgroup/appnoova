@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Loader2, Send, Save } from "lucide-react";
+import { ChevronLeft, Info, Loader2, Send, Save } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
+import { InfoBox } from "@/components/ui/InfoBox";
 import {
   btnGhost,
   btnPrimary,
@@ -20,8 +21,10 @@ import {
   extractNamedVariables,
   isValidTemplateName,
   normalizeTemplateName,
+  PMV_BROKER_TEMPLATE_PRESETS,
   templateStatusColor,
-  templateStatusLabel
+  templateStatusLabel,
+  type WhatsAppTemplatePreset
 } from "@/lib/whatsapp/template-record";
 import { WhatsAppPhonePreview } from "@/components/whatsapp/WhatsAppPhonePreview";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
@@ -121,6 +124,16 @@ export function WhatsAppTemplateEditor({
       next[index] = value;
       return next;
     });
+  };
+
+  const [appliedPreset, setAppliedPreset] = useState<string | null>(null);
+
+  const applyPreset = (preset: WhatsAppTemplatePreset) => {
+    setTemplateName(preset.template_name);
+    setCategory(preset.category);
+    setBodySource(preset.body_source);
+    setVariableExamples(preset.variable_examples);
+    setAppliedPreset(preset.template_name);
   };
 
   const buildPayload = useCallback(
@@ -310,6 +323,44 @@ export function WhatsAppTemplateEditor({
             <p className="text-sm text-gray-400 nv-wa-template-hint">
               Esta plantilla se usará para enviar notificaciones de WhatsApp fuera de la ventana de 24 h.
             </p>
+
+            {mode === "create" && (
+              <div>
+                <label className={nvFieldLabel}>Empezar desde una guía (opcional)</label>
+                <p className="text-[11px] text-gray-500 mt-1 mb-2.5 nv-field-hint">
+                  Elige un caso y ajusta el texto — así no tienes que inventar el formato ni adivinar qué es una variable.
+                </p>
+                <div className="grid sm:grid-cols-3 gap-2.5">
+                  {PMV_BROKER_TEMPLATE_PRESETS.map(preset => (
+                    <button
+                      key={preset.template_name}
+                      type="button"
+                      onClick={() => applyPreset(preset)}
+                      className={`text-left rounded-xl border px-3.5 py-3 transition-colors ${
+                        appliedPreset === preset.template_name
+                          ? "border-[#5b5bf6]/50 bg-[#5b5bf6]/[.10]"
+                          : "border-white/[.08] bg-white/[.02] hover:border-white/[.16] hover:bg-white/[.04]"
+                      }`}
+                    >
+                      <p className="text-xs font-semibold text-gray-100">{preset.label}</p>
+                      <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">{preset.hint}</p>
+                    </button>
+                  ))}
+                </div>
+
+                {(() => {
+                  const applied = PMV_BROKER_TEMPLATE_PRESETS.find(p => p.template_name === appliedPreset);
+                  if (!applied?.note) return null;
+                  return (
+                    <div className="mt-3">
+                      <InfoBox icon={Info} layout="row" variant="neutral">
+                        {applied.note}
+                      </InfoBox>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
 
             {mode === "create" && (
               <div>

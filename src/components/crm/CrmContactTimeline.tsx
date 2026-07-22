@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  CalendarCheck,
   Clock,
   Loader2,
   MessageSquare,
@@ -24,7 +25,8 @@ const KIND_META: Record<
   message_out: { icon: MessageSquare, accent: "text-[#a5a5ff]", dot: "bg-[#5b5bf6]" },
   call: { icon: Phone, accent: "text-sky-300", dot: "bg-sky-400" },
   lead: { icon: Sparkles, accent: "text-amber-300", dot: "bg-amber-400" },
-  contact_created: { icon: UserPlus, accent: "text-gray-400", dot: "bg-gray-500" }
+  contact_created: { icon: UserPlus, accent: "text-gray-400", dot: "bg-gray-500" },
+  appointment: { icon: CalendarCheck, accent: "text-teal-300", dot: "bg-teal-400" }
 };
 
 interface CrmContactTimelineProps {

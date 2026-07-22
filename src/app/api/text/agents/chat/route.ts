@@ -10,6 +10,8 @@ import { persistChatTurn } from "@/lib/text-conversation-persist";
 import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
 import { checkBillingForUser, recordUsageSafe } from "@/lib/billing/meter";
 import { resolveOrgActiveWhatsAppChannel } from "@/lib/text-notify-team";
+import { getActiveCalendarConnection } from "@/lib/google-calendar/connections-db";
+import { getOrgBusinessHours } from "@/lib/scheduling/business-hours-db";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -109,6 +111,8 @@ export async function POST(req: NextRequest) {
   const maxOutputTokens = Number(agent.max_output_tokens) || 2048;
   const orgId = billing.organizationId || String(agent.organization_id || "");
   const waChannel = orgId ? await resolveOrgActiveWhatsAppChannel(db, orgId) : null;
+  const calendarConnection = orgId ? await getActiveCalendarConnection(db, orgId) : null;
+  const businessHours = orgId ? await getOrgBusinessHours(db, orgId) : undefined;
 
   try {
     const generated = await generateTextAgentReply({
@@ -121,11 +125,16 @@ export async function POST(req: NextRequest) {
       temperature,
       maxOutputTokens,
       notifyRules: agent.notify_rules,
+      schedulingRules: agent.scheduling_rules,
+      businessHours,
+      calendarConnection,
       toolContext: {
         db,
         organizationId: orgId,
         conversationId: conversationId ?? null,
         channel: "web_test",
+        agentId: String(agent.id),
+        agentType: "text",
         agentName: String(agent.name),
         contactLabel: "Prueba web",
         outboundWhatsAppChannel: waChannel

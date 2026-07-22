@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Propuesta A — ElevenLabs + componentes Noova · Agente de voz</title>
+  <style>
+    :root {
+      --bg: #000000;
+      --panel: #0a0a0a;
+      --surface: #1a1a1a;
+      --surface-2: #222222;
+      --surface-3: #2a2a2a;
+      --text: #fafafa;
+      --muted: #a3a3a3;
+      --faint: #737373;
+      --line: rgba(255, 255, 255, 0.08);
+      --font: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* Scroll sin barra visible — solo el separador de columna */
+    .scroll-hide {
+      overflow-y: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .scroll-hide::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* ─── Barra superior (estilo ElevenLabs) ─── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      height: 52px;
+      padding: 0 16px 0 20px;
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
+      background: var(--bg);
+    }
+    /* Tabs Noova en la barra superior */
+    .tabs {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+      padding: 6px 11px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--faint);
+      background: transparent;
+      border: none;
+      cursor: default;
+    }
+    .tab svg { opacity: 0.8; }
+    .tab:hover { color: var(--muted); background: rgba(255,255,255,0.04); }
+    .tab.active {
+      color: var(--text);
+      background: var(--surface);
+    }
+    .tab.disabled { opacity: 0.35; pointer-events: none; }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 32px;
+      padding: 0 11px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      cursor: default;
+    }
+    .btn-ghost:hover { background: var(--surface); color: var(--text); }
+    /* Publicar / Guardar — blanco como ElevenLabs */
+    .btn-publish {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 32px;
+      padding: 0 12px 0 14px;
+      border: none;
+      border-radius: 8px;
+      background: #fff;
+      color: #0a0a0a;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: default;
+    }
+    .btn-publish .chev {
+      opacity: 0.55;
+      margin-left: 2px;
+    }
+
+    /* ─── Cuerpo: 2 columnas ─── */
+    .body {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      min-height: 0;
+    }
+    .main {
+      min-width: 0;
+      min-height: 0;
+      padding: 28px 32px 48px;
+    }
+    .aside {
+      min-height: 0;
+      border-left: 1px solid var(--line);
+      padding: 28px 18px 48px;
+      background: var(--panel);
+    }
+
+    .page-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .page-title-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      flex: 1;
+    }
+    .name-edit {
+      display: inline-block;
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      color: var(--text);
+      background: transparent;
+      border: none;
+      outline: none;
+      padding: 2px 10px 2px 2px;
+      margin: -2px 0;
+      border-radius: 8px;
+      min-width: 2ch;
+      max-width: min(520px, 70vw);
+      white-space: nowrap;
+      caret-color: var(--text);
+      cursor: text;
+    }
+    .name-edit:hover {
+      background: rgba(255,255,255,0.04);
+    }
+    .name-edit:focus {
+      background: var(--surface);
+      box-shadow: 0 0 0 1px var(--line);
+    }
+    .pill {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .mode-toggle {
+      display: flex;
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 2px;
+      height: 36px;
+      align-items: center;
+      margin-left: auto;
+    }
+    .mode-toggle button {
+      border: none;
+      background: transparent;
+      color: var(--faint);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 0 12px;
+      height: 30px;
+      border-radius: 8px;
+      cursor: default;
+    }
+    .mode-toggle button.on {
+      background: var(--surface-3);
+      color: var(--text);
+    }
+
+    .section-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    /* Cajas de prompt estilo ElevenLabs */
+    .box {
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 14px 14px 10px;
+      margin-bottom: 18px;
+      position: relative;
+    }
+    .box-tools {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      gap: 4px;
+    }
+    .icon-btn {
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--faint);
+      display: grid;
+      place-items: center;
+      cursor: default;
+    }
+    .icon-btn:hover { background: var(--surface-3); color: var(--muted); }
+    .box textarea {
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      resize: none;
+      color: #e5e5e5;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.65;
+      min-height: 280px;
+      padding-right: 56px;
+    }
+    .box.compact textarea { min-height: 72px; padding-right: 40px; }
+    .box-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 8px;
+      margin-top: 4px;
+      border-top: 1px solid var(--line);
+      font-size: 11px;
+      color: var(--faint);
+    }
+    .box-foot button {
+      border: none;
+      background: transparent;
+      color: var(--faint);
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: default;
+      padding: 4px 6px;
+      border-radius: 6px;
+    }
+    .box-foot button:hover { color: var(--muted); background: rgba(255,255,255,0.04); }
+
+    /* ─── Aside derecho ─── */
+    .aside-block { margin-bottom: 22px; }
+    .aside-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .aside-head h2 {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .aside-head .gear {
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--faint);
+      display: grid;
+      place-items: center;
+      cursor: default;
+    }
+    .aside-head .gear:hover { background: var(--surface); color: var(--muted); }
+
+    /* Tarjeta / picker de voz con orb ElevenLabs */
+    .voice-picker { position: relative; }
+    .voice-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--surface);
+      border-radius: 14px;
+      border: none;
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+    }
+    .voice-card:hover { background: var(--surface-2); }
+    /* Orb circular fijo (SVG) — no se estira en flex */
+    .orb {
+      width: 22px;
+      height: 22px;
+      min-width: 22px;
+      min-height: 22px;
+      flex: 0 0 22px;
+      display: block;
+      border-radius: 50%;
+      overflow: hidden;
+      line-height: 0;
+    }
+    .orb svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .orb.sm {
+      width: 18px;
+      height: 18px;
+      min-width: 18px;
+      min-height: 18px;
+      flex: 0 0 18px;
+    }
+    .voice-meta { flex: 1; min-width: 0; }
+    .voice-meta strong {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tag {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--muted);
+      background: rgba(255,255,255,0.08);
+      padding: 3px 7px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+    .chevron { color: var(--faint); flex-shrink: 0; transition: transform 0.15s ease; }
+    .voice-picker.open .chevron { transform: rotate(90deg); }
+
+    .voice-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      z-index: 30;
+      background: #141414;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 6px;
+      max-height: 280px;
+      overflow-y: auto;
+      scrollbar-width: none;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.55);
+    }
+    .voice-menu::-webkit-scrollbar { display: none; }
+    .voice-picker.open .voice-menu { display: block; }
+    .voice-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 8px 10px;
+      border: none;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .voice-option:hover { background: rgba(255,255,255,0.05); }
+    .voice-option.active { background: rgba(255,255,255,0.08); }
+    .voice-option .voice-name {
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .setting-card {
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .setting-card + .setting-card,
+    .aside-block + .aside-block .setting-card { margin-top: 0; }
+    .setting-card label {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--faint);
+      margin-bottom: 8px;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .setting-card .value {
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .setting-card p {
+      font-size: 11.5px;
+      color: var(--faint);
+      line-height: 1.45;
+    }
+    .setting-card p.mt { margin-top: 8px; }
+    .setting-stack { display: flex; flex-direction: column; gap: 10px; }
+
+    .select {
+      width: 100%;
+      height: 40px;
+      background: var(--surface-2);
+      border: none;
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 13px;
+      padding: 0 32px 0 12px;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23a3a3a3' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+    }
+    .linkish {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    .linkish:hover { color: var(--text); }
+
+    .slider-wrap { margin-top: 8px; }
+    .slider-wrap input[type="range"] {
+      width: 100%;
+      accent-color: #fff;
+    }
+    .slider-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--faint);
+      margin-top: 4px;
+    }
+    .slider-meta .val {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+    }
+
+    .proposal-banner {
+      position: fixed;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #171717;
+      color: #d4d4d4;
+      font-size: 11px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    @media (max-width: 960px) {
+      .body { grid-template-columns: 1fr; }
+      .aside { border-left: none; border-top: 1px solid var(--line); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Barra superior: solo menú Noova + Publicar -->
+    <header class="topbar">
+      <nav class="tabs" aria-label="Secciones del agente">
+        <button type="button" class="tab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          Probar agente
+        </button>
+        <button type="button" class="tab active">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          Configuración
+        </button>
+        <button type="button" class="tab disabled">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 14 4-4 4 4 5-6"/></svg>
+          Análisis de llamadas
+        </button>
+        <button type="button" class="tab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          Registro de llamadas
+        </button>
+        <button type="button" class="tab disabled">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Métrica
+        </button>
+        <button type="button" class="tab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49M7.76 7.76a6 6 0 0 0 0 8.49M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+          Canales
+        </button>
+      </nav>
+
+      <div class="top-actions">
+        <button type="button" class="btn-ghost">Vista previa</button>
+        <button type="button" class="btn-publish">
+          Publicar
+          <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="body">
+      <!-- Columna izquierda: prompt (estilo ElevenLabs) -->
+      <main class="main scroll-hide">
+        <div class="page-title">
+          <div class="page-title-left">
+            <h1
+              class="name-edit"
+              id="agentName"
+              contenteditable="true"
+              spellcheck="false"
+              title="Clic para editar el nombre"
+            >Camila</h1>
+            <span class="pill">Outbound</span>
+          </div>
+          <div class="mode-toggle">
+            <button type="button">Vista previa</button>
+            <button type="button" class="on">Markdown</button>
+          </div>
+        </div>
+
+        <div class="section-label">Mensaje del sistema</div>
+        <section class="box">
+          <div class="box-tools">
+            <button type="button" class="icon-btn" aria-label="Expandir">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+            </button>
+            <button type="button" class="icon-btn" aria-label="Mejorar prompt">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/><path d="m19 15 .75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75L19 15z"/></svg>
+            </button>
+          </div>
+          <textarea readonly># Instrucciones Operativas para el Agente de Voz **Camila**
+
+## 1. Identidad y Rol del Agente
+Nombre: Camila
+Propósito: Retomar contacto con leads y oportunidades sin respuesta
+Afiliación: Ambacar
+Personalidad: Cálida, profesional, persuasiva sin presión
+Alcance: Calificación y agendamiento; escala a humano si el caso lo requiere
+
+## 2. Idioma
+Responde siempre en español colombiano.
+PROHIBIDO hablar en inglés.
+
+## 3. Flujo de conversación
+1. Saludo y verificación de identidad
+2. Contexto del último contacto
+3. Oferta de siguiente paso concreto
+4. Escalado a humano si aplica
+
+## 4. Cierre
+Agradece y confirma el acuerdo.</textarea>
+          <div class="box-foot">
+            <span>Markdown · Editor del agente</span>
+          </div>
+        </section>
+      </main>
+
+      <!-- Columna derecha: voz + settings Noova, look ElevenLabs -->
+      <aside class="aside scroll-hide">
+        <div class="aside-block">
+          <div class="aside-head">
+            <h2>Voces</h2>
+            <button type="button" class="gear" aria-label="Ajustes de voz">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            </button>
+          </div>
+          <div class="voice-picker" id="voicePicker">
+            <button type="button" class="voice-card" id="voiceTrigger" aria-haspopup="listbox" aria-expanded="false">
+              <span class="orb" id="voiceOrb" aria-hidden="true"></span>
+              <div class="voice-meta">
+                <strong id="voiceLabel">Marcela — Colombiana, conversacional</strong>
+              </div>
+              <span class="tag">Principal</span>
+              <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            <div class="voice-menu" id="voiceMenu" role="listbox"></div>
+          </div>
+        </div>
+
+        <div class="aside-block">
+          <div class="aside-head"><h2>Motor</h2></div>
+          <div class="setting-card">
+            <div class="value">Voz premium</div>
+            <p>El proveedor se elige al crear el agente.</p>
+          </div>
+        </div>
+
+        <div class="aside-block">
+          <div class="aside-head"><h2>Marca / contexto</h2></div>
+          <div class="setting-card">
+            <select class="select" disabled>
+              <option>Ambacar</option>
+            </select>
+            <p class="mt">Marca: Ambacar — se añade al final de cada llamada.</p>
+            <a class="linkish" href="#">Gestionar contextos de marca →</a>
+          </div>
+        </div>
+
+        <div class="aside-block">
+          <div class="aside-head"><h2>LLM</h2></div>
+          <div class="setting-card">
+            <label>Modelo de IA</label>
+            <select class="select" disabled>
+              <option>Claude Haiku 4.5</option>
+            </select>
+            <p class="mt">
+              Modelo que razona y conversa en la llamada. Claude Haiku 4.5 es el recomendado
+              (rápido y sin errores de idioma). Al cambiarlo, publica para aplicarlo.
+            </p>
+          </div>
+        </div>
+
+        <div class="aside-block">
+          <div class="aside-head"><h2>Temperatura</h2></div>
+          <div class="setting-card">
+            <p>Creatividad del agente premium (0 = precisa · 2 = más libre)</p>
+            <div class="slider-wrap">
+              <input type="range" min="0.1" max="2" step="0.1" value="1" disabled />
+              <div class="slider-meta">
+                <span>preciso</span>
+                <span class="val">1.00</span>
+                <span>más libre</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <div class="proposal-banner">Propuesta A · Barra Noova + look ElevenLabs · Mockup</div>
+
+  <script>
+    const VOICES = [
+      { id: "86V9x9hrQds83qf7zaGn", label: "Marcela — Colombiana, conversacional", colors: ["#7DFFA3", "#15803D"] },
+      { id: "fuwN6hWqDt4SvK4KVpN4", label: "Tatiana — Bogotá, femenina", colors: ["#F5CABB", "#6DB035"] },
+      { id: "J4vZAFDEcpenkMp3f3R9", label: "Valentina — Paisa / Medellín", colors: ["#C4B5FD", "#5B21B6"] },
+      { id: "3Fx71T889APcHRu4VtQf", label: "Voz Colombiana — Medellín, cálida", colors: ["#FDE68A", "#B45309"] },
+      { id: "VmejBeYhbrcTPwDniox7", label: "Lina — Colombiana, fresca", colors: ["#A5F3FC", "#0E7490"] },
+      { id: "x5IDPSl4ZUbhosMmVFTk", label: "Lúminā — Bogotá, clara y natural", colors: ["#FBCFE8", "#BE185D"] },
+      { id: "TjldTGy7iELoRNPa6sJh", label: "Daniel — Bogotá, comercial masculino", colors: ["#93C5FD", "#1D4ED8"] },
+      { id: "j7XQZUnVCfhpa94EsaJS", label: "Dipemo — Colombiano, profesional", colors: ["#D4D4D8", "#3F3F46"] },
+    ];
+
+    /** Orb vectorial estilo ElevenLabs: círculo perfecto, 2 colores, brillo nítido */
+    function orbSvg(voice) {
+      const [c1, c2] = voice.colors;
+      const uid = "o" + voice.id.slice(0, 8);
+      return (
+        `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+        `<defs>` +
+        `<clipPath id="${uid}"><circle cx="16" cy="16" r="16"/></clipPath>` +
+        `</defs>` +
+        `<g clip-path="url(#${uid})">` +
+        `<circle cx="16" cy="16" r="16" fill="${c1}"/>` +
+        `<path d="M0 10 C10 6 18 14 32 12 L32 32 L0 32 Z" fill="${c2}"/>` +
+        `<circle cx="11" cy="10" r="3.2" fill="#fff" fill-opacity="0.85"/>` +
+        `</g>` +
+        `<circle cx="16" cy="16" r="15.5" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>` +
+        `</svg>`
+      );
+    }
+
+    function paintOrb(el, voice) {
+      el.innerHTML = orbSvg(voice);
+    }
+
+    const picker = document.getElementById("voicePicker");
+    const trigger = document.getElementById("voiceTrigger");
+    const menu = document.getElementById("voiceMenu");
+    const labelEl = document.getElementById("voiceLabel");
+    const mainOrb = document.getElementById("voiceOrb");
+    let selectedId = VOICES[0].id;
+
+    function currentVoice() {
+      return VOICES.find((v) => v.id === selectedId) || VOICES[0];
+    }
+
+    function renderMenu() {
+      menu.innerHTML = "";
+      VOICES.forEach((voice) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "voice-option" + (voice.id === selectedId ? " active" : "");
+        btn.setAttribute("role", "option");
+        const orb = document.createElement("span");
+        orb.className = "orb sm";
+        paintOrb(orb, voice);
+        const span = document.createElement("span");
+        span.className = "voice-name";
+        span.textContent = voice.label;
+        btn.appendChild(orb);
+        btn.appendChild(span);
+        if (voice.id === selectedId) {
+          const check = document.createElement("span");
+          check.className = "tag";
+          check.textContent = "Principal";
+          btn.appendChild(check);
+        }
+        btn.addEventListener("click", () => {
+          selectedId = voice.id;
+          applyVoice();
+          picker.classList.remove("open");
+          trigger.setAttribute("aria-expanded", "false");
+        });
+        menu.appendChild(btn);
+      });
+    }
+
+    function applyVoice() {
+      const voice = currentVoice();
+      labelEl.textContent = voice.label;
+      paintOrb(mainOrb, voice);
+      renderMenu();
+    }
+
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = picker.classList.toggle("open");
+      trigger.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    document.addEventListener("click", () => {
+      picker.classList.remove("open");
+      trigger.setAttribute("aria-expanded", "false");
+    });
+    picker.addEventListener("click", (e) => e.stopPropagation());
+
+    applyVoice();
+
+    const nameEl = document.getElementById("agentName");
+    nameEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        nameEl.blur();
+      }
+    });
+    nameEl.addEventListener("blur", () => {
+      const t = nameEl.textContent.replace(/\s+/g, " ").trim() || "Camila";
+      nameEl.textContent = t;
+    });
+  </script>
+</body>
+</html>

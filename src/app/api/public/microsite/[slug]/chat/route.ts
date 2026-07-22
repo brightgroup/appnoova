@@ -28,6 +28,8 @@ import {
 } from "@/lib/billing/meter";
 import { notifyPushForOrg } from "@/lib/push/send";
 import { resolveOrgActiveWhatsAppChannel } from "@/lib/text-notify-team";
+import { getActiveCalendarConnection } from "@/lib/google-calendar/connections-db";
+import { getOrgBusinessHours } from "@/lib/scheduling/business-hours-db";
 
 const PUBLIC_BILLING_FALLBACK =
   "¡Gracias por tu mensaje! En este momento no puedo responder automáticamente, pero un asesor te contactará muy pronto.";
@@ -183,6 +185,10 @@ export async function POST(
     });
   }
 
+  const waChannelForHandoff = billing.organizationId
+    ? await resolveOrgActiveWhatsAppChannel(db, billing.organizationId)
+    : null;
+
   const visitorText = lastUser.content.trim();
   if (detectUserHandoffIntent(visitorText)) {
     const contactLabel = conversationId ? undefined : makeVisitorLabel();
@@ -209,7 +215,9 @@ export async function POST(
         channel,
         agentName: String(agent.name),
         contactLabel: contactLabel ?? null,
-        visitorMessage: visitorText
+        visitorMessage: visitorText,
+        notifyRules: agent.notify_rules,
+        outboundWhatsAppChannel: waChannelForHandoff
       });
     }
     return NextResponse.json({
@@ -241,9 +249,13 @@ export async function POST(
   const temperature = geminiTextTemperature(Number(agent.temperature) || 0.7);
   const maxOutputTokens = Number(agent.max_output_tokens) || 2048;
   const contactLabel = conversationId ? undefined : makeVisitorLabel();
-  const waChannel = billing.organizationId
-    ? await resolveOrgActiveWhatsAppChannel(db, billing.organizationId)
+  const waChannel = waChannelForHandoff;
+  const calendarConnection = billing.organizationId
+    ? await getActiveCalendarConnection(db, billing.organizationId)
     : null;
+  const businessHours = billing.organizationId
+    ? await getOrgBusinessHours(db, billing.organizationId)
+    : undefined;
 
   try {
     const generated = await generateTextAgentReply({
@@ -256,11 +268,16 @@ export async function POST(
       temperature,
       maxOutputTokens,
       notifyRules: agent.notify_rules,
+      schedulingRules: agent.scheduling_rules,
+      businessHours,
+      calendarConnection,
       toolContext: {
         db,
         organizationId: billing.organizationId,
         conversationId: conversationId ?? null,
         channel,
+        agentId: String(agent.id),
+        agentType: "text",
         agentName: String(agent.name),
         contactLabel: contactLabel ?? null,
         outboundWhatsAppChannel: waChannel
@@ -299,7 +316,9 @@ export async function POST(
         channel,
         agentName: String(agent.name),
         contactLabel: contactLabel ?? null,
-        visitorMessage: visitorText
+        visitorMessage: visitorText,
+        notifyRules: agent.notify_rules,
+        outboundWhatsAppChannel: waChannelForHandoff
       });
     }
 

@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { notifyOrgHandoff, channelLabel, type HandoffNotifyContext } from "@/lib/email/notify-handoff";
+import { notifyOrgHandoff, buildHandoffWhatsAppBody, channelLabel, type HandoffNotifyContext } from "@/lib/email/notify-handoff";
 import { notifyPushForOrg } from "@/lib/push/send";
+import { normalizeNotifyTeamRules, type NotifyTeamRules } from "@/lib/text-notify-rules";
+import { sendWhatsAppTemplateMessage } from "@/lib/whatsapp/send-transport";
+import { getApprovedSingleVarTemplate } from "@/lib/whatsapp/notify-template";
+import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 
 /** Mensaje al visitante al pasar a cola humana (sin nombre de asesor). */
 export const HANDOFF_VISITOR_REPLY =
@@ -52,6 +56,10 @@ export interface EscalateHandoffInput {
   agentName?: string | null;
   contactLabel?: string | null;
   visitorMessage?: string | null;
+  /** Reglas de notificación del agente (evento "human_handoff"). Si no se pasa, se asume el default (email+push activos). */
+  notifyRules?: NotifyTeamRules | unknown;
+  /** Canal WhatsApp de la org, para avisar al equipo por ese medio si está activado. */
+  outboundWhatsAppChannel?: WhatsAppChannelRecord | null;
 }
 
 /**
@@ -110,7 +118,12 @@ export async function escalateConversationToHuman(
   const contactLabel = input.contactLabel ?? (row.contact_label ? String(row.contact_label) : null);
   const channel = input.channel || String(row.channel ?? "");
 
-  const result = await notifyOrgHandoff({
+  const rule = normalizeNotifyTeamRules(input.notifyRules).human_handoff!;
+  if (!rule.enabled) {
+    return { escalated: true, emailSent: false };
+  }
+
+  const notifyCtx: HandoffNotifyContext = {
     organizationId: input.organizationId,
     conversationId: input.conversationId,
     channel,
@@ -118,18 +131,52 @@ export async function escalateConversationToHuman(
     contactLabel,
     visitorMessage: input.visitorMessage ?? null,
     reason: input.reason
-  });
+  };
 
-  // Push a todo el equipo con acceso al inbox — no bloquea ni depende del email.
-  void notifyPushForOrg(input.organizationId, {
-    title: "Nueva conversación esperando asesor",
-    body: `${contactLabel || "Visitante"} · ${channelLabel(channel)}`,
-    url: `/m/chats/${input.conversationId}`,
-    tag: `handoff-${input.conversationId}`
-  });
+  let emailSent = false;
+  if (rule.email) {
+    const result = await notifyOrgHandoff(notifyCtx);
+    emailSent = result.sent;
+    if (!result.sent) {
+      console.warn("[handoff] email no enviado:", JSON.stringify(result));
+    }
+  }
 
-  if (!result.sent) {
-    console.warn("[handoff] email no enviado:", JSON.stringify(result));
+  if (rule.push) {
+    // No bloquea ni depende del email.
+    void notifyPushForOrg(input.organizationId, {
+      title: "Nueva conversación esperando asesor",
+      body: `${contactLabel || "Visitante"} · ${channelLabel(channel)}`,
+      url: `/m/chats/${input.conversationId}`,
+      tag: `handoff-${input.conversationId}`
+    });
+  }
+
+  if (rule.whatsapp && rule.whatsapp_destinations.length && input.outboundWhatsAppChannel) {
+    const template = rule.whatsapp_template_id
+      ? await getApprovedSingleVarTemplate(input.db, rule.whatsapp_template_id, input.outboundWhatsAppChannel.id)
+      : null;
+
+    if (!template) {
+      console.warn("[handoff] WhatsApp activo pero sin plantilla aprobada configurada");
+    } else {
+      const body = buildHandoffWhatsAppBody(notifyCtx);
+      for (const toE164 of rule.whatsapp_destinations) {
+        try {
+          await sendWhatsAppTemplateMessage({
+            channel: input.outboundWhatsAppChannel,
+            toE164,
+            contentSid: template.contentSid,
+            contentVariables: { "1": body }
+          });
+        } catch (err) {
+          console.warn("[handoff] whatsapp a", toE164, err instanceof Error ? err.message : err);
+        }
+      }
+    }
+  }
+
+  if (!emailSent) {
     return { escalated: true, emailSent: false };
   }
 
