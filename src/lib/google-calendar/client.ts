@@ -17,9 +17,16 @@ async function withFreshAccessToken(
   const expiresAtMs = conn.tokenExpiresAt ? new Date(conn.tokenExpiresAt).getTime() : 0;
   if (expiresAtMs - Date.now() > 60_000) return conn.accessToken;
 
-  const refreshed = await refreshGoogleAccessToken(conn.refreshToken);
-  await updateCalendarConnectionAccessToken(db, conn.id, refreshed.accessToken, refreshed.expiresInSec);
-  return refreshed.accessToken;
+  try {
+    const refreshed = await refreshGoogleAccessToken(conn.refreshToken);
+    await updateCalendarConnectionAccessToken(db, conn.id, refreshed.accessToken, refreshed.expiresInSec);
+    return refreshed.accessToken;
+  } catch (err) {
+    // Típico en modo Prueba de Google: el refresh_token vence a los 7 días y hay que reconectar.
+    const message = err instanceof Error ? err.message : "Error renovando el token de Google";
+    await markCalendarConnectionError(db, conn, message);
+    throw err;
+  }
 }
 
 async function googleCalendarFetch(
@@ -62,7 +69,7 @@ export async function getFreeBusy(
 
   if (!res.ok) {
     const message = json.error?.message || `Google freeBusy error ${res.status}`;
-    await markCalendarConnectionError(db, conn.id, message);
+    await markCalendarConnectionError(db, conn, message);
     throw new Error(message);
   }
 
@@ -109,7 +116,7 @@ export async function createCalendarEvent(
 
   if (!res.ok || !json.id) {
     const message = json.error?.message || `Google events.insert error ${res.status}`;
-    await markCalendarConnectionError(db, conn.id, message);
+    await markCalendarConnectionError(db, conn, message);
     throw new Error(message);
   }
 

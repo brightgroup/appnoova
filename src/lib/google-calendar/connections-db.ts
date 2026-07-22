@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { decryptToken, encryptToken } from "@/lib/crypto/token-cipher";
+import { notifyCalendarConnectionBroken } from "@/lib/email/notify-calendar-disconnected";
 
 /** Vista pública (sin tokens) — lo único que debe llegar al frontend. */
 export interface CalendarConnectionRecord {
@@ -81,7 +82,14 @@ export async function getCalendarConnectionSecretsById(
     .eq("id", connectionId)
     .maybeSingle();
 
-  return data ? toSecrets(data as CalendarConnectionRow) : null;
+  if (!data) return null;
+  const row = data as CalendarConnectionRow;
+  try {
+    return toSecrets(row);
+  } catch (err) {
+    await handleDecryptFailure(db, row, err);
+    return null;
+  }
 }
 
 export async function getActiveCalendarConnectionSecrets(
@@ -96,7 +104,31 @@ export async function getActiveCalendarConnectionSecrets(
     .eq("status", "active")
     .maybeSingle();
 
-  return data ? toSecrets(data as CalendarConnectionRow) : null;
+  if (!data) return null;
+  const row = data as CalendarConnectionRow;
+  try {
+    return toSecrets(row);
+  } catch (err) {
+    await handleDecryptFailure(db, row, err);
+    return null;
+  }
+}
+
+/**
+ * Si el token guardado no se puede descifrar (típico: `CALENDAR_TOKEN_ENC_KEY`
+ * cambió o no coincide entre entornos), esto pasaba antes en silencio —
+ * ni tocaba Google ni la fila en BD, así que nunca se notificaba ni quedaba
+ * registro. Ahora se trata igual que cualquier otra falla de la conexión.
+ */
+async function handleDecryptFailure(
+  db: SupabaseClient,
+  row: CalendarConnectionRow,
+  err: unknown
+): Promise<void> {
+  const detail = err instanceof Error ? err.message : "error de descifrado";
+  const message = `No se pudo leer el token guardado (${detail}). Probablemente CALENDAR_TOKEN_ENC_KEY cambió o no coincide en este entorno. Reconecta el calendario.`;
+  console.error("[calendar] fallo al descifrar el token guardado:", detail);
+  await markCalendarConnectionError(db, toPublicRecord(row), message);
 }
 
 export interface UpsertCalendarConnectionInput {
@@ -185,15 +217,29 @@ export async function updateCalendarConnectionAccessToken(
     .eq("id", connectionId);
 }
 
+/**
+ * Marca la conexión con error y, solo en la transición activa → error
+ * (nunca en fallos repetidos mientras ya está caída), avisa por correo a
+ * quienes administran Conectores. Acepta el registro completo (no solo el
+ * id) porque necesita `status` previo y `organizationId` para el aviso.
+ */
 export async function markCalendarConnectionError(
   db: SupabaseClient,
-  connectionId: string,
+  connection: Pick<CalendarConnectionRecord, "id" | "organizationId" | "status">,
   message: string
 ): Promise<void> {
+  const wasActive = connection.status === "active";
+
   await db
     .from("calendar_connections")
     .update({ status: "error", last_error: message.slice(0, 500), updated_at: new Date().toISOString() })
-    .eq("id", connectionId);
+    .eq("id", connection.id);
+
+  if (wasActive) {
+    void notifyCalendarConnectionBroken(connection.organizationId, message).catch(err =>
+      console.warn("[calendar] notifyCalendarConnectionBroken:", err)
+    );
+  }
 }
 
 export async function disconnectCalendarConnection(

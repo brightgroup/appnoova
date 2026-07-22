@@ -16,9 +16,15 @@ export function googleCalendarRedirectUri(): string {
   return `${getAppBaseUrl()}/api/conectores/google-calendar/callback`;
 }
 
-/** Scopes: eventos + lectura de calendario (freebusy) + email para mostrar la cuenta conectada. */
+/**
+ * Scopes: eventos (crear citas) + freebusy (solo consultar disponibilidad,
+ * nunca leemos el detalle de los eventos) + email para mostrar la cuenta
+ * conectada. `calendar.freebusy` es más angosto que `calendar.readonly` —
+ * coincide exactamente con lo único que usamos (`getFreeBusy`), lo que
+ * simplifica la justificación ante la revisión de Google.
+ */
 export const GOOGLE_CALENDAR_SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
-  "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/calendar.freebusy",
   "https://www.googleapis.com/auth/userinfo.email"
 ];
