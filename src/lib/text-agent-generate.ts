@@ -67,9 +67,18 @@ export async function generateTextAgentReply(
   const enabledTools = resolveEnabledTools(ALL_TEXT_AGENT_TOOLS, rulesCtx);
   const toolsEnabled = enabledTools.length > 0;
   const toolsPromptBlock = buildToolsPromptBlock(enabledTools, rulesCtx);
-  const systemInstruction = toolsPromptBlock
-    ? `${input.systemInstruction}\n\n${toolsPromptBlock}`
-    : input.systemInstruction;
+
+  // El agente tiene agendamiento activado pero sin calendario conectado (o caído):
+  // sin esto, el modelo no tiene ninguna señal de que el agendamiento existe y
+  // termina inventando una confirmación de cita que nunca se creó en ningún lado.
+  const schedulingUnavailableBlock =
+    rulesCtx.schedulingRules.enabled && !rulesCtx.calendarConnection
+      ? "IMPORTANTE — Agendamiento no disponible ahora mismo: el calendario está desconectado por un problema técnico. Si el usuario pide agendar una cita, discúlpate, explica que hay un inconveniente técnico y ofrece que un asesor humano lo contacte para coordinarla manualmente. NUNCA digas que la cita quedó agendada o confirmada: no tienes forma de agendarla en este momento."
+      : "";
+
+  const systemInstruction = [input.systemInstruction, toolsPromptBlock, schedulingUnavailableBlock]
+    .filter(block => block.trim().length > 0)
+    .join("\n\n");
 
   const ai = new GoogleGenAI({ apiKey });
   const contents = toGeminiContents(input.messages);

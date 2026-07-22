@@ -57,6 +57,15 @@ function toSecrets(row: CalendarConnectionRow): CalendarConnectionSecrets {
   };
 }
 
+/**
+ * Trae la conexión de la org salvo que el usuario la haya desconectado a
+ * propósito. A propósito NO filtra por status = "active": una conexión en
+ * "error" (ej. una falla transitoria de Google, o una env var que se acaba
+ * de corregir) debe poder reintentarse en el próximo uso — si no, una vez
+ * cae queda muerta para siempre porque nada la reactiva sola (el único
+ * camino sería reconectar por OAuth desde cero). El estado real para
+ * mostrarle al usuario sigue disponible en `status`/`lastError`.
+ */
 export async function getActiveCalendarConnection(
   db: SupabaseClient,
   organizationId: string
@@ -66,7 +75,7 @@ export async function getActiveCalendarConnection(
     .select("*")
     .eq("organization_id", organizationId)
     .eq("provider", "google")
-    .eq("status", "active")
+    .neq("status", "disconnected")
     .maybeSingle();
 
   return data ? toPublicRecord(data as CalendarConnectionRow) : null;
