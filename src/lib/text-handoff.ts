@@ -39,6 +39,41 @@ export function detectAssistantHandoffOffer(text: string): boolean {
   return ASSISTANT_HANDOFF_PATTERNS.some(p => p.test(t));
 }
 
+/** Minutos sin respuesta humana tras los cuales la conversación vuelve sola a la IA. */
+export const HUMAN_HANDOFF_AUTO_RETURN_MS = 30 * 60 * 1000;
+
+/**
+ * Milisegundos que lleva el visitante esperando sin respuesta humana: tiempo
+ * desde el primer mensaje de usuario sin contestar tras la última respuesta
+ * humana o de la IA. Null si el último turno ya fue respondido (nadie está
+ * esperando en este momento).
+ */
+export function getHumanHandoffPendingSinceMs(
+  messages: Array<{ role: string; created_at?: string | null }>
+): number | null {
+  let pendingAt: number | null = null;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== "user") break;
+    const t = m.created_at ? new Date(m.created_at).getTime() : NaN;
+    if (!Number.isNaN(t)) pendingAt = t;
+  }
+  return pendingAt;
+}
+
+/**
+ * Si un humano tomó la conversación pero lleva demasiado tiempo sin contestar
+ * al visitante, se devuelve sola a la IA para que el contacto nunca se quede
+ * sin respuesta de nadie (ver `getHumanHandoffPendingSinceMs`).
+ */
+export function shouldAutoReturnToAi(
+  messages: Array<{ role: string; created_at?: string | null }>
+): boolean {
+  const pendingAt = getHumanHandoffPendingSinceMs(messages);
+  if (pendingAt === null) return false;
+  return Date.now() - pendingAt > HUMAN_HANDOFF_AUTO_RETURN_MS;
+}
+
 function asMeta(raw: unknown): Record<string, unknown> {
   if (raw && typeof raw === "object" && !Array.isArray(raw)) {
     return { ...(raw as Record<string, unknown>) };

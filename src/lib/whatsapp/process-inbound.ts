@@ -15,6 +15,7 @@ import {
   detectAssistantHandoffOffer,
   detectUserHandoffIntent,
   escalateConversationToHuman,
+  shouldAutoReturnToAi,
   HANDOFF_VISITOR_REPLY
 } from "@/lib/text-handoff";
 import {
@@ -278,8 +279,8 @@ export async function processTwilioWhatsAppInbound(
     return { ok: true };
   }
 
-  // —— Modo humano ——
-  if (existing?.handoff_mode === "human") {
+  // —— Modo humano —— (si nadie del equipo respondió a tiempo, se devuelve sola a la IA más abajo)
+  if (existing?.handoff_mode === "human" && !shouldAutoReturnToAi(existing.messages ?? [])) {
     const persisted = await persistUserMessageOnly({
       db,
       userId: channel.user_id,
