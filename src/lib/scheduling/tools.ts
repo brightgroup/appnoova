@@ -50,11 +50,29 @@ export const buscarHorariosDisponiblesTool: AgentToolDefinition = {
     const rules = ctx.schedulingRules;
     const hours = ctx.businessHours;
     const now = new Date();
-    const timeMax = new Date(now.getTime() + hours.max_days_ahead * 86_400_000);
+
+    // Si el cliente pidió una fecha puntual, la búsqueda debe arrancar ahí — si no,
+    // como el resultado se corta en los primeros 6 horarios cronológicos, un día
+    // cercano con mucha disponibilidad (ej. mañana) tapa por completo cualquier
+    // fecha posterior (ej. pasado mañana), y el agente termina diciendo "sin
+    // horarios" para un día que en realidad sí tiene cupo.
+    const fechaDeseada = String(args.fecha_deseada ?? "").trim();
+    let searchFrom = now;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(fechaDeseada)) {
+      const requestedMs = new Date(bogotaLocalToUtcIso(fechaDeseada, "00:00")).getTime();
+      if (Number.isFinite(requestedMs) && requestedMs > now.getTime()) {
+        searchFrom = new Date(requestedMs);
+      }
+    }
+    const daysAheadFromRequested = Math.max(
+      0,
+      hours.max_days_ahead - Math.floor((searchFrom.getTime() - now.getTime()) / 86_400_000)
+    );
+    const timeMax = new Date(searchFrom.getTime() + daysAheadFromRequested * 86_400_000);
 
     let busy: BusyInterval[];
     try {
-      busy = await getFreeBusy(ctx.db, secrets, now.toISOString(), timeMax.toISOString());
+      busy = await getFreeBusy(ctx.db, secrets, searchFrom.toISOString(), timeMax.toISOString());
     } catch (err) {
       return {
         ok: false,
@@ -62,7 +80,13 @@ export const buscarHorariosDisponiblesTool: AgentToolDefinition = {
       };
     }
 
-    const slots = computeCandidateSlots(hours, rules, busy, now, { maxResults: 6 });
+    const slots = computeCandidateSlots(
+      { ...hours, max_days_ahead: daysAheadFromRequested },
+      rules,
+      busy,
+      searchFrom,
+      { maxResults: 6 }
+    );
     if (!slots.length) {
       return { ok: true, slots: [], reason: "No hay horarios disponibles en el rango configurado" };
     }
