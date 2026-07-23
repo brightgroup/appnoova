@@ -479,7 +479,11 @@ export async function processTwilioWhatsAppInbound(
   if (userPersist.error) return { ok: false, error: userPersist.error };
 
   // Best-effort: los "puntos de escribiendo" nativos de WhatsApp mientras el agente genera la respuesta.
-  void sendWhatsAppTypingIndicator({ channel, messageId: inbound.messageSid, db }).catch(err =>
+  // Se espera a que Twilio confirme el envío (no fire-and-forget) para que quede garantizado
+  // ANTES de la respuesta real — si no, con Gemini respondiendo rápido (sin "thinking"), el
+  // mensaje real puede alcanzar al indicador y WhatsApp nunca llega a mostrar la animación.
+  const typingStartedAt = Date.now();
+  await sendWhatsAppTypingIndicator({ channel, messageId: inbound.messageSid, db }).catch(err =>
     console.warn("[whatsapp] typing indicator:", err instanceof Error ? err.message : err)
   );
 
@@ -596,6 +600,14 @@ export async function processTwilioWhatsAppInbound(
   void enrichCrmLeadForConversationId(db, channel.user_id, userPersist.conversationId).catch(err =>
     console.error("[whatsapp/inbound] crm lead enrich (post-ai):", err)
   );
+
+  // Le da tiempo al indicador de "escribiendo…" de mostrarse de verdad antes de reemplazarlo
+  // con la respuesta — sin esto, una respuesta muy rápida de Gemini lo deja invisible.
+  const elapsedSinceTyping = Date.now() - typingStartedAt;
+  const MIN_TYPING_VISIBLE_MS = 1800;
+  if (elapsedSinceTyping < MIN_TYPING_VISIBLE_MS) {
+    await new Promise(resolve => setTimeout(resolve, MIN_TYPING_VISIBLE_MS - elapsedSinceTyping));
+  }
 
   const sendResult = await sendWhatsAppIfAllowed(
     db,
