@@ -12,6 +12,11 @@ export function isGoogleCalendarConfigured(): boolean {
   return Boolean(getGoogleCalendarClientId() && getGoogleCalendarClientSecret());
 }
 
+/** Cuenta de Workspace de Noova que suplanta la cuenta de servicio para crear/compartir calendarios "hosted". */
+export function getHostedCalendarOwnerEmail(): string | null {
+  return process.env.GOOGLE_CALENDAR_HOSTED_OWNER_EMAIL?.trim() || null;
+}
+
 export function googleCalendarRedirectUri(): string {
   return `${getAppBaseUrl()}/api/conectores/google-calendar/callback`;
 }

@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { decryptToken, encryptToken } from "@/lib/crypto/token-cipher";
 import { notifyCalendarConnectionBroken } from "@/lib/email/notify-calendar-disconnected";
+import { mintDelegatedAccessToken } from "@/lib/google-calendar/service-account";
+
+const HOSTED_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
 
 /** Vista pública (sin tokens) — lo único que debe llegar al frontend. */
 export interface CalendarConnectionRecord {
@@ -12,6 +15,10 @@ export interface CalendarConnectionRecord {
   status: "active" | "disconnected" | "error";
   lastError: string | null;
   updatedAt: string;
+  /** 'oauth': el cliente conectó su propia cuenta. 'hosted': calendario creado y compartido por Noova (delegación de dominio). */
+  connectionMode: "oauth" | "hosted";
+  /** Solo en modo hosted: correo del cliente al que se compartió el calendario. */
+  sharedWithEmail: string | null;
 }
 
 /** Con tokens en claro — solo para uso interno del servidor (llamadas a Google API). */
@@ -26,13 +33,15 @@ interface CalendarConnectionRow {
   organization_id: string;
   provider: string;
   google_email: string | null;
-  access_token_enc: string;
-  refresh_token_enc: string;
+  access_token_enc: string | null;
+  refresh_token_enc: string | null;
   token_expires_at: string | null;
   calendar_id: string;
   status: string;
   last_error: string | null;
   updated_at: string;
+  connection_mode: string;
+  shared_with_email: string | null;
 }
 
 function toPublicRecord(row: CalendarConnectionRow): CalendarConnectionRecord {
@@ -44,13 +53,32 @@ function toPublicRecord(row: CalendarConnectionRow): CalendarConnectionRecord {
     calendarId: row.calendar_id,
     status: row.status as CalendarConnectionRecord["status"],
     lastError: row.last_error,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    connectionMode: (row.connection_mode as CalendarConnectionRecord["connectionMode"]) || "oauth",
+    sharedWithEmail: row.shared_with_email
   };
 }
 
-function toSecrets(row: CalendarConnectionRow): CalendarConnectionSecrets {
+/** En modo hosted no hay tokens guardados: se emite un access token delegado fresco en cada uso. */
+async function toSecrets(row: CalendarConnectionRow): Promise<CalendarConnectionSecrets> {
+  const publicRecord = toPublicRecord(row);
+
+  if (publicRecord.connectionMode === "hosted") {
+    if (!row.google_email) throw new Error("Conexión hosted sin cuenta de Workspace asociada");
+    const { accessToken, expiresInSec } = await mintDelegatedAccessToken(row.google_email, HOSTED_CALENDAR_SCOPE);
+    return {
+      ...publicRecord,
+      accessToken,
+      refreshToken: "",
+      tokenExpiresAt: new Date(Date.now() + expiresInSec * 1000).toISOString()
+    };
+  }
+
+  if (!row.access_token_enc || !row.refresh_token_enc) {
+    throw new Error("Conexión OAuth sin tokens guardados");
+  }
   return {
-    ...toPublicRecord(row),
+    ...publicRecord,
     accessToken: decryptToken(row.access_token_enc),
     refreshToken: decryptToken(row.refresh_token_enc),
     tokenExpiresAt: row.token_expires_at
@@ -94,7 +122,7 @@ export async function getCalendarConnectionSecretsById(
   if (!data) return null;
   const row = data as CalendarConnectionRow;
   try {
-    return toSecrets(row);
+    return await toSecrets(row);
   } catch (err) {
     await handleDecryptFailure(db, row, err);
     return null;
@@ -116,7 +144,7 @@ export async function getActiveCalendarConnectionSecrets(
   if (!data) return null;
   const row = data as CalendarConnectionRow;
   try {
-    return toSecrets(row);
+    return await toSecrets(row);
   } catch (err) {
     await handleDecryptFailure(db, row, err);
     return null;
@@ -124,19 +152,24 @@ export async function getActiveCalendarConnectionSecrets(
 }
 
 /**
- * Si el token guardado no se puede descifrar (típico: `CALENDAR_TOKEN_ENC_KEY`
- * cambió o no coincide entre entornos), esto pasaba antes en silencio —
- * ni tocaba Google ni la fila en BD, así que nunca se notificaba ni quedaba
- * registro. Ahora se trata igual que cualquier otra falla de la conexión.
+ * Si no se pueden obtener credenciales utilizables (OAuth: el token guardado
+ * no se puede descifrar, típico si `CALENDAR_TOKEN_ENC_KEY` cambió; hosted:
+ * la cuenta de servicio con delegación de dominio falló), esto pasaba antes
+ * en silencio — ni tocaba Google ni la fila en BD, así que nunca se
+ * notificaba ni quedaba registro. Ahora se trata igual que cualquier otra
+ * falla de la conexión.
  */
 async function handleDecryptFailure(
   db: SupabaseClient,
   row: CalendarConnectionRow,
   err: unknown
 ): Promise<void> {
-  const detail = err instanceof Error ? err.message : "error de descifrado";
-  const message = `No se pudo leer el token guardado (${detail}). Probablemente CALENDAR_TOKEN_ENC_KEY cambió o no coincide en este entorno. Reconecta el calendario.`;
-  console.error("[calendar] fallo al descifrar el token guardado:", detail);
+  const detail = err instanceof Error ? err.message : "error desconocido";
+  const message =
+    row.connection_mode === "hosted"
+      ? `No se pudo autenticar el calendario alojado por Noova (${detail}). Revisa la cuenta de servicio y la delegación de dominio.`
+      : `No se pudo leer el token guardado (${detail}). Probablemente CALENDAR_TOKEN_ENC_KEY cambió o no coincide en este entorno. Reconecta el calendario.`;
+  console.error("[calendar] fallo obteniendo credenciales:", detail);
   await markCalendarConnectionError(db, toPublicRecord(row), message);
 }
 
@@ -260,4 +293,52 @@ export async function disconnectCalendarConnection(
     .update({ status: "disconnected", updated_at: new Date().toISOString() })
     .eq("organization_id", organizationId)
     .eq("provider", "google");
+}
+
+export interface HostedCalendarConnectionInput {
+  organizationId: string;
+  /** Cuenta de Workspace bajo la cual se crea el calendario (dueña real ante Google). */
+  impersonateEmail: string;
+  /** Correo del cliente al que se comparte el calendario creado. */
+  sharedWithEmail: string;
+  calendarId: string;
+}
+
+/** Persiste una conexión en modo "hosted" ya creada en Google (ver `createHostedCalendar`). */
+export async function upsertHostedCalendarConnection(
+  db: SupabaseClient,
+  input: HostedCalendarConnectionInput
+): Promise<CalendarConnectionRecord> {
+  const { data: existing } = await db
+    .from("calendar_connections")
+    .select("id")
+    .eq("organization_id", input.organizationId)
+    .eq("provider", "google")
+    .maybeSingle();
+
+  const row = {
+    organization_id: input.organizationId,
+    provider: "google",
+    connection_mode: "hosted",
+    google_email: input.impersonateEmail,
+    shared_with_email: input.sharedWithEmail,
+    calendar_id: input.calendarId,
+    access_token_enc: null,
+    refresh_token_enc: null,
+    token_expires_at: null,
+    scope: HOSTED_CALENDAR_SCOPE,
+    status: "active",
+    last_error: null,
+    updated_at: new Date().toISOString()
+  };
+
+  const { data, error } = existing?.id
+    ? await db.from("calendar_connections").update(row).eq("id", existing.id).select("*").single()
+    : await db.from("calendar_connections").insert(row).select("*").single();
+
+  if (error || !data) {
+    throw new Error(error?.message || "Error guardando la conexión hosted de calendario");
+  }
+
+  return toPublicRecord(data as CalendarConnectionRow);
 }

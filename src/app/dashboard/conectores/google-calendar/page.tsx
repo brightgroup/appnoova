@@ -15,6 +15,8 @@ interface CalendarConnection {
   status: "active" | "disconnected" | "error";
   lastError: string | null;
   updatedAt: string;
+  connectionMode: "oauth" | "hosted";
+  sharedWithEmail: string | null;
 }
 
 const ERROR_LABELS: Record<string, string> = {
@@ -33,6 +35,8 @@ function GoogleCalendarConectorContent() {
   const [configured, setConfigured] = useState(true);
   const [connection, setConnection] = useState<CalendarConnection | null>(null);
   const [banner, setBanner] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const [hostedEmail, setHostedEmail] = useState("");
+  const [creatingHosted, setCreatingHosted] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,7 +96,33 @@ function GoogleCalendarConectorContent() {
     }
   }
 
+  async function handleCreateHosted() {
+    setCreatingHosted(true);
+    setBanner(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/conectores/google-calendar/hosted", {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ shared_with_email: hostedEmail.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setBanner({ kind: "error", text: data.error || "No se pudo crear el calendario." });
+        return;
+      }
+      setBanner({ kind: "success", text: `Calendario creado y compartido con ${hostedEmail.trim()}.` });
+      setHostedEmail("");
+      await load();
+    } catch {
+      setBanner({ kind: "error", text: "Error de red al crear el calendario." });
+    } finally {
+      setCreatingHosted(false);
+    }
+  }
+
   const isActive = connection?.status === "active";
+  const isHosted = connection?.connectionMode === "hosted";
 
   return (
     <ChannelListPage
@@ -128,7 +158,10 @@ function GoogleCalendarConectorContent() {
               {isActive ? (
                 <>
                   <p className="text-xs text-emerald-400 flex items-center gap-1.5 mt-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Conectado — {connection?.googleEmail || "cuenta de Google"}
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {isHosted
+                      ? `Conectado — calendario de Noova compartido con ${connection?.sharedWithEmail}`
+                      : `Conectado — ${connection?.googleEmail || "cuenta de Google"}`}
                   </p>
                   <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
                     Tus agentes con &quot;Agendamiento&quot; activado ya pueden ofrecer horarios y crear citas en
@@ -163,6 +196,33 @@ function GoogleCalendarConectorContent() {
               </button>
             )}
           </div>
+
+          {!isActive && (
+            <div className="mt-5 pt-5 border-t border-white/[.08]">
+              <p className="text-xs font-medium text-white">¿No quieres conectar tu cuenta de Google?</p>
+              <p className="text-[11px] text-gray-500 mt-1 mb-3 leading-relaxed">
+                Te creamos un calendario y te lo compartimos a tu correo — te aparece en tu Google Calendar
+                como uno más, sin necesidad de conectar ni volver a autorizar nada.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={hostedEmail}
+                  onChange={e => setHostedEmail(e.target.value)}
+                  placeholder="tu-correo@empresa.com"
+                  className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-black/20 border border-white/[.08] text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-[#5b5bf6]/50"
+                />
+                <button
+                  onClick={handleCreateHosted}
+                  disabled={creatingHosted || !hostedEmail.trim()}
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-white bg-[#5b5bf6]/15 hover:bg-[#5b5bf6]/25 border border-[#5b5bf6]/30 disabled:opacity-50"
+                >
+                  {creatingHosted ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Calendar className="w-3.5 h-3.5" />}
+                  Usar calendario de Noova
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </ChannelListPage>
