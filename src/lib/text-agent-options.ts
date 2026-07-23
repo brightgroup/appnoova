@@ -15,10 +15,10 @@ export const DEFAULT_TEXT_MODEL = ORI_DEFAULT_MODEL;
  * que nunca corten una respuesta bien dentro de lo esperado.
  */
 export const TEXT_OUTPUT_TOKEN_OPTIONS = [
-  { id: 100, label: "Muy corto — objetivo ~20 palabras (tope 100 tokens)" },
-  { id: 150, label: "Corto — objetivo ~40 palabras (tope 150 tokens)" },
-  { id: 250, label: "Medio — objetivo ~70 palabras (tope 250 tokens)" },
-  { id: 500, label: "Amplio — objetivo ~150 palabras (tope 500 tokens)" },
-  { id: 1024, label: "Estándar (por defecto) — objetivo ~300 palabras (tope 1024 tokens)" },
-  { id: 4096, label: "Largo — objetivo 600+ palabras (tope 4096 tokens)" }
+  { id: 100, label: "100 tokens" },
+  { id: 150, label: "150 tokens" },
+  { id: 250, label: "250 tokens" },
+  { id: 500, label: "500 tokens" },
+  { id: 1024, label: "1024 tokens (por defecto)" },
+  { id: 4096, label: "4096 tokens" }
 ] as const;
