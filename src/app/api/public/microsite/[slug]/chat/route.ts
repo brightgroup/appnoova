@@ -247,7 +247,7 @@ export async function POST(
   const temporal = buildColombiaTemporalContext();
   const systemInstruction = `${temporal.promptBlock}\n\n${mergeCompanyContext(promptWithCatalog, companyContextText)}`;
   const temperature = geminiTextTemperature(Number(agent.temperature) || 0.7);
-  const maxOutputTokens = Number(agent.max_output_tokens) || 2048;
+  const maxOutputTokens = Number(agent.max_output_tokens) || 1024;
   const contactLabel = conversationId ? undefined : makeVisitorLabel();
   const waChannel = waChannelForHandoff;
   const calendarConnection = billing.organizationId

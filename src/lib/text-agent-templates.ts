@@ -54,7 +54,7 @@ export function getTextTemplateDefaults(templateId: string): TextAgentFormData {
     company_context_id: null,
     temperature: 0.7,
     llm_model: DEFAULT_TEXT_MODEL,
-    max_output_tokens: 2048,
+    max_output_tokens: 1024,
     color: t.color,
   };
 }

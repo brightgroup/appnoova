@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
   const systemInstruction = `${temporal.promptBlock}\n\n${mergedPrompt}`;
   const model = String(agent.llm_model || "gemini-2.5-flash");
   const temperature = geminiTextTemperature(Number(agent.temperature) || 0.7);
-  const maxOutputTokens = Number(agent.max_output_tokens) || 2048;
+  const maxOutputTokens = Number(agent.max_output_tokens) || 1024;
   const orgId = billing.organizationId || String(agent.organization_id || "");
   const waChannel = orgId ? await resolveOrgActiveWhatsAppChannel(db, orgId) : null;
   const calendarConnection = orgId ? await getActiveCalendarConnection(db, orgId) : null;

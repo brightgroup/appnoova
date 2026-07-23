@@ -547,7 +547,7 @@ export async function processTwilioWhatsAppInbound(
         content: m.content
       })),
       temperature: geminiTextTemperature(Number(agent.temperature) || 0.7),
-      maxOutputTokens: Number(agent.max_output_tokens) || 2048,
+      maxOutputTokens: Number(agent.max_output_tokens) || 1024,
       notifyRules: agent.notify_rules,
       schedulingRules: agent.scheduling_rules,
       businessHours,
