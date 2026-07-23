@@ -350,6 +350,11 @@ function ConfigContent() {
                     label: o.label
                   }))}
                 />
+                <p className="text-[10px] text-gray-500 mt-1.5 leading-relaxed">
+                  Es un tope de seguridad, no el control real del largo de la respuesta — eso lo define el
+                  prompt del agente. Elige una opción con margen sobre lo que esperas, para que nunca se
+                  corte una respuesta a media frase.
+                </p>
               </Field>
             </div>
 
