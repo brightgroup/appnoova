@@ -4,6 +4,7 @@ import { notifyPushForOrg } from "@/lib/push/send";
 import { normalizeNotifyTeamRules, type NotifyTeamRules } from "@/lib/text-notify-rules";
 import { sendWhatsAppTemplateMessage } from "@/lib/whatsapp/send-transport";
 import { getApprovedSingleVarTemplate } from "@/lib/whatsapp/notify-template";
+import { getOrgInboxTeamUserIds } from "@/lib/push/team";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 
 /** Mensaje al visitante al pasar a cola humana (sin nombre de asesor). */
@@ -82,6 +83,33 @@ export function shouldAutoReturnToAi(
   return Date.now() - pendingAt > HUMAN_HANDOFF_AUTO_RETURN_MS;
 }
 
+/**
+ * Si la organización tiene un solo miembro con acceso al inbox, no hay
+ * ambigüedad de "a quién" asignar — se le asigna directo para no meter
+ * fricción innecesaria (reclamarla manualmente) cuando no hay nadie más a
+ * quien pudiera haberle tocado. Con 2+ miembros (o ninguno) se deja como
+ * cola compartida sin asignar, para no asignarle a alguien que esté
+ * ausente mientras el resto del equipo no la ve como pendiente.
+ */
+async function resolveSoleInboxAssignee(
+  db: SupabaseClient,
+  organizationId: string
+): Promise<string | null> {
+  const userIds = await getOrgInboxTeamUserIds(organizationId);
+  if (userIds.length !== 1) return null;
+
+  const { data: profile } = await db
+    .from("profiles")
+    .select("full_name, email")
+    .eq("id", userIds[0])
+    .maybeSingle();
+
+  const name = String(profile?.full_name ?? "").trim();
+  if (name) return name;
+  const email = String(profile?.email ?? "").trim();
+  return email || null;
+}
+
 function asMeta(raw: unknown): Record<string, unknown> {
   if (raw && typeof raw === "object" && !Array.isArray(raw)) {
     return { ...(raw as Record<string, unknown>) };
@@ -106,8 +134,10 @@ export interface EscalateHandoffInput {
 }
 
 /**
- * Marca la conversación en modo humano sin asignar a nadie,
- * y notifica por email al equipo de la org (una sola vez).
+ * Marca la conversación en modo humano — asignada directo si la org tiene
+ * un solo miembro con acceso al inbox (ver `resolveSoleInboxAssignee`), o
+ * como cola compartida sin asignar si hay varios — y notifica por email al
+ * equipo de la org (una sola vez).
  */
 export async function escalateConversationToHuman(
   input: EscalateHandoffInput
@@ -136,12 +166,16 @@ export async function escalateConversationToHuman(
 
   const unread = Math.max(1, Number(row.unread_count) || 0);
 
+  const soleAssignee = input.organizationId
+    ? await resolveSoleInboxAssignee(input.db, input.organizationId)
+    : null;
+
   const { error: updateErr } = await input.db
     .from("text_agent_conversations")
     .update({
       handoff_mode: "human",
-      assigned_to: null,
-      status_label: "Esperando asesor",
+      assigned_to: soleAssignee,
+      status_label: soleAssignee ? "Atendido por humano" : "Esperando asesor",
       unread_count: unread < 1 ? 1 : unread,
       metadata: nextMeta,
       updated_at: nowIso
