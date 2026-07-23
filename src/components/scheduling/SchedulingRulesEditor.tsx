@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarClock, CheckCircle2, ExternalLink, Loader2, Info } from "lucide-react";
+import { CalendarClock, CheckCircle2, ExternalLink, Loader2, Info, Video } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { InfoBox } from "@/components/ui/InfoBox";
 import { defaultSchedulingRules, type SchedulingRules } from "@/lib/scheduling/rules";
@@ -112,6 +112,24 @@ export function SchedulingRulesEditor({ value, onChange }: SchedulingRulesEditor
                 onChange={v => patch({ buffer_min: v })}
               />
             </div>
+
+            <label className="flex items-start gap-3 cursor-pointer rounded-xl bg-white/[.03] border border-white/[.06] px-4 py-3">
+              <input
+                type="checkbox"
+                checked={rules.create_meet_link}
+                onChange={e => patch({ create_meet_link: e.target.checked })}
+                className="mt-0.5 rounded border-white/20 w-4 h-4"
+              />
+              <span>
+                <span className="flex items-center gap-1.5 text-xs font-medium text-gray-300">
+                  <Video className="w-3.5 h-3.5 text-[#5b5bf6]" /> Crear como reunión de Google Meet
+                </span>
+                <span className="block text-[11px] text-gray-500 leading-relaxed mt-0.5">
+                  En vez de un evento simple, cada cita se crea con un enlace de videollamada que se le
+                  comparte al cliente. Útil si atiendes citas de forma virtual.
+                </span>
+              </span>
+            </label>
 
             <div className="flex items-center justify-between rounded-xl bg-white/[.03] border border-white/[.06] px-4 py-3">
               <div>

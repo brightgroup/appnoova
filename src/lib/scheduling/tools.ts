@@ -186,7 +186,9 @@ export const crearCitaTool: AgentToolDefinition = {
         summary: title,
         description,
         startIso,
-        endIso
+        endIso,
+        createMeetLink: rules.create_meet_link,
+        attendeeEmail: correo
       });
     } catch (err) {
       return {
@@ -246,7 +248,8 @@ export const crearCitaTool: AgentToolDefinition = {
           contactName: nombre,
           organizationName: org?.name ? String(org.name) : null,
           whenLabel,
-          reason: motivo || null
+          reason: motivo || null,
+          meetLink: googleEvent.meetLink
         });
         contactEmailSent = emailResult.sent;
       } catch (err) {
@@ -260,7 +263,8 @@ export const crearCitaTool: AgentToolDefinition = {
       google_event_id: googleEvent.id,
       when_label: whenLabel,
       team_notified: notifyResult.ok && !notifyResult.skipped,
-      contact_email_sent: contactEmailSent
+      contact_email_sent: contactEmailSent,
+      meet_link: googleEvent.meetLink
     };
   }
 };

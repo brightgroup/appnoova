@@ -110,6 +110,8 @@ export interface SchedulingRules {
   buffer_min: number;
   /** Plantilla del título del evento. Variables: {nombre}, {motivo}. */
   event_title_template: string;
+  /** Si es true, la cita se crea como reunión de Google Meet (con link) en vez de un evento simple. */
+  create_meet_link: boolean;
 }
 
 export function defaultSchedulingRules(): SchedulingRules {
@@ -118,7 +120,8 @@ export function defaultSchedulingRules(): SchedulingRules {
     calendar_connection_id: null,
     event_duration_min: 30,
     buffer_min: 0,
-    event_title_template: "Cita: {nombre} — {motivo}"
+    event_title_template: "Cita: {nombre} — {motivo}",
+    create_meet_link: false
   };
 }
 
@@ -141,7 +144,8 @@ export function normalizeSchedulingRules(raw: unknown): SchedulingRules {
     event_title_template:
       typeof r.event_title_template === "string" && r.event_title_template.trim()
         ? r.event_title_template.trim()
-        : base.event_title_template
+        : base.event_title_template,
+    create_meet_link: Boolean(r.create_meet_link)
   };
 }
 
@@ -159,6 +163,7 @@ Puedes agendar citas en el calendario real de la empresa. Reglas:
 - Cuando el cliente confirme el horario, llama \`crear_cita\` con los datos que tengas.
 - Si \`crear_cita\` falla (ej. el horario ya se ocupó), dilo con naturalidad y vuelve a \`buscar_horarios_disponibles\`.
 - No agendes dos veces la misma cita en la misma conversación.
+${rules.create_meet_link ? '- Esta cita es una reunión virtual: si el resultado de `crear_cita` trae `meet_link`, compártelo con el cliente como el enlace para conectarse a la reunión.' : ""}
 `.trim();
 }
 

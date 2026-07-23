@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { randomUUID } from "crypto";
 import { refreshGoogleAccessToken } from "@/lib/google-calendar/oauth";
 import {
   markCalendarConnectionError,
@@ -81,11 +82,17 @@ export interface CreateCalendarEventInput {
   description?: string;
   startIso: string;
   endIso: string;
+  /** Si es true, pide a Google que genere una reunión de Meet asociada al evento. */
+  createMeetLink?: boolean;
+  /** Si se pasa, se agrega como invitado del evento — Google le manda el correo de invitación nativo (con el link de Meet si aplica). */
+  attendeeEmail?: string | null;
 }
 
 export interface CreateCalendarEventResult {
   id: string;
   htmlLink: string | null;
+  /** Link de Google Meet, solo si `createMeetLink` se pidió y Google lo generó. */
+  meetLink: string | null;
 }
 
 export async function createCalendarEvent(
@@ -93,24 +100,36 @@ export async function createCalendarEvent(
   conn: CalendarConnectionSecrets,
   input: CreateCalendarEventInput
 ): Promise<CreateCalendarEventResult> {
-  const res = await googleCalendarFetch(
-    db,
-    conn,
-    `/calendars/${encodeURIComponent(conn.calendarId)}/events`,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        summary: input.summary,
-        description: input.description ?? "",
-        start: { dateTime: input.startIso },
-        end: { dateTime: input.endIso }
-      })
-    }
-  );
+  const query = new URLSearchParams();
+  if (input.createMeetLink) query.set("conferenceDataVersion", "1");
+  if (input.attendeeEmail) query.set("sendUpdates", "all");
+  const path = `/calendars/${encodeURIComponent(conn.calendarId)}/events${query.size ? `?${query}` : ""}`;
+
+  const res = await googleCalendarFetch(db, conn, path, {
+    method: "POST",
+    body: JSON.stringify({
+      summary: input.summary,
+      description: input.description ?? "",
+      start: { dateTime: input.startIso },
+      end: { dateTime: input.endIso },
+      ...(input.attendeeEmail ? { attendees: [{ email: input.attendeeEmail }] } : {}),
+      ...(input.createMeetLink
+        ? {
+            conferenceData: {
+              createRequest: {
+                requestId: randomUUID(),
+                conferenceSolutionKey: { type: "hangoutsMeet" }
+              }
+            }
+          }
+        : {})
+    })
+  });
 
   const json = (await res.json().catch(() => ({}))) as {
     id?: string;
     htmlLink?: string;
+    conferenceData?: { entryPoints?: { entryPointType?: string; uri?: string }[] };
     error?: { message?: string };
   };
 
@@ -120,5 +139,8 @@ export async function createCalendarEvent(
     throw new Error(message);
   }
 
-  return { id: json.id, htmlLink: json.htmlLink ?? null };
+  const meetLink =
+    json.conferenceData?.entryPoints?.find(e => e.entryPointType === "video")?.uri ?? null;
+
+  return { id: json.id, htmlLink: json.htmlLink ?? null, meetLink };
 }

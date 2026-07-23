@@ -1,4 +1,4 @@
-import { sendEmail, type SendEmailResult } from "@/lib/email/send";
+import { sendEmail, buildContactFacingFromAddress, type SendEmailResult } from "@/lib/email/send";
 
 export interface AppointmentContactEmailInput {
   contactEmail: string;
@@ -6,6 +6,7 @@ export interface AppointmentContactEmailInput {
   organizationName: string | null;
   whenLabel: string;
   reason: string | null;
+  meetLink?: string | null;
 }
 
 function escapeHtml(value: string): string {
@@ -43,7 +44,12 @@ function buildHtml(input: AppointmentContactEmailInput): string {
                 <tr>
                   <td style="padding:16px 18px;font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#0f172a;line-height:1.55">
                     <p style="margin:0 0 8px"><strong>Cuándo:</strong> ${escapeHtml(input.whenLabel)}</p>
-                    ${input.reason ? `<p style="margin:0"><strong>Motivo:</strong> ${escapeHtml(input.reason)}</p>` : ""}
+                    ${input.reason ? `<p style="margin:0 0 8px"><strong>Motivo:</strong> ${escapeHtml(input.reason)}</p>` : ""}
+                    ${
+                      input.meetLink
+                        ? `<p style="margin:0"><strong>Enlace de la reunión:</strong> <a href="${escapeHtml(input.meetLink)}" style="color:#006e80">${escapeHtml(input.meetLink)}</a></p>`
+                        : ""
+                    }
                   </td>
                 </tr>
               </table>
@@ -72,6 +78,7 @@ export async function notifyContactAppointment(
   return sendEmail({
     to: input.contactEmail,
     subject: `Cita confirmada${input.organizationName ? ` — ${input.organizationName}` : ""}`,
-    html: buildHtml(input)
+    html: buildHtml(input),
+    from: buildContactFacingFromAddress(input.organizationName)
   });
 }
