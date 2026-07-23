@@ -20,11 +20,19 @@ const USER_HANDOFF_PATTERNS: RegExp[] = [
   /\b(operador|representante)\b/i
 ];
 
+/**
+ * Deben indicar un traspaso INMEDIATO dentro de este mismo chat, no una
+ * promesa de contacto futuro ("un asesor te llamará mañana", "te transfiero
+ * con un ejecutivo para que te cotice") — eso es lenguaje normal de cierre
+ * de venta, no una cesión real de la conversación. Antes incluía patrones
+ * más amplios ("te paso", "te transfiero", "un asesor te contactará") que
+ * disparaban falsos positivos con ese tipo de frases, dejando la
+ * conversación en modo humano sin que nadie la tomara.
+ */
 const ASSISTANT_HANDOFF_PATTERNS: RegExp[] = [
-  /\b(te\s+paso|te\s+transfiero|voy\s+a\s+(transferir|pasar|derivar)|te\s+derivo)\b/i,
-  /\b(un\s+asesor|nuestro\s+equipo|una\s+persona)\b[\s\S]{0,48}\b(te\s+(atender|contactar|responder)|tomar[aá]\s+el\s+chat)\b/i,
   /\b(quedo|quedas?)\s+en\s+(manos|espera)\b/i,
-  /\ben\s+un\s+momento\s+te\s+atienden?\b/i
+  /\ben\s+un\s+momento\s+te\s+atienden?\b/i,
+  /\b(te\s+paso|te\s+transfiero|te\s+derivo)\b[\s\S]{0,40}\b(ahora|ya|en\s+este\s+momento|de\s+una)\b/i
 ];
 
 export function detectUserHandoffIntent(text: string): boolean {
