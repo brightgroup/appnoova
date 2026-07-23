@@ -70,6 +70,53 @@ const SECTIONS = [
   },
   {
     num: 3,
+    title: "Integración con Google Calendar",
+    content: (
+      <>
+        <p>
+          Cuando un negocio cliente conecta su cuenta de Google Calendar en Noova 360 (mediante OAuth,
+          con su consentimiento explícito), nuestros agentes de inteligencia artificial usan esa conexión
+          exclusivamente para:
+        </p>
+        <ul className="list-disc pl-5 space-y-1.5 mb-4">
+          <li>Consultar la disponibilidad real (franjas libres/ocupadas) de su calendario</li>
+          <li>Crear eventos/citas cuando un usuario final agenda una cita a través del asistente de IA</li>
+        </ul>
+        <p>
+          <strong>Alcance de acceso (scopes):</strong> únicamente <code>calendar.events</code> (crear y
+          editar eventos que el propio asistente crea), <code>calendar.freebusy</code> (consultar
+          disponibilidad, sin leer el detalle de otros eventos) y <code>userinfo.email</code> (identificar
+          la cuenta conectada). No accedemos al contenido de otros eventos del calendario ni a ningún otro
+          dato de la cuenta de Google del cliente.
+        </p>
+        <p>
+          Nuestro uso de la información recibida a través de las APIs de Google se ajusta a la{" "}
+          <strong>Política de Datos de Usuario de los Servicios de API de Google</strong>, incluidos los
+          requisitos de <strong>Uso Limitado (Limited Use)</strong>: no usamos estos datos con fines
+          publicitarios, no los vendemos ni los compartimos con terceros salvo lo estrictamente necesario
+          para prestar el servicio contratado, y no los usamos para entrenar modelos de inteligencia
+          artificial de propósito general.
+        </p>
+        <p>
+          El negocio cliente puede revocar este acceso en cualquier momento desde Noova 360 (Conectores →
+          Google Calendar → Desconectar) o directamente desde su cuenta de Google en{" "}
+          <a
+            href="https://myaccount.google.com/permissions"
+            target="_blank"
+            rel="noreferrer"
+            className="text-[#a5a5ff] hover:underline"
+          >
+            myaccount.google.com/permissions
+          </a>
+          . Al desconectar, dejamos de acceder a su calendario de inmediato. No almacenamos una copia del
+          calendario del cliente; solo guardamos un registro local de las citas que el propio asistente
+          creó (fecha, nombre y motivo), no el calendario completo.
+        </p>
+      </>
+    )
+  },
+  {
+    num: 4,
     title: "Cómo usamos los datos",
     content: (
       <>
@@ -98,7 +145,7 @@ const SECTIONS = [
     )
   },
   {
-    num: 4,
+    num: 5,
     title: "Almacenamiento y retención de datos",
     content: (
       <>
@@ -119,7 +166,7 @@ const SECTIONS = [
     )
   },
   {
-    num: 5,
+    num: 6,
     title: "Compartición de datos con terceros",
     content: (
       <>
@@ -131,6 +178,10 @@ const SECTIONS = [
           <li>
             <strong>Meta Platforms / WhatsApp:</strong> como proveedor de tecnología registrado, los mensajes se
             transmiten a través de la WhatsApp Business Platform de Meta conforme a sus términos y condiciones.
+          </li>
+          <li>
+            <strong>Google Calendar API:</strong> cuando el negocio cliente conecta su calendario, consultamos y
+            creamos eventos a través de esta API de Google, conforme a lo descrito en la sección 3.
           </li>
           <li>
             <strong>Proveedores de infraestructura:</strong> servicios de hosting y bases de datos que alojan la
@@ -152,7 +203,7 @@ const SECTIONS = [
     )
   },
   {
-    num: 6,
+    num: 7,
     title: "Seguridad de los datos",
     content: (
       <>
@@ -173,7 +224,7 @@ const SECTIONS = [
     )
   },
   {
-    num: 7,
+    num: 8,
     title: "Derechos de los titulares de datos",
     content: (
       <>
@@ -199,7 +250,7 @@ const SECTIONS = [
     )
   },
   {
-    num: 8,
+    num: 9,
     title: "Uso de cookies y tecnologías similares",
     content: (
       <p>
@@ -210,7 +261,7 @@ const SECTIONS = [
     )
   },
   {
-    num: 9,
+    num: 10,
     title: "Cambios a esta política",
     content: (
       <p>
@@ -222,7 +273,7 @@ const SECTIONS = [
     )
   },
   {
-    num: 10,
+    num: 11,
     title: "Contacto",
     content: (
       <>
@@ -275,14 +326,14 @@ export default function PrivacyPolicyPage() {
           Política de Privacidad
         </h1>
         <p className="text-sm text-gray-500 mb-8 pb-8 border-b border-white/[.08]">
-          Última actualización: 15 de junio de 2026 · Vigente desde: 15 de junio de 2026
+          Última actualización: 23 de julio de 2026 · Vigente desde: 15 de junio de 2026
         </p>
 
         <div className="rounded-xl border border-[#5b5bf6]/25 bg-[#5b5bf6]/[.08] px-5 py-4 mb-10 text-sm text-gray-300 leading-relaxed">
           Noova 360 es una plataforma de automatización e inteligencia artificial para empresas. Esta política
           explica qué datos recopilamos, cómo los usamos y cómo los protegemos, tanto de nuestros clientes (los
           negocios que contratan el servicio) como de los usuarios finales con quienes esos negocios se comunican
-          a través de WhatsApp y otros canales.
+          a través de WhatsApp, Google Calendar y otros canales o integraciones.
         </div>
 
         <div className="space-y-10">
@@ -305,8 +356,9 @@ export default function PrivacyPolicyPage() {
       <footer className="border-t border-white/[.06] py-8 px-6 text-center text-sm text-gray-500 leading-relaxed">
         <p>© 2026 Noova 360 · BG Soluciones · Bogotá, Colombia</p>
         <p className="mt-2 text-xs text-gray-600 max-w-xl mx-auto">
-          Esta política cumple con la Ley 1581 de 2012 y los requisitos de Meta para proveedores de tecnología
-          de WhatsApp Business Platform.
+          Esta política cumple con la Ley 1581 de 2012, los requisitos de Meta para proveedores de tecnología
+          de WhatsApp Business Platform, y la Política de Datos de Usuario de los Servicios de API de Google
+          (incluidos los requisitos de Uso Limitado).
         </p>
       </footer>
     </div>
