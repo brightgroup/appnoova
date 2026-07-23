@@ -64,6 +64,35 @@ export function isMetaWhatsAppChannel(channel: {
   );
 }
 
+export interface SendMetaTypingIndicatorInput {
+  phoneNumberId: string;
+  accessToken: string;
+  /** wamid del mensaje entrante al que se responde. */
+  messageId: string;
+}
+
+/** Indicador nativo de "escribiendo…" vía Cloud API — se envía junto con la confirmación de lectura del mensaje entrante. */
+export async function sendMetaWhatsAppTypingIndicator(input: SendMetaTypingIndicatorInput): Promise<void> {
+  const res = await fetch(`${metaGraphBaseUrl()}/${input.phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      status: "read",
+      message_id: input.messageId,
+      typing_indicator: { type: "text" }
+    })
+  });
+
+  if (!res.ok) {
+    const json = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+    throw new Error(json.error?.message || `Meta typing indicator error ${res.status}`);
+  }
+}
+
 /** Lee token Meta de fila DB (no expuesto al cliente). */
 export function readMetaAccessToken(raw: Record<string, unknown>): string | null {
   const token = raw.meta_access_token;

@@ -35,7 +35,7 @@ import {
   WHATSAPP_OPT_OUT_CONFIRMATION
 } from "@/lib/whatsapp/compliance";
 import { buildWhatsAppInboundContent } from "@/lib/whatsapp/media-understanding";
-import { sendWhatsAppTextMessage } from "@/lib/whatsapp/send-transport";
+import { sendWhatsAppTextMessage, sendWhatsAppTypingIndicator } from "@/lib/whatsapp/send-transport";
 import {
   checkBillingForOrg,
   readGeminiUsage,
@@ -477,6 +477,11 @@ export async function processTwilioWhatsAppInbound(
   });
 
   if (userPersist.error) return { ok: false, error: userPersist.error };
+
+  // Best-effort: los "puntos de escribiendo" nativos de WhatsApp mientras el agente genera la respuesta.
+  void sendWhatsAppTypingIndicator({ channel, messageId: inbound.messageSid, db }).catch(err =>
+    console.warn("[whatsapp] typing indicator:", err instanceof Error ? err.message : err)
+  );
 
   await updateWhatsAppConversationMetadata(
     db,

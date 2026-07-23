@@ -143,3 +143,38 @@ export async function sendTwilioWhatsAppTemplate(
   }
   return postTwilioMessage(form, input.accountSid, input.authToken);
 }
+
+export interface SendTwilioTypingIndicatorInput {
+  /** SID (SM…/MM…) del mensaje entrante al que se responde. */
+  messageSid: string;
+  accountSid?: string | null;
+  authToken?: string | null;
+}
+
+/**
+ * Indicador nativo de "escribiendo…" de WhatsApp — Twilio lo desaparece solo
+ * al entregar la respuesta o a los 25s, lo que pase primero. Endpoint propio
+ * (no el de envío de mensajes), no lleva Accounts/{sid} en la URL.
+ */
+export async function sendTwilioTypingIndicator(input: SendTwilioTypingIndicatorInput): Promise<void> {
+  const master = twilioCredentials();
+  const activeSid = input.accountSid || master?.accountSid;
+  const activeToken = input.authToken || master?.authToken;
+  if (!activeSid || !activeToken) {
+    throw new Error("Twilio no configurado (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN)");
+  }
+
+  const res = await fetch("https://messaging.twilio.com/v3/Indicators/Typing.json", {
+    method: "POST",
+    headers: {
+      Authorization: authHeader(activeSid, activeToken),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ channel: "WHATSAPP", messageId: input.messageSid })
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Twilio typing indicator error ${res.status}: ${detail.slice(0, 200)}`);
+  }
+}

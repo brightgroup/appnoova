@@ -1,9 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { sendTwilioWhatsAppMessage, sendTwilioWhatsAppTemplate } from "@/lib/whatsapp/twilio-whatsapp";
+import {
+  sendTwilioWhatsAppMessage,
+  sendTwilioWhatsAppTemplate,
+  sendTwilioTypingIndicator
+} from "@/lib/whatsapp/twilio-whatsapp";
 import {
   isMetaWhatsAppChannel,
   readMetaAccessToken,
-  sendMetaWhatsAppTextMessage
+  sendMetaWhatsAppTextMessage,
+  sendMetaWhatsAppTypingIndicator
 } from "@/lib/whatsapp/meta-whatsapp";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 
@@ -62,6 +67,39 @@ export async function sendWhatsAppTextMessage(input: SendWhatsAppTextInput): Pro
 
 export function whatsAppProviderForBilling(channel: WhatsAppChannelRecord): "twilio" | "meta" {
   return channel.provider === "meta" ? "meta" : "twilio";
+}
+
+export interface SendWhatsAppTypingIndicatorInput {
+  channel: WhatsAppChannelRecord;
+  channelRaw?: Record<string, unknown>;
+  /** SID de Twilio (SM…/MM…) o wamid de Meta del mensaje entrante al que se responde. */
+  messageId: string;
+  db?: SupabaseClient;
+}
+
+/**
+ * Indicador nativo de "escribiendo…" de WhatsApp mientras el agente genera
+ * la respuesta. Se desvanece solo (respuesta entregada o ~25s). Quien llama
+ * debe tratarlo como best-effort (no bloquear ni fallar el envío si esto falla).
+ */
+export async function sendWhatsAppTypingIndicator(input: SendWhatsAppTypingIndicatorInput): Promise<void> {
+  const { channel, messageId } = input;
+  const metaToken = await resolveMetaToken(channel, input.channelRaw, input.db);
+
+  if (isMetaWhatsAppChannel({ ...channel, meta_access_token: metaToken })) {
+    await sendMetaWhatsAppTypingIndicator({
+      phoneNumberId: channel.meta_phone_number_id!,
+      accessToken: metaToken!,
+      messageId
+    });
+    return;
+  }
+
+  await sendTwilioTypingIndicator({
+    messageSid: messageId,
+    accountSid: channel.twilio_subaccount_sid,
+    authToken: channel.twilio_subaccount_auth_token
+  });
 }
 
 export interface SendWhatsAppTemplateNotifyInput {
