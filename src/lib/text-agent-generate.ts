@@ -88,6 +88,12 @@ export async function generateTextAgentReply(
     systemInstruction,
     temperature: input.temperature,
     maxOutputTokens: input.maxOutputTokens,
+    // Gemini 2.5 cuenta los tokens de "pensamiento" interno dentro del mismo
+    // presupuesto de maxOutputTokens — con topes bajos (ej. 150), el modelo
+    // podía gastarse casi todo pensando y dejar la respuesta visible cortada
+    // a unas pocas palabras. No hay razón para razonar en varios pasos en un
+    // chat de WhatsApp, así que se desactiva.
+    thinkingConfig: { thinkingBudget: 0 },
     ...(toolsEnabled ? { tools: [{ functionDeclarations: buildFunctionDeclarations(enabledTools) }] } : {})
   };
 

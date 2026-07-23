@@ -1,8 +1,7 @@
 import { ORI_DEFAULT_MODEL } from "@/lib/google-ai";
 
 export const TEXT_LLM_MODELS = [
-  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-  { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" }
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" }
 ] as const;
 
 export const DEFAULT_TEXT_MODEL = ORI_DEFAULT_MODEL;
