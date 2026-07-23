@@ -68,7 +68,7 @@ function ConfigContent() {
     data_table_id: null,
     temperature: 0.7,
     llm_model: TEXT_LLM_MODELS[0].id,
-    max_output_tokens: 2048,
+    max_output_tokens: 1024,
     color: null,
     notify_rules: defaultNotifyTeamRules(),
     scheduling_rules: defaultSchedulingRules()

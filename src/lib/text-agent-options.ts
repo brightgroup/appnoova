@@ -19,6 +19,7 @@ export const TEXT_OUTPUT_TOKEN_OPTIONS = [
   { id: 200, label: "Corto (~35-50 palabras)" },
   { id: 350, label: "Medio (~60-90 palabras)" },
   { id: 700, label: "Amplio (~150-200 palabras)" },
-  { id: 2048, label: "Estándar (por defecto)" },
+  { id: 1024, label: "Estándar (por defecto)" },
+  { id: 2048, label: "Extendido (2 048 tokens)" },
   { id: 4096, label: "Largo (explicaciones extensas)" }
 ] as const;
