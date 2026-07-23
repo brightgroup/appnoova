@@ -426,9 +426,11 @@ function InboxPageInner() {
       (detail.whatsapp_session_open !== false && !detail.whatsapp_opted_out));
 
   const assignLabel =
-    detail?.handoff_mode === "human" && detail?.assigned_to
-      ? detail.assigned_to
-      : "IA";
+    detail?.handoff_mode !== "human"
+      ? "IA"
+      : detail?.assigned_to
+        ? detail.assigned_to
+        : "Esperando asesor";
 
   const detailTitle =
     detail?.display_title ??

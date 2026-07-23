@@ -118,8 +118,10 @@ export default function MobileChatsPage() {
             </div>
           ) : (
             filtered.map((it, i) => {
-              const isHuman = it.handoff_mode === "human" && Boolean(it.assigned_to);
-              const handlerName = isHuman ? (it.assigned_to as string) : it.agent_name || "IA";
+              const isHuman = it.handoff_mode === "human";
+              const handlerName = isHuman
+                ? (it.assigned_to as string) || "Esperando asesor"
+                : it.agent_name || "IA";
               return (
                 <div key={it.id}>
                   <Link href={`/m/chats/${it.id}`} className={`conv${it.unread_count > 0 ? " unread" : ""}`}>
