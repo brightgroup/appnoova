@@ -480,22 +480,32 @@ export async function processTwilioWhatsAppInbound(
 
   // Best-effort: los "puntos de escribiendo" nativos de WhatsApp mientras el agente genera la respuesta.
   // Se espera a que Twilio confirme el envío (no fire-and-forget) para que quede garantizado
-  // ANTES de la respuesta real — si no, con Gemini respondiendo rápido (sin "thinking"), el
-  // mensaje real puede alcanzar al indicador y WhatsApp nunca llega a mostrar la animación.
+  // ANTES de la respuesta real. Twilio lo expira solo a los 25s — si todo el trabajo de abajo
+  // (CRM, tools, Gemini) tarda más que eso, se refresca cada 12s para que nunca desaparezca
+  // antes de que la respuesta esté lista.
   const typingStartedAt = Date.now();
   await sendWhatsAppTypingIndicator({ channel, messageId: inbound.messageSid, db }).catch(err =>
     console.warn("[whatsapp] typing indicator:", err instanceof Error ? err.message : err)
   );
+  const typingRefreshInterval = setInterval(() => {
+    void sendWhatsAppTypingIndicator({ channel, messageId: inbound.messageSid, db }).catch(err =>
+      console.warn("[whatsapp] typing indicator refresh:", err instanceof Error ? err.message : err)
+    );
+  }, 12_000);
 
-  await updateWhatsAppConversationMetadata(
-    db,
-    userPersist.conversationId,
-    channel.user_id,
-    existing?.metadata,
-    metaPatch
-  );
+  let reply: string;
+  let geminiUsage: ReturnType<typeof readGeminiUsage> | null = null;
 
-  await syncAndEnrichCrmFromInbound(db, channel, userPersist.conversationId, inbound, nowIso, optedOutAfter);
+  try {
+    await updateWhatsAppConversationMetadata(
+      db,
+      userPersist.conversationId,
+      channel.user_id,
+      existing?.metadata,
+      metaPatch
+    );
+
+    await syncAndEnrichCrmFromInbound(db, channel, userPersist.conversationId, inbound, nowIso, optedOutAfter);
 
   const refreshed = await findWhatsAppConversation(
     db,
@@ -526,8 +536,6 @@ export async function processTwilioWhatsAppInbound(
   const temporal = buildColombiaTemporalContext();
   const systemInstruction = `${temporal.promptBlock}\n\n${mergedPrompt}`;
 
-  let reply: string;
-  let geminiUsage: ReturnType<typeof readGeminiUsage> | null = null;
   try {
     const calendarConnection = orgId ? await getActiveCalendarConnection(db, orgId) : null;
     const businessHours = orgId ? await getOrgBusinessHours(db, orgId) : undefined;
@@ -567,6 +575,9 @@ export async function processTwilioWhatsAppInbound(
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error IA";
     return { ok: false, error: msg };
+  }
+  } finally {
+    clearInterval(typingRefreshInterval);
   }
 
   const assistantPersist = await persistAssistantReplyOnly({
