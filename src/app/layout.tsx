@@ -14,8 +14,11 @@ export const metadata: Metadata = {
   title: "Noova 360",
   description: "Plataforma de IA para automatizar ventas, atención y seguimiento comercial",
   icons: {
-    icon: [{ url: "/favicon.png", type: "image/png" }],
-    apple: [{ url: "/favicon.png", type: "image/png" }]
+    icon: [
+      { url: "/favicon.png", type: "image/png", sizes: "256x256" },
+      { url: "/app-icon.png", type: "image/png", sizes: "512x512" }
+    ],
+    apple: [{ url: "/favicon.png", type: "image/png", sizes: "256x256" }]
   }
 };
 

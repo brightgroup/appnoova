@@ -14,7 +14,7 @@ function DesktopOnlyMessage({ neutralBranding }: { neutralBranding?: boolean }) 
 
       {!neutralBranding && (
         <a href={marketingUrl} className="relative z-10 mb-8">
-          <NoovaLogo width={160} height={40} priority />
+          <NoovaLogo width={140} priority />
         </a>
       )}
 

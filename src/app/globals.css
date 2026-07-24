@@ -148,14 +148,15 @@ html.dark .noova-logo-dark {
   display: block !important;
 }
 
-/* Logo blanco — sidebar (fondo azul, sin rectángulo negro del asset dark) */
+/* Logo claro — sidebar (fondo azul) */
 .noova-logo-wrap {
   display: inline-flex;
   align-items: center;
 }
 
 .noova-logo-blend {
-  mix-blend-mode: screen;
+  /* Ya no hace falta screen: el asset es claro sobre transparente */
+  mix-blend-mode: normal;
 }
 
 /* Sidebar índigo — texto claro (anula remaps del tema claro) */

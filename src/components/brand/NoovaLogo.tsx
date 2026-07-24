@@ -6,13 +6,16 @@ const LOGO_ON_DARK = "/logo-noova-dark.webp";
 const LOGO_ON_LIGHT = "/logo-noova-light.png";
 const LOGO_SIDEBAR = "/logo-noova-white.webp";
 
+/** Proporción del logo nuevo (1024×220). */
+const LOGO_ASPECT = 220 / 1024;
+
 interface NoovaLogoProps {
   className?: string;
   width?: number;
   height?: number;
   priority?: boolean;
   /**
-   * `sidebar` — logo blanco sobre la barra azul (tema claro del dashboard).
+   * `sidebar` — logo claro sobre la barra azul (tema claro del dashboard).
    * `default` — light en tema claro, dark en tema oscuro (`html.dark`).
    */
   variant?: "default" | "sidebar";
@@ -22,10 +25,12 @@ interface NoovaLogoProps {
 export function NoovaLogo({
   className = "object-contain object-left",
   width = 176,
-  height = 40,
+  height,
   priority = false,
   variant = "default",
 }: NoovaLogoProps) {
+  const h = height ?? Math.round(width * LOGO_ASPECT);
+
   if (variant === "sidebar") {
     return (
       <span className="noova-logo-wrap inline-flex">
@@ -33,7 +38,7 @@ export function NoovaLogo({
           src={LOGO_SIDEBAR}
           alt="Noova 360"
           width={width}
-          height={Math.round(width * (72 / 256))}
+          height={h}
           className={`${className} noova-logo-blend`}
           priority={priority}
           unoptimized
@@ -48,7 +53,7 @@ export function NoovaLogo({
         src={LOGO_ON_LIGHT}
         alt="Noova 360"
         width={width}
-        height={height}
+        height={h}
         className={`noova-logo-light ${className}`}
         priority={priority}
       />
@@ -57,7 +62,7 @@ export function NoovaLogo({
         alt=""
         aria-hidden
         width={width}
-        height={height}
+        height={h}
         className={`noova-logo-dark ${className}`}
         priority={priority}
         unoptimized

@@ -233,7 +233,7 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
               </Link>
             ) : (
               <Link href="/dashboard" className="flex-shrink-0">
-                <NoovaLogo width={176} height={40} priority variant="sidebar" />
+                <NoovaLogo width={120} priority variant="sidebar" />
               </Link>
             )
           )}

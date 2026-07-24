@@ -415,8 +415,8 @@ html:has(.nv-m-app .nv-m-onboarding) body {
 
 /* ============ ONBOARDING: splash / login / instalar ============ */
 .nv-m-app .brand-logo { display: block; height: auto; flex: none; }
-.nv-m-app .brand-logo.lg { width: 172px; }
-.nv-m-app .brand-logo.sm { width: 128px; }
+.nv-m-app .brand-logo.lg { width: 140px; }
+.nv-m-app .brand-logo.sm { width: 120px; }
 .nv-m-app .onb-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 0 28px; text-align: center; }
 .nv-m-app .dots { display: flex; gap: 6px; }
 .nv-m-app .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); display: block; animation: nvMDot 1.1s ease-in-out infinite; }

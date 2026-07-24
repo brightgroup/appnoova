@@ -46,7 +46,13 @@ export default function MobileLoginPage() {
       <div className="login-body">
         <div className="login-head">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="brand-logo sm" src="/logo-noova-white.webp" alt="Noova360" />
+          <img
+            className="brand-logo sm"
+            src="/logo-noova-white.webp"
+            alt="Noova 360"
+            width={120}
+            height={26}
+          />
           <h1>Ingresa a tu panel</h1>
           <p>Chats y facturación de tu negocio, en un solo lugar.</p>
         </div>
