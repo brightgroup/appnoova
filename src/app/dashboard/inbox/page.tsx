@@ -40,7 +40,12 @@ import { Badge } from "@/components/ui/Badge";
 import { InfoBox } from "@/components/ui/InfoBox";
 import { inputSearch } from "@/lib/brand-ui";
 
-type AssignValue = "ai" | "me";
+type AssignValue = "ai" | "me" | string;
+
+interface InboxAssignee {
+  user_id: string;
+  name: string;
+}
 
 function AgentAvatar({ name }: { name: string }) {
   const initial = name.trim().charAt(0).toUpperCase() || "A";
@@ -75,6 +80,7 @@ function InboxPageInner() {
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [offline, setOffline] = useState(false);
   const [currentUserName, setCurrentUserName] = useState("Usuario");
+  const [assignees, setAssignees] = useState<InboxAssignee[]>([]);
   const [reply, setReply] = useState("");
   const [assignOpen, setAssignOpen] = useState(false);
   const [waTemplates, setWaTemplates] = useState<WhatsAppTemplateRecord[]>([]);
@@ -194,6 +200,19 @@ function InboxPageInner() {
   }, []);
 
   useEffect(() => { loadList(); }, [loadList]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch("/api/inbox/assignees", { headers });
+        const data = await res.json();
+        if (res.ok) setAssignees(data.assignees ?? []);
+      } catch {
+        /* silencioso: el selector de "Asignar a" solo pierde las opciones de compañeros */
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => loadList(true), 2000);
@@ -323,7 +342,7 @@ function InboxPageInner() {
         headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify({
           conversation_id: selectedId,
-          assign_to: value === "me" ? "me" : "ai"
+          assign_to: value
         })
       });
       const data = await res.json();
@@ -665,6 +684,23 @@ function InboxPageInner() {
                               {currentUserName} (yo)
                             </span>
                           </NoovaListMenuItem>
+                          {assignees
+                            .filter(a => a.name !== currentUserName)
+                            .map(a => (
+                              <NoovaListMenuItem
+                                key={a.user_id}
+                                active={
+                                  detail?.handoff_mode === "human" &&
+                                  detail?.assigned_to === a.name
+                                }
+                                onClick={() => assignConversation(a.name)}
+                              >
+                                <span className="flex items-center gap-2.5">
+                                  <User className="h-4 w-4 text-white/50" />
+                                  {a.name}
+                                </span>
+                              </NoovaListMenuItem>
+                            ))}
                         </NoovaListMenu>
                       )}
                     </div>
