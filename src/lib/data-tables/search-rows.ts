@@ -61,7 +61,21 @@ function distinctValues(rows: DataTableRowRecord[], col: DataTableColumn): strin
   return [...set].sort((a, b) => a.localeCompare(b, "es"));
 }
 
+/**
+ * Umbral de longitud para no confundir una pregunta corta y directa
+ * ("¿qué categorías tienen?") con un mensaje largo que solo MENCIONA esas
+ * palabras de pasada — típicamente la descripción automática de una imagen
+ * (ej. "...la app muestra opciones de navegación como 'Catálogo' y 'Mi
+ * cuenta'..."), que puede tener cientos de caracteres describiendo la
+ * interfaz de una captura de pantalla sin que el cliente esté pidiendo ver
+ * categorías. Sin este tope, ese texto disparaba la rama de "aquí están
+ * las categorías" y se perdía por completo el producto real que el cliente
+ * pedía (incluida su fila con el precio correcto).
+ */
+const CATEGORY_INTENT_MAX_LENGTH = 150;
+
 function wantsCategories(message: string): boolean {
+  if (message.length > CATEGORY_INTENT_MAX_LENGTH) return false;
   const m = normalizeText(message);
   return (
     m.includes("categoria") ||
@@ -99,12 +113,20 @@ export function extractSearchTokens(message: string): string[] {
   return [...new Set(tokens)];
 }
 
-/** Códigos tipo SKU / referencia en el mensaje. */
+/**
+ * Códigos tipo SKU / referencia en el mensaje. El mínimo de 5 caracteres es
+ * a propósito: con 2 caracteres, cualquier número corto incidental (una
+ * hora "6:16", una batería "38%", "5G") calzaba por coincidencia como
+ * subcadena de códigos largos reales (ISBNs de 17 caracteres), inflando el
+ * puntaje de decenas de filas sin relación alguna con lo que pedía el
+ * cliente — sobre todo en mensajes largos como las descripciones
+ * automáticas de imágenes, que mencionan varios números de pasada.
+ */
 export function extractCodeTokens(message: string): string[] {
   const raw = message.match(/\b[A-Za-z0-9][A-Za-z0-9\-_.]{1,}\b/g) ?? [];
   const codes = raw
     .map(c => c.trim())
-    .filter(c => c.length >= 2 && !STOP_WORDS.has(normalizeText(c)));
+    .filter(c => c.length >= 5 && !STOP_WORDS.has(normalizeText(c)));
   return [...new Set(codes)];
 }
 
@@ -196,7 +218,12 @@ export function selectRowsForMessage(
     }
   }
 
-  if (filterCol) {
+  // Mismo criterio que wantsCategories: un nombre de categoría que aparece de
+  // pasada en un mensaje largo (ej. una migaja de pan "Derecho privado" dentro
+  // de la descripción de una captura de pantalla) no es lo mismo que el
+  // cliente pidiendo esa categoría — sin este tope se devolvían decenas de
+  // filas ajenas en vez de la coincidencia específica del producto real.
+  if (filterCol && message.length <= CATEGORY_INTENT_MAX_LENGTH) {
     const cats = distinctValues(active, filterCol);
     const match = findCategoryMatch(message, cats);
     if (match) {
@@ -252,10 +279,17 @@ export function selectRowsForMessage(
   }
 
   const topScore = scored[0].score;
-  let selected = scored;
+  let selected: typeof scored;
 
   if (topScore >= 1000) {
-    selected = scored.filter(s => s.score >= 1000);
+    // Tope aplicado siempre, incluso aquí: en mensajes largos (ej. la
+    // descripción automática de una imagen, con decenas de palabras sueltas)
+    // muchas filas sin relación real pueden acumular +20 por cada palabra
+    // genérica que coincide en su reseña y cruzar los 1000 puntos igual que
+    // la coincidencia real — sin el tope, esas filas ajenas terminaban
+    // todas en el contexto en vez de solo las más relevantes (`scored` ya
+    // viene ordenado de mayor a menor, así que el slice conserva las mejores).
+    selected = scored.filter(s => s.score >= 1000).slice(0, MAX_ROWS_PER_QUERY);
   } else {
     const threshold = Math.max(topScore * 0.35, 80);
     selected = scored.filter(s => s.score >= threshold).slice(0, MAX_ROWS_PER_QUERY);

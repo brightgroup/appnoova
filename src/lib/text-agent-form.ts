@@ -17,6 +17,7 @@ export function normalizeTextAgentForm(raw: Partial<TextAgentFormData>): TextAge
     temperature: Number.isFinite(temperature) ? Math.min(2, Math.max(0.1, temperature)) : 0.7,
     llm_model: String(raw.llm_model ?? DEFAULT_TEXT_MODEL).trim() || DEFAULT_TEXT_MODEL,
     max_output_tokens: Number.isFinite(maxOutput) ? Math.min(8192, Math.max(50, maxOutput)) : 1024,
+    thinking_enabled: Boolean(raw.thinking_enabled),
     color: raw.color ?? null,
     notify_rules: normalizeNotifyTeamRules(raw.notify_rules),
     scheduling_rules: normalizeSchedulingRules(raw.scheduling_rules)

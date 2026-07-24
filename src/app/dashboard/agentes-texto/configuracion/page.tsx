@@ -69,6 +69,7 @@ function ConfigContent() {
     temperature: 0.7,
     llm_model: TEXT_LLM_MODELS[0].id,
     max_output_tokens: 1024,
+    thinking_enabled: false,
     color: null,
     notify_rules: defaultNotifyTeamRules(),
     scheduling_rules: defaultSchedulingRules()
@@ -355,6 +356,28 @@ function ConfigContent() {
                   prompt del agente. Elige una opción con margen sobre lo que esperas, para que nunca se
                   corte una respuesta a media frase.
                 </p>
+              </Field>
+
+              <Field label="Razonamiento cuidadoso (thinking)">
+                <label className="flex items-start gap-3 cursor-pointer rounded-xl bg-white/[.03] border border-white/[.06] px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.thinking_enabled)}
+                    onChange={e => setForm(f => ({ ...f, thinking_enabled: e.target.checked }))}
+                    className="mt-0.5 rounded border-white/20 w-4 h-4"
+                  />
+                  <span>
+                    <span className="block text-xs font-medium text-gray-300">
+                      Activar para este agente
+                    </span>
+                    <span className="block text-[11px] text-gray-500 leading-relaxed mt-0.5">
+                      Apagado por defecto — no aporta nada en una conversación normal. Actívalo solo si este
+                      agente lee una tabla de datos grande (catálogos, precios) y necesita distinguir con
+                      cuidado entre productos parecidos antes de responder. Hace las respuestas un poco más
+                      lentas.
+                    </span>
+                  </span>
+                </label>
               </Field>
             </div>
 

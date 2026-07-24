@@ -26,6 +26,8 @@ export interface TextAgentFormData {
   temperature: number;
   llm_model: string;
   max_output_tokens: number;
+  /** "Thinking" de Gemini — apagado por defecto, solo para agentes que leen tablas de datos grandes con cuidado. */
+  thinking_enabled?: boolean;
   color?: string | null;
   notify_rules?: NotifyTeamRules;
   scheduling_rules?: SchedulingRules;

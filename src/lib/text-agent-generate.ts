@@ -25,6 +25,14 @@ export interface GenerateTextAgentReplyInput {
   messages: TextAgentChatMessage[];
   temperature: number;
   maxOutputTokens: number;
+  /**
+   * Por defecto el "thinking" de Gemini está apagado (ver thinkingConfig más
+   * abajo) — no aporta nada en un chat conversacional simple y se come el
+   * presupuesto de maxOutputTokens. Actívalo por agente solo cuando de verdad
+   * lo necesite: leer con cuidado una tabla de datos grande (catálogos,
+   * precios) para no confundir filas parecidas.
+   */
+  thinkingEnabled?: boolean;
   notifyRules?: NotifyTeamRules | unknown;
   schedulingRules?: SchedulingRules | unknown;
   businessHours?: OrgBusinessHours | unknown;
@@ -91,9 +99,10 @@ export async function generateTextAgentReply(
     // Gemini 2.5 cuenta los tokens de "pensamiento" interno dentro del mismo
     // presupuesto de maxOutputTokens — con topes bajos (ej. 150), el modelo
     // podía gastarse casi todo pensando y dejar la respuesta visible cortada
-    // a unas pocas palabras. No hay razón para razonar en varios pasos en un
-    // chat de WhatsApp, así que se desactiva.
-    thinkingConfig: { thinkingBudget: 0 },
+    // a unas pocas palabras. Apagado por defecto (no aporta nada en un chat
+    // de WhatsApp simple); -1 = dinámico, el modelo decide cuánto razonar,
+    // solo para agentes que lo necesitan de verdad (ver thinkingEnabled).
+    thinkingConfig: { thinkingBudget: input.thinkingEnabled ? -1 : 0 },
     ...(toolsEnabled ? { tools: [{ functionDeclarations: buildFunctionDeclarations(enabledTools) }] } : {})
   };
 

@@ -118,6 +118,7 @@ export async function POST(req: NextRequest) {
     temperature: form.temperature,
     llm_model: form.llm_model,
     max_output_tokens: form.max_output_tokens,
+    thinking_enabled: form.thinking_enabled ?? false,
     color: form.color ?? defaults.color,
     company_context_id: form.company_context_id || null,
     data_table_id: form.data_table_id || null,
@@ -134,8 +135,9 @@ export async function POST(req: NextRequest) {
       || error?.message?.includes("data_table_id")
       || error?.message?.includes("notify_rules")
       || error?.message?.includes("scheduling_rules")
+      || error?.message?.includes("thinking_enabled")
     ) {
-      const { company_context_id: _c, data_table_id: _d, notify_rules: _n, scheduling_rules: _s, ...rest } = row;
+      const { company_context_id: _c, data_table_id: _d, notify_rules: _n, scheduling_rules: _s, thinking_enabled: _t, ...rest } = row;
       ({ data, error } = await updateTextAgentRow(db, rest, body.id, orgCtx.organizationId));
     }
 
@@ -156,8 +158,9 @@ export async function POST(req: NextRequest) {
     || error?.message?.includes("data_table_id")
     || error?.message?.includes("notify_rules")
     || error?.message?.includes("scheduling_rules")
+    || error?.message?.includes("thinking_enabled")
   ) {
-    const { company_context_id: _c, data_table_id: _d, notify_rules: _n, scheduling_rules: _s, ...rest } = row;
+    const { company_context_id: _c, data_table_id: _d, notify_rules: _n, scheduling_rules: _s, thinking_enabled: _t, ...rest } = row;
     ({ data, error } = await insertTextAgentRow(db, rest));
   }
 

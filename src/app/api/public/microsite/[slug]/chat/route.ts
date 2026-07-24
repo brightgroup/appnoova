@@ -267,6 +267,7 @@ export async function POST(
       })),
       temperature,
       maxOutputTokens,
+      thinkingEnabled: Boolean(agent.thinking_enabled),
       notifyRules: agent.notify_rules,
       schedulingRules: agent.scheduling_rules,
       businessHours,
