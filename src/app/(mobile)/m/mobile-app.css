@@ -215,29 +215,42 @@ html:has(.nv-m-app .nv-m-onboarding) body {
 /* ============ CHATS LIST ============ */
 .nv-m-app .chat-list { padding: 4px 10px calc(70px + env(safe-area-inset-bottom, 0px)); }
 .nv-m-app .conv {
-  display: flex; flex-direction: column; gap: 5px;
-  padding: 12px 14px; border-radius: 16px; cursor: pointer; position: relative;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 14px 14px; border-radius: 16px; cursor: pointer; position: relative;
   transition: background .13s ease;
   width: 100%; border: none; background: transparent; text-align: left; color: inherit;
 }
 .nv-m-app .conv:active { background: var(--surface-2); }
 .nv-m-app .conv-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.nv-m-app .conv-name { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nv-m-app .conv-time { font-size: 11.5px; color: var(--faint); flex: none; font-variant-numeric: tabular-nums; }
+.nv-m-app .conv-name { font-weight: 600; font-size: 16.5px; letter-spacing: -0.015em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nv-m-app .conv-time { font-size: 12.5px; color: var(--faint); flex: none; font-variant-numeric: tabular-nums; }
 .nv-m-app .conv-preview-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.nv-m-app .conv-preview { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.nv-m-app .conv-preview { font-size: 14.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; line-height: 1.35; }
 .nv-m-app .conv.unread .conv-name { font-weight: 700; }
 .nv-m-app .conv.unread .conv-preview { color: var(--ink); font-weight: 500; }
 .nv-m-app .unread-badge { flex: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-size: 11.5px; font-weight: 650; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
 
-.nv-m-app .conv-chips { display: flex; align-items: center; gap: 6px; margin-top: 1px; }
-.nv-m-app .chn { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 650; letter-spacing: 0.01em; padding: 3px 8px 3px 7px; border-radius: 7px; line-height: 1; white-space: nowrap; }
-.nv-m-app .chn svg { width: 11px; height: 11px; }
+.nv-m-app .conv-chips { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.nv-m-app .chn { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 650; letter-spacing: 0.01em; padding: 3px 8px 3px 7px; border-radius: 7px; line-height: 1; white-space: nowrap; }
+.nv-m-app .chn svg { width: 12px; height: 12px; }
 .nv-m-app .chn.wa { color: var(--wa); background: var(--wa-soft); }
 .nv-m-app .chn.milink { color: var(--ai); background: var(--ai-soft); }
 .nv-m-app .chn.other { color: var(--muted); background: var(--surface-2); }
-.nv-m-app .agent-chip { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); font-weight: 550; overflow: hidden; }
-.nv-m-app .agent-chip .mini-av { flex: none; width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 8.5px; font-weight: 700; }
+.nv-m-app .agent-chip { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); font-weight: 550; overflow: hidden; }
+.nv-m-app .agent-chip .mini-av {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: #0a0a0a;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
 .nv-m-app .agent-chip .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nv-m-app .list-divider { height: 1px; background: var(--border-soft); margin: 1px 14px; }
 .nv-m-app .empty-state { padding: 60px 24px; text-align: center; color: var(--muted); font-size: 13.5px; line-height: 1.6; }

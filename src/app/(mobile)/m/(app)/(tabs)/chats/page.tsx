@@ -21,15 +21,6 @@ function channelClass(channel: string): string {
   return "other";
 }
 
-const AI_HUES = ["#5b5bf6", "#8f86ff", "#3f74c9", "#6a5cff", "#7c6df2"];
-
-function handlerColor(seed: string, isHuman: boolean): string {
-  if (isHuman) return "#5b6672";
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  return AI_HUES[hash % AI_HUES.length];
-}
-
 export default function MobileChatsPage() {
   const [items, setItems] = useState<InboxListItem[] | null>(null);
   const [query, setQuery] = useState("");
@@ -139,9 +130,7 @@ export default function MobileChatsPage() {
                         {it.channel_label}
                       </span>
                       <span className="agent-chip">
-                        <span className="mini-av" style={{ background: handlerColor(handlerName, isHuman) }}>
-                          {initialsOf(handlerName)}
-                        </span>
+                        <span className="mini-av">{initialsOf(handlerName)}</span>
                         <span className="name">{handlerName}</span>
                       </span>
                     </span>
