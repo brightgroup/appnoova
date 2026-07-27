@@ -14,7 +14,7 @@ import { textAgentsAdminClient } from "@/lib/text-agents-server";
 import { resolvePublicChatChannel } from "@/lib/widget-channel";
 import { getOriApiKey } from "@/lib/google-ai";
 import { buildDataTableContext } from "@/lib/data-tables/retrieve";
-import { mergeDataTableContext } from "@/lib/data-tables/format-context";
+import { mergeDataTableContext, resolveProductCards } from "@/lib/data-tables/format-context";
 import {
   detectAssistantHandoffOffer,
   detectUserHandoffIntent,
@@ -230,7 +230,7 @@ export async function POST(
 
   const billingEventType = channel === WEB_EMBED_CHANNEL ? "widget" : "milink";
 
-  let dataTableContext = "";
+  let dataTableContext = { text: "", rows: [], columns: [] } as Awaited<ReturnType<typeof buildDataTableContext>>;
   if (agent.data_table_id) {
     dataTableContext = await buildDataTableContext(
       db,
@@ -241,7 +241,7 @@ export async function POST(
   }
   const promptWithCatalog = mergeDataTableContext(
     String(agent.prompt),
-    dataTableContext || null,
+    dataTableContext.text || null,
     { tableLinked: Boolean(agent.data_table_id) }
   );
   const temporal = buildColombiaTemporalContext();
@@ -285,7 +285,7 @@ export async function POST(
       }
     });
 
-    const reply = generated.text;
+    const reply = resolveProductCards(generated.text, dataTableContext.rows, dataTableContext.columns);
 
     let savedConversationId = conversationId ?? null;
     try {

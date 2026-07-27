@@ -3,7 +3,7 @@ import { getOriApiKey } from "@/lib/google-ai";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 import { buildDataTableContext } from "@/lib/data-tables/retrieve";
-import { mergeDataTableContext } from "@/lib/data-tables/format-context";
+import { mergeDataTableContext, resolveProductCards } from "@/lib/data-tables/format-context";
 import { geminiTextTemperature } from "@/lib/text-agent-form";
 import { generateTextAgentReply } from "@/lib/text-agent-generate";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
@@ -518,7 +518,7 @@ export async function processTwilioWhatsAppInbound(
     ? allConversationMessagesForGemini(refreshed)
     : [{ role: "user" as const, content: userForAi }];
 
-  let dataTableContext = "";
+  let dataTableContext = { text: "", rows: [], columns: [] } as Awaited<ReturnType<typeof buildDataTableContext>>;
   if (agent.data_table_id) {
     dataTableContext = await buildDataTableContext(
       db,
@@ -529,7 +529,7 @@ export async function processTwilioWhatsAppInbound(
   }
   const promptWithCatalog = mergeDataTableContext(
     String(agent.prompt),
-    dataTableContext || null,
+    dataTableContext.text || null,
     { tableLinked: Boolean(agent.data_table_id) }
   );
   const mergedPrompt = mergeCompanyContext(promptWithCatalog, companyContextText);
@@ -565,7 +565,7 @@ export async function processTwilioWhatsAppInbound(
         outboundWhatsAppChannel: channel
       }
     });
-    reply = generated.text;
+    reply = resolveProductCards(generated.text, dataTableContext.rows, dataTableContext.columns);
     geminiUsage = generated.usage;
     if (generated.toolResults.length) {
       console.info(
