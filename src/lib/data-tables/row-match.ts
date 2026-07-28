@@ -5,6 +5,18 @@ import { getCodeColumns, getNameColumn, normalizeText } from "@/lib/data-tables/
 const MIN_PRODUCT_NAME_LENGTH = 6;
 
 /**
+ * Descarta la frase que introducía a una línea recién eliminada.
+ *
+ * Sin esto, quitar un enlace o un precio dejaba colgando su presentación
+ * ("Puedes adquirirlo a través del siguiente enlace:") y el cliente recibía una
+ * frase que no lleva a ninguna parte.
+ */
+export function dropOrphanLeadIn(keptLines: string[]): void {
+  const last = keptLines[keptLines.length - 1]?.trim();
+  if (last && last.length <= 200 && last.endsWith(":")) keptLines.pop();
+}
+
+/**
  * Columnas que identifican de forma inequívoca a un producto: nombre, código y
  * enlace. Se excluyen a propósito categorías o atributos compartidos ("Códigos",
  * "Físico"), que casarían con decenas de filas a la vez.

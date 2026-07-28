@@ -302,6 +302,15 @@ section("Enlaces");
 
   r = guard(`Míralo en ${anotada.data.link}.`);
   check("enlace con punto final intacto", r.violations.length === 0, r.text);
+
+  // Al caerse el enlace no debe quedar colgando la frase que lo presentaba.
+  r = guard("Puedes adquirirlo en nuestra página web a través del siguiente enlace:\nhttps://edileyer.com/tienda/codigos/inventado/\n\n¿Necesitas algo más?");
+  check("frase que presentaba el enlace eliminado no queda huérfana",
+    !r.text.includes("siguiente enlace:") && r.text.includes("¿Necesitas algo más?"), r.text);
+
+  r = guard("El precio es el siguiente:\n$77.000\n\nQuedo atenta.");
+  check("frase que presentaba el precio eliminado no queda huérfana",
+    !r.text.includes("El precio es el siguiente:") && r.text.includes("Quedo atenta."), r.text);
 }
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 import type { DataTableColumn, DataTableRowRecord } from "@/types/data-table";
 import { formatCell } from "@/lib/data-tables/format-context";
 import { getNameColumn, normalizeText } from "@/lib/data-tables/search-rows";
-import { getIdentityColumns, rowsReferredIn } from "@/lib/data-tables/row-match";
+import { dropOrphanLeadIn, getIdentityColumns, rowsReferredIn } from "@/lib/data-tables/row-match";
 
 /**
  * Blindaje de los datos de ficha (título, autor, edición, año, código,
@@ -193,9 +193,14 @@ export function enforceCatalogLinks(
   const keptBlocks: string[] = [];
 
   for (const block of reply.split(/\n{2,}/)) {
-    const keptLines = block
-      .split("\n")
-      .filter(line => !offenders.some(url => line.includes(url)));
+    const keptLines: string[] = [];
+    for (const line of block.split("\n")) {
+      if (offenders.some(url => line.includes(url))) {
+        dropOrphanLeadIn(keptLines);
+        continue;
+      }
+      keptLines.push(line);
+    }
     const rebuilt = keptLines.join("\n");
     if (rebuilt.trim()) keptBlocks.push(rebuilt);
   }
@@ -258,6 +263,7 @@ export function enforceCatalogFields(
 
       // Un dato que la fila no tiene no puede aparecer en la respuesta.
       if (realParts.some(p => p === null)) {
+        dropOrphanLeadIn(keptLines);
         violations.push({
           label,
           action: "removed",

@@ -1,7 +1,7 @@
 import type { DataTableColumn, DataTableRowRecord } from "@/types/data-table";
 import { formatCell } from "@/lib/data-tables/format-context";
 import { getNameColumn, normalizeText } from "@/lib/data-tables/search-rows";
-import { getIdentityColumns, rowsReferredIn } from "@/lib/data-tables/row-match";
+import { dropOrphanLeadIn, getIdentityColumns, rowsReferredIn } from "@/lib/data-tables/row-match";
 
 /**
  * Última barrera contra precios inventados.
@@ -255,6 +255,7 @@ export function enforceCatalogAmounts(
 
       // La línea con el precio sin respaldo se cae; en su lugar queda el aviso
       // (una sola vez), para que el mensaje no pierda el hilo.
+      dropOrphanLeadIn(keptLines);
       if (!removedAny) keptLines.push(UNVERIFIED_PRICE_NOTE);
       removedAny = true;
       for (const offender of offenders) {
