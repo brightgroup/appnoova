@@ -497,6 +497,9 @@ export async function processTwilioWhatsAppInbound(
 
   let reply: string;
   let geminiUsage: ReturnType<typeof readGeminiUsage> | null = null;
+  // El guardián del catálogo tuvo que eliminar un dato que el agente afirmó
+  // sin respaldo: el cliente se queda sin respuesta y necesita un asesor.
+  let catalogNeedsHuman = false;
 
   try {
     await updateWhatsAppConversationMetadata(
@@ -590,6 +593,7 @@ export async function processTwilioWhatsAppInbound(
         JSON.stringify({ agentId: agent.id, violations: guarded.violations })
       );
     }
+    catalogNeedsHuman = guarded.needsHuman;
     reply = guarded.text;
     geminiUsage = generated.usage;
     if (generated.toolResults.length) {
@@ -618,7 +622,7 @@ export async function processTwilioWhatsAppInbound(
     return { ok: false, error: assistantPersist.error };
   }
 
-  if (detectAssistantHandoffOffer(reply)) {
+  if (catalogNeedsHuman || detectAssistantHandoffOffer(reply)) {
     await escalateConversationToHuman({
       db,
       userId: channel.user_id,

@@ -161,8 +161,13 @@ function priceColumnForLine(
   return priceCols.find(hasValue);
 }
 
-const UNVERIFIED_PRICE_NOTE =
-  "No tengo confirmado ese valor en el catálogo. Para darte el precio exacto, permíteme verificarlo con un asesor.";
+/**
+ * Reemplaza a la línea que se cayó. Anuncia el traspaso porque el sistema lo
+ * ejecuta de verdad (ver `needsHuman` en catalog-guard): sin eso el cliente se
+ * quedaba sin el dato y sin nadie que se lo diera.
+ */
+export const UNVERIFIED_PRICE_NOTE =
+  "No tengo ese dato confirmado en el catálogo. Te paso con un asesor de nuestro equipo para que te lo confirme; en un momento te atienden por este mismo chat.";
 
 export function enforceCatalogAmounts(
   reply: string,

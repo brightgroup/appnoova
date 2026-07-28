@@ -326,7 +326,9 @@ export async function POST(
       console.error("[public/microsite/chat] persist:", err);
     }
 
-    const aiHandoff = detectAssistantHandoffOffer(reply);
+    // `guarded.needsHuman`: el agente afirmó un dato que no existe en el
+    // catálogo y hubo que eliminarlo — el visitante se queda sin respuesta.
+    const aiHandoff = guarded.needsHuman || detectAssistantHandoffOffer(reply);
     if (aiHandoff && savedConversationId) {
       await escalateConversationToHuman({
         db,
