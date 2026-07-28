@@ -15,7 +15,7 @@ import { resolvePublicChatChannel } from "@/lib/widget-channel";
 import { getOriApiKey } from "@/lib/google-ai";
 import { buildDataTableContext } from "@/lib/data-tables/retrieve";
 import { mergeDataTableContext, resolveProductCards } from "@/lib/data-tables/format-context";
-import { enforceCatalogAmounts } from "@/lib/data-tables/price-guard";
+import { enforceCatalogFacts } from "@/lib/data-tables/catalog-guard";
 import { recentAssistantTextForCatalog } from "@/lib/data-tables/conversation-text";
 import {
   detectAssistantHandoffOffer,
@@ -249,6 +249,11 @@ export async function POST(
   );
   const temporal = buildColombiaTemporalContext();
   const systemInstruction = `${temporal.promptBlock}\n\n${mergeCompanyContext(promptWithCatalog, companyContextText)}`;
+  // Solo las instrucciones, SIN la tabla del catálogo: es lo que el guardián
+  // toma como "importes y enlaces que el negocio autoriza". Si se le pasara el
+  // prompt completo, la propia tabla incrustada daría por bueno cualquier
+  // precio del catálogo y la validación por producto dejaría de servir.
+  const catalogGuardPromptText = `${String(agent.prompt)}\n\n${companyContextText}`;
   const temperature = geminiTextTemperature(Number(agent.temperature) || 0.7);
   const maxOutputTokens = Number(agent.max_output_tokens) || 1024;
   const contactLabel = conversationId ? undefined : makeVisitorLabel();
@@ -288,15 +293,15 @@ export async function POST(
       }
     });
 
-    const guarded = enforceCatalogAmounts(
+    const guarded = enforceCatalogFacts(
       resolveProductCards(generated.text, dataTableContext.rows, dataTableContext.columns),
       dataTableContext.rows,
       dataTableContext.columns,
-      systemInstruction
+      catalogGuardPromptText
     );
     if (guarded.violations.length) {
       console.warn(
-        "[microsite/chat] precios fuera de catálogo:",
+        "[microsite/chat] datos corregidos contra el catálogo:",
         JSON.stringify({ agentId: agent.id, violations: guarded.violations })
       );
     }

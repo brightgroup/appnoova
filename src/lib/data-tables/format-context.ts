@@ -9,6 +9,10 @@ export function formatCell(value: unknown, col: DataTableColumn): string {
   if (col.type === "number" && typeof value === "number") {
     const label = col.label.toLowerCase();
     if (label.includes("precio") || label.includes("costo")) return formatCop(value);
+    // Sin separador de miles en enteros pequeños: un año salía como "2.026" y
+    // una edición como "1.043", tanto en la tabla que lee el modelo como en la
+    // ficha que ve el cliente.
+    if (Number.isInteger(value) && Math.abs(value) < 10000) return String(value);
     return new Intl.NumberFormat("es-CO").format(value);
   }
   return String(value);

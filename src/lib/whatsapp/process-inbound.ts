@@ -4,7 +4,7 @@ import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 import { buildDataTableContext } from "@/lib/data-tables/retrieve";
 import { mergeDataTableContext, resolveProductCards } from "@/lib/data-tables/format-context";
-import { enforceCatalogAmounts } from "@/lib/data-tables/price-guard";
+import { enforceCatalogFacts } from "@/lib/data-tables/catalog-guard";
 import { recentAssistantTextForCatalog } from "@/lib/data-tables/conversation-text";
 import { geminiTextTemperature } from "@/lib/text-agent-form";
 import { generateTextAgentReply } from "@/lib/text-agent-generate";
@@ -538,6 +538,11 @@ export async function processTwilioWhatsAppInbound(
   const mergedPrompt = mergeCompanyContext(promptWithCatalog, companyContextText);
   const temporal = buildColombiaTemporalContext();
   const systemInstruction = `${temporal.promptBlock}\n\n${mergedPrompt}`;
+  // Solo las instrucciones, SIN la tabla del catálogo: es lo que el guardián
+  // toma como "importes y enlaces que el negocio autoriza". Si se le pasara el
+  // prompt completo, la propia tabla incrustada daría por bueno cualquier
+  // precio del catálogo y la validación por producto dejaría de servir.
+  const catalogGuardPromptText = `${String(agent.prompt)}\n\n${companyContextText}`;
 
   try {
     const calendarConnection = orgId ? await getActiveCalendarConnection(db, orgId) : null;
@@ -573,15 +578,15 @@ export async function processTwilioWhatsAppInbound(
       dataTableContext.rows,
       dataTableContext.columns
     );
-    const guarded = enforceCatalogAmounts(
+    const guarded = enforceCatalogFacts(
       withRealCards,
       dataTableContext.rows,
       dataTableContext.columns,
-      systemInstruction
+      catalogGuardPromptText
     );
     if (guarded.violations.length) {
       console.warn(
-        "[whatsapp/inbound] precios fuera de catálogo:",
+        "[whatsapp/inbound] datos corregidos contra el catálogo:",
         JSON.stringify({ agentId: agent.id, violations: guarded.violations })
       );
     }
