@@ -225,6 +225,11 @@ export function enforceCatalogFields(
   const blocks = reply.split(/\n{2,}/);
   const keptBlocks: string[] = [];
 
+  // Mismo respaldo que en el guardián de importes: una ficha suelta sin repetir
+  // el título habla del único producto que hay en contexto.
+  const replyRows = rowsReferredIn(reply, rows, nameCol, strongCols);
+  const fallbackRows = replyRows.length > 0 ? replyRows : rows.length === 1 ? rows : [];
+
   for (const block of blocks) {
     const blockRows = rowsReferredIn(block, rows, nameCol, strongCols);
     const keptLines: string[] = [];
@@ -247,7 +252,14 @@ export function enforceCatalogFields(
       }
 
       const scope = rowsReferredIn(line, rows, nameCol, strongCols);
-      const row = scope.length === 1 ? scope[0] : blockRows.length === 1 ? blockRows[0] : null;
+      const row =
+        scope.length === 1
+          ? scope[0]
+          : blockRows.length === 1
+            ? blockRows[0]
+            : fallbackRows.length === 1
+              ? fallbackRows[0]
+              : null;
       if (!row) {
         keptLines.push(line);
         continue;

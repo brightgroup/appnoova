@@ -207,6 +207,23 @@ section("Precios: se corrige lo falso, se respeta lo correcto");
 
   r = guard("El envío cuesta $9.000 y a Amazonas $20.000. El bono mínimo es de $50.000.");
   check("importes autorizados por el prompt intactos", r.violations.length === 0, r.text);
+
+  // Seguimiento corto: "precio?" tras haber hablado de un solo producto.
+  r = guard("$160.000", [anotada]);
+  check("respuesta corta con un único producto en contexto se acepta",
+    r.violations.length === 0 && r.text.includes("$160.000"), r.text);
+
+  r = guard("El precio es $99.000.", [anotada]);
+  check("respuesta corta con precio falso se corrige",
+    r.text.includes("$160.000") && !r.text.includes("$99.000"), r.text);
+
+  r = guard("*Precio:* $89.000", [anotada]);
+  check("ficha suelta sin repetir el título se valida",
+    r.text.includes("$160.000") && !r.text.includes("$89.000"), r.text);
+
+  // Con varios productos en contexto y sin nombrar ninguno, no se adivina.
+  r = guard("Cuesta $99.000.");
+  check("respuesta corta ambigua con varios productos no se acepta", r.needsHuman, r.text);
 }
 
 // ---------------------------------------------------------------------------

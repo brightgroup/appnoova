@@ -203,6 +203,12 @@ export function enforceCatalogAmounts(
   const blocks = reply.split(/\n{2,}/);
   const keptBlocks: string[] = [];
 
+  // Cuando el texto no nombra ningún producto pero solo hay uno en contexto, se
+  // habla de ese. Es el caso de los seguimientos cortos: "precio?" → "$160.000".
+  // Sin este respaldo se borraba una respuesta correcta por no poder atribuirla.
+  const replyRows = rowsReferredIn(reply, rows, nameCol, strongCols);
+  const fallbackRows = replyRows.length > 0 ? replyRows : rows.length === 1 ? rows : [];
+
   for (const block of blocks) {
     const blockRows = rowsReferredIn(block, rows, nameCol, strongCols);
     const keptLines: string[] = [];
@@ -211,7 +217,8 @@ export function enforceCatalogAmounts(
       // El producto que nombra la propia línea manda sobre el del bloque: en
       // un listado ("Bolsillo: $65.000") cada línea habla de una fila distinta.
       const lineRows = rowsReferredIn(line, rows, nameCol, strongCols);
-      const scope = lineRows.length > 0 ? lineRows : blockRows;
+      const scope =
+        lineRows.length > 0 ? lineRows : blockRows.length > 0 ? blockRows : fallbackRows;
 
       // Solo se dan por buenos los precios del producto del que habla este
       // texto (más los importes que el propio prompt autoriza: envíos, bonos).
