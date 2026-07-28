@@ -320,7 +320,18 @@ function ConfigContent({
             <Field label="Agente de texto">
               <NoovaSelect
                 value={form.text_agent_id ?? ""}
-                onChange={v => updateForm({ text_agent_id: v || null })}
+                onChange={v => {
+                  const nextId = v || null;
+                  const prevName = agents.find(a => a.id === form.text_agent_id)?.name?.trim() ?? "";
+                  const nextName = agents.find(a => a.id === nextId)?.name?.trim() ?? "";
+                  const currentDisplay = form.agent_display_name?.trim() ?? "";
+                  const shouldSyncName =
+                    !currentDisplay || (Boolean(prevName) && currentDisplay === prevName);
+                  updateForm({
+                    text_agent_id: nextId,
+                    ...(shouldSyncName ? { agent_display_name: nextName || null } : {})
+                  });
+                }}
                 allowEmpty={true}
                 emptyLabel="Seleccionar agente"
                 options={agents.map(a => ({ value: a.id, label: a.name }))}
@@ -369,6 +380,10 @@ function ConfigContent({
                 placeholder={selectedAgent?.name ?? "Asistente virtual"}
                 className={inputCls}
               />
+              <p className="text-[10px] text-gray-500 mt-1.5 leading-snug">
+                Si lo dejas vacío o igual al agente, al cambiar de agente se actualiza solo.
+                Solo se conserva si escribes un nombre distinto (p. ej. “Asistente”).
+              </p>
             </Field>
 
             <ImageDropzone

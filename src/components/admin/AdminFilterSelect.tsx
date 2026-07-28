@@ -30,7 +30,12 @@ export function AdminFilterSelect({
   const [mounted, setMounted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [menuStyle, setMenuStyle] = useState({ top: 0, left: 0, minWidth: 0 });
+  const [menuStyle, setMenuStyle] = useState({
+    top: 0,
+    left: 0,
+    minWidth: 0,
+    maxHeight: 256,
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -40,12 +45,27 @@ export function AdminFilterSelect({
     const el = ref.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    const gap = 4;
+    const maxCap = 256;
+    const estimatedH = Math.min(maxCap, options.length * 40 + 8);
+    const spaceBelow = window.innerHeight - rect.bottom - gap;
+    const spaceAbove = rect.top - gap;
+    const openUpward = spaceBelow < Math.min(estimatedH, 140) && spaceAbove > spaceBelow;
+    const maxHeight = Math.min(maxCap, Math.max(96, openUpward ? spaceAbove : spaceBelow));
+    const minWidth = Math.max(rect.width, 160);
+    let left = rect.left;
+    if (left + minWidth > window.innerWidth - 8) {
+      left = Math.max(8, window.innerWidth - minWidth - 8);
+    }
     setMenuStyle({
-      top: rect.bottom + 4,
-      left: rect.left,
-      minWidth: Math.max(rect.width, 160),
+      top: openUpward
+        ? Math.max(8, rect.top - gap - maxHeight)
+        : rect.bottom + gap,
+      left,
+      minWidth,
+      maxHeight,
     });
-  }, []);
+  }, [options.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -79,11 +99,12 @@ export function AdminFilterSelect({
       <div
         ref={menuRef}
         role="listbox"
-        className={`fixed z-[9999] ${registryListShell} py-1 max-h-64 overflow-y-auto`}
+        className={`fixed z-[9999] ${registryListShell} py-1 overflow-y-auto`}
         style={{
           top: menuStyle.top,
           left: menuStyle.left,
           minWidth: menuStyle.minWidth,
+          maxHeight: menuStyle.maxHeight,
         }}
       >
         {options.map((opt) => {

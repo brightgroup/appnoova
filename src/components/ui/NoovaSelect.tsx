@@ -35,10 +35,18 @@ export function NoovaSelect({
   const [mounted, setMounted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [menuStyle, setMenuStyle] = useState<{ top: number; left: number; width: number }>({
+  const [menuStyle, setMenuStyle] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    openUpward: boolean;
+  }>({
     top: 0,
     left: 0,
     width: 0,
+    maxHeight: 240,
+    openUpward: false,
   });
 
   useEffect(() => {
@@ -49,17 +57,64 @@ export function NoovaSelect({
     const el = ref.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    const gap = 6;
+    const maxCap = 240; // max-h-60
+    const optionCount = options.length + (allowEmpty ? 1 : 0);
+    const estimatedH = Math.min(maxCap, optionCount * 42 + 8);
+    const spaceBelow = window.innerHeight - rect.bottom - gap;
+    const spaceAbove = rect.top - gap;
+    const openUpward = spaceBelow < Math.min(estimatedH, 140) && spaceAbove > spaceBelow;
+    const available = Math.max(96, openUpward ? spaceAbove : spaceBelow);
+    const maxHeight = Math.min(maxCap, available);
+    const width = Math.max(rect.width, 76);
+    let left = rect.left;
+    if (left + width > window.innerWidth - 8) {
+      left = Math.max(8, window.innerWidth - width - 8);
+    }
+
     setMenuStyle({
-      top: rect.bottom + 6,
-      left: rect.left,
-      width: rect.width,
+      top: openUpward
+        ? Math.max(8, rect.top - gap - maxHeight)
+        : rect.bottom + gap,
+      left,
+      width,
+      maxHeight,
+      openUpward,
     });
-  }, []);
+  }, [allowEmpty, options.length]);
 
   useEffect(() => {
     if (!open) return;
 
     updateMenuPosition();
+    // Recalcular con altura real del menú (abre hacia arriba si no cabe abajo).
+    const raf = requestAnimationFrame(() => {
+      const trigger = ref.current;
+      const menuEl = menuRef.current;
+      if (!trigger || !menuEl) return;
+      const rect = trigger.getBoundingClientRect();
+      const gap = 6;
+      const menuH = menuEl.getBoundingClientRect().height;
+      const spaceBelow = window.innerHeight - rect.bottom - gap;
+      const spaceAbove = rect.top - gap;
+      const openUpward = spaceBelow < menuH + 8 && spaceAbove > spaceBelow;
+      const maxHeight = Math.min(
+        240,
+        Math.max(96, openUpward ? spaceAbove : spaceBelow)
+      );
+      const width = Math.max(rect.width, 76);
+      let left = rect.left;
+      if (left + width > window.innerWidth - 8) {
+        left = Math.max(8, window.innerWidth - width - 8);
+      }
+      setMenuStyle({
+        top: openUpward ? Math.max(8, rect.top - gap - Math.min(menuH, maxHeight)) : rect.bottom + gap,
+        left,
+        width,
+        maxHeight,
+        openUpward,
+      });
+    });
 
     const close = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -75,6 +130,7 @@ export function NoovaSelect({
     window.addEventListener("scroll", onScrollOrResize, true);
 
     return () => {
+      cancelAnimationFrame(raf);
       document.removeEventListener("mousedown", close);
       window.removeEventListener("resize", onScrollOrResize);
       window.removeEventListener("scroll", onScrollOrResize, true);
@@ -102,12 +158,13 @@ export function NoovaSelect({
     <div
       ref={menuRef}
       role="listbox"
-      className={`fixed z-[9999] ${registryListShell} py-1 max-h-60 overflow-y-auto`}
+      className={`fixed z-[9999] ${registryListShell} py-1 overflow-y-auto`}
       style={{
         top: menuStyle.top,
         left: menuStyle.left,
         width: menuStyle.width,
         minWidth: menuStyle.width,
+        maxHeight: menuStyle.maxHeight,
       }}
     >
       {allowEmpty && (
