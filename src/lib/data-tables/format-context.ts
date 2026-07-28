@@ -4,7 +4,7 @@ function formatCop(value: number): string {
   return "$" + new Intl.NumberFormat("es-CO").format(Math.round(value));
 }
 
-function formatCell(value: unknown, col: DataTableColumn): string {
+export function formatCell(value: unknown, col: DataTableColumn): string {
   if (value === null || value === undefined || value === "") return "—";
   if (col.type === "number" && typeof value === "number") {
     const label = col.label.toLowerCase();
@@ -107,7 +107,10 @@ REGLAS OBLIGATORIAS — cumple siempre:
    - Si el cliente pide la información completa del producto: [[FICHA:<REF>]] — el sistema lo reemplaza por la ficha completa y exacta.
    - Si el cliente pide solo un dato puntual (solo el precio, solo el link, solo la edición, solo el código, etc.) o pides ese único dato dentro de un listado: [[FICHA:<REF>:<columna>]], usando el nombre exacto de esa columna tal como aparece en el encabezado de la tabla. El sistema lo reemplaza solo por ese valor.
    Nunca uses un REF o una columna que no aparezcan literalmente en la tabla de abajo; si no encuentras la fila o el dato, no pongas marcador — dile al cliente que no tienes esa información.
-7. Las reglas anteriores aplican solo a los datos factuales del producto. El resto de tu respuesta (saludo, tono, reseña si la piden, preguntas de seguimiento) lo sigues redactando tú con libertad.`;
+7. Esta sección tiene **prioridad sobre cualquier formato de ficha o plantilla** definido antes en tus instrucciones. Si tu formato incluye líneas como "*Precio:*", "*Autor:*" o "*Compra directa:*", rellénalas con el marcador correspondiente (ejemplo: \`*Precio:* [[FICHA:<REF>:<columna de precio>]]\`), nunca escribiendo el valor tú mismo. Si una línea de tu plantilla pide un dato que no existe en la tabla, omite esa línea: no la completes con tu conocimiento previo ni con el de un producto parecido.
+8. Si el cliente pregunta por **varios productos** en un mismo mensaje, responde solo por los que aparezcan en la tabla. De los que no aparezcan, di explícitamente que no tienes su información en el catálogo; jamás rellenes el faltante deduciendo de otro producto similar.
+9. Si el cliente dice que un precio o dato que diste **no coincide** con lo que ve en la web, en la tienda o en otro canal, no inventes explicaciones (promociones temporales, cambios recientes, versiones distintas, precios que varían). Vuelve a mirar la tabla: si el valor de la tabla es distinto al que diste, corrígelo usando el marcador; si no encuentras la fila, reconoce que no tienes ese dato confirmado y ofrece verificarlo con un asesor.
+10. Las reglas anteriores aplican solo a los datos factuales del producto. El resto de tu respuesta (saludo, tono, reseña si la piden, preguntas de seguimiento) lo sigues redactando tú con libertad.`;
 
   if (!catalogText?.trim()) {
     return `${base}

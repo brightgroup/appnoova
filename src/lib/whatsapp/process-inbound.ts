@@ -4,6 +4,8 @@ import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 import { buildDataTableContext } from "@/lib/data-tables/retrieve";
 import { mergeDataTableContext, resolveProductCards } from "@/lib/data-tables/format-context";
+import { enforceCatalogAmounts } from "@/lib/data-tables/price-guard";
+import { recentAssistantTextForCatalog } from "@/lib/data-tables/conversation-text";
 import { geminiTextTemperature } from "@/lib/text-agent-form";
 import { generateTextAgentReply } from "@/lib/text-agent-generate";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
@@ -524,7 +526,8 @@ export async function processTwilioWhatsAppInbound(
       db,
       String(agent.data_table_id),
       userForAi,
-      orgId
+      orgId,
+      { conversationText: recentAssistantTextForCatalog(geminiContents) }
     );
   }
   const promptWithCatalog = mergeDataTableContext(
@@ -565,7 +568,24 @@ export async function processTwilioWhatsAppInbound(
         outboundWhatsAppChannel: channel
       }
     });
-    reply = resolveProductCards(generated.text, dataTableContext.rows, dataTableContext.columns);
+    const withRealCards = resolveProductCards(
+      generated.text,
+      dataTableContext.rows,
+      dataTableContext.columns
+    );
+    const guarded = enforceCatalogAmounts(
+      withRealCards,
+      dataTableContext.rows,
+      dataTableContext.columns,
+      systemInstruction
+    );
+    if (guarded.violations.length) {
+      console.warn(
+        "[whatsapp/inbound] precios fuera de catálogo:",
+        JSON.stringify({ agentId: agent.id, violations: guarded.violations })
+      );
+    }
+    reply = guarded.text;
     geminiUsage = generated.usage;
     if (generated.toolResults.length) {
       console.info(

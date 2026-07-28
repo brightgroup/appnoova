@@ -15,6 +15,8 @@ import { resolvePublicChatChannel } from "@/lib/widget-channel";
 import { getOriApiKey } from "@/lib/google-ai";
 import { buildDataTableContext } from "@/lib/data-tables/retrieve";
 import { mergeDataTableContext, resolveProductCards } from "@/lib/data-tables/format-context";
+import { enforceCatalogAmounts } from "@/lib/data-tables/price-guard";
+import { recentAssistantTextForCatalog } from "@/lib/data-tables/conversation-text";
 import {
   detectAssistantHandoffOffer,
   detectUserHandoffIntent,
@@ -236,7 +238,8 @@ export async function POST(
       db,
       String(agent.data_table_id),
       visitorText,
-      billing.organizationId
+      billing.organizationId,
+      { conversationText: recentAssistantTextForCatalog(messages) }
     );
   }
   const promptWithCatalog = mergeDataTableContext(
@@ -285,7 +288,19 @@ export async function POST(
       }
     });
 
-    const reply = resolveProductCards(generated.text, dataTableContext.rows, dataTableContext.columns);
+    const guarded = enforceCatalogAmounts(
+      resolveProductCards(generated.text, dataTableContext.rows, dataTableContext.columns),
+      dataTableContext.rows,
+      dataTableContext.columns,
+      systemInstruction
+    );
+    if (guarded.violations.length) {
+      console.warn(
+        "[microsite/chat] precios fuera de catálogo:",
+        JSON.stringify({ agentId: agent.id, violations: guarded.violations })
+      );
+    }
+    const reply = guarded.text;
 
     let savedConversationId = conversationId ?? null;
     try {

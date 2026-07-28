@@ -12,6 +12,13 @@ export const MAX_ROWS_PER_QUERY = 60;
 /** Máximo al filtrar por categoría. */
 export const MAX_CATEGORY_ROWS = 100;
 
+/**
+ * Máximo de filas añadidas por la segunda pasada de cobertura (ver
+ * `addUncoveredMatches`), cuando el cliente pregunta por más de un producto en
+ * un mismo mensaje.
+ */
+export const MAX_SECOND_PASS_ROWS = 12;
+
 const CODE_COLUMN_HINTS = [
   "sku", "codigo", "código", "code", "referencia", "ref", "ean", "barcode", "plu", "item",
 ];
@@ -138,6 +145,18 @@ function rowValuesNormalized(row: DataTableRowRecord, columns: DataTableColumn[]
     .join(" ");
 }
 
+interface ScoredRow {
+  row: DataTableRowRecord;
+  score: number;
+  /** Palabras del mensaje que aparecen en la columna de nombre de esta fila. */
+  nameHits: string[];
+  /**
+   * La fila coincide por algo más que palabras sueltas dentro de un texto
+   * largo: código/SKU, nombre completo o categoría pedida explícitamente.
+   */
+  strong: boolean;
+}
+
 function scoreRow(
   row: DataTableRowRecord,
   columns: DataTableColumn[],
@@ -148,8 +167,10 @@ function scoreRow(
   codeCols: DataTableColumn[],
   categoryMatch: string | null,
   filterCol: DataTableColumn | undefined
-): number {
+): ScoredRow {
   let score = 0;
+  let strong = false;
+  let nameHits: string[] = [];
   const msgNorm = normalizeText(message);
   const rowText = rowValuesNormalized(row, columns);
 
@@ -158,8 +179,13 @@ function scoreRow(
     for (const col of codeCols) {
       const val = normalizeText(String(row.data[col.key] ?? ""));
       if (!val) continue;
-      if (val === codeNorm) score += 1000;
-      else if (val.includes(codeNorm) || codeNorm.includes(val)) score += 450;
+      if (val === codeNorm) {
+        score += 1000;
+        strong = true;
+      } else if (val.includes(codeNorm) || codeNorm.includes(val)) {
+        score += 450;
+        strong = true;
+      }
     }
     if (rowText.includes(codeNorm)) score += 120;
   }
@@ -167,14 +193,21 @@ function scoreRow(
   if (nameCol) {
     const name = normalizeText(String(row.data[nameCol.key] ?? ""));
     if (name) {
-      if (name === msgNorm) score += 900;
-      else if (msgNorm.includes(name)) score += 750;
-      else if (name.includes(msgNorm) && msgNorm.length >= 6) score += 650;
+      if (name === msgNorm) {
+        score += 900;
+        strong = true;
+      } else if (msgNorm.includes(name)) {
+        score += 750;
+        strong = true;
+      } else if (name.includes(msgNorm) && msgNorm.length >= 6) {
+        score += 650;
+        strong = true;
+      }
 
-      const matched = tokens.filter(t => name.includes(t));
-      score += matched.length * 90;
-      if (tokens.length >= 2 && matched.length === tokens.length) score += 250;
-      if (tokens.length === 1 && matched.length === 1) score += 150;
+      nameHits = tokens.filter(t => name.includes(t));
+      score += nameHits.length * 90;
+      if (tokens.length >= 2 && nameHits.length === tokens.length) score += 250;
+      if (tokens.length === 1 && nameHits.length === 1) score += 150;
     }
   }
 
@@ -184,10 +217,61 @@ function scoreRow(
 
   if (filterCol && categoryMatch) {
     const cat = normalizeText(String(row.data[filterCol.key] ?? ""));
-    if (cat === normalizeText(categoryMatch)) score += 300;
+    if (cat === normalizeText(categoryMatch)) {
+      score += 300;
+      strong = true;
+    }
   }
 
-  return score;
+  return { row, score, nameHits, strong };
+}
+
+function rowName(row: DataTableRowRecord, nameCol: DataTableColumn | undefined): string {
+  if (!nameCol) return "";
+  return normalizeText(String(row.data[nameCol.key] ?? ""));
+}
+
+/**
+ * Segunda pasada: rescata los productos que el cliente nombró en el mismo
+ * mensaje pero que la primera pasada descartó por puntaje.
+ *
+ * Sin esto, un mensaje con dos productos ("info de estos dos: Código Civil
+ * Anotado y la Constitución Política Anotada") devolvía UNA sola fila: la
+ * coincidencia exacta se lleva ~1.000 puntos y el segundo producto, nombrado
+ * de forma parcial, se queda en ~350 — por debajo de cualquier umbral relativo
+ * al primero. El modelo se quedaba sin datos reales del segundo producto y se
+ * los inventaba (precio, autor, edición) con total confianza.
+ *
+ * En vez de bajar el umbral (que reintroduce decenas de filas irrelevantes),
+ * se mira qué palabras del mensaje NO quedaron cubiertas por el nombre de
+ * ninguna fila ya seleccionada y se rescatan solo las filas que cubren el
+ * máximo de esas palabras sobrantes.
+ */
+function addUncoveredMatches(
+  selected: ScoredRow[],
+  candidates: ScoredRow[],
+  tokens: string[],
+  nameCol: DataTableColumn | undefined
+): ScoredRow[] {
+  if (!nameCol || candidates.length === 0) return [];
+
+  const selectedNames = selected.map(s => rowName(s.row, nameCol)).filter(Boolean);
+  const uncovered = tokens.filter(
+    t => t.length >= 4 && !selectedNames.some(name => name.includes(t))
+  );
+  if (uncovered.length === 0) return [];
+
+  const rescued = candidates
+    .map(c => ({ candidate: c, hits: uncovered.filter(t => rowName(c.row, nameCol).includes(t)) }))
+    .filter(r => r.hits.length > 0);
+  if (rescued.length === 0) return [];
+
+  const bestHits = Math.max(...rescued.map(r => r.hits.length));
+  return rescued
+    .filter(r => r.hits.length === bestHits)
+    .sort((a, b) => b.candidate.score - a.candidate.score)
+    .slice(0, MAX_SECOND_PASS_ROWS)
+    .map(r => r.candidate);
 }
 
 export interface RowSelectionResult {
@@ -263,13 +347,19 @@ export function selectRowsForMessage(
     };
   }
 
-  const scored = active
-    .map(row => ({
-      row,
-      score: scoreRow(row, columns, message, tokens, codeTokens, nameCol, codeCols, categoryMatch, filterCol),
-    }))
+  const allScored = active
+    .map(row =>
+      scoreRow(row, columns, message, tokens, codeTokens, nameCol, codeCols, categoryMatch, filterCol)
+    )
     .filter(s => s.score > 0)
     .sort((a, b) => b.score - a.score);
+
+  // Si alguna fila coincide por nombre/código/categoría, las que solo calzan
+  // por palabras sueltas dentro de un texto largo (una reseña que menciona
+  // "civil" de pasada) son ruido: contaminan el contexto y le dan al modelo
+  // productos ajenos con los que confundir el precio del que sí pidieron.
+  const relevant = allScored.filter(s => s.nameHits.length > 0 || s.strong);
+  const scored = relevant.length > 0 ? relevant : allScored;
 
   if (scored.length === 0) {
     return {
@@ -279,7 +369,7 @@ export function selectRowsForMessage(
   }
 
   const topScore = scored[0].score;
-  let selected: typeof scored;
+  let selected: ScoredRow[];
 
   if (topScore >= 1000) {
     // Tope aplicado siempre, incluso aquí: en mensajes largos (ej. la
@@ -295,7 +385,16 @@ export function selectRowsForMessage(
     selected = scored.filter(s => s.score >= threshold).slice(0, MAX_ROWS_PER_QUERY);
   }
 
-  const note = `Resultados relevantes: ${selected.length} de ${total} productos en catálogo.`;
+  const selectedIds = new Set(selected.map(s => s.row.id));
+  const extra = addUncoveredMatches(
+    selected,
+    scored.filter(s => !selectedIds.has(s.row.id)),
+    tokens,
+    nameCol
+  );
+  const finalRows = [...selected, ...extra];
 
-  return { rows: selected.map(s => s.row), note };
+  const note = `Resultados relevantes: ${finalRows.length} de ${total} productos en catálogo.`;
+
+  return { rows: finalRows.map(s => s.row), note };
 }

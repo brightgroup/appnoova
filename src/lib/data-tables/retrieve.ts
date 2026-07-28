@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DataTableColumn, DataTableRowRecord } from "@/types/data-table";
 import { formatRowsAsCatalog } from "@/lib/data-tables/format-context";
+import { mergeRowsUnique, pinRowsMentionedIn } from "@/lib/data-tables/pinned-rows";
 import {
   FULL_CATALOG_MAX_ROWS,
   selectRowsForMessage,
@@ -16,11 +17,21 @@ export interface DataTableContextResult {
 
 const EMPTY_CONTEXT: DataTableContextResult = { text: "", rows: [], columns: [] };
 
+export interface DataTableContextOptions {
+  /**
+   * Texto reciente de la conversación (últimas respuestas del agente) para
+   * mantener en contexto los productos ya nombrados, aunque el mensaje actual
+   * no los repita. Ver `pinRowsMentionedIn`.
+   */
+  conversationText?: string | null;
+}
+
 export async function buildDataTableContext(
   db: SupabaseClient,
   dataTableId: string,
   userMessage: string,
-  organizationId?: string | null
+  organizationId?: string | null,
+  options?: DataTableContextOptions
 ): Promise<DataTableContextResult> {
   let tableQuery = db.from("data_tables").select("*").eq("id", dataTableId);
   if (organizationId) tableQuery = tableQuery.eq("organization_id", organizationId);
@@ -48,8 +59,20 @@ export async function buildDataTableContext(
   }
 
   const { rows: selected, note } = selectRowsForMessage(typedRows, columns, userMessage);
-  const catalog = formatRowsAsCatalog(columns, selected);
+  const pinned = pinRowsMentionedIn(options?.conversationText ?? "", typedRows, columns);
+  const rowsForContext = mergeRowsUnique(selected, pinned);
+  const catalog = formatRowsAsCatalog(columns, rowsForContext);
 
-  const text = note && catalog.trim() ? `${note}\n\n${catalog}` : note || catalog;
-  return { text, rows: selected, columns };
+  const carried = rowsForContext.length - selected.length;
+  const fullNote = [
+    note,
+    carried > 0
+      ? `Se incluyen además ${carried} producto(s) ya mencionados antes en esta conversación.`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const text = fullNote && catalog.trim() ? `${fullNote}\n\n${catalog}` : fullNote || catalog;
+  return { text, rows: rowsForContext, columns };
 }
