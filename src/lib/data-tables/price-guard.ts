@@ -173,7 +173,9 @@ export function enforceCatalogAmounts(
   reply: string,
   rows: DataTableRowRecord[],
   columns: DataTableColumn[],
-  allowedText?: string | null
+  allowedText?: string | null,
+  /** Importes ya tomados de la base de datos por un guardián anterior. */
+  preVerified: number[] = []
 ): AmountGuardResult {
   const priceCols = getPriceColumns(columns);
   // Sin columna de precios, el dinero que mencione el agente no sale del
@@ -183,6 +185,7 @@ export function enforceCatalogAmounts(
   const strongCols = getIdentityColumns(columns).filter(c => c !== getNameColumn(columns));
   const nameCol = getNameColumn(columns);
   const promptAmounts = collectAllowedFromPrompt(allowedText);
+  for (const value of preVerified) promptAmounts.add(value);
 
   // Importes que el agente escribió y que sí existen en alguna fila del
   // contexto. No sirven para dar por bueno un precio suelto (con decenas de

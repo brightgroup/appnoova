@@ -67,6 +67,14 @@ export interface FieldViolation {
 export interface FieldGuardResult {
   text: string;
   violations: FieldViolation[];
+  /**
+   * Valores numéricos que este guardián escribió tomándolos de la fila real.
+   * Los guardianes que corren después los dan por buenos: al reescribir una
+   * línea puede perderse el texto que identificaba al producto, y sin esto el
+   * guardián de importes no reconocía el precio que este acababa de corregir y
+   * borraba su propia corrección.
+   */
+  verifiedAmounts: number[];
 }
 
 function labelKey(label: string): string {
@@ -98,6 +106,9 @@ function columnsForLabel(label: string, columns: DataTableColumn[]): DataTableCo
 
 function valueTokens(value: string): string[] {
   return normalizeText(value)
+    // "1.200" y "1200" son el mismo dato: se colapsa el separador de miles
+    // antes de partir, para no comparar trozos sueltos ("1" y "200").
+    .replace(/(\d)[.,](?=\d{3}\b)/g, "$1")
     .split(/[^a-z0-9]+/)
     // Los números de una cifra cuentan: una edición "3" es un dato, mientras
     // que una letra suelta es ruido de puntuación.
@@ -110,16 +121,24 @@ function valueTokens(value: string): string[] {
  * "Álvaro Tafur González"), pero exigiendo que estén todas: cambiar "43" por
  * "44" o un apellido por otro no pasa.
  */
-function valueMatches(wrote: string, real: string): boolean {
-  const a = valueTokens(wrote);
-  const b = valueTokens(real);
-  if (b.length === 0) return false;
-  const setA = new Set(a);
-  const missing = b.filter(t => !setA.has(t));
-  if (missing.length > 0) return false;
-  // El agente puede añadir contexto ("$192.000 COP"), pero no un dato distinto:
-  // se limita cuánto puede sobrar respecto al valor real.
-  return a.length <= b.length + 3;
+function valueMatches(wrote: string, realValues: string[], numericStrict: boolean): boolean {
+  const wroteTokens = valueTokens(wrote);
+  const setA = new Set(wroteTokens);
+  const realTokens = new Set(realValues.flatMap(valueTokens));
+  if (realTokens.size === 0) return false;
+
+  // Basta con que estén todas las palabras del valor real. El agente suele
+  // añadir contexto ("$192.000 COP", "Álvaro Tafur González, jurista"), y
+  // rechazar eso hacía que se reescribiera una línea que era correcta,
+  // truncando de paso el texto que la acompañaba.
+  for (const t of realTokens) if (!setA.has(t)) return false;
+
+  // En un campo numérico, en cambio, una cifra de más es un dato inventado:
+  // "$160.000 con descuento $120.000" trae el precio real y otro que no existe.
+  if (numericStrict && wroteTokens.some(t => /^\d+$/.test(t) && !realTokens.has(t))) {
+    return false;
+  }
+  return true;
 }
 
 const URL_RE = /https?:\/\/[^\s<>()[\]{}"']+|\bwww\.[^\s<>()[\]{}"']+/gi;
@@ -190,12 +209,13 @@ export function enforceCatalogFields(
   columns: DataTableColumn[]
 ): FieldGuardResult {
   if (!reply.trim() || rows.length === 0 || columns.length === 0) {
-    return { text: reply, violations: [] };
+    return { text: reply, violations: [], verifiedAmounts: [] };
   }
 
   const nameCol = getNameColumn(columns);
   const strongCols = getIdentityColumns(columns).filter(c => c !== nameCol);
   const violations: FieldViolation[] = [];
+  const verifiedAmounts: number[] = [];
 
   const blocks = reply.split(/\n{2,}/);
   const keptBlocks: string[] = [];
@@ -248,14 +268,18 @@ export function enforceCatalogFields(
       }
 
       const real = realParts.map(p => p!.value);
+      // Una etiqueta simple puede corresponder a varias columnas ("Autor" →
+      // "Autor (catálogo)" o "Autor completo"): basta con que el valor escrito
+      // coincida con una de ellas. Una compuesta ("Edición/Año") se valida
+      // contra el conjunto de todas sus partes a la vez.
       const ok =
         real.length === 1
           ? mapped[0].some(c => {
               const v = row.data[c.key];
               if (v === null || v === undefined || v === "") return false;
-              return valueMatches(wrote, formatCell(v, c));
+              return valueMatches(wrote, [formatCell(v, c)], c.type === "number");
             })
-          : real.every(value => valueMatches(wrote, value) || valueTokens(wrote).includes(valueTokens(value)[0]));
+          : valueMatches(wrote, real, realParts.every(p => p!.col.type === "number"));
 
       if (ok) {
         keptLines.push(line);
@@ -264,6 +288,10 @@ export function enforceCatalogFields(
 
       const rebuilt = `${indent}${heading} ${real.join(" / ")}`;
       keptLines.push(rebuilt);
+      for (const part of realParts) {
+        const raw = part!.col.type === "number" ? row.data[part!.col.key] : null;
+        if (typeof raw === "number") verifiedAmounts.push(raw);
+      }
       violations.push({
         label,
         action: "corrected",
@@ -277,5 +305,5 @@ export function enforceCatalogFields(
     if (rebuilt.trim()) keptBlocks.push(rebuilt);
   }
 
-  return { text: keptBlocks.join("\n\n").trim(), violations };
+  return { text: keptBlocks.join("\n\n").trim(), violations, verifiedAmounts };
 }

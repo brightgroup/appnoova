@@ -48,7 +48,13 @@ export function enforceCatalogFacts(
 ): CatalogGuardResult {
   const fields = enforceCatalogFields(reply, rows, columns);
   const links = enforceCatalogLinks(fields.text, rows, columns, promptText);
-  const amounts = enforceCatalogAmounts(links.text, rows, columns, promptText);
+  const amounts = enforceCatalogAmounts(
+    links.text,
+    rows,
+    columns,
+    promptText,
+    fields.verifiedAmounts
+  );
 
   const violations = [...fields.violations, ...links.violations, ...amounts.violations];
   const needsHuman = violations.some(v => v.action === "removed");
