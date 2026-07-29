@@ -274,6 +274,24 @@ section("Campos de ficha: autor, edición, año, código");
   r = guard("*Horario:* Lunes a viernes de 9 a 5\n*Teléfono:* 300 279 6489");
   check("etiquetas que no son columnas quedan intactas",
     r.violations.length === 0 && r.text.includes("300 279 6489"), r.text);
+
+  // El catálogo real tiene una columna "N°" (número de fila). Sin exigir que el
+  // prefijo sea una palabra completa, casaba con "Número de contacto" y el
+  // teléfono de la librería salía reescrito como el número de fila.
+  const conNumero = [{ ...anotada, data: { ...anotada.data, "n": 47 } }] as DataTableRowRecord[];
+  const columnasConN = [{ key: "n", label: "N°", type: "number", display: true, filterable: false },
+    ...columns] as unknown as DataTableColumn[];
+  const tel = enforceCatalogFacts(
+    "*Ciudad:* Cali\n*Número de contacto:* 300 602 9794\n*Título:* Constitución Política de Colombia Anotada",
+    conNumero, columnasConN, PROMPT);
+  check("teléfono no se confunde con la columna N°",
+    tel.violations.length === 0 && tel.text.includes("300 602 9794"), tel.text);
+
+  const nombre = enforceCatalogFacts(
+    "*Nombre del asesor:* Laura\n*Título:* Constitución Política de Colombia Anotada",
+    conNumero, columnasConN, PROMPT);
+  check("etiqueta que empieza como una columna pero no lo es queda intacta",
+    nombre.violations.length === 0 && nombre.text.includes("Laura"), nombre.text);
 }
 
 // ---------------------------------------------------------------------------

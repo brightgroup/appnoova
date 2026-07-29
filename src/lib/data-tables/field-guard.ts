@@ -56,6 +56,9 @@ const LABEL_SYNONYMS: Record<string, string[]> = {
 
 const MIN_TOKEN_LENGTH = 2;
 
+/** Largo mínimo para emparejar una etiqueta con una columna por prefijo. */
+const MIN_PREFIX_LENGTH = 4;
+
 export interface FieldViolation {
   label: string;
   action: "corrected" | "removed";
@@ -98,7 +101,13 @@ function columnsForLabel(label: string, columns: DataTableColumn[]): DataTableCo
   const candidates = columns.filter(c => {
     const colKey = labelKey(c.label);
     const rawKey = labelKey(c.key);
-    if (colKey.startsWith(key) || key.startsWith(colKey)) return true;
+    // Solo se admite que la COLUMNA amplíe la etiqueta ("Precio" → "Precio
+    // COP"), nunca al revés, y por palabra completa. La dirección contraria
+    // convertía cualquier etiqueta que empezara como una columna en un dato del
+    // catálogo: "Número de contacto" tomaba la columna "N°" (el número de fila)
+    // y "Nombre del asesor" tomaba el nombre del producto, así que el teléfono
+    // de la librería y el nombre de la asesora salían reescritos.
+    if (key.length >= MIN_PREFIX_LENGTH && colKey.startsWith(`${key} `)) return true;
     return synonyms.some(s => colKey === s || rawKey === s || colKey.startsWith(`${s} `));
   });
   return candidates;
