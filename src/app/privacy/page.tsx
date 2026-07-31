@@ -354,6 +354,13 @@ export default function PrivacyPolicyPage() {
       </main>
 
       <footer className="border-t border-white/[.06] py-8 px-6 text-center text-sm text-gray-500 leading-relaxed">
+        <p className="mb-3 space-x-3">
+          <Link href="/privacy" className="text-[#a5a5ff] hover:underline">Política de Privacidad</Link>
+          <span>·</span>
+          <Link href="/terminos" className="text-[#a5a5ff] hover:underline">Términos de Servicio</Link>
+          <span>·</span>
+          <Link href="/reembolsos" className="text-[#a5a5ff] hover:underline">Política de Reembolsos</Link>
+        </p>
         <p>© 2026 Noova 360 · BG Soluciones · Bogotá, Colombia</p>
         <p className="mt-2 text-xs text-gray-600 max-w-xl mx-auto">
           Esta política cumple con la Ley 1581 de 2012, los requisitos de Meta para proveedores de tecnología
