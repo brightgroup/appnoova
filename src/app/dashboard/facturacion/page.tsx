@@ -19,6 +19,7 @@ import { InfoBox } from "@/components/ui/InfoBox";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { usePricingCatalog } from "@/hooks/usePricingCatalog";
+import { PaddleCheckoutButton } from "@/components/billing/PaddleCheckoutButton";
 import type { PlanPromoDisplay } from "@/lib/billing/plan-promo";
 import {
   BILLING_CHART_CATEGORIES,
@@ -858,6 +859,11 @@ export default function FacturacionPage() {
                               <p className="text-sm font-bold text-[var(--nv-text)]">{fmtN(callsEstActive)} min/mes</p>
                               <p className="text-[9px] text-[var(--nv-text-muted)]">a {voiceCreditsPerMin} créditos / minuto</p>
                             </div>
+                          </div>
+                        )}
+                        {!isActive && p.price_usd > 0 && (
+                          <div className="px-5 pb-5">
+                            <PaddleCheckoutButton planId={p.id} planName={p.name} onCheckoutCompleted={load} />
                           </div>
                         )}
                       </div>
