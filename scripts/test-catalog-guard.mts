@@ -133,6 +133,15 @@ section("Búsqueda: qué filas llegan al modelo");
   check("descripción de imagen larga no dispara rama de categorías",
     imagen.rows.some(r => String(r.data.nombre).includes("Anotada")), imagen.rows.map(r => r.data.nombre));
 
+  // Un mensaje que no nombra ningún producto no debe dar por buenas las filas
+  // que calzan de casualidad dentro de una reseña: es lo que marca `weak`, y
+  // lo que permite rehacer la búsqueda con lo que el cliente pidió antes.
+  const flojo = selectRowsForMessage(catalogo, columns, "todas, solo necesito precios para comparar");
+  check("mensaje sin producto se marca como búsqueda débil", flojo.weak, flojo.rows.map(r => r.data.nombre));
+
+  const conNombre = selectRowsForMessage(catalogo, columns, "precio de la constitucion anotada");
+  check("mensaje que sí nombra un producto no es débil", !conNombre.weak, conNombre.rows.map(r => r.data.nombre));
+
   // Seguimiento sin nombre de producto: el ancla lo mantiene en contexto.
   const seguimiento = selectRowsForMessage(catalogo, columns, "y ese precio es en fisico?");
   const anclado = mergeRowsUnique(
@@ -227,6 +236,71 @@ section("Precios: se corrige lo falso, se respeta lo correcto");
 }
 
 // ---------------------------------------------------------------------------
+section("Listado de presentaciones y productos que no están en el catálogo");
+// ---------------------------------------------------------------------------
+{
+  // Conversación #771000 (widget, 1-ago-2026): la clienta pidió siete productos
+  // y ninguno llegó al contexto, así que el modelo redactó la tabla con las
+  // únicas cifras que tenía a la vista y fusionó dos títulos en uno inexistente.
+  const listado = `*Constitución Política de Colombia*
+*Bolsillo:* $25.000
+*Básico:* $35.000
+*Anotado:* $35.000
+*Comentado:* $35.000`;
+
+  let r = guard(listado);
+  check("cada presentación se corrige con SU precio, no con el de una hermana",
+    r.text.includes("$65.000") && r.text.includes("$80.000") &&
+    r.text.includes("$160.000") && r.text.includes("$450.000") && !r.text.includes("$35.000"), r.text);
+
+  // El modelo escribe "Anotado" donde el catálogo dice "Anotada".
+  r = guard(`*Constitución Política de Colombia*
+*Bolsillo:* $65.000
+*Básica:* $80.000
+*Anotada:* $160.000
+*Comentada:* $450.000`);
+  check("listado de presentaciones con precios correctos intacto", r.violations.length === 0, r.text);
+
+  // Un precio del prompt (envío, bono, suscripción) no autoriza el precio de un
+  // producto: en la línea de ficha manda el dato de la fila.
+  r = guard("*Constitución Política de Colombia Bolsillo*\n*Precio:* $50.000");
+  check("importe del prompt no se cuela como precio de una ficha",
+    r.text.includes("$65.000") && !r.text.includes("$50.000"), r.text);
+
+  r = guard("El envío cuesta $9.000 y el bono mínimo es de $50.000.");
+  check("importes del prompt siguen intactos fuera de una ficha", r.violations.length === 0, r.text);
+
+  // Producto que NO existe: no puede tomar prestado el precio ni el enlace del
+  // que más se le parece.
+  r = guard(`*Código General del Proceso y de Familia*
+*Bolsillo:* $25.000
+*Básico:* $35.000
+*Compra directa:* ${anotada.data.link}`);
+  check("producto inexistente no hereda precio de otro",
+    r.needsHuman && !r.text.includes("$25.000") && !r.text.includes("$35.000"), r.text);
+  check("el bloque contaminado se cae entero, sin dejar el enlace ajeno",
+    !r.text.includes(String(anotada.data.link)), r.text);
+
+  // Un bloque huérfano no se atribuye a un producto nombrado en otro bloque.
+  r = guard(`La *Constitución Política de Colombia Anotada* cuesta $160.000.
+
+*Código de Comercio*
+*Precio:* $75.000`);
+  check("un bloque no toma el producto de otro bloque para validar su precio",
+    r.needsHuman && !r.text.includes("$75.000") && r.text.includes("$160.000"), r.text);
+
+  // El guardián de campos tampoco debe reescribir la ficha de un bloque con los
+  // datos del producto que calzó en otro: así se sustituyó el enlace de la
+  // Gaceta por el de un libro sobre la familia.
+  r = guard(`La *Constitución Política de Colombia Anotada* cuesta $160.000.
+
+*Gaceta Jurisprudencial*
+*Enlace:* www.edileyer.com`);
+  check("un enlace de otro bloque no se reescribe con el del producto vecino",
+    r.text.includes("www.edileyer.com") && !r.text.includes(String(anotada.data.link)), r.text);
+}
+
+// ---------------------------------------------------------------------------
 section("Campos de ficha: autor, edición, año, código");
 // ---------------------------------------------------------------------------
 {
@@ -256,6 +330,15 @@ section("Campos de ficha: autor, edición, año, código");
 
   r = guard(ficha("Francisco Gómez Sierra", "43 / 2026", "$160.000", LINK));
   check("campo ajeno a la tabla (Formato) intacto", r.text.includes("*Formato:* Físico y digital"), r.text);
+
+  // Reescribir el título convierte la ficha en la de OTRO libro: el cliente
+  // recibía autor, precio y enlace de una obra que nunca pidió.
+  r = guard(`*Título:* Código de Comercio Anotado
+*Autor:* Jairo Ramos
+*Precio:* $88.000
+*Compra directa:* https://edileyer.com/tienda/codigos/codigo-de-comercio-anotado/`);
+  check("ficha de un libro ausente no se reescribe como otro libro",
+    r.needsHuman && !r.text.includes("Gómez Sierra") && !r.text.includes("$160.000"), r.text);
 
   r = guard("*Título:* Constitución Política de Colombia Anotada\n*Código:* 978-111-222-333-4");
   check("ISBN inventado corregido", r.text.includes("978-958-795-631-3"), r.text);

@@ -5,7 +5,10 @@ import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 import { buildDataTableContext } from "@/lib/data-tables/retrieve";
 import { mergeDataTableContext, resolveProductCards } from "@/lib/data-tables/format-context";
 import { enforceCatalogFacts } from "@/lib/data-tables/catalog-guard";
-import { recentAssistantTextForCatalog } from "@/lib/data-tables/conversation-text";
+import {
+  previousUserTextForCatalog,
+  recentAssistantTextForCatalog
+} from "@/lib/data-tables/conversation-text";
 import { geminiTextTemperature } from "@/lib/text-agent-form";
 import { generateTextAgentReply } from "@/lib/text-agent-generate";
 import { persistChatTurn } from "@/lib/text-conversation-persist";
@@ -98,7 +101,10 @@ export async function POST(req: NextRequest) {
       String(agent.data_table_id),
       lastUser.content.trim(),
       billing.organizationId,
-      { conversationText: recentAssistantTextForCatalog(messages) }
+      {
+        conversationText: recentAssistantTextForCatalog(messages),
+        previousUserText: previousUserTextForCatalog(messages)
+      }
     );
   }
   const promptWithCatalog = mergeDataTableContext(

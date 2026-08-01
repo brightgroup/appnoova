@@ -5,7 +5,10 @@ import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 import { buildDataTableContext } from "@/lib/data-tables/retrieve";
 import { mergeDataTableContext, resolveProductCards } from "@/lib/data-tables/format-context";
 import { enforceCatalogFacts } from "@/lib/data-tables/catalog-guard";
-import { recentAssistantTextForCatalog } from "@/lib/data-tables/conversation-text";
+import {
+  previousUserTextForCatalog,
+  recentAssistantTextForCatalog
+} from "@/lib/data-tables/conversation-text";
 import { geminiTextTemperature } from "@/lib/text-agent-form";
 import { generateTextAgentReply } from "@/lib/text-agent-generate";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
@@ -530,7 +533,10 @@ export async function processTwilioWhatsAppInbound(
       String(agent.data_table_id),
       userForAi,
       orgId,
-      { conversationText: recentAssistantTextForCatalog(geminiContents) }
+      {
+        conversationText: recentAssistantTextForCatalog(geminiContents),
+        previousUserText: previousUserTextForCatalog(geminiContents)
+      }
     );
   }
   const promptWithCatalog = mergeDataTableContext(

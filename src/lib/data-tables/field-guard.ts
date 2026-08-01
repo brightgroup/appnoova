@@ -1,7 +1,14 @@
 import type { DataTableColumn, DataTableRowRecord } from "@/types/data-table";
 import { formatCell } from "@/lib/data-tables/format-context";
 import { getNameColumn, normalizeText } from "@/lib/data-tables/search-rows";
-import { dropOrphanLeadIn, getIdentityColumns, rowsReferredIn } from "@/lib/data-tables/row-match";
+import {
+  blockOpensWithProductHeading,
+  dropOrphanLeadIn,
+  getIdentityColumns,
+  resolveNamedRows,
+  rowForLineInFamily,
+  rowsReferredIn,
+} from "@/lib/data-tables/row-match";
 
 /**
  * Blindaje de los datos de ficha (título, autor, edición, año, código,
@@ -235,13 +242,29 @@ export function enforceCatalogFields(
   const keptBlocks: string[] = [];
 
   // Mismo respaldo que en el guardián de importes: una ficha suelta sin repetir
-  // el título habla del único producto que hay en contexto.
-  const replyRows = rowsReferredIn(reply, rows, nameCol, strongCols);
-  const fallbackRows = replyRows.length > 0 ? replyRows : rows.length === 1 ? rows : [];
+  // el título habla del único producto que hay en contexto, y a partir de ahí
+  // del último que quedó identificado.
+  //
+  // Antes se miraba la respuesta ENTERA, y en un listado de varios productos
+  // eso significaba atribuir cualquier bloque huérfano al único producto que sí
+  // estaba en el catálogo: al enlace de la Gaceta se le sustituyó el de un
+  // libro sobre la familia, que era el que había calzado en otro bloque.
+  let carriedRows = rows.length === 1 ? rows : [];
 
   for (const block of blocks) {
     const blockRows = rowsReferredIn(block, rows, nameCol, strongCols);
+    if (blockRows.length > 0) carriedRows = blockRows;
+    // Ver `resolveNamedRows`: un bloque que nombra a varias hermanas no se
+    // puede atribuir a una sola, o se reescribe la ficha de una presentación
+    // con el enlace y la edición de otra.
+    const named = resolveNamedRows(block, rows, nameCol);
+    // Ver el guardián de importes: un bloque que presenta un producto propio y
+    // no lo encuentra en el catálogo no hereda la fila del bloque anterior.
+    const inherited =
+      named.rows.length === 0 && blockOpensWithProductHeading(block) ? [] : carriedRows;
     const keptLines: string[] = [];
+    // Ver abajo: una ficha cuyo título no corresponde a la fila se cae entera.
+    let blockPoisoned = false;
 
     for (const line of block.split("\n")) {
       const match = LABELED_LINE_RE.exec(line);
@@ -261,14 +284,19 @@ export function enforceCatalogFields(
       }
 
       const scope = rowsReferredIn(line, rows, nameCol, strongCols);
+      const sibling = rowForLineInFamily(line, named.family, nameCol);
       const row =
         scope.length === 1
           ? scope[0]
-          : blockRows.length === 1
-            ? blockRows[0]
-            : fallbackRows.length === 1
-              ? fallbackRows[0]
-              : null;
+          : sibling
+            ? sibling
+            : named.ambiguous
+              ? null
+              : blockRows.length === 1
+                ? blockRows[0]
+                : inherited.length === 1
+                  ? inherited[0]
+                  : null;
       if (!row) {
         keptLines.push(line);
         continue;
@@ -313,6 +341,22 @@ export function enforceCatalogFields(
         continue;
       }
 
+      // El título es la identidad de la ficha, no un campo más. Si no coincide
+      // con la fila, lo que hay delante no es un dato equivocado de este
+      // producto: es la ficha de OTRO producto, y reescribirle el título la
+      // convierte en la de un libro que el cliente nunca pidió — con su autor,
+      // su precio y su enlace. Se cae la ficha entera y la resuelve un asesor.
+      if (nameCol && mapped.some(cols => cols.includes(nameCol))) {
+        blockPoisoned = true;
+        violations.push({
+          label,
+          action: "removed",
+          wrote: wrote.trim(),
+          product: String(row.data[nameCol.key] || row.id),
+        });
+        break;
+      }
+
       const rebuilt = `${indent}${heading} ${real.join(" / ")}`;
       keptLines.push(rebuilt);
       for (const part of realParts) {
@@ -327,6 +371,8 @@ export function enforceCatalogFields(
         product: String((nameCol && row.data[nameCol.key]) || row.id),
       });
     }
+
+    if (blockPoisoned) continue;
 
     const rebuilt = keptLines.join("\n");
     if (rebuilt.trim()) keptBlocks.push(rebuilt);

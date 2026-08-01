@@ -277,6 +277,17 @@ function addUncoveredMatches(
 export interface RowSelectionResult {
   rows: DataTableRowRecord[];
   note?: string;
+  /**
+   * Ninguna fila coincidió por nombre, código o categoría: el mensaje no nombra
+   * ningún producto y lo que se devuelve son, como mucho, coincidencias
+   * incidentales de palabras sueltas dentro de reseñas.
+   *
+   * Quien llama lo usa para rehacer la búsqueda con lo que el cliente pidió en
+   * sus mensajes anteriores (ver `buildDataTableContext`). Importa porque estas
+   * filas incidentales no son inofensivas: son productos ajenos con precios
+   * reales, y el modelo los toma prestados para el producto que sí le pidieron.
+   */
+  weak: boolean;
 }
 
 export function selectRowsForMessage(
@@ -285,7 +296,7 @@ export function selectRowsForMessage(
   message: string
 ): RowSelectionResult {
   const active = rows.filter(r => r.is_active);
-  if (active.length === 0) return { rows: [] };
+  if (active.length === 0) return { rows: [], weak: true };
 
   const filterCol = getPrimaryFilterColumn(columns);
   const nameCol = getNameColumn(columns);
@@ -298,6 +309,7 @@ export function selectRowsForMessage(
       return {
         rows: [],
         note: `Catálogo de ${total} productos. Categorías disponibles: ${cats.join(", ")}.`,
+        weak: false,
       };
     }
   }
@@ -320,7 +332,7 @@ export function selectRowsForMessage(
           filtered.length > MAX_CATEGORY_ROWS
             ? `Categoría «${match}»: ${filtered.length} productos (mostrando ${slice.length}).`
             : `Categoría «${match}»: ${filtered.length} productos.`;
-        return { rows: slice, note };
+        return { rows: slice, note, weak: false };
       }
     }
   }
@@ -338,12 +350,14 @@ export function selectRowsForMessage(
         return {
           rows: [],
           note: `Catálogo de ${total} productos en ${cats.length} categorías: ${cats.join(", ")}. Pregunta por un producto, SKU o categoría específica.`,
+          weak: true,
         };
       }
     }
     return {
       rows: [],
       note: `Catálogo de ${total} productos. Pregunta por nombre, SKU o categoría.`,
+      weak: true,
     };
   }
 
@@ -365,6 +379,7 @@ export function selectRowsForMessage(
     return {
       rows: [],
       note: `No se encontraron productos que coincidan con la consulta (catálogo: ${total} productos). No inventes datos; pide nombre, SKU o categoría más específica.`,
+      weak: true,
     };
   }
 
@@ -396,5 +411,5 @@ export function selectRowsForMessage(
 
   const note = `Resultados relevantes: ${finalRows.length} de ${total} productos en catálogo.`;
 
-  return { rows: finalRows.map(s => s.row), note };
+  return { rows: finalRows.map(s => s.row), note, weak: relevant.length === 0 };
 }

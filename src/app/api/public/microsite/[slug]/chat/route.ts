@@ -16,7 +16,10 @@ import { getOriApiKey } from "@/lib/google-ai";
 import { buildDataTableContext } from "@/lib/data-tables/retrieve";
 import { mergeDataTableContext, resolveProductCards } from "@/lib/data-tables/format-context";
 import { enforceCatalogFacts } from "@/lib/data-tables/catalog-guard";
-import { recentAssistantTextForCatalog } from "@/lib/data-tables/conversation-text";
+import {
+  previousUserTextForCatalog,
+  recentAssistantTextForCatalog
+} from "@/lib/data-tables/conversation-text";
 import {
   detectAssistantHandoffOffer,
   detectUserHandoffIntent,
@@ -239,7 +242,10 @@ export async function POST(
       String(agent.data_table_id),
       visitorText,
       billing.organizationId,
-      { conversationText: recentAssistantTextForCatalog(messages) }
+      {
+        conversationText: recentAssistantTextForCatalog(messages),
+        previousUserText: previousUserTextForCatalog(messages)
+      }
     );
   }
   const promptWithCatalog = mergeDataTableContext(

@@ -1,7 +1,13 @@
 import type { DataTableColumn, DataTableRowRecord } from "@/types/data-table";
 import { formatCell } from "@/lib/data-tables/format-context";
 import { getNameColumn, normalizeText } from "@/lib/data-tables/search-rows";
-import { dropOrphanLeadIn, getIdentityColumns, rowsReferredIn } from "@/lib/data-tables/row-match";
+import {
+  blockOpensWithProductHeading,
+  getIdentityColumns,
+  resolveNamedRows,
+  rowForLineInFamily,
+  rowsReferredIn,
+} from "@/lib/data-tables/row-match";
 
 /**
  * Última barrera contra precios inventados.
@@ -142,6 +148,24 @@ function isSumOfKnown(value: number, pool: number[]): boolean {
   return false;
 }
 
+/**
+ * Largo máximo de lo que puede acompañar al importe para dar la línea por
+ * "línea de precio de una ficha": una etiqueta corta y poco más ("*Bolsillo:*",
+ * "*Precio:*", "El precio es"). Cualquier frase más larga habla de dinero por
+ * otro motivo — un envío, un bono, un total — y ahí sí valen los importes que
+ * autoriza el prompt.
+ */
+const PRICE_LINE_LABEL_MAX_LENGTH = 25;
+
+function isProductPriceLine(line: string, amounts: string[]): boolean {
+  if (amounts.length !== 1) return false;
+  const rest = line
+    .replace(amounts[0], " ")
+    .replace(/[^a-zA-ZÀ-ÿ0-9]+/g, " ")
+    .trim();
+  return rest.length <= PRICE_LINE_LABEL_MAX_LENGTH;
+}
+
 /** Columna de precio a usar para corregir: la que nombre la propia línea, si la nombra. */
 function priceColumnForLine(
   line: string,
@@ -206,31 +230,76 @@ export function enforceCatalogAmounts(
   // Cuando el texto no nombra ningún producto pero solo hay uno en contexto, se
   // habla de ese. Es el caso de los seguimientos cortos: "precio?" → "$160.000".
   // Sin este respaldo se borraba una respuesta correcta por no poder atribuirla.
-  const replyRows = rowsReferredIn(reply, rows, nameCol, strongCols);
-  const fallbackRows = replyRows.length > 0 ? replyRows : rows.length === 1 ? rows : [];
+  //
+  // Este arrastre AVANZA con el texto (el último producto que quedó nombrado),
+  // en vez de mirar la respuesta entera. Mirar la respuesta entera es lo que
+  // dejó pasar los precios inventados: en un listado de siete productos, el
+  // único que sí estaba en el catálogo autorizaba su precio para los bloques de
+  // los otros seis, que no lo estaban.
+  let carriedRows = rows.length === 1 ? rows : [];
 
   for (const block of blocks) {
-    const blockRows = rowsReferredIn(block, rows, nameCol, strongCols);
+    // Solo por nombre: que en el bloque aparezca el enlace de otro producto no
+    // convierte al bloque en ese producto.
+    const named = resolveNamedRows(block, rows, nameCol);
+    const blockRows = named.rows;
+    const family = named.family;
+    if (blockRows.length > 0) carriedRows = blockRows;
+    // Un bloque que presenta un producto propio y no lo encuentra en el catálogo
+    // se queda sin respaldo: no puede tomar prestado el del bloque anterior.
+    const inherited =
+      blockRows.length === 0 && blockOpensWithProductHeading(block) ? [] : carriedRows;
     const keptLines: string[] = [];
+    // Un dato inventado contamina todo su bloque: lo que lo acompaña son datos
+    // del mismo producto fantasma (su enlace, su edición, las demás
+    // presentaciones), y dejarlos sueltos es lo que hacía llegar al cliente un
+    // enlace que no corresponde junto al aviso de que falta el dato.
+    let blockPoisoned = false;
 
     for (const line of block.split("\n")) {
       // El producto que nombra la propia línea manda sobre el del bloque: en
       // un listado ("Bolsillo: $65.000") cada línea habla de una fila distinta.
       const lineRows = rowsReferredIn(line, rows, nameCol, strongCols);
+      // Con una familia de hermanas, la línea manda si dice cuál es ("Bolsillo:
+      // $65.000"). Si no lo dice, el ámbito es la familia entera: sirve para
+      // reconocer un precio que sí existe, pero no para corregir — corregir
+      // exige una fila única, y sin ella la línea se cae en vez de salir con el
+      // precio de otra presentación.
+      const sibling = rowForLineInFamily(line, family, nameCol);
       const scope =
-        lineRows.length > 0 ? lineRows : blockRows.length > 0 ? blockRows : fallbackRows;
+        lineRows.length > 0
+          ? lineRows
+          : sibling
+            ? [sibling]
+            : named.ambiguous
+              ? family
+              : blockRows.length > 0
+                ? blockRows
+                : inherited;
 
       // Solo se dan por buenos los precios del producto del que habla este
       // texto (más los importes que el propio prompt autoriza: envíos, bonos).
       // Aceptar cualquier precio del catálogo no sirve de nada: con decenas de
       // filas en contexto, casi cualquier cifra redonda coincidiría con alguna.
       const scopeAmounts = collectRealAmounts(scope, priceCols);
-      const isKnown = (v: number) => scopeAmounts.has(v) || promptAmounts.has(v);
+      const includeBare = PRICE_LINE_RE.test(line);
+      const lineAmounts = amountsIn(line, includeBare);
+
+      const row = scope.length === 1 ? scope[0] : null;
+      const col = row ? priceColumnForLine(line, row, priceCols) : undefined;
+
+      // En la línea de precio de una ficha manda el dato de la fila y solo ese.
+      // Los importes que autoriza el prompt (envíos, bonos, suscripciones) son
+      // para frases que hablan de dinero por otro motivo; aplicarlos aquí dejaba
+      // pasar el precio de otro producto solo porque el prompt lo mencionaba en
+      // otro contexto — así salió una Constitución de bolsillo a $25.000.
+      const isFichaPrice = Boolean(row && col) && isProductPriceLine(line, lineAmounts);
+      const isKnown = (v: number) =>
+        scopeAmounts.has(v) || (!isFichaPrice && promptAmounts.has(v));
       const sumPool = [...new Set([...scopeAmounts, ...promptAmounts, ...verifiedInReply])];
 
-      const includeBare = PRICE_LINE_RE.test(line);
       const allowSums = TOTAL_LINE_RE.test(line);
-      const offenders = amountsIn(line, includeBare).filter(raw => {
+      const offenders = lineAmounts.filter(raw => {
         const value = parseAmount(raw);
         if (value === null || isKnown(value)) return false;
         return !(allowSums && isSumOfKnown(value, sumPool));
@@ -240,9 +309,6 @@ export function enforceCatalogAmounts(
         keptLines.push(line);
         continue;
       }
-
-      const row = scope.length === 1 ? scope[0] : null;
-      const col = row ? priceColumnForLine(line, row, priceCols) : undefined;
 
       if (row && col) {
         let fixed = line;
@@ -260,14 +326,19 @@ export function enforceCatalogAmounts(
         continue;
       }
 
-      // La línea con el precio sin respaldo se cae; en su lugar queda el aviso
-      // (una sola vez), para que el mensaje no pierda el hilo.
-      dropOrphanLeadIn(keptLines);
-      if (!removedAny) keptLines.push(UNVERIFIED_PRICE_NOTE);
-      removedAny = true;
+      // El precio no tiene respaldo: se cae el bloque entero y en su lugar
+      // queda el aviso (una sola vez), para que el mensaje no pierda el hilo.
+      blockPoisoned = true;
       for (const offender of offenders) {
         violations.push({ amount: offender, action: "removed" });
       }
+      break;
+    }
+
+    if (blockPoisoned) {
+      if (!removedAny) keptBlocks.push(UNVERIFIED_PRICE_NOTE);
+      removedAny = true;
+      continue;
     }
 
     const rebuilt = keptLines.join("\n");
