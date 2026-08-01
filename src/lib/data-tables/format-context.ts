@@ -8,7 +8,11 @@ export function formatCell(value: unknown, col: DataTableColumn): string {
   if (value === null || value === undefined || value === "") return "—";
   if (col.type === "number" && typeof value === "number") {
     const label = col.label.toLowerCase();
-    if (label.includes("precio") || label.includes("costo")) return formatCop(value);
+    // El rol confirmado en el importador manda sobre el nombre de la columna:
+    // una columna marcada como precio se muestra como precio aunque se llame
+    // «PVP» o «Importe».
+    if (col.role === "price") return formatCop(value);
+    if (!col.role && (label.includes("precio") || label.includes("costo"))) return formatCop(value);
     // Sin separador de miles en enteros pequeños: un año salía como "2.026" y
     // una edición como "1.043", tanto en la tabla que lee el modelo como en la
     // ficha que ve el cliente.

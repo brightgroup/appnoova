@@ -11,7 +11,9 @@
  */
 import { enforceCatalogFacts } from "../src/lib/data-tables/catalog-guard";
 import { resolveProductCards } from "../src/lib/data-tables/format-context";
-import { selectRowsForMessage } from "../src/lib/data-tables/search-rows";
+import { getNameColumn, selectRowsForMessage } from "../src/lib/data-tables/search-rows";
+import { getPriceColumns } from "../src/lib/data-tables/price-guard";
+import { applyColumnRolesFromForm, applyRoleMap } from "../src/lib/data-tables/column-roles";
 import { pinRowsMentionedIn, mergeRowsUnique } from "../src/lib/data-tables/pinned-rows";
 import { detectAssistantHandoffOffer } from "../src/lib/text-handoff";
 import type { DataTableColumn, DataTableRowRecord } from "../src/types/data-table";
@@ -150,6 +152,62 @@ section("Búsqueda: qué filas llegan al modelo");
   );
   check("seguimiento conserva el producto ya mencionado",
     anclado.some(r => r.id === anotada.id), anclado.map(r => r.data.nombre));
+}
+
+// ---------------------------------------------------------------------------
+section("Mapeo de columnas: rol confirmado vs. detección automática");
+// ---------------------------------------------------------------------------
+{
+  // Tablas ya importadas (sin rol): todo se resuelve como siempre.
+  check("sin rol, la columna de producto se sigue detectando por nombre",
+    getNameColumn(columns)?.key === "nombre", getNameColumn(columns));
+  check("sin rol, la columna de precio se sigue detectando por nombre",
+    getPriceColumns(columns).map(c => c.key).join(",") === "precio_cop", getPriceColumns(columns));
+
+  // El caso que no se podía importar bien: encabezados que la lista de
+  // sinónimos no reconoce ("Ítem", "PVP").
+  const raras = [
+    { key: "item", label: "Ítem", type: "text", display: true, filterable: false, required: true },
+    { key: "pvp", label: "PVP", type: "number", display: true, filterable: false, required: false },
+  ] as unknown as DataTableColumn[];
+  check("sin rol, «Ítem» y «PVP» NO se detectan (el fallo que había)",
+    !getNameColumn(raras) && getPriceColumns(raras).length === 0);
+
+  const mapeadas = applyRoleMap(raras, { name: ["item"], price: ["pvp"] });
+  check("con rol, «Ítem» es el producto", getNameColumn(mapeadas)?.key === "item");
+  check("con rol, «PVP» es el precio", getPriceColumns(mapeadas).map(c => c.key).join(",") === "pvp");
+
+  // El blindaje de precios ya puede actuar sobre una tabla que antes ignoraba.
+  const filaRara = [{
+    id: "r1", is_active: true, sort_order: 0,
+    data: { item: "Torta de chocolate", pvp: 90000 },
+  }] as unknown as DataTableRowRecord[];
+  const antes = enforceCatalogFacts("La *Torta de chocolate* cuesta $55.000.", filaRara, raras, PROMPT);
+  check("sin mapeo, el precio inventado se colaba", antes.violations.length === 0, antes.text);
+  const despues = enforceCatalogFacts("La *Torta de chocolate* cuesta $55.000.", filaRara, mapeadas, PROMPT);
+  check("con mapeo, el precio inventado se corrige",
+    despues.text.includes("$90.000") && !despues.text.includes("$55.000"), despues.text);
+
+  // Una tabla sin precios (sedes, horarios) declara ese vacío a propósito.
+  const sedes = applyRoleMap(
+    [
+      { key: "sede", label: "Sede", type: "text", display: true, filterable: false, required: true },
+      { key: "tel", label: "Teléfono", type: "text", display: true, filterable: false, required: false },
+    ] as unknown as DataTableColumn[],
+    { name: ["sede"] }
+  );
+  check("mapeo sin precio: el guardián de importes no interviene",
+    getPriceColumns(sedes).length === 0, sedes);
+
+  // Reimportar un Excel actualizado sin volver a tocar el mapeo lo conserva.
+  const conservado = applyColumnRolesFromForm(raras, null, mapeadas);
+  check("reimportación sin mapeo conserva el anterior",
+    getNameColumn(conservado)?.key === "item" && getPriceColumns(conservado)[0]?.key === "pvp");
+
+  // Y un mapeo explícito del importador manda sobre todo.
+  const delFormulario = applyColumnRolesFromForm(raras, JSON.stringify({ name: ["pvp"] }), mapeadas);
+  check("el mapeo enviado por el importador manda",
+    getNameColumn(delFormulario)?.key === "pvp" && getPriceColumns(delFormulario).length === 0);
 }
 
 // ---------------------------------------------------------------------------

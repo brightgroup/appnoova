@@ -6,13 +6,18 @@ import {
   getNameColumn,
   getPrimaryFilterColumn,
 } from "@/lib/data-tables/search-rows";
+import { getPriceColumns } from "@/lib/data-tables/price-guard";
+import { getIdentityColumns } from "@/lib/data-tables/row-match";
+import type { ColumnRoleMap } from "@/lib/data-tables/column-roles";
 
 export { FULL_CATALOG_MAX_ROWS, MAX_SUPPORTED_TABLE_ROWS };
 
 export interface ColumnMapping {
   product: string | null;
+  price: string[];
   category: string | null;
   sku: string | null;
+  link: string | null;
 }
 
 export interface ImportValidation {
@@ -24,6 +29,31 @@ export interface ImportValidation {
   search_mode: "full_catalog" | "smart_search";
 }
 
+/**
+ * Mapeo que propone la detección automática, para precargar el importador.
+ *
+ * Es la misma adivinanza de siempre, pero puesta delante del usuario para que
+ * la confirme: deja de ser una suposición silenciosa que solo se descubre
+ * cuando el agente da un dato mal.
+ */
+export function suggestedRoleMap(columns: DataTableColumn[]): ColumnRoleMap {
+  const nameCol = getNameColumn(columns);
+  const codeCols = getCodeColumns(columns);
+  const linkCol = getIdentityColumns(columns).find(
+    c => c !== nameCol && !codeCols.includes(c)
+  );
+  const filterCol = getPrimaryFilterColumn(columns);
+  const priceCols = getPriceColumns(columns);
+
+  const map: ColumnRoleMap = {};
+  if (nameCol) map.name = [nameCol.key];
+  if (priceCols.length) map.price = priceCols.map(c => c.key);
+  if (filterCol) map.category = [filterCol.key];
+  if (codeCols.length) map.code = codeCols.map(c => c.key);
+  if (linkCol) map.link = [linkCol.key];
+  return map;
+}
+
 export function validateDataTableImport(
   rowCount: number,
   columns: DataTableColumn[]
@@ -31,11 +61,17 @@ export function validateDataTableImport(
   const nameCol = getNameColumn(columns);
   const filterCol = getPrimaryFilterColumn(columns);
   const codeCols = getCodeColumns(columns);
+  const priceCols = getPriceColumns(columns);
+  const linkCol = getIdentityColumns(columns).find(
+    c => c !== nameCol && !codeCols.includes(c)
+  );
 
   const column_mapping: ColumnMapping = {
     product: nameCol?.label ?? null,
+    price: priceCols.map(c => c.label),
     category: filterCol?.label ?? null,
     sku: codeCols[0]?.label ?? null,
+    link: linkCol?.label ?? null,
   };
 
   const search_mode: ImportValidation["search_mode"] =
@@ -58,8 +94,8 @@ export function validateDataTableImport(
     return {
       ok: false,
       error:
-        "No se detectó una columna de producto o nombre. " +
-        "Incluye una columna llamada «Producto», «Nombre» o similar en la primera fila.",
+        "No se detectó automáticamente la columna de producto. " +
+        "Selecciónala abajo, en «Columnas clave», para continuar.",
       warnings: [],
       column_mapping,
       search_mode,
@@ -67,6 +103,14 @@ export function validateDataTableImport(
   }
 
   const warnings: string[] = [];
+  // El aviso más importante: sin columna de precio el blindaje de importes no
+  // llega a ejecutarse, así que el agente podría dar cifras que nadie contrasta.
+  if (priceCols.length === 0) {
+    warnings.push(
+      "No se marcó columna de precio. La IA no podrá verificar los importes que " +
+        "mencione: no los contrastará contra la tabla. Márcala si tu catálogo tiene precios."
+    );
+  }
   if (!filterCol) {
     warnings.push(
       "No se detectó columna de categoría (Categoría, Tipo, Línea…). " +

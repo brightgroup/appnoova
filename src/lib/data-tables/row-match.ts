@@ -1,5 +1,6 @@
 import type { DataTableColumn, DataTableRowRecord } from "@/types/data-table";
 import { getCodeColumns, getNameColumn, normalizeText } from "@/lib/data-tables/search-rows";
+import { columnsWithRole, hasRoleMap } from "@/lib/data-tables/column-roles";
 
 /** Nombres más cortos que esto no identifican un producto de forma fiable. */
 const MIN_PRODUCT_NAME_LENGTH = 6;
@@ -39,10 +40,12 @@ export function dropOrphanLeadIn(keptLines: string[]): void {
  */
 export function getIdentityColumns(columns: DataTableColumn[]): DataTableColumn[] {
   const nameCol = getNameColumn(columns);
-  const linkCols = columns.filter(c => {
-    const n = normalizeText(`${c.label} ${c.key}`);
-    return n.includes("link") || n.includes("url") || n.includes("enlace");
-  });
+  const linkCols = hasRoleMap(columns)
+    ? columnsWithRole(columns, "link")
+    : columns.filter(c => {
+        const n = normalizeText(`${c.label} ${c.key}`);
+        return n.includes("link") || n.includes("url") || n.includes("enlace");
+      });
   const all = [nameCol, ...getCodeColumns(columns), ...linkCols].filter(
     (c): c is DataTableColumn => Boolean(c)
   );

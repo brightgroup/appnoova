@@ -1,4 +1,5 @@
 import type { DataTableColumn, DataTableRowRecord } from "@/types/data-table";
+import { columnsWithRole, hasRoleMap } from "@/lib/data-tables/column-roles";
 
 /** Catálogo completo en prompt (sin búsqueda previa). */
 export const FULL_CATALOG_MAX_ROWS = 150;
@@ -44,7 +45,15 @@ function colNormalized(col: DataTableColumn): string {
   return normalizeText(`${col.label} ${col.key}`);
 }
 
+/**
+ * Los tres resolvedores siguen el mismo criterio: si el usuario confirmó el
+ * mapeo de columnas al importar, manda ese mapeo — incluido el vacío ("esta
+ * tabla no tiene precios"). Solo las tablas anteriores al mapeo, que nunca
+ * tuvieron ocasión de declararlo, siguen adivinando por el nombre de la
+ * columna. Ver `src/lib/data-tables/column-roles.ts`.
+ */
 export function getPrimaryFilterColumn(columns: DataTableColumn[]): DataTableColumn | undefined {
+  if (hasRoleMap(columns)) return columnsWithRole(columns, "category")[0];
   return columns.find(c => c.filterable) ?? columns.find(c => {
     const n = colNormalized(c);
     return n.includes("categoria") || n.includes("category");
@@ -52,10 +61,12 @@ export function getPrimaryFilterColumn(columns: DataTableColumn[]): DataTableCol
 }
 
 export function getNameColumn(columns: DataTableColumn[]): DataTableColumn | undefined {
+  if (hasRoleMap(columns)) return columnsWithRole(columns, "name")[0];
   return columns.find(c => NAME_COLUMN_HINTS.some(h => colNormalized(c).includes(h)));
 }
 
 export function getCodeColumns(columns: DataTableColumn[]): DataTableColumn[] {
+  if (hasRoleMap(columns)) return columnsWithRole(columns, "code");
   return columns.filter(c => CODE_COLUMN_HINTS.some(h => colNormalized(c).includes(h)));
 }
 

@@ -3,6 +3,7 @@ import { adminClient } from "@/lib/voice-agents-server";
 import { requireOrgModule } from "@/lib/module-auth";
 import { parseExcelBuffer } from "@/lib/data-tables/parse-excel";
 import { validateDataTableImport } from "@/lib/data-tables/validate-import";
+import { applyColumnRolesFromForm } from "@/lib/data-tables/column-roles";
 import type { DataTableColumn, DataTableRecord, DataTableRowRecord } from "@/types/data-table";
 
 function toTable(raw: Record<string, unknown>): DataTableRecord {
@@ -160,12 +161,18 @@ export async function POST(
     );
   }
 
-  const importCheck = validateDataTableImport(parsed.rows.length, parsed.columns);
+  // Igual que al crear: manda el mapeo confirmado en el importador. Si el
+  // usuario reimporta sin tocarlo, se conserva el que ya tenía la tabla.
+  const columns = applyColumnRolesFromForm(
+    parsed.columns as DataTableColumn[],
+    form.get("column_roles"),
+    (table.columns ?? []) as DataTableColumn[]
+  );
+
+  const importCheck = validateDataTableImport(parsed.rows.length, columns);
   if (!importCheck.ok) {
     return NextResponse.json({ error: importCheck.error }, { status: 400 });
   }
-
-  const columns = parsed.columns as DataTableColumn[];
   const now = new Date().toISOString();
 
   await db.from("data_table_rows").delete().eq("data_table_id", id);

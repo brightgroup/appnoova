@@ -1,6 +1,7 @@
 import type { DataTableColumn, DataTableRowRecord } from "@/types/data-table";
 import { formatCell } from "@/lib/data-tables/format-context";
 import { getNameColumn, normalizeText } from "@/lib/data-tables/search-rows";
+import { columnsWithRole, hasRoleMap } from "@/lib/data-tables/column-roles";
 import {
   blockOpensWithProductHeading,
   getIdentityColumns,
@@ -60,6 +61,9 @@ export interface AmountGuardResult {
 }
 
 export function getPriceColumns(columns: DataTableColumn[]): DataTableColumn[] {
+  // Ver `column-roles.ts`: el mapeo confirmado manda sobre la adivinanza, y su
+  // vacío también — una tabla de sedes u horarios no tiene precios que validar.
+  if (hasRoleMap(columns)) return columnsWithRole(columns, "price");
   return columns.filter(c => {
     const n = normalizeText(`${c.label} ${c.key}`);
     return PRICE_COLUMN_HINTS.some(h => n.includes(h));

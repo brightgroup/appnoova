@@ -3,6 +3,7 @@ import { adminClient } from "@/lib/voice-agents-server";
 import { requireOrgModule } from "@/lib/module-auth";
 import { parseExcelBuffer } from "@/lib/data-tables/parse-excel";
 import { validateDataTableImport } from "@/lib/data-tables/validate-import";
+import { applyColumnRolesFromForm } from "@/lib/data-tables/column-roles";
 import type { DataTableRecord } from "@/types/data-table";
 
 function toRecord(raw: Record<string, unknown>): DataTableRecord {
@@ -60,7 +61,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const importCheck = validateDataTableImport(parsed.rows.length, parsed.columns);
+    // El mapeo que confirmó el usuario en el importador manda sobre la
+    // detección automática; si no llega ninguno, las columnas quedan sin rol y
+    // el sistema sigue adivinando como hasta ahora.
+    const columns = applyColumnRolesFromForm(parsed.columns, form.get("column_roles"));
+
+    const importCheck = validateDataTableImport(parsed.rows.length, columns);
     if (!importCheck.ok) {
       return NextResponse.json({ error: importCheck.error }, { status: 400 });
     }
@@ -76,7 +82,7 @@ export async function POST(req: NextRequest) {
         user_id: ctx.userId,
         name: tableName,
         description: `Importado desde ${file.name}`,
-        columns: parsed.columns,
+        columns,
         row_count: parsed.rows.length,
         updated_at: now,
       })

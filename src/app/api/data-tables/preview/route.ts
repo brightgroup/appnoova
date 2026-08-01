@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireOrgModule } from "@/lib/module-auth";
 import { parseExcelBuffer } from "@/lib/data-tables/parse-excel";
-import { validateDataTableImport } from "@/lib/data-tables/validate-import";
+import { suggestedRoleMap, validateDataTableImport } from "@/lib/data-tables/validate-import";
 
 /** POST — vista previa de importación Excel (sin guardar) */
 export async function POST(req: NextRequest) {
@@ -24,6 +24,10 @@ export async function POST(req: NextRequest) {
       row_count: parsed.rows.length,
       sample_rows: parsed.rows.slice(0, 8),
       validation,
+      // Precarga del mapeo: lo que la detección automática propone, para que el
+      // usuario lo confirme o lo corrija en vez de descubrir el fallo en
+      // producción con un precio inventado.
+      suggested_roles: suggestedRoleMap(parsed.columns),
     });
   } catch (err) {
     return NextResponse.json(

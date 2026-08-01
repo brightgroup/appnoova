@@ -1,5 +1,13 @@
 export type DataColumnType = "text" | "number" | "boolean";
 
+/**
+ * Papel que cumple una columna para la IA, confirmado por el usuario al
+ * importar. Sin rol, el sistema lo adivina por el nombre de la columna
+ * (ver `getNameColumn`, `getPriceColumns`…), que es lo que hacía que un
+ * encabezado como «PVP» o «Ítem» pasara desapercibido.
+ */
+export type DataColumnRole = "name" | "price" | "category" | "code" | "link";
+
 export interface DataTableColumn {
   key: string;
   label: string;
@@ -7,6 +15,8 @@ export interface DataTableColumn {
   filterable: boolean;
   display: boolean;
   required: boolean;
+  /** Confirmado por el usuario. Ausente = detección automática por nombre. */
+  role?: DataColumnRole;
 }
 
 export interface DataTableRecord {

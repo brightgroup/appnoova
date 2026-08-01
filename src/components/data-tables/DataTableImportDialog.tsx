@@ -4,7 +4,14 @@ import { useCallback, useRef, useState } from "react";
 import { Upload, Loader2, FileSpreadsheet, X } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { btnPrimary, btnGhost } from "@/lib/brand-ui";
-import type { DataTableColumn } from "@/types/data-table";
+import type { DataColumnRole, DataTableColumn } from "@/types/data-table";
+import {
+  COLUMN_ROLES,
+  COLUMN_ROLE_SPECS,
+  type ColumnRoleMap,
+} from "@/lib/data-tables/column-roles";
+
+const NO_COLUMN = "";
 
 export interface ImportPreview {
   suggested_name: string;
@@ -18,11 +25,14 @@ export interface ImportPreview {
     warnings: string[];
     column_mapping: {
       product: string | null;
+      price: string[];
       category: string | null;
       sku: string | null;
+      link: string | null;
     };
     search_mode: "full_catalog" | "smart_search";
   };
+  suggested_roles?: ColumnRoleMap;
 }
 
 function formatPreviewCell(value: unknown, col: DataTableColumn): string {
@@ -61,12 +71,17 @@ export function DataTableImportDialog({
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
   const [tableName, setTableName] = useState("");
+  // Mapeo de columnas confirmado por el usuario. Arranca con lo que propone la
+  // detección automática y se envía siempre, incluso sin tocarlo: así queda
+  // registrado que alguien lo revisó.
+  const [roleMap, setRoleMap] = useState<ColumnRoleMap>({});
 
   const reset = useCallback(() => {
     setFile(null);
     setPreview(null);
     setError("");
     setTableName("");
+    setRoleMap({});
     setDragOver(false);
   }, []);
 
@@ -91,6 +106,23 @@ export function DataTableImportDialog({
     }
     setPreview(json);
     setTableName(json.suggested_name ?? "");
+    setRoleMap(json.suggested_roles ?? {});
+  };
+
+  const setRole = (role: DataColumnRole, key: string) => {
+    setRoleMap(prev => {
+      const next: ColumnRoleMap = { ...prev };
+      if (!key) delete next[role];
+      else next[role] = [key];
+      // Una columna no puede cumplir dos papeles a la vez.
+      for (const other of COLUMN_ROLES) {
+        if (other === role || !key) continue;
+        const kept = (next[other] ?? []).filter(k => k !== key);
+        if (kept.length) next[other] = kept;
+        else delete next[other];
+      }
+      return next;
+    });
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -107,6 +139,7 @@ export function DataTableImportDialog({
     const fd = new FormData();
     fd.append("file", file);
     if (tableName.trim()) fd.append("name", tableName.trim());
+    fd.append("column_roles", JSON.stringify(roleMap));
 
     const url = tableId ? `/api/data-tables/${tableId}` : "/api/data-tables";
     const res = await authFetch(url, { method: "POST", body: fd });
@@ -216,51 +249,80 @@ export function DataTableImportDialog({
                 </div>
               </div>
 
-              {preview.validation && (
-                <div className="rounded-lg border border-white/[.08] bg-white/[.02] p-3 space-y-2">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wide">Columnas clave detectadas</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                    <div>
-                      <span className="text-gray-500">Producto </span>
-                      <span className={preview.validation.column_mapping.product ? "text-emerald-400" : "text-red-400"}>
-                        {preview.validation.column_mapping.product ?? "No detectada"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Categoría </span>
-                      <span className={preview.validation.column_mapping.category ? "text-emerald-400" : "text-amber-400"}>
-                        {preview.validation.column_mapping.category ?? "Opcional"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">SKU </span>
-                      <span className={preview.validation.column_mapping.sku ? "text-emerald-400" : "text-amber-400"}>
-                        {preview.validation.column_mapping.sku ?? "Opcional"}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-gray-500">
+              <div className="rounded-lg border border-white/[.08] bg-white/[.02] p-3 space-y-3">
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wide">Columnas clave</p>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Confirma qué columna es cada cosa. La IA usa esto para verificar
+                    los datos que da; si algo queda sin marcar, no podrá revisarlo.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {COLUMN_ROLES.map(role => {
+                    const spec = COLUMN_ROLE_SPECS[role];
+                    const selected = roleMap[role]?.[0] ?? NO_COLUMN;
+                    const missing = spec.required && !selected;
+                    return (
+                      <div key={role}>
+                        <label className="block text-xs text-gray-400 mb-1">
+                          {spec.label}
+                          {spec.required && <span className="text-red-400"> *</span>}
+                        </label>
+                        <select
+                          value={selected}
+                          onChange={e => setRole(role, e.target.value)}
+                          className={`w-full rounded-lg border bg-white/[.04] px-3 py-2 text-sm text-white ${
+                            missing ? "border-red-500/50" : "border-white/[.12]"
+                          }`}
+                        >
+                          <option value={NO_COLUMN}>
+                            {spec.required ? "— Selecciona una columna —" : "— No aplica —"}
+                          </option>
+                          {preview.columns.map(c => (
+                            <option key={c.key} value={c.key}>
+                              {c.label}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-gray-500 mt-1">{spec.hint}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {preview.validation && (
+                  <p className="text-[10px] text-gray-500 border-t border-white/[.06] pt-2">
                     {preview.validation.search_mode === "full_catalog"
                       ? "Modo catálogo completo: la IA verá todos los productos en cada mensaje."
                       : "Modo búsqueda inteligente: la IA recibe solo los productos relevantes a cada pregunta."}
                   </p>
-                </div>
-              )}
+                )}
+              </div>
 
-              {preview.validation && !preview.validation.ok && (
+              {!roleMap.name?.length && (
                 <div className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-                  {preview.validation.error}
+                  Selecciona la columna de producto para continuar.
                 </div>
               )}
 
-              {preview.validation?.warnings.map(w => (
-                <div
-                  key={w}
-                  className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-200/90"
-                >
-                  {w}
+              {roleMap.name?.length && !roleMap.price?.length ? (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-200/90">
+                  Sin columna de precio la IA no podrá verificar los importes que mencione.
+                  Márcala si tu catálogo tiene precios.
                 </div>
-              ))}
+              ) : null}
+
+              {preview.validation?.warnings
+                .filter(w => !w.startsWith("No se marcó columna de precio"))
+                .map(w => (
+                  <div
+                    key={w}
+                    className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-200/90"
+                  >
+                    {w}
+                  </div>
+                ))}
 
               <div>
                 <p className="text-xs text-gray-400 mb-2">Vista previa (primeras filas)</p>
@@ -331,7 +393,10 @@ export function DataTableImportDialog({
               disabled={
                 importing ||
                 (!tableId && !tableName.trim()) ||
-                preview.validation?.ok === false
+                // La validación del servidor mira la detección automática; aquí
+                // manda lo que el usuario acaba de elegir, que puede haber
+                // corregido justamente lo que la detección no encontró.
+                !roleMap.name?.length
               }
               className={`${btnPrimary} gap-2`}
             >
