@@ -28,7 +28,7 @@ const SECTIONS = [
         <p>
           <strong>Noova 360</strong> es un software como servicio (SaaS) operado por{" "}
           <strong>DOMAL SAS</strong>, con domicilio en Bogotá, Colombia. Los pagos de Noova 360 son
-          procesados por <strong>Paddle.com Market Limited</strong> ("Paddle"), nuestro revendedor
+          procesados por <strong>Paddle.com Market Limited</strong> (&ldquo;Paddle&rdquo;), nuestro revendedor
           autorizado y Merchant of Record. Esto significa que Paddle es la entidad que aparece en tu
           extracto bancario, emite la factura de la compra y procesa cualquier reembolso — nosotros
           definimos la política, pero la ejecución del reembolso la hace Paddle.

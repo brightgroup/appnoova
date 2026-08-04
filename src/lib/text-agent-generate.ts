@@ -38,6 +38,26 @@ export interface GenerateTextAgentReplyResult {
   toolResults: AgentToolResult[];
 }
 
+function isTransientGeminiError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /"code":\s*(503|429)|"status":\s*"(UNAVAILABLE|RESOURCE_EXHAUSTED)"/.test(msg);
+}
+
+/**
+ * Gemini devuelve 503 "high demand" de forma intermitente; un segundo intento
+ * a los pocos segundos casi siempre pasa. Sin esto, un solo error transitorio
+ * dejaba al cliente sin respuesta y sin ningún aviso.
+ */
+async function withOneRetryOnOverload<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (!isTransientGeminiError(err)) throw err;
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    return await fn();
+  }
+}
+
 function toGeminiContents(messages: TextAgentChatMessage[]): Content[] {
   return messages.map(m => ({
     role: m.role === "assistant" ? ("model" as const) : ("user" as const),
@@ -100,11 +120,13 @@ export async function generateTextAgentReply(
     ...(toolsEnabled ? { tools: [{ functionDeclarations: buildFunctionDeclarations(enabledTools) }] } : {})
   };
 
-  let response = await ai.models.generateContent({
-    model: input.model,
-    contents,
-    config: baseConfig
-  });
+  let response = await withOneRetryOnOverload(() =>
+    ai.models.generateContent({
+      model: input.model,
+      contents,
+      config: baseConfig
+    })
+  );
 
   let rounds = 0;
   while (toolsEnabled && response.functionCalls?.length && rounds < 3) {
@@ -142,11 +164,13 @@ export async function generateTextAgentReply(
 
     contents.push({ role: "user", parts: functionResponseParts });
 
-    response = await ai.models.generateContent({
-      model: input.model,
-      contents,
-      config: baseConfig
-    });
+    response = await withOneRetryOnOverload(() =>
+      ai.models.generateContent({
+        model: input.model,
+        contents,
+        config: baseConfig
+      })
+    );
   }
 
   const text = response.text?.trim() ?? "";

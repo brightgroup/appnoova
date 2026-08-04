@@ -609,7 +609,46 @@ export async function processTwilioWhatsAppInbound(
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error IA";
-    return { ok: false, error: msg };
+    console.error("[whatsapp/inbound] generación de respuesta falló tras reintento, escalando a humano:", msg);
+
+    // Gemini falló dos veces seguidas (ver withOneRetryOnOverload): antes esto
+    // dejaba al cliente sin ninguna respuesta y sin rastro visible del error.
+    const fallbackReply = "En un momento un asesor te contactará.";
+    await persistAssistantReplyOnly({
+      db,
+      userId: channel.user_id,
+      conversationId: userPersist.conversationId,
+      assistantReply: fallbackReply,
+      llmModel: model
+    });
+
+    await escalateConversationToHuman({
+      db,
+      userId: channel.user_id,
+      conversationId: userPersist.conversationId,
+      organizationId: orgId,
+      reason: "ai_escalation",
+      channel: WHATSAPP_CONVERSATION_CHANNEL,
+      agentName: String(agent.name),
+      contactLabel: existing?.contact_label ? String(existing.contact_label) : contactLabel,
+      visitorMessage: userDisplay,
+      notifyRules: agent.notify_rules,
+      outboundWhatsAppChannel: channel
+    });
+
+    const sendResult = await sendWhatsAppIfAllowed(
+      db,
+      channel,
+      inbound.fromE164,
+      fallbackReply,
+      nowIso,
+      optedOutAfter
+    );
+    if (!sendResult.ok) {
+      console.error("[whatsapp/inbound] fallback send:", sendResult.error);
+    }
+
+    return { ok: true };
   }
   } finally {
     clearInterval(typingRefreshInterval);
