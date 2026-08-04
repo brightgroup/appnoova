@@ -27,7 +27,7 @@ const SECTIONS = [
       <>
         <p>
           <strong>Noova 360</strong> es un software como servicio (SaaS) operado por{" "}
-          <strong>DOMAL SAS</strong> ("Noova", "nosotros"), sociedad domiciliada en Bogotá, Colombia. Al
+          <strong>DOMAL SAS</strong> (&ldquo;Noova&rdquo;, &ldquo;nosotros&rdquo;), sociedad domiciliada en Bogotá, Colombia. Al
           crear una cuenta, contratar un plan o usar la plataforma, aceptas estos Términos de Servicio en
           nombre tuyo o de la empresa a la que representas.
         </p>
@@ -251,7 +251,7 @@ const SECTIONS = [
     content: (
       <>
         <p>
-          Noova 360 se ofrece "tal cual" y "según disponibilidad". En la medida permitida por la ley, no
+          Noova 360 se ofrece &ldquo;tal cual&rdquo; y &ldquo;según disponibilidad&rdquo;. En la medida permitida por la ley, no
           otorgamos garantías implícitas de comerciabilidad, idoneidad para un propósito particular o no
           infracción, más allá de lo expresamente indicado en estos términos.
         </p>
