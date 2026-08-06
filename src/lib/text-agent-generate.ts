@@ -38,24 +38,51 @@ export interface GenerateTextAgentReplyResult {
   toolResults: AgentToolResult[];
 }
 
+function geminiErrorStatus(err: unknown): number | null {
+  if (err && typeof err === "object" && "status" in err) {
+    const status = (err as { status?: unknown }).status;
+    if (typeof status === "number" && Number.isFinite(status)) return status;
+    if (typeof status === "string" && /^\d+$/.test(status)) return Number(status);
+  }
+  return null;
+}
+
 function isTransientGeminiError(err: unknown): boolean {
+  const status = geminiErrorStatus(err);
+  if (status === 429 || status === 503 || status === 500 || status === 502 || status === 504) {
+    return true;
+  }
   const msg = err instanceof Error ? err.message : String(err);
-  return /"code":\s*(503|429)|"status":\s*"(UNAVAILABLE|RESOURCE_EXHAUSTED)"/.test(msg);
+  return (
+    /"code":\s*(429|500|502|503|504)/.test(msg) ||
+    /"status":\s*"(UNAVAILABLE|RESOURCE_EXHAUSTED|INTERNAL|DEADLINE_EXCEEDED)"/.test(msg) ||
+    /\b(429|503)\b/.test(msg) ||
+    /high demand|overloaded|try again later/i.test(msg)
+  );
 }
 
 /**
- * Gemini devuelve 503 "high demand" de forma intermitente; un segundo intento
- * a los pocos segundos casi siempre pasa. Sin esto, un solo error transitorio
- * dejaba al cliente sin respuesta y sin ningún aviso.
+ * Gemini sigue devolviendo 503/429 "high demand" de forma intermitente aunque el
+ * SDK ya reintente por debajo. Un par de reintentos con backoff corto suelen
+ * pasar; sin esto el cliente de WhatsApp se queda sin respuesta.
  */
-async function withOneRetryOnOverload<T>(fn: () => Promise<T>): Promise<T> {
-  try {
-    return await fn();
-  } catch (err) {
-    if (!isTransientGeminiError(err)) throw err;
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    return await fn();
+async function withRetryOnOverload<T>(fn: () => Promise<T>): Promise<T> {
+  const delaysMs = [1500, 3000];
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= delaysMs.length; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientGeminiError(err) || attempt >= delaysMs.length) throw err;
+      console.warn(
+        `[text-agent] Gemini transitorio (intento ${attempt + 1}/${delaysMs.length + 1}), reintento en ${delaysMs[attempt]}ms:`,
+        err instanceof Error ? err.message : err
+      );
+      await new Promise(resolve => setTimeout(resolve, delaysMs[attempt]));
+    }
   }
+  throw lastErr;
 }
 
 function toGeminiContents(messages: TextAgentChatMessage[]): Content[] {
@@ -120,7 +147,7 @@ export async function generateTextAgentReply(
     ...(toolsEnabled ? { tools: [{ functionDeclarations: buildFunctionDeclarations(enabledTools) }] } : {})
   };
 
-  let response = await withOneRetryOnOverload(() =>
+  let response = await withRetryOnOverload(() =>
     ai.models.generateContent({
       model: input.model,
       contents,
@@ -164,7 +191,7 @@ export async function generateTextAgentReply(
 
     contents.push({ role: "user", parts: functionResponseParts });
 
-    response = await withOneRetryOnOverload(() =>
+    response = await withRetryOnOverload(() =>
       ai.models.generateContent({
         model: input.model,
         contents,

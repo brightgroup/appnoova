@@ -285,7 +285,31 @@ export async function processTwilioWhatsAppInbound(
   }
 
   // —— Modo humano —— (si nadie del equipo respondió a tiempo, se devuelve sola a la IA más abajo)
-  if (existing?.handoff_mode === "human" && !shouldAutoReturnToAi(existing.messages ?? [])) {
+  // Recuperación: el catch antiguo de Gemini escalaba a humano con
+  // "En un momento un asesor te contactará." y dejaba el chat mudo hasta 30 min.
+  // Si ese es el último mensaje del asistente/asesor y nadie del equipo contestó, reintentamos IA.
+  const msgs = existing?.messages ?? [];
+  let lastAgentOrHuman: { role: string; content: string } | undefined;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (m.role === "assistant" || m.role === "human") {
+      lastAgentOrHuman = { role: m.role, content: m.content };
+      break;
+    }
+  }
+  const stuckAfterGeminiFailure =
+    existing?.handoff_mode === "human" &&
+    lastAgentOrHuman?.role === "assistant" &&
+    typeof lastAgentOrHuman.content === "string" &&
+    /^(En un momento un asesor te contactará\.|Disculpa, tuve un problema técnico por un momento\. ¿Me puedes escribir de nuevo\?)$/.test(
+      lastAgentOrHuman.content.trim()
+    );
+
+  if (
+    existing?.handoff_mode === "human" &&
+    !shouldAutoReturnToAi(msgs) &&
+    !stuckAfterGeminiFailure
+  ) {
     const persisted = await persistUserMessageOnly({
       db,
       userId: channel.user_id,
@@ -609,11 +633,14 @@ export async function processTwilioWhatsAppInbound(
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error IA";
-    console.error("[whatsapp/inbound] generación de respuesta falló tras reintento, escalando a humano:", msg);
+    console.error("[whatsapp/inbound] generación de respuesta falló tras reintento:", msg);
 
-    // Gemini falló dos veces seguidas (ver withOneRetryOnOverload): antes esto
-    // dejaba al cliente sin ninguna respuesta y sin rastro visible del error.
-    const fallbackReply = "En un momento un asesor te contactará.";
+    // Avisamos al cliente y al equipo, pero NO dejamos la conversación en modo
+    // humano: ese modo silencia la IA hasta 30 min (shouldAutoReturnToAi) y
+    // exactamente eso se siente como "la IA no contesta WhatsApp" cuando Gemini
+    // solo tuvo un corte transitorio. El siguiente mensaje vuelve a intentar IA.
+    const fallbackReply =
+      "Disculpa, tuve un problema técnico por un momento. ¿Me puedes escribir de nuevo?";
     await persistAssistantReplyOnly({
       db,
       userId: channel.user_id,
@@ -622,19 +649,16 @@ export async function processTwilioWhatsAppInbound(
       llmModel: model
     });
 
-    await escalateConversationToHuman({
-      db,
-      userId: channel.user_id,
-      conversationId: userPersist.conversationId,
-      organizationId: orgId,
-      reason: "ai_escalation",
-      channel: WHATSAPP_CONVERSATION_CHANNEL,
-      agentName: String(agent.name),
-      contactLabel: existing?.contact_label ? String(existing.contact_label) : contactLabel,
-      visitorMessage: userDisplay,
-      notifyRules: agent.notify_rules,
-      outboundWhatsAppChannel: channel
-    });
+    if (orgId) {
+      void notifyPushForOrg(orgId, {
+        title: "Fallo temporal de la IA (WhatsApp)",
+        body: `${contactLabel || "Contacto"}: Gemini no respondió. El chat sigue en modo IA.`,
+        url: `/m/chats/${userPersist.conversationId}`,
+        tag: `gemini-fail-${userPersist.conversationId}`
+      }).catch(pushErr =>
+        console.warn("[whatsapp/inbound] push fallo IA:", pushErr instanceof Error ? pushErr.message : pushErr)
+      );
+    }
 
     const sendResult = await sendWhatsAppIfAllowed(
       db,
