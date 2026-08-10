@@ -3,6 +3,11 @@ import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 /** Canal de conversaciones iniciadas por WhatsApp (Twilio Fase 0). */
 export const WHATSAPP_CONVERSATION_CHANNEL = "whatsapp";
 
+/** BSUID Meta/Twilio: `CO.1808175430425940` (país ISO + punto + id). */
+const BSUID_RE = /^[A-Za-z]{2}\.\d{6,}$/;
+/** Forma rota que guardábamos al quitar el punto y anteponer `+`. */
+const MANGLED_BSUID_RE = /^\+?([A-Za-z]{2})(\d{10,})$/;
+
 export function toWhatsAppChannelRecord(raw: Record<string, unknown>): WhatsAppChannelRecord {
   return {
     id: String(raw.id),
@@ -33,24 +38,67 @@ export function toWhatsAppChannelRecord(raw: Record<string, unknown>): WhatsAppC
   };
 }
 
-/** +57 321 9883163 → +573219883163 */
-export function normalizeWhatsAppE164(value: string): string {
+function stripWhatsAppPrefix(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
-  const withoutPrefix = trimmed.toLowerCase().startsWith("whatsapp:")
+  return trimmed.toLowerCase().startsWith("whatsapp:")
     ? trimmed.slice("whatsapp:".length).trim()
     : trimmed;
+}
+
+/** ¿Es un Business-Scoped User ID (username WhatsApp sin teléfono visible)? */
+export function isWhatsAppBsuid(value: string): boolean {
+  const raw = stripWhatsAppPrefix(value);
+  if (!raw) return false;
+  if (BSUID_RE.test(raw)) return true;
+  return MANGLED_BSUID_RE.test(raw);
+}
+
+function formatBsuid(country: string, id: string): string {
+  return `${country.toUpperCase()}.${id}`;
+}
+
+/**
+ * Normaliza un destinatario WhatsApp:
+ * - E.164 clásico → `+573001234567`
+ * - BSUID Twilio/Meta (`whatsapp:CO.1808…` o forma rota `+CO1808…`) → `CO.1808…`
+ */
+export function normalizeWhatsAppE164(value: string): string {
+  const withoutPrefix = stripWhatsAppPrefix(value);
+  if (!withoutPrefix) return "";
+
+  if (BSUID_RE.test(withoutPrefix)) {
+    const [cc, id] = withoutPrefix.split(".");
+    return formatBsuid(cc, id);
+  }
+
+  const mangled = withoutPrefix.match(MANGLED_BSUID_RE);
+  if (mangled) {
+    return formatBsuid(mangled[1], mangled[2]);
+  }
+
+  // E.164: quita separadores visuales. Las letras ya se manejaron arriba (BSUID).
   const compact = withoutPrefix.replace(/[\s().-]/g, "");
   if (!compact) return "";
+  if (/[A-Za-z]/.test(compact)) {
+    // No inventar `+CO…`: deja la forma legible para diagnóstico.
+    return compact;
+  }
   return compact.startsWith("+") ? compact : `+${compact}`;
 }
 
-/** whatsapp:+573001234567 → +573001234567 */
+/** whatsapp:+573001234567 | whatsapp:CO.1808… → forma canónica interna */
 export function parseTwilioWhatsAppAddress(value: string): string {
   return normalizeWhatsAppE164(value);
 }
 
-export function toTwilioWhatsAppAddress(e164: string): string {
-  const normalized = e164.startsWith("+") ? e164 : `+${e164}`;
-  return `whatsapp:${normalized}`;
+/** Forma canónica → dirección Twilio (`whatsapp:+57…` o `whatsapp:CO.1808…`). */
+export function toTwilioWhatsAppAddress(address: string): string {
+  const normalized = normalizeWhatsAppE164(address);
+  if (!normalized) return "";
+  if (isWhatsAppBsuid(normalized)) {
+    return `whatsapp:${normalized}`;
+  }
+  const e164 = normalized.startsWith("+") ? normalized : `+${normalized}`;
+  return `whatsapp:${e164}`;
 }

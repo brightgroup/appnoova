@@ -1,5 +1,5 @@
 import { metaGraphBaseUrl } from "@/lib/meta/graph-config";
-import { normalizeWhatsAppE164 } from "@/lib/whatsapp-channel";
+import { isWhatsAppBsuid, normalizeWhatsAppE164 } from "@/lib/whatsapp-channel";
 
 export interface SendMetaWhatsAppTextInput {
   phoneNumberId: string;
@@ -13,7 +13,10 @@ export interface SendMetaWhatsAppTextResult {
 }
 
 function metaRecipientE164(e164: string): string {
-  return normalizeWhatsAppE164(e164).replace(/^\+/, "");
+  const normalized = normalizeWhatsAppE164(e164);
+  // Cloud API: teléfono sin `+`; BSUID tal cual (CO.xxxx).
+  if (isWhatsAppBsuid(normalized)) return normalized;
+  return normalized.replace(/^\+/, "");
 }
 
 /** Envía mensaje de sesión (texto) vía Cloud API. */

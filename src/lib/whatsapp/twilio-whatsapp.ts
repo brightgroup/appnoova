@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { twilioWhatsAppStatusWebhookUrl, twilioWhatsAppWebhookUrl } from "@/lib/telephony/app-url";
+import { toTwilioWhatsAppAddress } from "@/lib/whatsapp-channel";
 
 function twilioCredentials(): { accountSid: string; authToken: string } | null {
   const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
@@ -99,10 +100,9 @@ async function postTwilioMessage(form: Record<string, string>, accountSid?: stri
   return { sid: String(json.sid ?? "") };
 }
 
-function whatsAppAddress(e164: string): string {
-  return e164.startsWith("whatsapp:")
-    ? e164
-    : `whatsapp:${e164.startsWith("+") ? e164 : `+${e164}`}`;
+function whatsAppAddress(address: string): string {
+  // Soporta E.164 (+57…) y BSUID (CO.1808…) — ver toTwilioWhatsAppAddress.
+  return toTwilioWhatsAppAddress(address);
 }
 
 function applyFromFields(

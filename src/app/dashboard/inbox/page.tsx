@@ -371,9 +371,9 @@ function InboxPageInner() {
         headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify({ conversation_id: selectedId, content: text })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({} as { error?: string }));
       if (!res.ok) {
-        setError(data.error || "No se pudo enviar");
+        setError(data.error || `No se pudo enviar (${res.status})`);
         return;
       }
       setReply("");
@@ -381,8 +381,8 @@ function InboxPageInner() {
       await loadDetail(selectedId);
       await loadList();
       requestAnimationFrame(() => scrollToBottom("smooth"));
-    } catch {
-      setError("Error de red al enviar");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error de red al enviar");
     }
     setSending(false);
   };
