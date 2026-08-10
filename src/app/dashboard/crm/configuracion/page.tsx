@@ -22,6 +22,7 @@ export default function CrmConfigPage() {
   const [stages, setStages] = useState<StageDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,12 +66,14 @@ export default function CrmConfigPage() {
 
   const saveStages = async () => {
     setSaving(true);
+    setSaveError(null);
     const headers = await getAuthHeaders();
     const res = await fetch("/api/crm/stages", {
       method: "PUT",
       headers,
       body: JSON.stringify({
         stages: stages.map((s, i) => ({
+          id: s.id && !s.id.startsWith("new-") ? s.id : undefined,
           name: s.name,
           slug: s.slug,
           color: s.color,
@@ -79,9 +82,11 @@ export default function CrmConfigPage() {
         }))
       })
     });
-    if (res.ok) {
-      const data = await res.json();
+    const data = await res.json().catch(() => null);
+    if (res.ok && data) {
       setStages((data.stages ?? []).filter((s: CrmPipelineStage) => !s.is_won && !s.is_lost));
+    } else {
+      setSaveError(data?.error ?? "No se pudo guardar. Intenta de nuevo.");
     }
     setSaving(false);
   };
@@ -140,6 +145,11 @@ export default function CrmConfigPage() {
                 <p className="text-sm text-gray-500 mb-4">
                   Las etapas representan el avance en el pipeline. Define cuándo la IA debe mover un lead a cada etapa según la conversación.
                 </p>
+                {saveError && (
+                  <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 mb-4">
+                    {saveError}
+                  </p>
+                )}
                 {stages.map((stage, i) => (
                   <div key={stage.id ?? i} className="border-b border-white/[.06] py-4 space-y-3">
                     <div className="flex items-center gap-3">

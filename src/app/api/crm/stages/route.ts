@@ -29,7 +29,16 @@ export async function PUT(req: NextRequest) {
   if (!stagesIn.length) return NextResponse.json({ error: "stages requerido" }, { status: 400 });
 
   const db = textAgentsAdminClient();
+
+  const { data: existingRows, error: fetchError } = await db
+    .from("crm_pipeline_stages")
+    .select("id")
+    .eq("user_id", userId);
+  if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
+  const existingIds = new Set((existingRows ?? []).map(r => String(r.id)));
+
   const rows = stagesIn.map((s: Record<string, unknown>, i: number) => ({
+    id: typeof s.id === "string" && existingIds.has(s.id) ? s.id : undefined,
     user_id: userId,
     name: String(s.name ?? "").trim(),
     slug: slugifyStageName(String(s.slug ?? s.name ?? `stage_${i}`)),
@@ -41,9 +50,49 @@ export async function PUT(req: NextRequest) {
     updated_at: new Date().toISOString()
   })).filter(r => r.name);
 
-  await db.from("crm_pipeline_stages").delete().eq("user_id", userId);
-  const { data, error } = await db.from("crm_pipeline_stages").insert(rows).select("*");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const toUpdate = rows.filter(r => r.id);
+  const toInsert = rows.filter(r => !r.id).map(({ id: _id, ...r }) => r);
 
-  return NextResponse.json({ stages: (data ?? []).map(r => toCrmStage(r)) });
+  const keepIds = new Set(toUpdate.map(r => r.id));
+  const toDeleteIds = [...existingIds].filter(id => !keepIds.has(id));
+
+  if (toDeleteIds.length) {
+    const { error: deleteError } = await db
+      .from("crm_pipeline_stages")
+      .delete()
+      .in("id", toDeleteIds)
+      .eq("user_id", userId);
+    if (deleteError) {
+      if (deleteError.code === "23503") {
+        return NextResponse.json(
+          { error: "No se pueden eliminar una o más etapas porque tienen leads asignados. Mueve esos leads a otra etapa primero." },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    }
+  }
+
+  if (toUpdate.length) {
+    const { error: updateError } = await db
+      .from("crm_pipeline_stages")
+      .upsert(toUpdate, { onConflict: "id" });
+    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+  }
+
+  if (toInsert.length) {
+    const { error: insertError } = await db.from("crm_pipeline_stages").insert(toInsert);
+    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+  }
+
+  const { data: finalRows, error: finalError } = await db
+    .from("crm_pipeline_stages")
+    .select("*")
+    .eq("user_id", userId)
+    .order("sort_order");
+  if (finalError) return NextResponse.json({ error: finalError.message }, { status: 500 });
+
+  return NextResponse.json({
+    stages: (finalRows ?? []).map(r => toCrmStage(r)).filter(s => !s.is_won && !s.is_lost)
+  });
 }
