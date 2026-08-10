@@ -40,7 +40,7 @@ export async function uploadWhatsAppMedia(
   return path;
 }
 
-async function signedUrlForPath(
+export async function signedUrlForPath(
   db: SupabaseClient,
   path: string
 ): Promise<string | null> {

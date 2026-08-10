@@ -30,6 +30,7 @@ import {
 } from "@/lib/whatsapp/conversation-thread";
 import { mergeWhatsAppMetadata } from "@/lib/whatsapp/conversation-meta";
 import { notifyPushForOrg } from "@/lib/push/send";
+import { emitAutomationEvent } from "@/lib/automations/events";
 import { syncCrmContactFromWhatsAppInbound } from "@/lib/crm-contact-sync";
 import { enrichCrmContactFromWhatsAppConversation } from "@/lib/crm-contact-enrich";
 import { enrichCrmLeadForConversationId } from "@/lib/crm-lead-enrich";
@@ -482,6 +483,21 @@ export async function processTwilioWhatsAppInbound(
   });
 
   if (userPersist.error) return { ok: false, error: userPersist.error };
+
+  // Automatizaciones (Workflows/Conectores): si el cliente final envió una imagen,
+  // avisa a los workflows activos de la org en paralelo con la generación de la
+  // respuesta de la IA — no bloquea ni retrasa el envío al cliente.
+  if (orgId && inboundContent.primaryMediaType === "image") {
+    void emitAutomationEvent(db, {
+      organizationId: orgId,
+      conversationId: userPersist.conversationId,
+      contactPhone: inbound.fromE164,
+      contactLabel,
+      mediaStoragePath: inboundContent.mediaStoragePath ?? null,
+      analysisText: inboundContent.userText,
+      messageSid: inbound.messageSid
+    }).catch(err => console.error("[automations] emit:", err));
+  }
 
   // Best-effort: los "puntos de escribiendo" nativos de WhatsApp mientras el agente genera la respuesta.
   // Se espera a que Twilio confirme el envío (no fire-and-forget) para que quede garantizado

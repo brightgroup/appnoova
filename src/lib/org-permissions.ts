@@ -34,6 +34,7 @@ export const DASHBOARD_ROUTE_RULES: { prefix: string; rule: DashboardRouteRule }
   { prefix: "/dashboard/campaigns", rule: { module: "campaigns", min: "view" } },
   { prefix: "/dashboard/canales", rule: { module: "channels", min: "view" } },
   { prefix: "/dashboard/conectores", rule: { module: "conectores", min: "view" } },
+  { prefix: "/dashboard/workflows", rule: { module: "workflows", min: "view" } },
   { prefix: "/dashboard/micrositio", rule: { module: "channels", min: "view" } },
   { prefix: "/dashboard/contextos", rule: { module: "company_context", min: "view" } },
   { prefix: "/dashboard/tablas", rule: { module: "campaigns", min: "view" } },
@@ -79,6 +80,8 @@ export function buildPermissionFlags(permissions: OrgPermissionsMap) {
     can_edit_channels: canAccessModule(permissions, "channels", "edit"),
     can_view_conectores: canAccessModule(permissions, "conectores", "view"),
     can_edit_conectores: canAccessModule(permissions, "conectores", "edit"),
+    can_view_workflows: canAccessModule(permissions, "workflows", "view"),
+    can_edit_workflows: canAccessModule(permissions, "workflows", "edit"),
     can_view_contexts: canAccessModule(permissions, "company_context", "view"),
     can_edit_contexts: canAccessModule(permissions, "company_context", "edit"),
   };
