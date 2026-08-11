@@ -20,6 +20,38 @@ export async function GET(req: NextRequest) {
   }
 }
 
+export async function POST(req: NextRequest) {
+  const userId = await getCrmUserId(req, "edit");
+  if (userId instanceof NextResponse) return userId;
+
+  const body = await req.json();
+  const name = String(body.name ?? "").trim();
+  if (!name) return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 });
+
+  const db = textAgentsAdminClient();
+
+  const { count, error: countError } = await db
+    .from("crm_pipeline_stages")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
+  if (countError) return NextResponse.json({ error: countError.message }, { status: 500 });
+
+  const { error: insertError } = await db.from("crm_pipeline_stages").insert({
+    user_id: userId,
+    name,
+    slug: slugifyStageName(String(body.slug ?? name)),
+    color: String(body.color ?? "#5b5bf6"),
+    sort_order: count ?? 0,
+    is_won: false,
+    is_lost: false,
+    ai_enter_criteria: body.ai_enter_criteria ? String(body.ai_enter_criteria).trim() : null
+  });
+  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+
+  const stages = await getCrmStages(db, userId);
+  return NextResponse.json({ stages });
+}
+
 export async function PUT(req: NextRequest) {
   const userId = await getCrmUserId(req, "edit");
   if (userId instanceof NextResponse) return userId;

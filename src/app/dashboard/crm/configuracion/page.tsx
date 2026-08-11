@@ -12,6 +12,8 @@ import { DEFAULT_CRM_STAGES } from "@/lib/crm-record";
 import { DEFAULT_STAGE_AI_CRITERIA } from "@/lib/crm-lead-ai-shared";
 import { CrmPropertyConfigPanel } from "@/components/crm/CrmPropertyConfigPanel";
 import { CrmTenantLabelsPanel } from "@/components/crm/CrmTenantLabelsPanel";
+import { CreateStageModal } from "@/components/crm/CreateStageModal";
+import { DeleteStageModal } from "@/components/crm/DeleteStageModal";
 import type { CrmPipelineStage } from "@/types/crm";
 
 type Tab = "stages" | "contacts" | "leads" | "labels";
@@ -23,6 +25,15 @@ export default function CrmConfigPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleteLeadCount, setDeleteLeadCount] = useState<number | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,25 +54,57 @@ export default function CrmConfigPage() {
     setStages(prev => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
   };
 
-  const addStage = () => {
-    setStages(prev => [
-      ...prev,
-      {
-        id: `new-${Date.now()}`,
-        name: "Nueva etapa",
-        slug: `etapa_${prev.length}`,
-        color: "#5b5bf6",
-        sort_order: prev.length,
-        is_won: false,
-        is_lost: false,
-        ai_enter_criteria: null
-      }
-    ]);
+  const handleCreateStage = async (payload: { name: string; color: string; ai_enter_criteria: string | null }) => {
+    setCreateSaving(true);
+    setCreateError(null);
+    const headers = await getAuthHeaders();
+    const res = await fetch("/api/crm/stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data) {
+      setStages((data.stages ?? []).filter((s: CrmPipelineStage) => !s.is_won && !s.is_lost));
+      setCreateOpen(false);
+    } else {
+      setCreateError(data?.error ?? "No se pudo crear la etapa.");
+    }
+    setCreateSaving(false);
   };
 
-  const removeStage = (index: number) => {
+  const handleDeleteClick = (stage: StageDraft) => {
     if (stages.length <= 2) return;
-    setStages(prev => prev.filter((_, i) => i !== index).map((s, i) => ({ ...s, sort_order: i })));
+    if (!stage.id || stage.id.startsWith("new-")) {
+      setStages(prev => prev.filter(s => s !== stage).map((s, i) => ({ ...s, sort_order: i })));
+      return;
+    }
+    setDeleteTarget({ id: stage.id, name: stage.name });
+    setDeleteLeadCount(null);
+    setDeleteError(null);
+  };
+
+  const handleDeleteConfirm = async (reassignToStageId?: string) => {
+    if (!deleteTarget) return;
+    setDeleteSaving(true);
+    setDeleteError(null);
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/crm/stages/${deleteTarget.id}`, {
+      method: "DELETE",
+      headers,
+      body: JSON.stringify(reassignToStageId ? { reassign_to_stage_id: reassignToStageId } : {})
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data) {
+      setStages((data.stages ?? []).filter((s: CrmPipelineStage) => !s.is_won && !s.is_lost));
+      setDeleteTarget(null);
+      setDeleteLeadCount(null);
+    } else if (res.status === 409 && data?.lead_count != null) {
+      setDeleteLeadCount(data.lead_count);
+    } else {
+      setDeleteError(data?.error ?? "No se pudo eliminar. Intenta de nuevo.");
+    }
+    setDeleteSaving(false);
   };
 
   const saveStages = async () => {
@@ -108,7 +151,7 @@ export default function CrmConfigPage() {
           </div>
           {tab === "stages" && (
             <div className="flex gap-2">
-              <button type="button" onClick={addStage} className={btnGhost}>
+              <button type="button" onClick={() => { setCreateError(null); setCreateOpen(true); }} className={btnGhost}>
                 <Plus className="w-4 h-4" /> Etapa
               </button>
               <button type="button" onClick={saveStages} disabled={saving} className={btnPrimary}>
@@ -170,7 +213,7 @@ export default function CrmConfigPage() {
                       />
                       <button
                         type="button"
-                        onClick={() => removeStage(i)}
+                        onClick={() => handleDeleteClick(stage)}
                         disabled={stages.length <= 2}
                         className={btnGhost}
                       >
@@ -205,6 +248,25 @@ export default function CrmConfigPage() {
           {tab === "labels" && <CrmTenantLabelsPanel />}
         </div>
       </div>
+
+      <CreateStageModal
+        open={createOpen}
+        saving={createSaving}
+        error={createError}
+        onClose={() => setCreateOpen(false)}
+        onCreate={handleCreateStage}
+      />
+      <DeleteStageModal
+        stage={deleteTarget}
+        otherStages={stages
+          .filter((s): s is StageDraft & { id: string } => !!s.id && s.id !== deleteTarget?.id)
+          .map(s => ({ id: s.id, name: s.name }))}
+        leadCount={deleteLeadCount}
+        saving={deleteSaving}
+        error={deleteError}
+        onClose={() => { setDeleteTarget(null); setDeleteLeadCount(null); setDeleteError(null); }}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   );
 }
