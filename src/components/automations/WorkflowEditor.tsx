@@ -29,7 +29,8 @@ import {
   X,
   Info,
   Pencil,
-  Trash2
+  Trash2,
+  Radio
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { tabActive, tabIdle } from "@/lib/brand-ui";
@@ -44,7 +45,7 @@ import {
   CopyButton
 } from "@/components/automations/workflow-nodes";
 import { DeleteWorkflowModal } from "@/components/automations/DeleteWorkflowModal";
-import { AutomationEventsTable, type AutomationEventRow } from "@/components/automations/AutomationEventsTable";
+import { AutomationEventsTable, prettyPrint, type AutomationEventRow } from "@/components/automations/AutomationEventsTable";
 import { WhatsAppLogo } from "@/components/icons/brands/WhatsAppLogo";
 import { NODE_CATALOG, type WorkflowNodeType, type WorkflowNodeData } from "@/lib/automations/node-types";
 import type { WorkflowRecord } from "@/lib/automations/workflows-db";
@@ -59,14 +60,13 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 const NODE_PICKER_ICON: Record<WorkflowNodeType, React.ReactNode> = {
-  "trigger.whatsapp_image": <WhatsAppLogo className="w-4 h-4 text-white" />,
-  "trigger.whatsapp_text": <WhatsAppLogo className="w-4 h-4 text-white" />,
+  "trigger.whatsapp_message": <WhatsAppLogo className="w-4 h-4 text-white" />,
   "trigger.webhook": <Webhook className="w-4 h-4 text-white" strokeWidth={1.8} />,
   "action.webhook": <Globe className="w-4 h-4 text-white" strokeWidth={1.6} />,
   "action.send_whatsapp_message": <WhatsAppLogo className="w-4 h-4 text-white" />
 };
 
-const TRIGGER_TYPES: WorkflowNodeType[] = ["trigger.whatsapp_image", "trigger.whatsapp_text", "trigger.webhook"];
+const TRIGGER_TYPES: WorkflowNodeType[] = ["trigger.whatsapp_message", "trigger.webhook"];
 
 interface WhatsAppTemplateOption {
   id: string;
@@ -453,6 +453,8 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
                 connections={connections}
                 channels={channels}
                 templates={templates}
+                workflowId={workflowId}
+                events={events}
                 onSetData={patch => setNodeData(configNode.id, patch)}
                 onClose={() => setConfigNodeId(null)}
               />
@@ -463,6 +465,82 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
         <div className="flex-1 overflow-y-auto p-6 min-h-0">
           <AutomationEventsTable events={events} emptyLabel="Sin ejecuciones todavía." />
         </div>
+      )}
+    </div>
+  );
+}
+
+function whatsappEventMatches(e: AutomationEventRow, mediaFilter: "image" | "text" | "any"): boolean {
+  if (e.event_type !== "whatsapp.image_received" && e.event_type !== "whatsapp.text_received") return false;
+  if (mediaFilter === "image") return e.event_type === "whatsapp.image_received";
+  if (mediaFilter === "text") return e.event_type === "whatsapp.text_received";
+  return true;
+}
+
+function webhookEventMatches(e: AutomationEventRow): boolean {
+  return e.event_type === "webhook.received" || e.event_type === "automation.callback";
+}
+
+/**
+ * Botón "Escuchar evento de prueba" (como n8n) — sondea los eventos del
+ * workflow cada 2s hasta 2 minutos buscando uno real que llegue después de
+ * hacer clic, para reemplazar el JSON de ejemplo por datos reales del cliente
+ * o sistema externo, sin tener que fabricar valores de mentira en el editor.
+ */
+function TestListenButton({
+  workflowId,
+  matches,
+  onCaptured
+}: {
+  workflowId: string;
+  matches: (event: AutomationEventRow) => boolean;
+  onCaptured: (event: AutomationEventRow) => void;
+}) {
+  const [listening, setListening] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
+
+  async function startListening() {
+    setTimedOut(false);
+    setListening(true);
+    const startedAt = Date.now();
+    const deadline = startedAt + 120_000;
+
+    while (Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const res = await authFetch(`/api/automations/workflows/${workflowId}/events`);
+      if (res.ok) {
+        const json = await res.json();
+        const found = ((json.events ?? []) as AutomationEventRow[]).find(
+          e => new Date(e.created_at).getTime() > startedAt && matches(e)
+        );
+        if (found) {
+          onCaptured(found);
+          setListening(false);
+          return;
+        }
+      }
+    }
+    setListening(false);
+    setTimedOut(true);
+  }
+
+  return (
+    <div className="mb-4">
+      <button
+        type="button"
+        onClick={() => void startListening()}
+        disabled={listening}
+        className={`w-full inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-default ${
+          listening
+            ? "border-[#5b5bf6]/40 bg-[#5b5bf6]/10 text-[#c4c4ff]"
+            : "border-white/[.12] bg-white/[.04] text-white hover:bg-white/[.08]"
+        }`}
+      >
+        {listening ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Radio className="w-3.5 h-3.5" />}
+        {listening ? "Escuchando… manda un evento de prueba ahora" : "Escuchar evento de prueba"}
+      </button>
+      {timedOut && (
+        <p className="text-[11px] text-amber-400 mt-1.5">No llegó ningún evento en 2 minutos. Intenta de nuevo.</p>
       )}
     </div>
   );
@@ -679,6 +757,8 @@ function NodeConfigPanel({
   connections,
   channels,
   templates,
+  workflowId,
+  events,
   onClose,
   onSetData
 }: {
@@ -686,6 +766,8 @@ function NodeConfigPanel({
   connections: AutomationConnectionRecord[];
   channels: WhatsAppChannelRecord[];
   templates: WhatsAppTemplateOption[];
+  workflowId: string;
+  events: AutomationEventRow[];
   onClose: () => void;
   onSetData: (patch: Partial<WorkflowNodeData>) => void;
 }) {
@@ -700,6 +782,16 @@ function NodeConfigPanel({
   const displayLabel = resolveNodeLabel(type, node.data, channels, connections);
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelDraft, setLabelDraft] = useState("");
+  const [capturedExample, setCapturedExample] = useState<AutomationEventRow | null>(() => {
+    if (type === "trigger.whatsapp_message") {
+      const mediaFilter = node.data.mediaFilter === "image" || node.data.mediaFilter === "text" ? node.data.mediaFilter : "any";
+      return events.find(e => whatsappEventMatches(e, mediaFilter)) ?? null;
+    }
+    if (type === "trigger.webhook") {
+      return events.find(webhookEventMatches) ?? null;
+    }
+    return null;
+  });
 
   function startEditingLabel() {
     setLabelDraft(node.data.label ?? displayLabel);
@@ -747,51 +839,75 @@ function NodeConfigPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        {type === "trigger.whatsapp_image" && (
-          <div>
-            <InfoNote example={EXAMPLE_JSON_IMAGE_EVENT} exampleLabel="JSON que sale hacia tu conector">
-              Se activa cada vez que un cliente final envía una imagen por WhatsApp.
-            </InfoNote>
-            <ChannelSelectField
-              channels={channels}
-              value={node.data.channelId}
-              onChange={channelId => onSetData({ channelId })}
-              kindLabel="imágenes"
-            />
-          </div>
-        )}
+        {type === "trigger.whatsapp_message" && (() => {
+          const mediaFilter = node.data.mediaFilter === "image" || node.data.mediaFilter === "text" ? node.data.mediaFilter : "any";
+          const staticExample = mediaFilter === "text" ? EXAMPLE_JSON_TEXT_EVENT : EXAMPLE_JSON_IMAGE_EVENT;
+          const kindLabel = mediaFilter === "image" ? "imágenes" : mediaFilter === "text" ? "mensajes de texto" : "imágenes o mensajes de texto";
+          const example = capturedExample ? prettyPrint(capturedExample.request_body) ?? staticExample : staticExample;
+          const exampleLabel = capturedExample
+            ? `JSON real capturado el ${new Date(capturedExample.created_at).toLocaleString("es-CO")}`
+            : "Ejemplo ilustrativo — todavía no hay datos reales";
 
-        {type === "trigger.whatsapp_text" && (
-          <div>
-            <InfoNote example={EXAMPLE_JSON_TEXT_EVENT} exampleLabel="JSON que sale hacia tu conector">
-              Se activa cada vez que un cliente final envía un mensaje de texto por WhatsApp.
-            </InfoNote>
-            <ChannelSelectField
-              channels={channels}
-              value={node.data.channelId}
-              onChange={channelId => onSetData({ channelId })}
-              kindLabel="mensajes"
-            />
-          </div>
-        )}
-
-        {type === "trigger.webhook" && (
-          <div>
-            <InfoNote example={EXAMPLE_JSON_REPLY_DEFAULT} exampleLabel="Ejemplo de JSON que puede llegar aquí">
-              Genera una URL pública única. Cualquier sistema externo — n8n, tu CRM, un backend propio — puede hacer un{" "}
-              <code>POST</code> con JSON a esa URL para activar este workflow.
-            </InfoNote>
-            <label className="block text-xs font-semibold text-gray-400 mb-1.5">URL del webhook</label>
-            <div className="flex items-center gap-1.5 rounded-lg border border-white/[.12] bg-white/[.04] px-2.5 py-2">
-              <code className="flex-1 text-[11px] text-gray-300 truncate">{webhookUrl}</code>
-              <CopyButton value={webhookUrl} />
+          return (
+            <div>
+              <InfoNote example={example} exampleLabel={exampleLabel}>
+                Se activa cada vez que un cliente final envía {kindLabel} por WhatsApp.
+                {mediaFilter === "any" && !capturedExample && " El ejemplo de la derecha corresponde a una imagen — con texto cambia \"image\" por \"message\"."}
+              </InfoNote>
+              <TestListenButton
+                workflowId={workflowId}
+                matches={e => whatsappEventMatches(e, mediaFilter)}
+                onCaptured={setCapturedExample}
+              />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-400 mb-1.5">Se activa con</label>
+                  <select
+                    value={mediaFilter}
+                    onChange={e => onSetData({ mediaFilter: e.target.value as "image" | "text" | "any" })}
+                    className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white"
+                  >
+                    <option value="any">Cualquiera — imagen o texto</option>
+                    <option value="image">Solo imágenes</option>
+                    <option value="text">Solo texto</option>
+                  </select>
+                </div>
+                <ChannelSelectField
+                  channels={channels}
+                  value={node.data.channelId}
+                  onChange={channelId => onSetData({ channelId })}
+                  kindLabel={kindLabel}
+                />
+              </div>
             </div>
-            <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
-              Conéctala a un nodo <strong className="text-gray-300">Enviar mensaje de WhatsApp</strong> para decirle a Noova
-              qué responder y a quién.
-            </p>
-          </div>
-        )}
+          );
+        })()}
+
+        {type === "trigger.webhook" && (() => {
+          const example = capturedExample ? prettyPrint(capturedExample.request_body) ?? EXAMPLE_JSON_REPLY_DEFAULT : EXAMPLE_JSON_REPLY_DEFAULT;
+          const exampleLabel = capturedExample
+            ? `JSON real capturado el ${new Date(capturedExample.created_at).toLocaleString("es-CO")}`
+            : "Ejemplo ilustrativo — todavía no hay datos reales";
+
+          return (
+            <div>
+              <InfoNote example={example} exampleLabel={exampleLabel}>
+                Genera una URL pública única. Cualquier sistema externo — n8n, tu CRM, un backend propio — puede hacer un{" "}
+                <code>POST</code> con JSON a esa URL para activar este workflow.
+              </InfoNote>
+              <TestListenButton workflowId={workflowId} matches={webhookEventMatches} onCaptured={setCapturedExample} />
+              <label className="block text-xs font-semibold text-gray-400 mb-1.5">URL del webhook</label>
+              <div className="flex items-center gap-1.5 rounded-lg border border-white/[.12] bg-white/[.04] px-2.5 py-2">
+                <code className="flex-1 text-[11px] text-gray-300 truncate">{webhookUrl}</code>
+                <CopyButton value={webhookUrl} />
+              </div>
+              <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+                Conéctala a un nodo <strong className="text-gray-300">Enviar mensaje de WhatsApp</strong> para decirle a Noova
+                qué responder y a quién.
+              </p>
+            </div>
+          );
+        })()}
 
         {type === "action.webhook" && (
           <div>

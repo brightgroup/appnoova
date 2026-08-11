@@ -1,13 +1,13 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronRight } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronRight, Radio } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 
 export interface AutomationEventRow {
   id: string;
   event_type: string;
-  status: "sent" | "responded" | "no_response" | "error";
+  status: "sent" | "responded" | "no_response" | "error" | "captured";
   http_status?: number | null;
   latency_ms: number | null;
   error_message?: string | null;
@@ -21,11 +21,12 @@ export interface AutomationEventRow {
 function EventStatusBadge({ status }: { status: AutomationEventRow["status"] }) {
   if (status === "sent" || status === "responded") return <Badge variant="emerald" icon={CheckCircle2}>Respuesta recibida</Badge>;
   if (status === "error") return <Badge variant="danger">Sin conexión</Badge>;
+  if (status === "captured") return <Badge variant="sky" icon={Radio}>Capturado (sin conector aún)</Badge>;
   return <Badge variant="neutral">Sin respuesta aún</Badge>;
 }
 
 /** Repretty-imprime el JSON guardado; si no es JSON válido (ej. HTML de error de un servidor caído), lo muestra tal cual. */
-function prettyPrint(raw: string | null | undefined): string | null {
+export function prettyPrint(raw: string | null | undefined): string | null {
   if (!raw) return null;
   try {
     return JSON.stringify(JSON.parse(raw), null, 2);

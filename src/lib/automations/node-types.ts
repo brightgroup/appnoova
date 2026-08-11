@@ -7,17 +7,16 @@
  */
 
 export const NODE_TYPES = [
-  "trigger.whatsapp_image",
-  "trigger.whatsapp_text",
+  "trigger.whatsapp_message",
   "trigger.webhook",
   "action.webhook",
   "action.send_whatsapp_message"
 ] as const;
 
-/** Disparadores de WhatsApp — comparten selector de canal y motor de emisión (ver events.ts). */
-export const WHATSAPP_TRIGGER_TYPES = ["trigger.whatsapp_image", "trigger.whatsapp_text"] as const;
-
 export type WorkflowNodeType = (typeof NODE_TYPES)[number];
+
+/** Qué disparó realmente el evento — no es un tipo de nodo, es el hecho real (llegó una imagen o un texto). */
+export type WhatsAppEventMediaType = "image" | "text";
 
 export interface WorkflowNodeData {
   /** Nombre propio puesto por el usuario — si está, siempre gana sobre cualquier etiqueta calculada (canal/conexión/default). */
@@ -32,8 +31,10 @@ export interface WorkflowNodeData {
   requestHeadersJson?: string;
   /** Solo aplica a action.webhook con customRequest activo: JSON del cuerpo, como texto (admite tokens {{...}}), reemplaza el payload automático. */
   requestBodyTemplate?: string;
-  /** Solo aplica a los disparadores de WhatsApp: id del whatsapp_channels a escuchar. Vacío/ausente = cualquier canal de la org. */
+  /** Solo aplica al disparador de WhatsApp: id del whatsapp_channels a escuchar. Vacío/ausente = cualquier canal de la org. */
   channelId?: string;
+  /** Solo aplica a trigger.whatsapp_message: qué lo activa. Default "any" (imagen o texto). */
+  mediaFilter?: "image" | "text" | "any";
   /** Solo aplica a trigger.webhook: token único de este nodo — la URL pública es /api/automations/inbound/{webhookToken}. Se genera al crear el nodo. */
   webhookToken?: string;
   /** Solo aplica a action.send_whatsapp_message: qué tipo de contenido envía. Default "text". */
@@ -85,16 +86,10 @@ export interface NodeCatalogEntry {
 /** Catálogo para la paleta "Agregar nodo" del editor — hoy pocas opciones, pensado para crecer. */
 export const NODE_CATALOG: NodeCatalogEntry[] = [
   {
-    type: "trigger.whatsapp_image",
-    category: "trigger",
-    label: "Imagen de WhatsApp recibida",
-    description: "WhatsApp · elige el canal"
-  },
-  {
-    type: "trigger.whatsapp_text",
+    type: "trigger.whatsapp_message",
     category: "trigger",
     label: "Mensaje de WhatsApp recibido",
-    description: "WhatsApp · elige el canal"
+    description: "Imagen o texto · elige el canal y qué lo activa"
   },
   {
     type: "trigger.webhook",
@@ -120,6 +115,12 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Tipos de nodo que existieron antes de unificar el disparador de WhatsApp — se migran solos al cargar/guardar, sin romper workflows ya guardados. */
+const LEGACY_NODE_TYPE_MIGRATIONS: Record<string, { type: WorkflowNodeType; data: Partial<WorkflowNodeData> }> = {
+  "trigger.whatsapp_image": { type: "trigger.whatsapp_message", data: { mediaFilter: "image" } },
+  "trigger.whatsapp_text": { type: "trigger.whatsapp_message", data: { mediaFilter: "text" } }
+};
+
 /** Valida/normaliza un grafo recibido del cliente antes de guardarlo. */
 export function normalizeWorkflowGraph(input: unknown): WorkflowGraph {
   if (!isPlainObject(input)) return { ...EMPTY_GRAPH };
@@ -133,6 +134,11 @@ export function normalizeWorkflowGraph(input: unknown): WorkflowGraph {
 
   const nodes: WorkflowNode[] = rawNodes
     .filter(isPlainObject)
+    .map((n) => {
+      const migration = LEGACY_NODE_TYPE_MIGRATIONS[n.type as string];
+      if (!migration) return n;
+      return { ...n, type: migration.type, data: { ...migration.data, ...(isPlainObject(n.data) ? n.data : {}) } };
+    })
     .filter((n) => typeof n.id === "string" && NODE_TYPES.includes(n.type as WorkflowNodeType))
     .map((n) => ({
       id: n.id as string,
@@ -171,26 +177,40 @@ export interface WebhookActionConfig {
 }
 
 /**
- * Recorre el grafo buscando nodos disparadores de WhatsApp (imagen o texto)
- * conectados por una arista directa a un nodo `action.webhook`, y devuelve
- * la configuración de cada uno (conexión + si tiene solicitud personalizada).
+ * Ids de los nodos `trigger.whatsapp_message` que aplican para un evento real
+ * (canal + si llegó imagen o texto, contra `mediaFilter`). Se usa tanto para
+ * saber a qué conectores avisar como para loguear el evento como "captured"
+ * aunque el disparador todavía no esté conectado a nada — así el botón
+ * "Escuchar evento de prueba" del editor funciona desde el primer momento.
  *
  * `channelId` es el canal de WhatsApp que recibió el mensaje real: un
  * disparador sin `data.channelId` configurado dispara para cualquier canal
- * (comportamiento por defecto/retrocompatible); uno con `channelId` solo
- * dispara si coincide.
+ * (comportamiento por defecto); uno con `channelId` solo dispara si coincide.
+ */
+export function findMatchingWhatsAppTriggerNodeIds(
+  graph: WorkflowGraph,
+  eventMediaType: WhatsAppEventMediaType,
+  channelId?: string
+): string[] {
+  return graph.nodes
+    .filter((n) => n.type === "trigger.whatsapp_message")
+    .filter((n) => !n.data.channelId || n.data.channelId === channelId)
+    .filter((n) => !n.data.mediaFilter || n.data.mediaFilter === "any" || n.data.mediaFilter === eventMediaType)
+    .map((n) => n.id);
+}
+
+/**
+ * Recorre el grafo buscando nodos disparadores de WhatsApp que apliquen a
+ * este evento, conectados por una arista directa a un nodo `action.webhook`,
+ * y devuelve la configuración de cada uno (conexión + si tiene solicitud
+ * personalizada).
  */
 export function findWebhookActionConfigs(
   graph: WorkflowGraph,
-  triggerType: (typeof WHATSAPP_TRIGGER_TYPES)[number],
+  eventMediaType: WhatsAppEventMediaType,
   channelId?: string
 ): WebhookActionConfig[] {
-  const triggerIds = new Set(
-    graph.nodes
-      .filter((n) => n.type === triggerType)
-      .filter((n) => !n.data.channelId || n.data.channelId === channelId)
-      .map((n) => n.id)
-  );
+  const triggerIds = new Set(findMatchingWhatsAppTriggerNodeIds(graph, eventMediaType, channelId));
   if (triggerIds.size === 0) return [];
 
   const actionNodesById = new Map(

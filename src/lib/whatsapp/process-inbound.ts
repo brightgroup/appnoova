@@ -491,9 +491,8 @@ export async function processTwilioWhatsAppInbound(
   // Automatizaciones (Workflows/Conectores): si el cliente final envió una imagen o un
   // mensaje de texto, avisa a los workflows activos de la org en paralelo con la
   // generación de la respuesta de la IA — no bloquea ni retrasa el envío al cliente.
-  const automationTriggerType =
-    userMediaType === "image" ? "trigger.whatsapp_image" : userMediaType === "text" ? "trigger.whatsapp_text" : null;
-  if (orgId && automationTriggerType) {
+  const automationMediaType = userMediaType === "image" ? "image" : userMediaType === "text" ? "text" : null;
+  if (orgId && automationMediaType) {
     void emitAutomationEvent(db, {
       organizationId: orgId,
       conversationId: userPersist.conversationId,
@@ -503,7 +502,7 @@ export async function processTwilioWhatsAppInbound(
       analysisText: inboundContent.userText,
       messageSid: inbound.messageSid,
       channelId: channel.id,
-      triggerType: automationTriggerType
+      mediaType: automationMediaType
     }).catch(err => console.error("[automations] emit:", err));
   }
 

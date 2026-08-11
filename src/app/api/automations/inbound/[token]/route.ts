@@ -159,6 +159,15 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     }
     const targets = findSendMessageTargets(workflow.graph, trigger.nodeId);
     if (targets.length === 0) {
+      // Igual se deja el JSON real recibido — así "Escuchar evento de prueba" en el editor
+      // funciona aunque el nodo Webhook entrante todavía no esté conectado a nada.
+      await db.from("automation_event_log").insert({
+        organization_id: trigger.organizationId,
+        workflow_id: trigger.workflowId,
+        event_type: "webhook.received",
+        status: "captured",
+        request_body: rawBody.slice(0, LOGGED_BODY_MAX_CHARS)
+      });
       return NextResponse.json(
         { error: "Este webhook no está conectado a ningún nodo de 'Enviar mensaje de WhatsApp'" },
         { status: 422 }

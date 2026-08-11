@@ -15,8 +15,7 @@ export const ChannelsContext = createContext<WhatsAppChannelRecord[]>([]);
 
 /** Color corporativo sólido de cada nodo — reutilizado por el nodo en canvas y por la paleta. */
 export const NODE_BRAND_COLOR: Record<string, string> = {
-  "trigger.whatsapp_image": "#25D366",
-  "trigger.whatsapp_text": "#25D366",
+  "trigger.whatsapp_message": "#25D366",
   "trigger.webhook": "#F5A623",
   "action.webhook": "#0EA5E9",
   "action.send_whatsapp_message": "#25D366"
@@ -24,18 +23,23 @@ export const NODE_BRAND_COLOR: Record<string, string> = {
 
 /** Nombre "de fábrica" de cada tipo de nodo — lo que se ve cuando no hay canal/conexión elegido ni nombre propio. */
 export const NODE_TITLE: Record<WorkflowNodeType, string> = {
-  "trigger.whatsapp_image": "Imagen de WhatsApp recibida",
-  "trigger.whatsapp_text": "Mensaje de WhatsApp recibido",
+  "trigger.whatsapp_message": "Mensaje de WhatsApp recibido",
   "trigger.webhook": "Webhook entrante",
   "action.webhook": "HTTP Request",
   "action.send_whatsapp_message": "Enviar mensaje de WhatsApp"
+};
+
+const MEDIA_FILTER_LABEL: Record<string, string> = {
+  image: "Imagen de WhatsApp",
+  text: "Texto de WhatsApp"
 };
 
 /**
  * Etiqueta que se muestra para un nodo — la misma función la usa el nodo en
  * el canvas y el panel de configuración, para que nunca queden desincronizados.
  * Prioridad: nombre propio (`data.label`, puesto a mano con el lápiz) > valor
- * calculado (canal/conexión elegidos) > nombre de fábrica del tipo de nodo.
+ * calculado (canal/conexión elegidos, o el filtro de imagen/texto) > nombre
+ * de fábrica del tipo de nodo.
  */
 export function resolveNodeLabel(
   type: WorkflowNodeType,
@@ -45,9 +49,10 @@ export function resolveNodeLabel(
 ): string {
   if (data.label?.trim()) return data.label.trim();
 
-  if (type === "trigger.whatsapp_image" || type === "trigger.whatsapp_text") {
+  if (type === "trigger.whatsapp_message") {
     const channel = channels.find(c => c.id === data.channelId);
     if (channel) return channel.friendly_name || channel.e164;
+    if (data.mediaFilter && data.mediaFilter !== "any") return MEDIA_FILTER_LABEL[data.mediaFilter] ?? NODE_TITLE[type];
   }
   if (type === "action.webhook") {
     const connection = connections.find(c => c.id === data.connectionId);
@@ -140,8 +145,7 @@ export function SendWhatsAppMessageNode({ selected, data }: NodeProps) {
 }
 
 export const WORKFLOW_NODE_TYPES = {
-  "trigger.whatsapp_image": WhatsAppTriggerNode,
-  "trigger.whatsapp_text": WhatsAppTriggerNode,
+  "trigger.whatsapp_message": WhatsAppTriggerNode,
   "trigger.webhook": WebhookTriggerNode,
   "action.webhook": WebhookActionNode,
   "action.send_whatsapp_message": SendWhatsAppMessageNode
