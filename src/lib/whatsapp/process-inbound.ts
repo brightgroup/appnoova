@@ -41,7 +41,11 @@ import {
   WHATSAPP_OPT_OUT_CONFIRMATION
 } from "@/lib/whatsapp/compliance";
 import { buildWhatsAppInboundContent } from "@/lib/whatsapp/media-understanding";
-import { sendWhatsAppTextMessage, sendWhatsAppTypingIndicator } from "@/lib/whatsapp/send-transport";
+import {
+  sendWhatsAppTextMessage,
+  sendWhatsAppMediaMessage,
+  sendWhatsAppTypingIndicator
+} from "@/lib/whatsapp/send-transport";
 import {
   checkBillingForOrg,
   readGeminiUsage,
@@ -748,12 +752,19 @@ export async function processTwilioWhatsAppInbound(
   return { ok: true };
 }
 
-export async function sendWhatsAppOutboundForConversation(
+interface OutboundWhatsAppContext {
+  channel: WhatsAppChannelRecord;
+  channelRaw: Record<string, unknown>;
+  contactE164: string;
+  outboundOrgId: string | null;
+}
+
+/** Preámbulo compartido por cualquier envío saliente a una conversación: valida ventana de 24h/opt-out, resuelve canal y organización, y checa billing. */
+async function resolveOutboundWhatsAppContext(
   db: SupabaseClient,
   userId: string,
-  conversationId: string,
-  body: string
-): Promise<{ ok: boolean; error?: string; code?: string }> {
+  conversationId: string
+): Promise<{ ok: true; ctx: OutboundWhatsAppContext } | { ok: false; error: string; code?: string }> {
   const { data: conv, error: convErr } = await db
     .from("text_agent_conversations")
     .select("*")
@@ -766,7 +777,7 @@ export async function sendWhatsAppOutboundForConversation(
   }
 
   if (String(conv.channel) !== WHATSAPP_CONVERSATION_CHANNEL) {
-    return { ok: true };
+    return { ok: false, error: "La conversación no es de WhatsApp" };
   }
 
   const meta = (conv.metadata ?? {}) as Record<string, unknown>;
@@ -815,15 +826,29 @@ export async function sendWhatsAppOutboundForConversation(
     }
   }
 
-  try {
-    const channel = toWhatsAppChannelRecord(channelRow as Record<string, unknown>);
-    await sendWhatsAppTextMessage({
-      db,
-      channel,
+  return {
+    ok: true,
+    ctx: {
+      channel: toWhatsAppChannelRecord(channelRow as Record<string, unknown>),
       channelRaw: channelRow as Record<string, unknown>,
-      toE164: contactE164,
-      body
-    });
+      contactE164,
+      outboundOrgId
+    }
+  };
+}
+
+export async function sendWhatsAppOutboundForConversation(
+  db: SupabaseClient,
+  userId: string,
+  conversationId: string,
+  body: string
+): Promise<{ ok: boolean; error?: string; code?: string }> {
+  const resolved = await resolveOutboundWhatsAppContext(db, userId, conversationId);
+  if (!resolved.ok) return resolved;
+  const { channel, channelRaw, contactE164, outboundOrgId } = resolved.ctx;
+
+  try {
+    await sendWhatsAppTextMessage({ db, channel, channelRaw, toE164: contactE164, body });
 
     if (outboundOrgId) {
       await recordUsageSafe({
@@ -842,6 +867,43 @@ export async function sendWhatsAppOutboundForConversation(
     return { ok: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error al enviar WhatsApp";
+    return { ok: false, error: msg };
+  }
+}
+
+/** Envía imagen o documento (por URL) a una conversación — usado por el nodo de automatización "Enviar mensaje de WhatsApp" con tipo Imagen/Documento. */
+export async function sendWhatsAppMediaOutboundForConversation(
+  db: SupabaseClient,
+  userId: string,
+  conversationId: string,
+  mediaUrl: string,
+  mediaType: "image" | "document",
+  caption?: string
+): Promise<{ ok: boolean; error?: string; code?: string }> {
+  const resolved = await resolveOutboundWhatsAppContext(db, userId, conversationId);
+  if (!resolved.ok) return resolved;
+  const { channel, channelRaw, contactE164, outboundOrgId } = resolved.ctx;
+
+  try {
+    await sendWhatsAppMediaMessage({ db, channel, channelRaw, toE164: contactE164, mediaUrl, mediaType, caption });
+
+    if (outboundOrgId) {
+      await recordUsageSafe({
+        db,
+        organizationId: outboundOrgId,
+        userId,
+        eventType: "whatsapp_manual",
+        channel: WHATSAPP_CONVERSATION_CHANNEL,
+        provider: "twilio",
+        twilioMessages: 1,
+        referenceType: "text_agent_conversation",
+        referenceId: conversationId
+      });
+    }
+
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error al enviar el adjunto por WhatsApp";
     return { ok: false, error: msg };
   }
 }

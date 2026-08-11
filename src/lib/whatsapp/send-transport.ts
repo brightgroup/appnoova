@@ -8,6 +8,7 @@ import {
   isMetaWhatsAppChannel,
   readMetaAccessToken,
   sendMetaWhatsAppTextMessage,
+  sendMetaWhatsAppMediaMessage,
   sendMetaWhatsAppTypingIndicator
 } from "@/lib/whatsapp/meta-whatsapp";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
@@ -58,6 +59,48 @@ export async function sendWhatsAppTextMessage(input: SendWhatsAppTextInput): Pro
     fromE164: channel.e164,
     messagingServiceSid: channel.twilio_messaging_service_sid,
     body,
+    accountSid: channel.twilio_subaccount_sid,
+    authToken: channel.twilio_subaccount_auth_token
+  });
+
+  return { externalId: twilio.sid };
+}
+
+export interface SendWhatsAppMediaInput {
+  channel: WhatsAppChannelRecord;
+  channelRaw?: Record<string, unknown>;
+  toE164: string;
+  mediaUrl: string;
+  mediaType: "image" | "document";
+  caption?: string;
+  filename?: string;
+  db?: SupabaseClient;
+}
+
+/** Envía imagen o documento (por URL) por Twilio o Meta según provider del canal. */
+export async function sendWhatsAppMediaMessage(input: SendWhatsAppMediaInput): Promise<{ externalId?: string }> {
+  const { channel, toE164, mediaUrl, mediaType, caption, filename } = input;
+  const metaToken = await resolveMetaToken(channel, input.channelRaw, input.db);
+
+  if (isMetaWhatsAppChannel({ ...channel, meta_access_token: metaToken })) {
+    const result = await sendMetaWhatsAppMediaMessage({
+      phoneNumberId: channel.meta_phone_number_id!,
+      accessToken: metaToken!,
+      toE164,
+      mediaUrl,
+      mediaType,
+      caption,
+      filename
+    });
+    return { externalId: result.messageId };
+  }
+
+  const twilio = await sendTwilioWhatsAppMessage({
+    toE164,
+    fromE164: channel.e164,
+    messagingServiceSid: channel.twilio_messaging_service_sid,
+    body: caption ?? "",
+    mediaUrls: [mediaUrl],
     accountSid: channel.twilio_subaccount_sid,
     authToken: channel.twilio_subaccount_auth_token
   });

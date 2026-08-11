@@ -55,6 +55,58 @@ export async function sendMetaWhatsAppTextMessage(
   return { messageId };
 }
 
+export interface SendMetaWhatsAppMediaInput {
+  phoneNumberId: string;
+  accessToken: string;
+  toE164: string;
+  mediaUrl: string;
+  mediaType: "image" | "document";
+  caption?: string;
+  /** Solo aplica a document — el nombre de archivo que ve el cliente. */
+  filename?: string;
+}
+
+/** Envía imagen o documento por URL vía Cloud API. */
+export async function sendMetaWhatsAppMediaMessage(
+  input: SendMetaWhatsAppMediaInput
+): Promise<SendMetaWhatsAppTextResult> {
+  const mediaPayload: Record<string, unknown> =
+    input.mediaType === "image"
+      ? { link: input.mediaUrl, caption: input.caption || undefined }
+      : { link: input.mediaUrl, caption: input.caption || undefined, filename: input.filename || undefined };
+
+  const res = await fetch(`${metaGraphBaseUrl()}/${input.phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: metaRecipientE164(input.toE164),
+      type: input.mediaType,
+      [input.mediaType]: mediaPayload
+    })
+  });
+
+  const json = (await res.json().catch(() => ({}))) as {
+    messages?: { id?: string }[];
+    error?: { message?: string };
+  };
+
+  if (!res.ok) {
+    throw new Error(json.error?.message || `Meta send media error ${res.status}`);
+  }
+
+  const messageId = json.messages?.[0]?.id;
+  if (!messageId) {
+    throw new Error("Meta no devolvió message id");
+  }
+
+  return { messageId };
+}
+
 export function isMetaWhatsAppChannel(channel: {
   provider: string;
   meta_phone_number_id?: string | null;

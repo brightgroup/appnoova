@@ -68,12 +68,21 @@ const NODE_PICKER_ICON: Record<WorkflowNodeType, React.ReactNode> = {
 
 const TRIGGER_TYPES: WorkflowNodeType[] = ["trigger.whatsapp_image", "trigger.whatsapp_text", "trigger.webhook"];
 
+interface WhatsAppTemplateOption {
+  id: string;
+  template_name: string;
+  body_preview: string;
+  variable_labels: string[];
+  channel_label: string;
+}
+
 export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string; initialTab?: string }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>(initialTab === "ejecuciones" ? "ejecuciones" : "editor");
   const [workflow, setWorkflow] = useState<WorkflowRecord | null>(null);
   const [connections, setConnections] = useState<AutomationConnectionRecord[]>([]);
   const [channels, setChannels] = useState<WhatsAppChannelRecord[]>([]);
+  const [templates, setTemplates] = useState<WhatsAppTemplateOption[]>([]);
   const [events, setEvents] = useState<AutomationEventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -102,11 +111,12 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const [wfRes, connRes, evRes, chRes] = await Promise.all([
+    const [wfRes, connRes, evRes, chRes, tplRes] = await Promise.all([
       authFetch(`/api/automations/workflows/${workflowId}`),
       authFetch("/api/automations/connections"),
       authFetch(`/api/automations/workflows/${workflowId}/events`),
-      authFetch("/api/whatsapp/channels")
+      authFetch("/api/whatsapp/channels"),
+      authFetch("/api/automations/templates")
     ]);
     const wfJson = await wfRes.json();
     if (!wfRes.ok) {
@@ -122,6 +132,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
     if (connRes.ok) setConnections((await connRes.json()).connections ?? []);
     if (evRes.ok) setEvents((await evRes.json()).events ?? []);
     if (chRes.ok) setChannels((await chRes.json()).channels ?? []);
+    if (tplRes.ok) setTemplates((await tplRes.json()).templates ?? []);
     setLoading(false);
   }, [workflowId, setNodes, setEdges]);
 
@@ -441,6 +452,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
                 node={configNode}
                 connections={connections}
                 channels={channels}
+                templates={templates}
                 onSetData={patch => setNodeData(configNode.id, patch)}
                 onClose={() => setConfigNodeId(null)}
               />
@@ -457,14 +469,78 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
 }
 
 /** Nota explicativa consistente al tope de cada panel — qué hace el nodo, en un par de líneas. */
-function InfoNote({ children }: { children: React.ReactNode }) {
+function InfoNote({
+  children,
+  example,
+  exampleLabel = "Ejemplo de JSON"
+}: {
+  children: React.ReactNode;
+  /** JSON de ejemplo (ya formateado) — el mismo que este nodo produce o espera recibir en la vida real. */
+  example?: string;
+  exampleLabel?: string;
+}) {
   return (
-    <div className="flex gap-2.5 p-3 rounded-lg bg-white/[.03] border border-white/[.08] text-xs text-gray-300 leading-relaxed mb-4">
-      <Info className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
-      <div>{children}</div>
+    <div className="rounded-lg bg-white/[.03] border border-white/[.08] mb-4 overflow-hidden">
+      <div className="flex gap-2.5 p-3 text-xs text-gray-300 leading-relaxed">
+        <Info className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
+        <div>{children}</div>
+      </div>
+      {example && (
+        <div className="border-t border-white/[.08] p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">{exampleLabel}</p>
+          <pre className="text-[11px] font-mono text-gray-400 bg-black/30 rounded-lg p-2.5 overflow-x-auto whitespace-pre-wrap break-all">
+            {example}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }
+
+const EXAMPLE_JSON_IMAGE_EVENT = JSON.stringify(
+  {
+    event: "whatsapp.image_received",
+    conversation_id: "5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02",
+    contact: { phone: "+573001234567", label: "Juan Pérez" },
+    image: { url: "https://.../foto.jpg", analysis: "Producto con empaque dañado" },
+    callback_url: "https://app.noova360.com/api/automations/inbound/<token>"
+  },
+  null,
+  2
+);
+
+const EXAMPLE_JSON_TEXT_EVENT = JSON.stringify(
+  {
+    event: "whatsapp.text_received",
+    conversation_id: "5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02",
+    contact: { phone: "+573001234567", label: "Juan Pérez" },
+    message: { text: "¿Tienen disponible la talla M?" },
+    callback_url: "https://app.noova360.com/api/automations/inbound/<token>"
+  },
+  null,
+  2
+);
+
+const EXAMPLE_JSON_REPLY_DEFAULT = JSON.stringify(
+  { conversation_id: "5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02", reply: { text: "¡Gracias por tu compra! Aquí tu guía: https://..." } },
+  null,
+  2
+);
+
+const EXAMPLE_JSON_REPLY_TEMPLATE = JSON.stringify(
+  { conversation_id: "5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02", variables: ["Juan", "PED-4821"] },
+  null,
+  2
+);
+
+const EXAMPLE_JSON_REPLY_MEDIA = JSON.stringify(
+  {
+    conversation_id: "5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02",
+    media: { url: "https://.../guia-envio.pdf", caption: "Aquí tu guía de envío" }
+  },
+  null,
+  2
+);
 
 /** Selector de línea de WhatsApp — reutilizado por cualquier disparador de WhatsApp (imagen, texto, y los que se agreguen después). */
 function ChannelSelectField({
@@ -602,12 +678,14 @@ function NodeConfigPanel({
   node,
   connections,
   channels,
+  templates,
   onClose,
   onSetData
 }: {
   node: Node<WorkflowNodeData>;
   connections: AutomationConnectionRecord[];
   channels: WhatsAppChannelRecord[];
+  templates: WhatsAppTemplateOption[];
   onClose: () => void;
   onSetData: (patch: Partial<WorkflowNodeData>) => void;
 }) {
@@ -671,7 +749,9 @@ function NodeConfigPanel({
       <div className="flex-1 overflow-y-auto p-4">
         {type === "trigger.whatsapp_image" && (
           <div>
-            <InfoNote>Se activa cada vez que un cliente final envía una imagen por WhatsApp.</InfoNote>
+            <InfoNote example={EXAMPLE_JSON_IMAGE_EVENT} exampleLabel="JSON que sale hacia tu conector">
+              Se activa cada vez que un cliente final envía una imagen por WhatsApp.
+            </InfoNote>
             <ChannelSelectField
               channels={channels}
               value={node.data.channelId}
@@ -683,7 +763,9 @@ function NodeConfigPanel({
 
         {type === "trigger.whatsapp_text" && (
           <div>
-            <InfoNote>Se activa cada vez que un cliente final envía un mensaje de texto por WhatsApp.</InfoNote>
+            <InfoNote example={EXAMPLE_JSON_TEXT_EVENT} exampleLabel="JSON que sale hacia tu conector">
+              Se activa cada vez que un cliente final envía un mensaje de texto por WhatsApp.
+            </InfoNote>
             <ChannelSelectField
               channels={channels}
               value={node.data.channelId}
@@ -695,7 +777,7 @@ function NodeConfigPanel({
 
         {type === "trigger.webhook" && (
           <div>
-            <InfoNote>
+            <InfoNote example={EXAMPLE_JSON_REPLY_DEFAULT} exampleLabel="Ejemplo de JSON que puede llegar aquí">
               Genera una URL pública única. Cualquier sistema externo — n8n, tu CRM, un backend propio — puede hacer un{" "}
               <code>POST</code> con JSON a esa URL para activar este workflow.
             </InfoNote>
@@ -713,7 +795,7 @@ function NodeConfigPanel({
 
         {type === "action.webhook" && (
           <div>
-            <InfoNote>
+            <InfoNote example={EXAMPLE_JSON_IMAGE_EVENT} exampleLabel="Ejemplo de JSON de salida (varía según el disparador conectado)">
               Llama por <code>POST</code> a la URL de un conector configurado en Conectores — n8n, Zapier, o cualquier
               backend propio que reciba JSON. No está atado a ninguna app en particular.
             </InfoNote>
@@ -787,32 +869,117 @@ function NodeConfigPanel({
           </div>
         )}
 
-        {type === "action.send_whatsapp_message" && (
-          <div>
-            <InfoNote>
-              Conéctalo a un nodo <strong className="text-white">Webhook entrante</strong>. Cuando llegue el JSON, Noova
-              toma estos dos campos y responde por WhatsApp en el chat de esa conversación.
-            </InfoNote>
-            <div className="space-y-4">
-              <JsonPathField
-                label="Campo con el ID de la conversación"
-                value={node.data.conversationIdPath}
-                onChange={conversationIdPath => onSetData({ conversationIdPath })}
-                placeholder="conversation_id"
-              />
-              <JsonPathField
-                label="Campo con el texto a enviar"
-                value={node.data.messageTextPath}
-                onChange={messageTextPath => onSetData({ messageTextPath })}
-                placeholder="reply.text"
-              />
-              <p className="text-[11px] text-gray-500 leading-relaxed">
-                Ruta dentro del JSON recibido, separada por puntos — ej. <code>reply.text</code> lee{" "}
-                <code>{"{ reply: { text: \"...\" } }"}</code>. Si lo dejas vacío usa esos mismos nombres por defecto.
-              </p>
+        {type === "action.send_whatsapp_message" && (() => {
+          const messageType = node.data.messageType === "template" || node.data.messageType === "media" ? node.data.messageType : "text";
+          const example =
+            messageType === "template" ? EXAMPLE_JSON_REPLY_TEMPLATE : messageType === "media" ? EXAMPLE_JSON_REPLY_MEDIA : EXAMPLE_JSON_REPLY_DEFAULT;
+          const selectedTemplate = templates.find(t => t.id === node.data.templateId);
+
+          return (
+            <div>
+              <InfoNote example={example} exampleLabel="Ejemplo de JSON que espera recibir">
+                Conéctalo a un nodo <strong className="text-white">Webhook entrante</strong>. Cuando llegue el JSON, Noova
+                envía el mensaje elegido por WhatsApp en el chat de esa conversación.
+              </InfoNote>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-400 mb-1.5">Tipo de mensaje</label>
+                  <select
+                    value={messageType}
+                    onChange={e => onSetData({ messageType: e.target.value as "text" | "template" | "media" })}
+                    className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white"
+                  >
+                    <option value="text">Texto</option>
+                    <option value="template">Plantilla (HSM)</option>
+                    <option value="media">Imagen / Documento</option>
+                  </select>
+                </div>
+
+                <JsonPathField
+                  label="Campo con el ID de la conversación"
+                  value={node.data.conversationIdPath}
+                  onChange={conversationIdPath => onSetData({ conversationIdPath })}
+                  placeholder="conversation_id"
+                />
+
+                {messageType === "text" && (
+                  <JsonPathField
+                    label="Campo con el texto a enviar"
+                    value={node.data.messageTextPath}
+                    onChange={messageTextPath => onSetData({ messageTextPath })}
+                    placeholder="reply.text"
+                  />
+                )}
+
+                {messageType === "template" && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1.5">Plantilla</label>
+                      <select
+                        value={node.data.templateId ?? ""}
+                        onChange={e => onSetData({ templateId: e.target.value })}
+                        className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white"
+                      >
+                        <option value="">Sin elegir</option>
+                        {templates.map(t => (
+                          <option key={t.id} value={t.id}>{t.template_name} · {t.channel_label}</option>
+                        ))}
+                      </select>
+                      {templates.length === 0 ? (
+                        <p className="text-[11px] text-gray-500 mt-2">
+                          Todavía no tienes plantillas aprobadas. <Link href="/dashboard/canales/whatsapp" className="text-[#5b5bf6] hover:underline">Créalas en Canales</Link>.
+                        </p>
+                      ) : selectedTemplate ? (
+                        <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+                          &ldquo;{selectedTemplate.body_preview}&rdquo; — espera {selectedTemplate.variable_labels.length} variable(s), en ese orden.
+                        </p>
+                      ) : null}
+                    </div>
+                    <JsonPathField
+                      label="Campo con las variables (arreglo, en orden)"
+                      value={node.data.variablesPath}
+                      onChange={variablesPath => onSetData({ variablesPath })}
+                      placeholder="variables"
+                    />
+                  </>
+                )}
+
+                {messageType === "media" && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1.5">Tipo de archivo</label>
+                      <select
+                        value={node.data.mediaType ?? "image"}
+                        onChange={e => onSetData({ mediaType: e.target.value as "image" | "document" })}
+                        className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white"
+                      >
+                        <option value="image">Imagen</option>
+                        <option value="document">Documento</option>
+                      </select>
+                    </div>
+                    <JsonPathField
+                      label="Campo con la URL del archivo"
+                      value={node.data.mediaUrlPath}
+                      onChange={mediaUrlPath => onSetData({ mediaUrlPath })}
+                      placeholder="media.url"
+                    />
+                    <JsonPathField
+                      label="Campo con el texto/caption (opcional)"
+                      value={node.data.captionPath}
+                      onChange={captionPath => onSetData({ captionPath })}
+                      placeholder="media.caption"
+                    />
+                  </>
+                )}
+
+                <p className="text-[11px] text-gray-500 leading-relaxed">
+                  Rutas dentro del JSON recibido, separadas por puntos — ej. <code>reply.text</code> lee{" "}
+                  <code>{"{ reply: { text: \"...\" } }"}</code>. Si las dejas vacías usa esos mismos nombres por defecto.
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </>
   );

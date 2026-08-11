@@ -52,6 +52,8 @@ export interface SendWhatsAppMessageInput {
   fromE164?: string;
   messagingServiceSid?: string | null;
   body: string;
+  /** URLs de media a adjuntar (imagen/documento) — Twilio acepta hasta 10, un MediaUrl repetido por adjunto. */
+  mediaUrls?: string[];
   /** Opcional: credenciales de subcuenta */
   accountSid?: string | null;
   authToken?: string | null;
@@ -68,7 +70,12 @@ export interface SendWhatsAppTemplateInput {
   authToken?: string | null;
 }
 
-async function postTwilioMessage(form: Record<string, string>, accountSid?: string | null, authToken?: string | null): Promise<{ sid: string }> {
+async function postTwilioMessage(
+  form: Record<string, string>,
+  accountSid?: string | null,
+  authToken?: string | null,
+  mediaUrls?: string[]
+): Promise<{ sid: string }> {
   const master = twilioCredentials();
   if (!master) {
     throw new Error("Twilio no configurado (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN)");
@@ -80,6 +87,12 @@ async function postTwilioMessage(form: Record<string, string>, accountSid?: stri
 
   form.StatusCallback = twilioWhatsAppStatusWebhookUrl();
 
+  const params = new URLSearchParams(form);
+  // MediaUrl se repite una vez por adjunto — por eso se arma aparte de `form` (Record no admite claves repetidas).
+  for (const url of mediaUrls ?? []) {
+    params.append("MediaUrl", url);
+  }
+
   const res = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${activeSid}/Messages.json`,
     {
@@ -88,7 +101,7 @@ async function postTwilioMessage(form: Record<string, string>, accountSid?: stri
         Authorization: authHeader(activeSid, activeToken),
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: new URLSearchParams(form).toString()
+      body: params.toString()
     }
   );
 
@@ -122,11 +135,11 @@ export async function sendTwilioWhatsAppMessage(
   input: SendWhatsAppMessageInput
 ): Promise<{ sid: string }> {
   const form: Record<string, string> = {
-    To: whatsAppAddress(input.toE164),
-    Body: input.body
+    To: whatsAppAddress(input.toE164)
   };
+  if (input.body) form.Body = input.body;
   applyFromFields(form, input);
-  return postTwilioMessage(form, input.accountSid, input.authToken);
+  return postTwilioMessage(form, input.accountSid, input.authToken, input.mediaUrls);
 }
 
 /** Plantilla aprobada por Meta (ContentSid HX…). Fuera de ventana 24 h. */

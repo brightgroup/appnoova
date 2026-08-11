@@ -36,9 +36,21 @@ export interface WorkflowNodeData {
   channelId?: string;
   /** Solo aplica a trigger.webhook: token único de este nodo — la URL pública es /api/automations/inbound/{webhookToken}. Se genera al crear el nodo. */
   webhookToken?: string;
+  /** Solo aplica a action.send_whatsapp_message: qué tipo de contenido envía. Default "text". */
+  messageType?: "text" | "template" | "media";
   /** Solo aplican a action.send_whatsapp_message: dot-path dentro del JSON entrante. Vacío = usa el default ("conversation_id"/"reply.text"). */
   conversationIdPath?: string;
   messageTextPath?: string;
+  /** Solo aplica a messageType "template": id de whatsapp_templates elegido en el editor. */
+  templateId?: string;
+  /** Solo aplica a messageType "template": dot-path a un arreglo de variables (en el orden de la plantilla) dentro del JSON entrante. Default "variables". */
+  variablesPath?: string;
+  /** Solo aplica a messageType "media": tipo de archivo a enviar. Default "image". */
+  mediaType?: "image" | "document";
+  /** Solo aplica a messageType "media": dot-path a la URL del archivo dentro del JSON entrante. Default "media.url". */
+  mediaUrlPath?: string;
+  /** Solo aplica a messageType "media": dot-path al texto/caption opcional dentro del JSON entrante. Default "media.caption". */
+  captionPath?: string;
   [key: string]: unknown;
 }
 
@@ -224,14 +236,26 @@ export function ensureWebhookTokens(graph: WorkflowGraph): WorkflowGraph {
 }
 
 export interface SendMessageTarget {
+  messageType: "text" | "template" | "media";
   conversationIdPath: string;
   messageTextPath: string;
+  templateId: string;
+  variablesPath: string;
+  mediaType: "image" | "document";
+  mediaUrlPath: string;
+  captionPath: string;
+}
+
+function strOr(value: unknown, fallback: string): string {
+  return typeof value === "string" && value ? value : fallback;
 }
 
 /**
  * Recorre el grafo desde un nodo `trigger.webhook` (por su id) buscando
  * nodos `action.send_whatsapp_message` conectados por una arista directa, y
- * devuelve cómo extraer conversation_id/texto del JSON que llegue a esa URL.
+ * devuelve cómo extraer del JSON que llegue a esa URL lo necesario para
+ * enviar — según el tipo de mensaje configurado en cada nodo (texto,
+ * plantilla o media).
  */
 export function findSendMessageTargets(graph: WorkflowGraph, triggerNodeId: string): SendMessageTarget[] {
   const actionNodesById = new Map(
@@ -243,15 +267,16 @@ export function findSendMessageTargets(graph: WorkflowGraph, triggerNodeId: stri
     if (edge.source !== triggerNodeId) continue;
     const action = actionNodesById.get(edge.target);
     if (!action) continue;
+    const messageType = action.data.messageType === "template" || action.data.messageType === "media" ? action.data.messageType : "text";
     targets.push({
-      conversationIdPath:
-        typeof action.data.conversationIdPath === "string" && action.data.conversationIdPath
-          ? action.data.conversationIdPath
-          : "conversation_id",
-      messageTextPath:
-        typeof action.data.messageTextPath === "string" && action.data.messageTextPath
-          ? action.data.messageTextPath
-          : "reply.text"
+      messageType,
+      conversationIdPath: strOr(action.data.conversationIdPath, "conversation_id"),
+      messageTextPath: strOr(action.data.messageTextPath, "reply.text"),
+      templateId: typeof action.data.templateId === "string" ? action.data.templateId : "",
+      variablesPath: strOr(action.data.variablesPath, "variables"),
+      mediaType: action.data.mediaType === "document" ? "document" : "image",
+      mediaUrlPath: strOr(action.data.mediaUrlPath, "media.url"),
+      captionPath: strOr(action.data.captionPath, "media.caption")
     });
   }
   return targets;
@@ -267,4 +292,15 @@ export function resolveJsonPath(body: unknown, path: string): string | undefined
   if (typeof current === "string") return current;
   if (typeof current === "number" || typeof current === "boolean") return String(current);
   return undefined;
+}
+
+/** Como resolveJsonPath pero para un arreglo (usado por plantillas: variables en orden). Valores no-string se convierten a texto. */
+export function resolveJsonPathArray(body: unknown, path: string): string[] | undefined {
+  let current: unknown = body;
+  for (const part of path.split(".").filter(Boolean)) {
+    if (typeof current !== "object" || current === null) return undefined;
+    current = (current as Record<string, unknown>)[part];
+  }
+  if (!Array.isArray(current)) return undefined;
+  return current.map((v) => (typeof v === "string" ? v : v === null || v === undefined ? "" : String(v)));
 }
