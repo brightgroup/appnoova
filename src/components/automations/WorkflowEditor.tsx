@@ -17,16 +17,37 @@ import {
   type Connection,
   type NodeMouseHandler
 } from "@xyflow/react";
-import { ChevronLeft, Loader2, Plus, Save, CheckCircle2, Search, Reply, X, Info } from "lucide-react";
+import {
+  ChevronLeft,
+  Loader2,
+  Plus,
+  Save,
+  CheckCircle2,
+  Search,
+  Webhook,
+  Globe,
+  MessageSquareText,
+  X,
+  Info,
+  Pencil,
+  Trash2
+} from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { tabActive, tabIdle } from "@/lib/brand-ui";
 import { Badge } from "@/components/ui/Badge";
-import { ConnectionsContext, NODE_BRAND_COLOR, WORKFLOW_NODE_TYPES } from "@/components/automations/workflow-nodes";
-import { N8nLogo } from "@/components/icons/brands/N8nLogo";
+import {
+  ConnectionsContext,
+  ChannelsContext,
+  NODE_BRAND_COLOR,
+  WORKFLOW_NODE_TYPES,
+  CopyButton
+} from "@/components/automations/workflow-nodes";
+import { DeleteWorkflowModal } from "@/components/automations/DeleteWorkflowModal";
 import { WhatsAppLogo } from "@/components/icons/brands/WhatsAppLogo";
 import { NODE_CATALOG, type WorkflowNodeType, type WorkflowNodeData } from "@/lib/automations/node-types";
 import type { WorkflowRecord } from "@/lib/automations/workflows-db";
 import type { AutomationConnectionRecord } from "@/lib/automations/connections-db";
+import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 
 type Tab = "editor" | "ejecuciones";
 
@@ -37,15 +58,21 @@ const TABS: { id: Tab; label: string }[] = [
 
 const NODE_PICKER_ICON: Record<WorkflowNodeType, React.ReactNode> = {
   "trigger.whatsapp_image": <WhatsAppLogo className="w-4 h-4 text-white" />,
-  "action.webhook": <N8nLogo className="w-4 h-4 text-white" />,
-  "result.whatsapp_reply": <Reply className="w-4 h-4 text-white" strokeWidth={1.8} />
+  "trigger.whatsapp_text": <MessageSquareText className="w-4 h-4 text-white" strokeWidth={1.8} />,
+  "trigger.webhook": <Webhook className="w-4 h-4 text-white" strokeWidth={1.8} />,
+  "action.webhook": <Globe className="w-4 h-4 text-white" strokeWidth={1.6} />,
+  "action.send_whatsapp_message": <WhatsAppLogo className="w-4 h-4 text-white" />
 };
 
 const NODE_TITLE: Record<WorkflowNodeType, string> = {
-  "trigger.whatsapp_image": "Imagen recibida",
-  "action.webhook": "Enviar a conector",
-  "result.whatsapp_reply": "Responder al cliente"
+  "trigger.whatsapp_image": "Imagen de WhatsApp recibida",
+  "trigger.whatsapp_text": "Mensaje de WhatsApp recibido",
+  "trigger.webhook": "Webhook entrante",
+  "action.webhook": "HTTP Request",
+  "action.send_whatsapp_message": "Enviar mensaje de WhatsApp"
 };
+
+const TRIGGER_TYPES: WorkflowNodeType[] = ["trigger.whatsapp_image", "trigger.whatsapp_text", "trigger.webhook"];
 
 interface AutomationEventRow {
   id: string;
@@ -60,6 +87,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
   const [activeTab, setActiveTab] = useState<Tab>(initialTab === "ejecuciones" ? "ejecuciones" : "editor");
   const [workflow, setWorkflow] = useState<WorkflowRecord | null>(null);
   const [connections, setConnections] = useState<AutomationConnectionRecord[]>([]);
+  const [channels, setChannels] = useState<WhatsAppChannelRecord[]>([]);
   const [events, setEvents] = useState<AutomationEventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -68,6 +96,11 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteSearch, setPaletteSearch] = useState("");
   const [configNodeId, setConfigNodeId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [nodes, setNodes, onNodesChangeBase] = useNodesState<Node<WorkflowNodeData>>([]);
   const [edges, setEdges, onEdgesChangeBase] = useEdgesState<Edge>([]);
@@ -83,10 +116,11 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const [wfRes, connRes, evRes] = await Promise.all([
+    const [wfRes, connRes, evRes, chRes] = await Promise.all([
       authFetch(`/api/automations/workflows/${workflowId}`),
       authFetch("/api/automations/connections"),
-      authFetch(`/api/automations/workflows/${workflowId}/events`)
+      authFetch(`/api/automations/workflows/${workflowId}/events`),
+      authFetch("/api/whatsapp/channels")
     ]);
     const wfJson = await wfRes.json();
     if (!wfRes.ok) {
@@ -101,6 +135,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
 
     if (connRes.ok) setConnections((await connRes.json()).connections ?? []);
     if (evRes.ok) setEvents((await evRes.json()).events ?? []);
+    if (chRes.ok) setChannels((await chRes.json()).channels ?? []);
     setLoading(false);
   }, [workflowId, setNodes, setEdges]);
 
@@ -135,9 +170,11 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
 
   function addNode(type: WorkflowNodeType) {
     const id = crypto.randomUUID();
+    // El nodo Webhook entrante genera su URL propia de inmediato — sin fricción, sin esperar a Guardar.
+    const data: WorkflowNodeData = type === "trigger.webhook" ? { webhookToken: crypto.randomUUID().replace(/-/g, "") } : {};
     setNodes(nds => [
       ...nds,
-      { id, type, position: { x: 60 + nds.length * 230, y: 160 }, data: {} }
+      { id, type, position: { x: 60 + nds.length * 230, y: 160 }, data }
     ]);
     setSaved(false);
     setPaletteOpen(false);
@@ -146,9 +183,36 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
 
   const configNode = useMemo(() => nodes.find(n => n.id === configNodeId) ?? null, [nodes, configNodeId]);
 
-  function setNodeConnection(nodeId: string, connectionId: string) {
-    setNodes(nds => nds.map(n => (n.id === nodeId ? { ...n, data: { ...n.data, connectionId } } : n)));
+  function setNodeData(nodeId: string, patch: Partial<WorkflowNodeData>) {
+    setNodes(nds => nds.map(n => (n.id === nodeId ? { ...n, data: { ...n.data, ...patch } } : n)));
     setSaved(false);
+  }
+
+  function startRename() {
+    if (!workflow) return;
+    setNameDraft(workflow.name);
+    setEditingName(true);
+  }
+
+  async function commitRename() {
+    const name = nameDraft.trim();
+    setEditingName(false);
+    if (!workflow || !name || name === workflow.name) return;
+    setSavingName(true);
+    const res = await authFetch(`/api/automations/workflows/${workflowId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name })
+    });
+    setSavingName(false);
+    if (res.ok) setWorkflow(prev => (prev ? { ...prev, name } : prev));
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    const res = await authFetch(`/api/automations/workflows/${workflowId}`, { method: "DELETE" });
+    setDeleting(false);
+    if (res.ok) router.push("/dashboard/workflows");
+    else setDeleteOpen(false);
   }
 
   async function handleSave() {
@@ -193,7 +257,33 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
           </Link>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold truncate">{workflow.name}</h1>
+              {editingName ? (
+                <input
+                  autoFocus
+                  value={nameDraft}
+                  onChange={e => setNameDraft(e.target.value)}
+                  onBlur={() => void commitRename()}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                    if (e.key === "Escape") setEditingName(false);
+                  }}
+                  className="text-lg font-bold bg-white/[.06] border border-white/[.16] rounded-lg px-2 py-0.5 outline-none focus:border-[#5b5bf6] min-w-0"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={startRename}
+                  className="group flex items-center gap-1.5 min-w-0"
+                  title="Editar nombre"
+                >
+                  <h1 className="text-lg font-bold truncate">{workflow.name}</h1>
+                  {savingName ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-500 shrink-0" />
+                  ) : (
+                    <Pencil className="w-3.5 h-3.5 text-gray-500 opacity-0 group-hover:opacity-100 shrink-0" />
+                  )}
+                </button>
+              )}
               {workflow.status === "active" ? <Badge variant="emerald">Activo</Badge> : <Badge variant="neutral">Pausado</Badge>}
             </div>
             <p className="text-xs text-gray-400">
@@ -201,16 +291,34 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={saving || saved}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#5b5bf6] hover:bg-[#7070f8] disabled:opacity-50 px-4 py-2 text-sm font-semibold text-white shrink-0"
-        >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-          {saving ? "Guardando…" : "Guardar"}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setDeleteOpen(true)}
+            title="Eliminar workflow"
+            aria-label="Eliminar workflow"
+            className="p-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={saving || saved}
+            className="inline-flex items-center gap-2 rounded-lg bg-[#5b5bf6] hover:bg-[#7070f8] disabled:opacity-50 px-4 py-2 text-sm font-semibold text-white"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+            {saving ? "Guardando…" : "Guardar"}
+          </button>
+        </div>
       </div>
+
+      <DeleteWorkflowModal
+        workflowName={deleteOpen ? workflow.name : null}
+        loading={deleting}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => void handleDelete()}
+      />
 
       <div className="border-b border-white/[.08] px-6 flex gap-1 overflow-x-auto shrink-0">
         {TABS.map(tab => (
@@ -230,6 +338,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
       {activeTab === "editor" ? (
         <div className="flex-1 min-h-0 relative overflow-hidden">
           <ConnectionsContext.Provider value={connections}>
+          <ChannelsContext.Provider value={channels}>
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -249,6 +358,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
               <Background variant={BackgroundVariant.Dots} gap={20} size={1.3} color="rgba(255,255,255,.09)" />
               <Controls showInteractive={false} className="!shadow-none [&>button]:!bg-[#16171e] [&>button]:!border-white/[.12] [&>button]:!text-gray-300" />
             </ReactFlow>
+          </ChannelsContext.Provider>
           </ConnectionsContext.Provider>
 
           <button
@@ -281,7 +391,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
             {paletteOpen && (
               <>
                 <div className="flex items-center justify-between px-4 py-4 border-b border-white/[.08] shrink-0">
-                  <h3 className="text-sm font-bold text-white">¿Qué pasa después?</h3>
+                  <h3 className="text-sm font-bold text-white">Nodos</h3>
                   <button type="button" onClick={() => setPaletteOpen(false)} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/[.08]">
                     <X className="w-4 h-4" />
                   </button>
@@ -343,8 +453,9 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
               <NodeConfigPanel
                 node={configNode}
                 connections={connections}
+                channels={channels}
+                onSetData={patch => setNodeData(configNode.id, patch)}
                 onClose={() => setConfigNodeId(null)}
-                onSetConnection={connectionId => setNodeConnection(configNode.id, connectionId)}
               />
             )}
           </div>
@@ -358,19 +469,106 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
   );
 }
 
+/** Nota explicativa consistente al tope de cada panel — qué hace el nodo, en un par de líneas. */
+function InfoNote({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex gap-2.5 p-3 rounded-lg bg-white/[.03] border border-white/[.08] text-xs text-gray-300 leading-relaxed mb-4">
+      <Info className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
+      <div>{children}</div>
+    </div>
+  );
+}
+
+/** Selector de línea de WhatsApp — reutilizado por cualquier disparador de WhatsApp (imagen, texto, y los que se agreguen después). */
+function ChannelSelectField({
+  channels,
+  value,
+  onChange,
+  kindLabel
+}: {
+  channels: WhatsAppChannelRecord[];
+  value: string | undefined;
+  onChange: (channelId: string) => void;
+  /** Cómo nombrar lo que dispara este nodo en el texto de ayuda — ej. "imágenes", "mensajes". */
+  kindLabel: string;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-400 mb-1.5">Canal de WhatsApp</label>
+      <select
+        value={value ?? ""}
+        onChange={e => onChange(e.target.value)}
+        className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white"
+      >
+        <option value="">Cualquier canal de la organización</option>
+        {channels.map(c => (
+          <option key={c.id} value={c.id}>
+            {c.friendly_name || "WhatsApp"} · {c.e164}
+          </option>
+        ))}
+      </select>
+      {channels.length === 0 ? (
+        <p className="text-[11px] text-gray-500 mt-2">
+          Todavía no tienes líneas de WhatsApp conectadas.{" "}
+          <Link href="/dashboard/canales/whatsapp" className="text-[#5b5bf6] hover:underline">Conecta una</Link>.
+        </p>
+      ) : (
+        <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+          {value
+            ? `Este workflow solo se activa con ${kindLabel} recibidos en esa línea. El resto de tus canales no lo disparan.`
+            : `Si tienes varias líneas activas y no eliges una, este workflow se activa con ${kindLabel} de cualquiera de ellas.`}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Campo de mapeo por dot-path dentro de un JSON entrante — reutilizable para cualquier acción que necesite leer un campo variable. */
+function JsonPathField({
+  label,
+  value,
+  onChange,
+  placeholder
+}: {
+  label: string;
+  value: string | undefined;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-400 mb-1.5">{label}</label>
+      <input
+        type="text"
+        value={value ?? ""}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white placeholder:text-gray-600"
+      />
+    </div>
+  );
+}
+
 function NodeConfigPanel({
   node,
   connections,
+  channels,
   onClose,
-  onSetConnection
+  onSetData
 }: {
   node: Node<WorkflowNodeData>;
   connections: AutomationConnectionRecord[];
+  channels: WhatsAppChannelRecord[];
   onClose: () => void;
-  onSetConnection: (connectionId: string) => void;
+  onSetData: (patch: Partial<WorkflowNodeData>) => void;
 }) {
   const type = node.type as WorkflowNodeType;
   const color = NODE_BRAND_COLOR[type];
+  const isTrigger = TRIGGER_TYPES.includes(type);
+  const webhookUrl =
+    typeof window !== "undefined" && node.data.webhookToken
+      ? `${window.location.origin}/api/automations/inbound/${node.data.webhookToken}`
+      : "";
 
   return (
     <>
@@ -380,7 +578,7 @@ function NodeConfigPanel({
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-white truncate">{NODE_TITLE[type]}</p>
-          <p className="text-[11px] text-gray-500">{type === "trigger.whatsapp_image" ? "Disparador" : "Acción"}</p>
+          <p className="text-[11px] text-gray-500">{isTrigger ? "Disparador" : "Acción"}</p>
         </div>
         <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/[.08] shrink-0">
           <X className="w-4 h-4" />
@@ -389,19 +587,57 @@ function NodeConfigPanel({
 
       <div className="flex-1 overflow-y-auto p-4">
         {type === "trigger.whatsapp_image" && (
-          <div className="flex gap-2.5 p-3 rounded-lg bg-white/[.03] border border-white/[.08] text-xs text-gray-300 leading-relaxed">
-            <Info className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
-            Este workflow se activa cada vez que un cliente final envía una imagen por WhatsApp a
-            cualquiera de tus canales conectados. No tiene configuración adicional.
+          <div>
+            <InfoNote>Se activa cada vez que un cliente final envía una imagen por WhatsApp.</InfoNote>
+            <ChannelSelectField
+              channels={channels}
+              value={node.data.channelId}
+              onChange={channelId => onSetData({ channelId })}
+              kindLabel="imágenes"
+            />
+          </div>
+        )}
+
+        {type === "trigger.whatsapp_text" && (
+          <div>
+            <InfoNote>Se activa cada vez que un cliente final envía un mensaje de texto por WhatsApp.</InfoNote>
+            <ChannelSelectField
+              channels={channels}
+              value={node.data.channelId}
+              onChange={channelId => onSetData({ channelId })}
+              kindLabel="mensajes"
+            />
+          </div>
+        )}
+
+        {type === "trigger.webhook" && (
+          <div>
+            <InfoNote>
+              Genera una URL pública única. Cualquier sistema externo — n8n, tu CRM, un backend propio — puede hacer un{" "}
+              <code>POST</code> con JSON a esa URL para activar este workflow.
+            </InfoNote>
+            <label className="block text-xs font-semibold text-gray-400 mb-1.5">URL del webhook</label>
+            <div className="flex items-center gap-1.5 rounded-lg border border-white/[.12] bg-white/[.04] px-2.5 py-2">
+              <code className="flex-1 text-[11px] text-gray-300 truncate">{webhookUrl}</code>
+              <CopyButton value={webhookUrl} />
+            </div>
+            <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+              Conéctala a un nodo <strong className="text-gray-300">Enviar mensaje de WhatsApp</strong> para decirle a Noova
+              qué responder y a quién.
+            </p>
           </div>
         )}
 
         {type === "action.webhook" && (
           <div>
+            <InfoNote>
+              Llama por <code>POST</code> a la URL de un conector configurado en Conectores — n8n, Zapier, o cualquier
+              backend propio que reciba JSON. No está atado a ninguna app en particular.
+            </InfoNote>
             <label className="block text-xs font-semibold text-gray-400 mb-1.5">Conexión</label>
             <select
               value={node.data.connectionId ?? ""}
-              onChange={e => onSetConnection(e.target.value)}
+              onChange={e => onSetData({ connectionId: e.target.value })}
               className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white"
             >
               <option value="">Sin elegir</option>
@@ -415,17 +651,37 @@ function NodeConfigPanel({
               </p>
             ) : (
               <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
-                El JSON con el análisis de la imagen se envía a la URL del webhook de esta conexión.
+                El JSON del disparador se envía a la URL de esta conexión — ya incluye una URL de callback lista para
+                usar, sin necesidad de armar el regreso manualmente.
               </p>
             )}
           </div>
         )}
 
-        {type === "result.whatsapp_reply" && (
-          <div className="flex gap-2.5 p-3 rounded-lg bg-white/[.03] border border-white/[.08] text-xs text-gray-300 leading-relaxed">
-            <Info className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
-            Cuando tu conector llame a la URL de callback con la respuesta, Noova la reenvía por
-            WhatsApp al cliente final — en el mismo chat. No tiene configuración adicional.
+        {type === "action.send_whatsapp_message" && (
+          <div>
+            <InfoNote>
+              Conéctalo a un nodo <strong className="text-white">Webhook entrante</strong>. Cuando llegue el JSON, Noova
+              toma estos dos campos y responde por WhatsApp en el chat de esa conversación.
+            </InfoNote>
+            <div className="space-y-4">
+              <JsonPathField
+                label="Campo con el ID de la conversación"
+                value={node.data.conversationIdPath}
+                onChange={conversationIdPath => onSetData({ conversationIdPath })}
+                placeholder="conversation_id"
+              />
+              <JsonPathField
+                label="Campo con el texto a enviar"
+                value={node.data.messageTextPath}
+                onChange={messageTextPath => onSetData({ messageTextPath })}
+                placeholder="reply.text"
+              />
+              <p className="text-[11px] text-gray-500 leading-relaxed">
+                Ruta dentro del JSON recibido, separada por puntos — ej. <code>reply.text</code> lee{" "}
+                <code>{"{ reply: { text: \"...\" } }"}</code>. Si lo dejas vacío usa esos mismos nombres por defecto.
+              </p>
+            </div>
           </div>
         )}
       </div>

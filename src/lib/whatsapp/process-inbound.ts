@@ -484,10 +484,12 @@ export async function processTwilioWhatsAppInbound(
 
   if (userPersist.error) return { ok: false, error: userPersist.error };
 
-  // Automatizaciones (Workflows/Conectores): si el cliente final envió una imagen,
-  // avisa a los workflows activos de la org en paralelo con la generación de la
-  // respuesta de la IA — no bloquea ni retrasa el envío al cliente.
-  if (orgId && inboundContent.primaryMediaType === "image") {
+  // Automatizaciones (Workflows/Conectores): si el cliente final envió una imagen o un
+  // mensaje de texto, avisa a los workflows activos de la org en paralelo con la
+  // generación de la respuesta de la IA — no bloquea ni retrasa el envío al cliente.
+  const automationTriggerType =
+    userMediaType === "image" ? "trigger.whatsapp_image" : userMediaType === "text" ? "trigger.whatsapp_text" : null;
+  if (orgId && automationTriggerType) {
     void emitAutomationEvent(db, {
       organizationId: orgId,
       conversationId: userPersist.conversationId,
@@ -495,7 +497,9 @@ export async function processTwilioWhatsAppInbound(
       contactLabel,
       mediaStoragePath: inboundContent.mediaStoragePath ?? null,
       analysisText: inboundContent.userText,
-      messageSid: inbound.messageSid
+      messageSid: inbound.messageSid,
+      channelId: channel.id,
+      triggerType: automationTriggerType
     }).catch(err => console.error("[automations] emit:", err));
   }
 

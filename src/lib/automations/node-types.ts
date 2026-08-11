@@ -8,15 +8,27 @@
 
 export const NODE_TYPES = [
   "trigger.whatsapp_image",
+  "trigger.whatsapp_text",
+  "trigger.webhook",
   "action.webhook",
-  "result.whatsapp_reply"
+  "action.send_whatsapp_message"
 ] as const;
+
+/** Disparadores de WhatsApp — comparten selector de canal y motor de emisión (ver events.ts). */
+export const WHATSAPP_TRIGGER_TYPES = ["trigger.whatsapp_image", "trigger.whatsapp_text"] as const;
 
 export type WorkflowNodeType = (typeof NODE_TYPES)[number];
 
 export interface WorkflowNodeData {
   /** Solo aplica a action.webhook: qué automation_connection usar al ejecutar. */
   connectionId?: string;
+  /** Solo aplica a los disparadores de WhatsApp: id del whatsapp_channels a escuchar. Vacío/ausente = cualquier canal de la org. */
+  channelId?: string;
+  /** Solo aplica a trigger.webhook: token único de este nodo — la URL pública es /api/automations/inbound/{webhookToken}. Se genera al crear el nodo. */
+  webhookToken?: string;
+  /** Solo aplican a action.send_whatsapp_message: dot-path dentro del JSON entrante. Vacío = usa el default ("conversation_id"/"reply.text"). */
+  conversationIdPath?: string;
+  messageTextPath?: string;
   [key: string]: unknown;
 }
 
@@ -53,20 +65,32 @@ export const NODE_CATALOG: NodeCatalogEntry[] = [
   {
     type: "trigger.whatsapp_image",
     category: "trigger",
-    label: "Imagen recibida",
-    description: "WhatsApp · cualquier canal"
+    label: "Imagen de WhatsApp recibida",
+    description: "WhatsApp · elige el canal"
+  },
+  {
+    type: "trigger.whatsapp_text",
+    category: "trigger",
+    label: "Mensaje de WhatsApp recibido",
+    description: "WhatsApp · elige el canal"
+  },
+  {
+    type: "trigger.webhook",
+    category: "trigger",
+    label: "Webhook entrante",
+    description: "Genera una URL propia — cualquier sistema externo puede llamarla"
   },
   {
     type: "action.webhook",
     category: "action",
-    label: "Enviar a conector",
-    description: "Webhook saliente (n8n y similares)"
+    label: "HTTP Request",
+    description: "Llama a la URL de un conector (n8n y similares)"
   },
   {
-    type: "result.whatsapp_reply",
+    type: "action.send_whatsapp_message",
     category: "action",
-    label: "Responder al cliente",
-    description: "Mismo chat de WhatsApp, cuando el conector responda"
+    label: "Enviar mensaje de WhatsApp",
+    description: "Responde en el mismo chat del cliente final"
   }
 ];
 
@@ -116,13 +140,25 @@ export function normalizeWorkflowGraph(input: unknown): WorkflowGraph {
 }
 
 /**
- * Recorre el grafo buscando nodos `trigger.whatsapp_image` conectados (por una
- * arista, directa) a un nodo `action.webhook`, y devuelve el/los connectionId
- * configurados. Es el único recorrido que el motor de ejecución entiende hoy.
+ * Recorre el grafo buscando nodos disparadores de WhatsApp (imagen o texto)
+ * conectados por una arista directa a un nodo `action.webhook`, y devuelve
+ * el/los connectionId configurados.
+ *
+ * `channelId` es el canal de WhatsApp que recibió el mensaje real: un
+ * disparador sin `data.channelId` configurado dispara para cualquier canal
+ * (comportamiento por defecto/retrocompatible); uno con `channelId` solo
+ * dispara si coincide.
  */
-export function findWebhookActionConnectionIds(graph: WorkflowGraph): string[] {
+export function findWebhookActionConnectionIds(
+  graph: WorkflowGraph,
+  triggerType: (typeof WHATSAPP_TRIGGER_TYPES)[number],
+  channelId?: string
+): string[] {
   const triggerIds = new Set(
-    graph.nodes.filter((n) => n.type === "trigger.whatsapp_image").map((n) => n.id)
+    graph.nodes
+      .filter((n) => n.type === triggerType)
+      .filter((n) => !n.data.channelId || n.data.channelId === channelId)
+      .map((n) => n.id)
   );
   if (triggerIds.size === 0) return [];
 
@@ -140,4 +176,67 @@ export function findWebhookActionConnectionIds(graph: WorkflowGraph): string[] {
     }
   }
   return [...new Set(connectionIds)];
+}
+
+/**
+ * Asigna un `webhookToken` a cualquier nodo `trigger.webhook` que aún no
+ * tenga uno (el editor ya lo genera al crear el nodo — esto es solo un
+ * resguardo del lado del servidor antes de persistir el grafo).
+ */
+export function ensureWebhookTokens(graph: WorkflowGraph): WorkflowGraph {
+  let changed = false;
+  const nodes = graph.nodes.map((n) => {
+    if (n.type !== "trigger.webhook" || (typeof n.data.webhookToken === "string" && n.data.webhookToken)) {
+      return n;
+    }
+    changed = true;
+    return { ...n, data: { ...n.data, webhookToken: crypto.randomUUID().replace(/-/g, "") } };
+  });
+  return changed ? { ...graph, nodes } : graph;
+}
+
+export interface SendMessageTarget {
+  conversationIdPath: string;
+  messageTextPath: string;
+}
+
+/**
+ * Recorre el grafo desde un nodo `trigger.webhook` (por su id) buscando
+ * nodos `action.send_whatsapp_message` conectados por una arista directa, y
+ * devuelve cómo extraer conversation_id/texto del JSON que llegue a esa URL.
+ */
+export function findSendMessageTargets(graph: WorkflowGraph, triggerNodeId: string): SendMessageTarget[] {
+  const actionNodesById = new Map(
+    graph.nodes.filter((n) => n.type === "action.send_whatsapp_message").map((n) => [n.id, n])
+  );
+
+  const targets: SendMessageTarget[] = [];
+  for (const edge of graph.edges) {
+    if (edge.source !== triggerNodeId) continue;
+    const action = actionNodesById.get(edge.target);
+    if (!action) continue;
+    targets.push({
+      conversationIdPath:
+        typeof action.data.conversationIdPath === "string" && action.data.conversationIdPath
+          ? action.data.conversationIdPath
+          : "conversation_id",
+      messageTextPath:
+        typeof action.data.messageTextPath === "string" && action.data.messageTextPath
+          ? action.data.messageTextPath
+          : "reply.text"
+    });
+  }
+  return targets;
+}
+
+/** Lee un valor por dot-path (`"reply.text"`) de un JSON arbitrario recibido en un webhook entrante. */
+export function resolveJsonPath(body: unknown, path: string): string | undefined {
+  let current: unknown = body;
+  for (const part of path.split(".").filter(Boolean)) {
+    if (typeof current !== "object" || current === null) return undefined;
+    current = (current as Record<string, unknown>)[part];
+  }
+  if (typeof current === "string") return current;
+  if (typeof current === "number" || typeof current === "boolean") return String(current);
+  return undefined;
 }
