@@ -26,7 +26,6 @@ import {
   Search,
   Webhook,
   Globe,
-  MessageSquareText,
   X,
   Info,
   Pencil,
@@ -39,7 +38,9 @@ import {
   ConnectionsContext,
   ChannelsContext,
   NODE_BRAND_COLOR,
+  NODE_TITLE,
   WORKFLOW_NODE_TYPES,
+  resolveNodeLabel,
   CopyButton
 } from "@/components/automations/workflow-nodes";
 import { DeleteWorkflowModal } from "@/components/automations/DeleteWorkflowModal";
@@ -58,18 +59,10 @@ const TABS: { id: Tab; label: string }[] = [
 
 const NODE_PICKER_ICON: Record<WorkflowNodeType, React.ReactNode> = {
   "trigger.whatsapp_image": <WhatsAppLogo className="w-4 h-4 text-white" />,
-  "trigger.whatsapp_text": <MessageSquareText className="w-4 h-4 text-white" strokeWidth={1.8} />,
+  "trigger.whatsapp_text": <WhatsAppLogo className="w-4 h-4 text-white" />,
   "trigger.webhook": <Webhook className="w-4 h-4 text-white" strokeWidth={1.8} />,
   "action.webhook": <Globe className="w-4 h-4 text-white" strokeWidth={1.6} />,
   "action.send_whatsapp_message": <WhatsAppLogo className="w-4 h-4 text-white" />
-};
-
-const NODE_TITLE: Record<WorkflowNodeType, string> = {
-  "trigger.whatsapp_image": "Imagen de WhatsApp recibida",
-  "trigger.whatsapp_text": "Mensaje de WhatsApp recibido",
-  "trigger.webhook": "Webhook entrante",
-  "action.webhook": "HTTP Request",
-  "action.send_whatsapp_message": "Enviar mensaje de WhatsApp"
 };
 
 const TRIGGER_TYPES: WorkflowNodeType[] = ["trigger.whatsapp_image", "trigger.whatsapp_text", "trigger.webhook"];
@@ -451,6 +444,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
 
             {configNode && !paletteOpen && (
               <NodeConfigPanel
+                key={configNode.id}
                 node={configNode}
                 connections={connections}
                 channels={channels}
@@ -549,6 +543,68 @@ function JsonPathField({
   );
 }
 
+/** Interruptor sí/no — mismo lenguaje visual que el switch activo/pausado del listado de workflows. */
+function ToggleField({
+  label,
+  description,
+  checked,
+  onChange
+}: {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-gray-300">{label}</p>
+        {description && <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">{description}</p>}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative w-8 h-[18px] rounded-full transition-colors shrink-0 mt-0.5 ${checked ? "bg-[#5b5bf6]" : "bg-white/[.14]"}`}
+      >
+        <span
+          className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${checked ? "translate-x-[14px]" : ""}`}
+        />
+      </button>
+    </div>
+  );
+}
+
+/** Campo de JSON multilínea — reutilizable para cualquier acción que necesite un cuerpo/headers editables a mano. */
+function JsonTextareaField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  rows = 5
+}: {
+  label: string;
+  value: string | undefined;
+  onChange: (value: string) => void;
+  placeholder: string;
+  rows?: number;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-400 mb-1.5">{label}</label>
+      <textarea
+        value={value ?? ""}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        spellCheck={false}
+        className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-xs font-mono text-white placeholder:text-gray-600 resize-y leading-relaxed"
+      />
+    </div>
+  );
+}
+
 function NodeConfigPanel({
   node,
   connections,
@@ -570,6 +626,20 @@ function NodeConfigPanel({
       ? `${window.location.origin}/api/automations/inbound/${node.data.webhookToken}`
       : "";
 
+  const displayLabel = resolveNodeLabel(type, node.data, channels, connections);
+  const [editingLabel, setEditingLabel] = useState(false);
+  const [labelDraft, setLabelDraft] = useState("");
+
+  function startEditingLabel() {
+    setLabelDraft(node.data.label ?? displayLabel);
+    setEditingLabel(true);
+  }
+  function commitLabel() {
+    setEditingLabel(false);
+    const trimmed = labelDraft.trim();
+    onSetData({ label: trimmed || undefined });
+  }
+
   return (
     <>
       <div className="flex items-center gap-3 px-4 py-4 border-b border-white/[.08] shrink-0">
@@ -577,8 +647,28 @@ function NodeConfigPanel({
           {NODE_PICKER_ICON[type]}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-white truncate">{NODE_TITLE[type]}</p>
-          <p className="text-[11px] text-gray-500">{isTrigger ? "Disparador" : "Acción"}</p>
+          {editingLabel ? (
+            <input
+              autoFocus
+              value={labelDraft}
+              onChange={e => setLabelDraft(e.target.value)}
+              onBlur={commitLabel}
+              onKeyDown={e => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                if (e.key === "Escape") setEditingLabel(false);
+              }}
+              className="text-sm font-bold bg-white/[.06] border border-white/[.16] rounded-md px-1.5 py-0.5 outline-none focus:border-[#5b5bf6] w-full -ml-1.5"
+            />
+          ) : (
+            <button type="button" onClick={startEditingLabel} className="group flex items-center gap-1.5 min-w-0 -ml-0.5">
+              <p className="text-sm font-bold text-white truncate">{displayLabel}</p>
+              <Pencil className="w-3 h-3 text-gray-500 opacity-0 group-hover:opacity-100 shrink-0" />
+            </button>
+          )}
+          <p className="text-[11px] text-gray-500">
+            {isTrigger ? "Disparador" : "Acción"}
+            {displayLabel !== NODE_TITLE[type] ? ` · ${NODE_TITLE[type]}` : ""}
+          </p>
         </div>
         <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/[.08] shrink-0">
           <X className="w-4 h-4" />
@@ -655,6 +745,52 @@ function NodeConfigPanel({
                 usar, sin necesidad de armar el regreso manualmente.
               </p>
             )}
+
+            <div className="mt-5 pt-4 border-t border-white/[.08]">
+              <ToggleField
+                label="Personalizar solicitud"
+                description="Por defecto Noova arma el JSON automáticamente. Actívalo para elegir el método, headers y el cuerpo exacto que se envía."
+                checked={Boolean(node.data.customRequest)}
+                onChange={customRequest => onSetData({ customRequest })}
+              />
+
+              {node.data.customRequest && (
+                <div className="space-y-4 mt-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-400 mb-1.5">Método</label>
+                    <select
+                      value={node.data.requestMethod ?? "POST"}
+                      onChange={e => onSetData({ requestMethod: e.target.value })}
+                      className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white"
+                    >
+                      <option value="POST">POST</option>
+                      <option value="PUT">PUT</option>
+                      <option value="PATCH">PATCH</option>
+                    </select>
+                  </div>
+                  <JsonTextareaField
+                    label="Cuerpo (JSON)"
+                    value={node.data.requestBodyTemplate}
+                    onChange={requestBodyTemplate => onSetData({ requestBodyTemplate })}
+                    placeholder={'{\n  "id": "{{conversation_id}}",\n  "texto": "{{message_text}}"\n}'}
+                    rows={6}
+                  />
+                  <JsonTextareaField
+                    label="Headers extra (JSON, opcional)"
+                    value={node.data.requestHeadersJson}
+                    onChange={requestHeadersJson => onSetData({ requestHeadersJson })}
+                    placeholder={'{\n  "Authorization": "Bearer ..."\n}'}
+                    rows={3}
+                  />
+                  <p className="text-[11px] text-gray-500 leading-relaxed">
+                    Variables disponibles — deben ir dentro de las comillas del JSON: <code>{"{{conversation_id}}"}</code>,{" "}
+                    <code>{"{{contact_phone}}"}</code>, <code>{"{{contact_label}}"}</code>, <code>{"{{message_text}}"}</code>,{" "}
+                    <code>{"{{image_url}}"}</code>, <code>{"{{callback_url}}"}</code>. La firma HMAC y{" "}
+                    <code>Content-Type</code> se agregan siempre, sin importar los headers que pongas aquí.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

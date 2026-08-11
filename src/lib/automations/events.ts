@@ -4,7 +4,7 @@ import { getWebhookBaseUrl } from "@/lib/telephony/app-url";
 import { signedUrlForPath } from "@/lib/whatsapp/media-storage";
 import { getConnectionSecretsById, markConnectionError } from "@/lib/automations/connections-db";
 import { listActiveWorkflowsForOrg } from "@/lib/automations/workflows-db";
-import { findWebhookActionConnectionIds, type WHATSAPP_TRIGGER_TYPES } from "@/lib/automations/node-types";
+import { findWebhookActionConfigs, type WebhookActionConfig, type WHATSAPP_TRIGGER_TYPES } from "@/lib/automations/node-types";
 
 const WEBHOOK_TIMEOUT_MS = 8000;
 
@@ -44,22 +44,29 @@ export async function emitAutomationEvent(
       : null;
 
   for (const workflow of workflows) {
-    const connectionIds = findWebhookActionConnectionIds(workflow.graph, params.triggerType, params.channelId);
-    for (const connectionId of connectionIds) {
+    const actionConfigs = findWebhookActionConfigs(workflow.graph, params.triggerType, params.channelId);
+    for (const config of actionConfigs) {
       await sendWebhookEvent(db, {
         workflowId: workflow.id,
-        connectionId,
         imageUrl,
-        ...params
+        ...params,
+        ...config
       });
     }
   }
 }
 
-interface SendWebhookEventParams extends EmitWhatsAppEventParams {
+interface SendWebhookEventParams extends EmitWhatsAppEventParams, WebhookActionConfig {
   workflowId: string;
-  connectionId: string;
   imageUrl: string | null;
+}
+
+/** Reemplaza tokens `{{nombre}}` por su valor, JSON-escapado — para usar dentro de comillas de un JSON ya armado por el usuario. */
+function substituteTokens(template: string, tokens: Record<string, string>): string {
+  return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, key: string) => {
+    const value = tokens[key] ?? "";
+    return JSON.stringify(value).slice(1, -1);
+  });
 }
 
 async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventParams): Promise<void> {
@@ -68,23 +75,73 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
 
   const isImage = params.triggerType === "trigger.whatsapp_image";
   const eventType = isImage ? "whatsapp.image_received" : "whatsapp.text_received";
+  const callbackUrl = `${getWebhookBaseUrl()}/api/automations/inbound/${connection.inboundToken}`;
 
-  const payload: Record<string, unknown> = {
-    event: eventType,
-    schema_version: "1",
-    organization_id: params.organizationId,
-    conversation_id: params.conversationId,
-    correlation_id: `${params.conversationId}:${params.messageSid}`,
-    contact: { phone: params.contactPhone, label: params.contactLabel },
-    callback_url: `${getWebhookBaseUrl()}/api/automations/inbound/${connection.inboundToken}`
-  };
-  if (isImage) {
-    payload.image = { url: params.imageUrl, analysis: params.analysisText };
+  let method = "POST";
+  let extraHeaders: Record<string, string> = {};
+  let body: string;
+
+  if (params.customRequest && params.requestBodyTemplate?.trim()) {
+    method = params.requestMethod || "POST";
+    const tokens: Record<string, string> = {
+      event: eventType,
+      organization_id: params.organizationId,
+      conversation_id: params.conversationId,
+      correlation_id: `${params.conversationId}:${params.messageSid}`,
+      contact_phone: params.contactPhone,
+      contact_label: params.contactLabel ?? "",
+      message_text: params.analysisText,
+      image_url: params.imageUrl ?? "",
+      callback_url: callbackUrl
+    };
+
+    const substitutedBody = substituteTokens(params.requestBodyTemplate, tokens);
+    try {
+      JSON.parse(substitutedBody);
+    } catch {
+      await db.from("automation_event_log").insert({
+        organization_id: params.organizationId,
+        workflow_id: params.workflowId,
+        connection_id: params.connectionId,
+        conversation_id: params.conversationId,
+        event_type: eventType,
+        status: "error",
+        error_message: "El cuerpo personalizado no es JSON válido después de reemplazar las variables"
+      });
+      return;
+    }
+    body = substitutedBody;
+
+    if (params.requestHeadersJson?.trim()) {
+      try {
+        const parsedHeaders = JSON.parse(substituteTokens(params.requestHeadersJson, tokens));
+        if (parsedHeaders && typeof parsedHeaders === "object") {
+          extraHeaders = Object.fromEntries(
+            Object.entries(parsedHeaders as Record<string, unknown>).map(([k, v]) => [k, String(v)])
+          );
+        }
+      } catch {
+        // Headers personalizados inválidos: se ignoran, la solicitud sigue con los headers por defecto.
+      }
+    }
   } else {
-    payload.message = { text: params.analysisText };
+    const payload: Record<string, unknown> = {
+      event: eventType,
+      schema_version: "1",
+      organization_id: params.organizationId,
+      conversation_id: params.conversationId,
+      correlation_id: `${params.conversationId}:${params.messageSid}`,
+      contact: { phone: params.contactPhone, label: params.contactLabel },
+      callback_url: callbackUrl
+    };
+    if (isImage) {
+      payload.image = { url: params.imageUrl, analysis: params.analysisText };
+    } else {
+      payload.message = { text: params.analysisText };
+    }
+    body = JSON.stringify(payload);
   }
 
-  const body = JSON.stringify(payload);
   const signature = createHmac("sha256", connection.secret).update(body).digest("hex");
 
   const startedAt = Date.now();
@@ -97,8 +154,8 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
     const timeout = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
     try {
       const res = await fetch(connection.webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Noova-Signature": signature },
+        method,
+        headers: { "Content-Type": "application/json", "X-Noova-Signature": signature, ...extraHeaders },
         body,
         signal: controller.signal
       });

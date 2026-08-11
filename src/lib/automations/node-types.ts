@@ -20,8 +20,18 @@ export const WHATSAPP_TRIGGER_TYPES = ["trigger.whatsapp_image", "trigger.whatsa
 export type WorkflowNodeType = (typeof NODE_TYPES)[number];
 
 export interface WorkflowNodeData {
+  /** Nombre propio puesto por el usuario — si está, siempre gana sobre cualquier etiqueta calculada (canal/conexión/default). */
+  label?: string;
   /** Solo aplica a action.webhook: qué automation_connection usar al ejecutar. */
   connectionId?: string;
+  /** Solo aplica a action.webhook: si está activo, se usa method/headers/body personalizados en vez del payload automático. */
+  customRequest?: boolean;
+  /** Solo aplica a action.webhook con customRequest activo. Default "POST". */
+  requestMethod?: string;
+  /** Solo aplica a action.webhook con customRequest activo: JSON de headers extra, como texto (admite tokens {{...}}). */
+  requestHeadersJson?: string;
+  /** Solo aplica a action.webhook con customRequest activo: JSON del cuerpo, como texto (admite tokens {{...}}), reemplaza el payload automático. */
+  requestBodyTemplate?: string;
   /** Solo aplica a los disparadores de WhatsApp: id del whatsapp_channels a escuchar. Vacío/ausente = cualquier canal de la org. */
   channelId?: string;
   /** Solo aplica a trigger.webhook: token único de este nodo — la URL pública es /api/automations/inbound/{webhookToken}. Se genera al crear el nodo. */
@@ -139,21 +149,30 @@ export function normalizeWorkflowGraph(input: unknown): WorkflowGraph {
   return { nodes, edges };
 }
 
+export interface WebhookActionConfig {
+  connectionId: string;
+  /** Si es false, el motor arma el payload automático (comportamiento por defecto, sin fricción). */
+  customRequest: boolean;
+  requestMethod: string;
+  requestHeadersJson?: string;
+  requestBodyTemplate?: string;
+}
+
 /**
  * Recorre el grafo buscando nodos disparadores de WhatsApp (imagen o texto)
  * conectados por una arista directa a un nodo `action.webhook`, y devuelve
- * el/los connectionId configurados.
+ * la configuración de cada uno (conexión + si tiene solicitud personalizada).
  *
  * `channelId` es el canal de WhatsApp que recibió el mensaje real: un
  * disparador sin `data.channelId` configurado dispara para cualquier canal
  * (comportamiento por defecto/retrocompatible); uno con `channelId` solo
  * dispara si coincide.
  */
-export function findWebhookActionConnectionIds(
+export function findWebhookActionConfigs(
   graph: WorkflowGraph,
   triggerType: (typeof WHATSAPP_TRIGGER_TYPES)[number],
   channelId?: string
-): string[] {
+): WebhookActionConfig[] {
   const triggerIds = new Set(
     graph.nodes
       .filter((n) => n.type === triggerType)
@@ -166,16 +185,25 @@ export function findWebhookActionConnectionIds(
     graph.nodes.filter((n) => n.type === "action.webhook").map((n) => [n.id, n])
   );
 
-  const connectionIds: string[] = [];
+  const seenActionIds = new Set<string>();
+  const configs: WebhookActionConfig[] = [];
   for (const edge of graph.edges) {
     if (!triggerIds.has(edge.source)) continue;
     const action = actionNodesById.get(edge.target);
     const connectionId = action?.data.connectionId;
-    if (typeof connectionId === "string" && connectionId) {
-      connectionIds.push(connectionId);
-    }
+    if (!action || typeof connectionId !== "string" || !connectionId) continue;
+    if (seenActionIds.has(action.id)) continue;
+    seenActionIds.add(action.id);
+    configs.push({
+      connectionId,
+      customRequest: Boolean(action.data.customRequest),
+      requestMethod:
+        typeof action.data.requestMethod === "string" && action.data.requestMethod ? action.data.requestMethod : "POST",
+      requestHeadersJson: typeof action.data.requestHeadersJson === "string" ? action.data.requestHeadersJson : undefined,
+      requestBodyTemplate: typeof action.data.requestBodyTemplate === "string" ? action.data.requestBodyTemplate : undefined
+    });
   }
-  return [...new Set(connectionIds)];
+  return configs;
 }
 
 /**
