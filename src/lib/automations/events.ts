@@ -7,6 +7,8 @@ import { listActiveWorkflowsForOrg } from "@/lib/automations/workflows-db";
 import { findWebhookActionConfigs, type WebhookActionConfig, type WHATSAPP_TRIGGER_TYPES } from "@/lib/automations/node-types";
 
 const WEBHOOK_TIMEOUT_MS = 8000;
+/** Cuánto del payload/respuesta se guarda para inspección en la UI — evita que un conector que devuelva HTML gigante llene la tabla. */
+const LOGGED_BODY_MAX_CHARS = 8000;
 
 export interface EmitWhatsAppEventParams {
   organizationId: string;
@@ -106,7 +108,8 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
         conversation_id: params.conversationId,
         event_type: eventType,
         status: "error",
-        error_message: "El cuerpo personalizado no es JSON válido después de reemplazar las variables"
+        error_message: "El cuerpo personalizado no es JSON válido después de reemplazar las variables",
+        request_body: substitutedBody.slice(0, LOGGED_BODY_MAX_CHARS)
       });
       return;
     }
@@ -148,6 +151,7 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
   let status: "sent" | "error" = "sent";
   let httpStatus: number | null = null;
   let errorMessage: string | null = null;
+  let responseBodyText: string | null = null;
 
   try {
     const controller = new AbortController();
@@ -155,11 +159,22 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
     try {
       const res = await fetch(connection.webhookUrl, {
         method,
-        headers: { "Content-Type": "application/json", "X-Noova-Signature": signature, ...extraHeaders },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Noova-Signature": signature,
+          // Header plano equivalente a un API key — para usar la credencial "Header Auth" de n8n sin código.
+          "X-Noova-Api-Key": connection.secret,
+          ...extraHeaders
+        },
         body,
         signal: controller.signal
       });
       httpStatus = res.status;
+      try {
+        responseBodyText = (await res.text()).slice(0, LOGGED_BODY_MAX_CHARS);
+      } catch {
+        // Cuerpo de respuesta no legible (stream vacío, etc.) — no es crítico.
+      }
       if (!res.ok) {
         status = "error";
         errorMessage = `HTTP ${res.status}`;
@@ -183,7 +198,9 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
     status,
     http_status: httpStatus,
     latency_ms: latencyMs,
-    error_message: errorMessage
+    error_message: errorMessage,
+    request_body: body.slice(0, LOGGED_BODY_MAX_CHARS),
+    response_body: responseBodyText
   });
 
   if (status === "error") {

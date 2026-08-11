@@ -44,6 +44,7 @@ import {
   CopyButton
 } from "@/components/automations/workflow-nodes";
 import { DeleteWorkflowModal } from "@/components/automations/DeleteWorkflowModal";
+import { AutomationEventsTable, type AutomationEventRow } from "@/components/automations/AutomationEventsTable";
 import { WhatsAppLogo } from "@/components/icons/brands/WhatsAppLogo";
 import { NODE_CATALOG, type WorkflowNodeType, type WorkflowNodeData } from "@/lib/automations/node-types";
 import type { WorkflowRecord } from "@/lib/automations/workflows-db";
@@ -66,14 +67,6 @@ const NODE_PICKER_ICON: Record<WorkflowNodeType, React.ReactNode> = {
 };
 
 const TRIGGER_TYPES: WorkflowNodeType[] = ["trigger.whatsapp_image", "trigger.whatsapp_text", "trigger.webhook"];
-
-interface AutomationEventRow {
-  id: string;
-  event_type: string;
-  status: "sent" | "responded" | "no_response" | "error";
-  latency_ms: number | null;
-  created_at: string;
-}
 
 export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string; initialTab?: string }) {
   const router = useRouter();
@@ -456,7 +449,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto p-6 min-h-0">
-          <EventsTable events={events} />
+          <AutomationEventsTable events={events} emptyLabel="Sin ejecuciones todavía." />
         </div>
       )}
     </div>
@@ -825,40 +818,3 @@ function NodeConfigPanel({
   );
 }
 
-function EventsTable({ events }: { events: AutomationEventRow[] }) {
-  if (events.length === 0) {
-    return <p className="text-sm text-gray-500 py-10 text-center">Sin ejecuciones todavía.</p>;
-  }
-  return (
-    <div className="rounded-xl border border-white/[.08] overflow-hidden max-w-3xl">
-      <table className="w-full text-xs">
-        <thead className="bg-white/[.03]">
-          <tr className="border-b border-white/[.08]">
-            <th className="px-4 py-2.5 text-left font-bold uppercase tracking-wide text-[11px] text-gray-400">Evento</th>
-            <th className="px-4 py-2.5 text-left font-bold uppercase tracking-wide text-[11px] text-gray-400">Estado</th>
-            <th className="px-4 py-2.5 text-left font-bold uppercase tracking-wide text-[11px] text-gray-400">Latencia</th>
-            <th className="px-4 py-2.5 text-left font-bold uppercase tracking-wide text-[11px] text-gray-400">Cuándo</th>
-          </tr>
-        </thead>
-        <tbody>
-          {events.map(e => (
-            <tr key={e.id} className="border-b border-white/[.06] last:border-0 hover:bg-white/[.03]">
-              <td className="px-4 py-3 text-gray-200">{e.event_type}</td>
-              <td className="px-4 py-3">
-                {e.status === "sent" || e.status === "responded" ? (
-                  <Badge variant="emerald" icon={CheckCircle2}>Respuesta recibida</Badge>
-                ) : e.status === "error" ? (
-                  <Badge variant="danger">Sin conexión</Badge>
-                ) : (
-                  <Badge variant="neutral">Sin respuesta aún</Badge>
-                )}
-              </td>
-              <td className="px-4 py-3 text-gray-400 tabular-nums">{e.latency_ms ? `${(e.latency_ms / 1000).toFixed(1)} s` : "—"}</td>
-              <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(e.created_at).toLocaleString("es-CO")}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}

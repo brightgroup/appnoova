@@ -19,6 +19,7 @@ import { authFetch } from "@/lib/telephony-api";
 import { tabActive, tabIdle } from "@/lib/brand-ui";
 import { Badge } from "@/components/ui/Badge";
 import { N8nLogo } from "@/components/icons/brands/N8nLogo";
+import { AutomationEventsTable, type AutomationEventRow } from "@/components/automations/AutomationEventsTable";
 import type { AutomationConnectionRecord } from "@/lib/automations/connections-db";
 
 type Tab = "vista-general" | "autenticacion" | "registros" | "webhooks";
@@ -32,16 +33,6 @@ const TABS: { id: Tab; label: string }[] = [
 
 function parseTab(value: string | undefined): Tab {
   return TABS.some(t => t.id === value) ? (value as Tab) : "vista-general";
-}
-
-interface AutomationEventRow {
-  id: string;
-  event_type: string;
-  status: "sent" | "responded" | "no_response" | "error";
-  http_status: number | null;
-  latency_ms: number | null;
-  error_message: string | null;
-  created_at: string;
 }
 
 export function ConnectorDetailView({
@@ -258,7 +249,7 @@ export function ConnectorDetailView({
             onCopy={copyText}
           />
         )}
-        {activeTab === "registros" && <RegistrosTab events={events} />}
+        {activeTab === "registros" && <AutomationEventsTable events={events} />}
         {activeTab === "webhooks" && (
           <WebhooksTab
             webhookUrl={connection.webhookUrl}
@@ -348,7 +339,7 @@ function AutenticacionTab({
   return (
     <div className="max-w-xl space-y-4">
       <div>
-        <label className="block text-xs font-semibold text-gray-400 mb-1.5">Firma secreta</label>
+        <label className="block text-xs font-semibold text-gray-400 mb-1.5">Firma / API key</label>
         <div className="flex gap-2">
           <div className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-black/20 border border-white/[.08] text-xs font-mono text-white truncate">
             {displayValue}
@@ -372,9 +363,20 @@ function AutenticacionTab({
         </div>
         {copiedField === "secret" && <p className="text-[11px] text-emerald-400 mt-1.5">Copiado.</p>}
         <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
-          Va en el header <code className="bg-black/30 px-1 py-0.5 rounded text-gray-300">X-Noova-Signature</code> de
-          cada envío (HMAC-SHA256), para que tu flujo verifique que viene de Noova.
+          Noova la manda de dos formas en cada envío, usa la que te sea más fácil de configurar:
         </p>
+        <ul className="text-[11px] text-gray-500 mt-1.5 space-y-1 leading-relaxed list-disc list-inside">
+          <li>
+            Como API key plana en el header{" "}
+            <code className="bg-black/30 px-1 py-0.5 rounded text-gray-300">X-Noova-Api-Key</code> — pégala en una
+            credencial &ldquo;Header Auth&rdquo; de n8n, sin escribir código.
+          </li>
+          <li>
+            Como firma HMAC-SHA256 en{" "}
+            <code className="bg-black/30 px-1 py-0.5 rounded text-gray-300">X-Noova-Signature</code> — para quien
+            quiera verificar criptográficamente que el cuerpo no fue alterado.
+          </li>
+        </ul>
       </div>
 
       <button
@@ -390,41 +392,6 @@ function AutenticacionTab({
   );
 }
 
-function RegistrosTab({ events }: { events: AutomationEventRow[] }) {
-  if (events.length === 0) {
-    return <p className="text-sm text-gray-500 py-10 text-center">Sin actividad todavía.</p>;
-  }
-  return (
-    <div className="rounded-xl border border-white/[.08] overflow-hidden">
-      <table className="w-full text-xs">
-        <thead className="bg-white/[.03]">
-          <tr className="border-b border-white/[.08]">
-            <th className="px-4 py-2.5 text-left font-bold uppercase tracking-wide text-[11px] text-gray-400">Evento</th>
-            <th className="px-4 py-2.5 text-left font-bold uppercase tracking-wide text-[11px] text-gray-400">Estado</th>
-            <th className="px-4 py-2.5 text-left font-bold uppercase tracking-wide text-[11px] text-gray-400">Latencia</th>
-            <th className="px-4 py-2.5 text-left font-bold uppercase tracking-wide text-[11px] text-gray-400">Cuándo</th>
-          </tr>
-        </thead>
-        <tbody>
-          {events.map(e => (
-            <tr key={e.id} className="border-b border-white/[.06] last:border-0 hover:bg-white/[.03]">
-              <td className="px-4 py-3 text-gray-200">{e.event_type}</td>
-              <td className="px-4 py-3"><EventStatusBadge status={e.status} /></td>
-              <td className="px-4 py-3 text-gray-400 tabular-nums">{e.latency_ms ? `${(e.latency_ms / 1000).toFixed(1)} s` : "—"}</td>
-              <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(e.created_at).toLocaleString("es-CO")}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function EventStatusBadge({ status }: { status: AutomationEventRow["status"] }) {
-  if (status === "sent" || status === "responded") return <Badge variant="emerald" icon={CheckCircle2}>Respuesta recibida</Badge>;
-  if (status === "error") return <Badge variant="danger">Sin conexión</Badge>;
-  return <Badge variant="neutral">Sin respuesta aún</Badge>;
-}
 
 function WebhooksTab({
   webhookUrl,

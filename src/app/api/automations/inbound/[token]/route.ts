@@ -10,12 +10,16 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 type Ctx = { params: Promise<{ token: string }> };
 
+const LOGGED_BODY_MAX_CHARS = 8000;
+
 interface DeliverParams {
   organizationId: string;
   conversationId: string;
   replyText: string;
   connectionId?: string;
   workflowId?: string;
+  /** JSON crudo recibido en este callback, tal como lo mandó el sistema externo — para inspección en la UI. */
+  requestBody: string;
 }
 
 async function deliverReply(db: SupabaseClient, params: DeliverParams) {
@@ -44,7 +48,8 @@ async function deliverReply(db: SupabaseClient, params: DeliverParams) {
     conversation_id: params.conversationId,
     event_type: "automation.callback",
     status: sendResult.ok ? "responded" : "error",
-    error_message: sendResult.ok ? null : (sendResult.error ?? "Error desconocido").slice(0, 500)
+    error_message: sendResult.ok ? null : (sendResult.error ?? "Error desconocido").slice(0, 500),
+    request_body: params.requestBody.slice(0, LOGGED_BODY_MAX_CHARS)
   });
 
   if (!sendResult.ok) {
@@ -69,9 +74,10 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   const { token } = await ctx.params;
   const db = textAgentsAdminClient();
 
+  const rawBody = await req.text();
   let body: unknown;
   try {
-    body = await req.json();
+    body = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
@@ -89,7 +95,8 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       organizationId: connection.organizationId,
       conversationId,
       replyText,
-      connectionId: connection.id
+      connectionId: connection.id,
+      requestBody: rawBody
     });
   }
 
@@ -122,7 +129,8 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         organizationId: trigger.organizationId,
         conversationId,
         replyText,
-        workflowId: trigger.workflowId
+        workflowId: trigger.workflowId,
+        requestBody: rawBody
       });
     }
     return lastResponse ?? NextResponse.json({ ok: true });
