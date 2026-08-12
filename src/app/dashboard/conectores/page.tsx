@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plug, Plus } from "lucide-react";
+import { Plug, Plus, Webhook } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
 import { Badge } from "@/components/ui/Badge";
-import { N8nLogo } from "@/components/icons/brands/N8nLogo";
 import { GoogleCalendarLogo } from "@/components/icons/brands/GoogleCalendarLogo";
 import { ExploreConnectorsModal } from "@/components/automations/ExploreConnectorsModal";
 import {
@@ -131,13 +130,13 @@ export default function ConectoresPage() {
                     <div className="flex items-center gap-3">
                       <div
                         className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                          row.kind === "google_calendar" ? "bg-[#4285f4]/15" : "bg-[#ea4b71]/15"
+                          row.kind === "google_calendar" ? "bg-[#4285f4]/15" : "bg-white/[.08]"
                         }`}
                       >
                         {row.kind === "google_calendar" ? (
                           <GoogleCalendarLogo className="w-[18px] h-[18px] text-[#4285f4]" />
                         ) : (
-                          <N8nLogo className="w-[18px] h-[18px] text-[#ea4b71]" />
+                          <Webhook className="w-[18px] h-[18px] text-gray-300" />
                         )}
                       </div>
                       <div className="text-sm font-medium text-white truncate">{row.name}</div>
