@@ -1,7 +1,7 @@
 "use client";
 
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -19,6 +19,7 @@ import {
 } from "@xyflow/react";
 import {
   ChevronLeft,
+  ChevronRight,
   Loader2,
   Plus,
   Save,
@@ -35,6 +36,7 @@ import {
 import { authFetch } from "@/lib/telephony-api";
 import { tabActive, tabIdle } from "@/lib/brand-ui";
 import { Badge } from "@/components/ui/Badge";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import {
   ConnectionsContext,
   ChannelsContext,
@@ -498,16 +500,20 @@ function TestListenButton({
 }) {
   const [listening, setListening] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
+  const cancelledRef = useRef(false);
 
   async function startListening() {
     setTimedOut(false);
     setListening(true);
+    cancelledRef.current = false;
     const startedAt = Date.now();
     const deadline = startedAt + 120_000;
 
     while (Date.now() < deadline) {
       await new Promise(resolve => setTimeout(resolve, 2000));
+      if (cancelledRef.current) return;
       const res = await authFetch(`/api/automations/workflows/${workflowId}/events`);
+      if (cancelledRef.current) return;
       if (res.ok) {
         const json = await res.json();
         const found = ((json.events ?? []) as AutomationEventRow[]).find(
@@ -524,21 +530,39 @@ function TestListenButton({
     setTimedOut(true);
   }
 
+  function cancelListening() {
+    cancelledRef.current = true;
+    setListening(false);
+  }
+
   return (
     <div className="mb-4">
-      <button
-        type="button"
-        onClick={() => void startListening()}
-        disabled={listening}
-        className={`w-full inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-default ${
-          listening
-            ? "border-[#5b5bf6]/40 bg-[#5b5bf6]/10 text-[#c4c4ff]"
-            : "border-white/[.12] bg-white/[.04] text-white hover:bg-white/[.08]"
-        }`}
-      >
-        {listening ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Radio className="w-3.5 h-3.5" />}
-        {listening ? "Escuchando… manda un evento de prueba ahora" : "Escuchar evento de prueba"}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => void startListening()}
+          disabled={listening}
+          className={`flex-1 inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-default ${
+            listening
+              ? "border-[#5b5bf6]/40 bg-[#5b5bf6]/10 text-[#c4c4ff]"
+              : "border-white/[.12] bg-white/[.04] text-white hover:bg-white/[.08]"
+          }`}
+        >
+          {listening ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Radio className="w-3.5 h-3.5" />}
+          {listening ? "Escuchando… manda un evento de prueba ahora" : "Escuchar evento de prueba"}
+        </button>
+        {listening && (
+          <button
+            type="button"
+            onClick={cancelListening}
+            title="Cancelar"
+            aria-label="Cancelar"
+            className="shrink-0 p-2 rounded-lg border border-white/[.12] bg-white/[.04] text-gray-400 hover:text-white hover:bg-white/[.08]"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
       {timedOut && (
         <p className="text-[11px] text-amber-400 mt-1.5">No llegó ningún evento en 2 minutos. Intenta de nuevo.</p>
       )}
@@ -546,30 +570,42 @@ function TestListenButton({
   );
 }
 
-/** Nota explicativa consistente al tope de cada panel — qué hace el nodo, en un par de líneas. */
+/** Nota explicativa consistente al tope de cada panel — qué hace el nodo, en un par de líneas. El ejemplo de JSON va colapsado y discreto, para no competir con la explicación ni con los controles. */
 function InfoNote({
   children,
   example,
-  exampleLabel = "Ejemplo de JSON"
+  exampleLabel = "Ejemplo de JSON",
+  exampleIsReal
 }: {
   children: React.ReactNode;
   /** JSON de ejemplo (ya formateado) — el mismo que este nodo produce o espera recibir en la vida real. */
   example?: string;
   exampleLabel?: string;
+  /** true cuando `example` son datos reales capturados (no el ilustrativo) — se marca con un puntito para que se note sin ocupar espacio. */
+  exampleIsReal?: boolean;
 }) {
+  const [showExample, setShowExample] = useState(false);
   return (
-    <div className="rounded-lg bg-white/[.03] border border-white/[.08] mb-4 overflow-hidden">
-      <div className="flex gap-2.5 p-3 text-xs text-gray-300 leading-relaxed">
+    <div className="mb-4">
+      <div className="flex gap-2.5 p-3 rounded-lg bg-white/[.03] border border-white/[.08] text-xs text-gray-300 leading-relaxed">
         <Info className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
         <div>{children}</div>
       </div>
       {example && (
-        <div className="border-t border-white/[.08] p-3">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">{exampleLabel}</p>
-          <pre className="text-[11px] font-mono text-gray-400 bg-black/30 rounded-lg p-2.5 overflow-x-auto whitespace-pre-wrap break-all">
-            {example}
-          </pre>
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowExample(v => !v)}
+          className="mt-1.5 flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-gray-300"
+        >
+          <ChevronRight className={`w-3 h-3 transition-transform ${showExample ? "rotate-90" : ""}`} />
+          {exampleIsReal && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />}
+          {exampleLabel}
+        </button>
+      )}
+      {example && showExample && (
+        <pre className="mt-1.5 text-[10px] font-mono text-gray-500 bg-black/20 border border-white/[.06] rounded-lg p-2.5 overflow-x-auto whitespace-pre-wrap break-all">
+          {example}
+        </pre>
       )}
     </div>
   );
@@ -620,6 +656,30 @@ const EXAMPLE_JSON_REPLY_MEDIA = JSON.stringify(
   2
 );
 
+/** Select estándar de la app (mismo componente/estilo que Agentes de Texto) con su label — reutilizado por cualquier dropdown simple del editor. */
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  allowEmpty,
+  emptyLabel
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  allowEmpty?: boolean;
+  emptyLabel?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-[11px] font-medium text-gray-400 mb-1.5 uppercase tracking-wide">{label}</label>
+      <NoovaSelect value={value} onChange={onChange} options={options} allowEmpty={allowEmpty ?? false} emptyLabel={emptyLabel} />
+    </div>
+  );
+}
+
 /** Selector de línea de WhatsApp — reutilizado por cualquier disparador de WhatsApp (imagen, texto, y los que se agreguen después). */
 function ChannelSelectField({
   channels,
@@ -635,19 +695,14 @@ function ChannelSelectField({
 }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-gray-400 mb-1.5">Canal de WhatsApp</label>
-      <select
+      <SelectField
+        label="Canal de WhatsApp"
         value={value ?? ""}
-        onChange={e => onChange(e.target.value)}
-        className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white"
-      >
-        <option value="">Cualquier canal de la organización</option>
-        {channels.map(c => (
-          <option key={c.id} value={c.id}>
-            {c.friendly_name || "WhatsApp"} · {c.e164}
-          </option>
-        ))}
-      </select>
+        onChange={onChange}
+        allowEmpty
+        emptyLabel="Cualquier canal de la organización"
+        options={channels.map(c => ({ value: c.id, label: `${c.friendly_name || "WhatsApp"} · ${c.e164}` }))}
+      />
       {channels.length === 0 ? (
         <p className="text-[11px] text-gray-500 mt-2">
           Todavía no tienes líneas de WhatsApp conectadas.{" "}
@@ -845,14 +900,13 @@ function NodeConfigPanel({
           const kindLabel = mediaFilter === "image" ? "imágenes" : mediaFilter === "text" ? "mensajes de texto" : "imágenes o mensajes de texto";
           const example = capturedExample ? prettyPrint(capturedExample.request_body) ?? staticExample : staticExample;
           const exampleLabel = capturedExample
-            ? `JSON real capturado el ${new Date(capturedExample.created_at).toLocaleString("es-CO")}`
-            : "Ejemplo ilustrativo — todavía no hay datos reales";
+            ? `Ver JSON real · capturado ${new Date(capturedExample.created_at).toLocaleString("es-CO")}`
+            : "Ver ejemplo ilustrativo (sin datos reales aún)";
 
           return (
             <div>
-              <InfoNote example={example} exampleLabel={exampleLabel}>
+              <InfoNote example={example} exampleLabel={exampleLabel} exampleIsReal={Boolean(capturedExample)}>
                 Se activa cada vez que un cliente final envía {kindLabel} por WhatsApp.
-                {mediaFilter === "any" && !capturedExample && " El ejemplo de la derecha corresponde a una imagen — con texto cambia \"image\" por \"message\"."}
               </InfoNote>
               <TestListenButton
                 workflowId={workflowId}
@@ -860,18 +914,16 @@ function NodeConfigPanel({
                 onCaptured={setCapturedExample}
               />
               <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 mb-1.5">Se activa con</label>
-                  <select
-                    value={mediaFilter}
-                    onChange={e => onSetData({ mediaFilter: e.target.value as "image" | "text" | "any" })}
-                    className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white"
-                  >
-                    <option value="any">Cualquiera — imagen o texto</option>
-                    <option value="image">Solo imágenes</option>
-                    <option value="text">Solo texto</option>
-                  </select>
-                </div>
+                <SelectField
+                  label="Se activa con"
+                  value={mediaFilter}
+                  onChange={v => onSetData({ mediaFilter: v as "image" | "text" | "any" })}
+                  options={[
+                    { value: "any", label: "Cualquiera — imagen o texto" },
+                    { value: "image", label: "Solo imágenes" },
+                    { value: "text", label: "Solo texto" }
+                  ]}
+                />
                 <ChannelSelectField
                   channels={channels}
                   value={node.data.channelId}
@@ -886,12 +938,12 @@ function NodeConfigPanel({
         {type === "trigger.webhook" && (() => {
           const example = capturedExample ? prettyPrint(capturedExample.request_body) ?? EXAMPLE_JSON_REPLY_DEFAULT : EXAMPLE_JSON_REPLY_DEFAULT;
           const exampleLabel = capturedExample
-            ? `JSON real capturado el ${new Date(capturedExample.created_at).toLocaleString("es-CO")}`
-            : "Ejemplo ilustrativo — todavía no hay datos reales";
+            ? `Ver JSON real · capturado ${new Date(capturedExample.created_at).toLocaleString("es-CO")}`
+            : "Ver ejemplo ilustrativo (sin datos reales aún)";
 
           return (
             <div>
-              <InfoNote example={example} exampleLabel={exampleLabel}>
+              <InfoNote example={example} exampleLabel={exampleLabel} exampleIsReal={Boolean(capturedExample)}>
                 Genera una URL pública única. Cualquier sistema externo — n8n, tu CRM, un backend propio — puede hacer un{" "}
                 <code>POST</code> con JSON a esa URL para activar este workflow.
               </InfoNote>
@@ -911,21 +963,18 @@ function NodeConfigPanel({
 
         {type === "action.webhook" && (
           <div>
-            <InfoNote example={EXAMPLE_JSON_IMAGE_EVENT} exampleLabel="Ejemplo de JSON de salida (varía según el disparador conectado)">
+            <InfoNote example={EXAMPLE_JSON_IMAGE_EVENT} exampleLabel="Ver ejemplo de JSON de salida (varía según el disparador conectado)">
               Llama por <code>POST</code> a la URL de un conector configurado en Conectores — n8n, Zapier, o cualquier
               backend propio que reciba JSON. No está atado a ninguna app en particular.
             </InfoNote>
-            <label className="block text-xs font-semibold text-gray-400 mb-1.5">Conexión</label>
-            <select
+            <SelectField
+              label="Conexión"
               value={node.data.connectionId ?? ""}
-              onChange={e => onSetData({ connectionId: e.target.value })}
-              className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white"
-            >
-              <option value="">Sin elegir</option>
-              {connections.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+              onChange={v => onSetData({ connectionId: v })}
+              allowEmpty
+              emptyLabel="Sin elegir"
+              options={connections.map(c => ({ value: c.id, label: c.name }))}
+            />
             {connections.length === 0 ? (
               <p className="text-[11px] text-gray-500 mt-2">
                 Todavía no tienes conectores. <Link href="/dashboard/conectores" className="text-[#5b5bf6] hover:underline">Crea uno</Link>.
@@ -947,18 +996,16 @@ function NodeConfigPanel({
 
               {node.data.customRequest && (
                 <div className="space-y-4 mt-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-400 mb-1.5">Método</label>
-                    <select
-                      value={node.data.requestMethod ?? "POST"}
-                      onChange={e => onSetData({ requestMethod: e.target.value })}
-                      className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white"
-                    >
-                      <option value="POST">POST</option>
-                      <option value="PUT">PUT</option>
-                      <option value="PATCH">PATCH</option>
-                    </select>
-                  </div>
+                  <SelectField
+                    label="Método"
+                    value={node.data.requestMethod ?? "POST"}
+                    onChange={v => onSetData({ requestMethod: v })}
+                    options={[
+                      { value: "POST", label: "POST" },
+                      { value: "PUT", label: "PUT" },
+                      { value: "PATCH", label: "PATCH" }
+                    ]}
+                  />
                   <JsonTextareaField
                     label="Cuerpo (JSON)"
                     value={node.data.requestBodyTemplate}
@@ -993,23 +1040,21 @@ function NodeConfigPanel({
 
           return (
             <div>
-              <InfoNote example={example} exampleLabel="Ejemplo de JSON que espera recibir">
+              <InfoNote example={example} exampleLabel="Ver ejemplo de JSON que espera recibir">
                 Conéctalo a un nodo <strong className="text-white">Webhook entrante</strong>. Cuando llegue el JSON, Noova
                 envía el mensaje elegido por WhatsApp en el chat de esa conversación.
               </InfoNote>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 mb-1.5">Tipo de mensaje</label>
-                  <select
-                    value={messageType}
-                    onChange={e => onSetData({ messageType: e.target.value as "text" | "template" | "media" })}
-                    className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white"
-                  >
-                    <option value="text">Texto</option>
-                    <option value="template">Plantilla (HSM)</option>
-                    <option value="media">Imagen / Documento</option>
-                  </select>
-                </div>
+                <SelectField
+                  label="Tipo de mensaje"
+                  value={messageType}
+                  onChange={v => onSetData({ messageType: v as "text" | "template" | "media" })}
+                  options={[
+                    { value: "text", label: "Texto" },
+                    { value: "template", label: "Plantilla (HSM)" },
+                    { value: "media", label: "Imagen / Documento" }
+                  ]}
+                />
 
                 <JsonPathField
                   label="Campo con el ID de la conversación"
@@ -1030,17 +1075,14 @@ function NodeConfigPanel({
                 {messageType === "template" && (
                   <>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-400 mb-1.5">Plantilla</label>
-                      <select
+                      <SelectField
+                        label="Plantilla"
                         value={node.data.templateId ?? ""}
-                        onChange={e => onSetData({ templateId: e.target.value })}
-                        className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white"
-                      >
-                        <option value="">Sin elegir</option>
-                        {templates.map(t => (
-                          <option key={t.id} value={t.id}>{t.template_name} · {t.channel_label}</option>
-                        ))}
-                      </select>
+                        onChange={v => onSetData({ templateId: v })}
+                        allowEmpty
+                        emptyLabel="Sin elegir"
+                        options={templates.map(t => ({ value: t.id, label: `${t.template_name} · ${t.channel_label}` }))}
+                      />
                       {templates.length === 0 ? (
                         <p className="text-[11px] text-gray-500 mt-2">
                           Todavía no tienes plantillas aprobadas. <Link href="/dashboard/canales/whatsapp" className="text-[#5b5bf6] hover:underline">Créalas en Canales</Link>.
@@ -1062,17 +1104,15 @@ function NodeConfigPanel({
 
                 {messageType === "media" && (
                   <>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-400 mb-1.5">Tipo de archivo</label>
-                      <select
-                        value={node.data.mediaType ?? "image"}
-                        onChange={e => onSetData({ mediaType: e.target.value as "image" | "document" })}
-                        className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white"
-                      >
-                        <option value="image">Imagen</option>
-                        <option value="document">Documento</option>
-                      </select>
-                    </div>
+                    <SelectField
+                      label="Tipo de archivo"
+                      value={node.data.mediaType ?? "image"}
+                      onChange={v => onSetData({ mediaType: v as "image" | "document" })}
+                      options={[
+                        { value: "image", label: "Imagen" },
+                        { value: "document", label: "Documento" }
+                      ]}
+                    />
                     <JsonPathField
                       label="Campo con la URL del archivo"
                       value={node.data.mediaUrlPath}
