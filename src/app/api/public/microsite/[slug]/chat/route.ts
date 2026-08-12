@@ -6,7 +6,7 @@ import { resolveMicrositeAgentForChat } from "@/lib/microsite-server";
 import { resolveWidgetAgentForChat } from "@/lib/widget-server";
 import { isLandingWidgetPreview } from "@/lib/landing-widget";
 import { WEB_EMBED_CHANNEL } from "@/lib/widget-channel";
-import { geminiTextTemperature } from "@/lib/text-agent-form";
+import { geminiTextTemperature, isTextAgentHumanOnly } from "@/lib/text-agent-form";
 import { generateTextAgentReply } from "@/lib/text-agent-generate";
 import { persistChatTurn, persistUserMessageOnly } from "@/lib/text-conversation-persist";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
@@ -117,7 +117,9 @@ export async function POST(
   const { agent, companyContextText, userId } = resolved;
   const model = String(agent.llm_model || "gemini-2.5-flash");
   const db = textAgentsAdminClient();
+  const humanOnly = isTextAgentHumanOnly(agent);
 
+  let existingHandoff: "human" | "ai" | null = null;
   if (conversationId) {
     const { data: existing } = await db
       .from("text_agent_conversations")
@@ -125,43 +127,65 @@ export async function POST(
       .eq("id", conversationId)
       .eq("user_id", userId)
       .maybeSingle();
+    if (existing) {
+      existingHandoff = existing.handoff_mode === "human" ? "human" : "ai";
+    }
+  }
 
-    if (existing?.handoff_mode === "human") {
-      const persisted = await persistUserMessageOnly({
+  if (humanOnly || existingHandoff === "human") {
+    const visitorText = lastUser.content.trim();
+    const contactLabel = conversationId ? undefined : makeVisitorLabel();
+    const persisted = await persistUserMessageOnly({
+      db,
+      userId,
+      agentId: String(agent.id),
+      agentName: String(agent.name),
+      conversationId,
+      userMessage: visitorText,
+      llmModel: model,
+      channel,
+      contactLabel,
+      bumpUnread: true,
+      handoffMode: "human"
+    });
+
+    if (persisted.error) {
+      return NextResponse.json({ error: persisted.error }, { status: 500 });
+    }
+
+    const savedId = persisted.conversationId || conversationId;
+    const pushOrgId = await resolveOrgIdForUser(db, userId);
+    const firstHumanOnlyQueue = humanOnly && existingHandoff !== "human";
+
+    if (firstHumanOnlyQueue && savedId) {
+      const waChannel = pushOrgId ? await resolveOrgActiveWhatsAppChannel(db, pushOrgId) : null;
+      await escalateConversationToHuman({
         db,
         userId,
-        agentId: String(agent.id),
-        agentName: String(agent.name),
-        conversationId,
-        userMessage: lastUser.content.trim(),
-        llmModel: model,
+        conversationId: savedId,
+        organizationId: pushOrgId,
+        reason: "human_only",
         channel,
-        bumpUnread: true
+        agentName: String(agent.name),
+        contactLabel: contactLabel ?? null,
+        visitorMessage: visitorText,
+        notifyRules: agent.notify_rules,
+        outboundWhatsAppChannel: waChannel
       });
-
-      if (persisted.error) {
-        return NextResponse.json({ error: persisted.error }, { status: 500 });
-      }
-
-      // Mensaje nuevo en cola humana — avisa al equipo (no bloquea la respuesta al widget).
-      const pushOrgId = await resolveOrgIdForUser(db, userId);
-      if (pushOrgId) {
-        const preview = lastUser.content.trim();
-        void notifyPushForOrg(pushOrgId, {
-          title: "Nuevo mensaje",
-          body: preview.length > 120 ? `${preview.slice(0, 120)}…` : preview,
-          url: `/m/chats/${persisted.conversationId || conversationId}`,
-          tag: `msg-${persisted.conversationId || conversationId}`
-        });
-      }
-
-      // Sin reply: un asesor ya atiende; el visitante verá respuestas vía polling (rol human).
-      return NextResponse.json({
-        handoff: true,
-        handoff_mode: "human",
-        conversation_id: persisted.conversationId || conversationId
+    } else if (pushOrgId && savedId) {
+      void notifyPushForOrg(pushOrgId, {
+        title: "Nuevo mensaje",
+        body: visitorText.length > 120 ? `${visitorText.slice(0, 120)}…` : visitorText,
+        url: `/m/chats/${savedId}`,
+        tag: `msg-${savedId}`
       });
     }
+
+    return NextResponse.json({
+      handoff: true,
+      handoff_mode: "human",
+      conversation_id: savedId
+    });
   }
 
   const apiKey = getOriApiKey();

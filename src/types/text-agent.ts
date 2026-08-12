@@ -30,6 +30,8 @@ export interface TextAgentFormData {
   color?: string | null;
   notify_rules?: NotifyTeamRules;
   scheduling_rules?: SchedulingRules;
+  /** Si es true, el agente no responde con IA: los chats quedan en cola humana. */
+  human_only?: boolean;
 }
 
 export interface TextAgentRecord extends TextAgentFormData, TextAgentStats {

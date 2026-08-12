@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Save, Loader2, CheckCircle2, MessageSquare, Settings2,
-  History, Radio, BarChart3, FileCode2, CalendarClock, Bell
+  History, Radio, BarChart3, FileCode2, CalendarClock, Bell, Users
 } from "lucide-react";
 import { InfoBox } from "@/components/ui/InfoBox";
 import { btnPrimary, tabActive, tabIdle } from "@/lib/brand-ui";
@@ -71,7 +71,8 @@ function ConfigContent() {
     max_output_tokens: 1024,
     color: null,
     notify_rules: defaultNotifyTeamRules(),
-    scheduling_rules: defaultSchedulingRules()
+    scheduling_rules: defaultSchedulingRules(),
+    human_only: false
   });
 
   const [contexts, setContexts] = useState<CompanyContext[]>([]);
@@ -270,6 +271,24 @@ function ConfigContent() {
             <h2 className="text-sm font-semibold text-gray-300 mb-4">Configuración del agente</h2>
 
             <div className="space-y-4">
+              <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-white/[.08] bg-white/[.03] px-3 py-3">
+                <input
+                  type="checkbox"
+                  checked={form.human_only === true}
+                  onChange={e => setForm(f => ({ ...f, human_only: e.target.checked }))}
+                  className="mt-0.5 rounded border-white/20 w-4 h-4"
+                />
+                <span>
+                  <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-100">
+                    <Users className="w-3.5 h-3.5 text-[#67e8f9]" />
+                    Solo respuesta humana
+                  </span>
+                  <span className="block text-[10px] text-gray-500 leading-relaxed mt-1">
+                    La IA no responde. Los mensajes de WhatsApp, widget o Mi Link quedan en el inbox para que los atienda el equipo.
+                  </span>
+                </span>
+              </label>
+
               <Field label="Marca / contexto">
                 <NoovaSelect
                   value={form.company_context_id ?? ""}
@@ -441,6 +460,7 @@ function ConfigContent() {
           agentName={form.name}
           llmModel={form.llm_model}
           ready={!loading && !!agentId}
+          humanOnly={form.human_only === true}
           onConversationSaved={() => setRegistryRefresh(k => k + 1)}
         />
       )}

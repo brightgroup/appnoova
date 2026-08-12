@@ -70,6 +70,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Agente no encontrado" }, { status: 404 });
   }
 
+  if (agent.human_only === true) {
+    return NextResponse.json(
+      {
+        error:
+          "Este agente solo atiende con humanos. Las pruebas de IA están desactivadas."
+      },
+      { status: 400 }
+    );
+  }
+
   const billing = await checkBillingForUser(db, userId);
   if (!billing.allowed) {
     return NextResponse.json(

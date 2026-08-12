@@ -9,7 +9,7 @@ import {
   previousUserTextForCatalog,
   recentAssistantTextForCatalog
 } from "@/lib/data-tables/conversation-text";
-import { geminiTextTemperature } from "@/lib/text-agent-form";
+import { geminiTextTemperature, isTextAgentHumanOnly } from "@/lib/text-agent-form";
 import { generateTextAgentReply } from "@/lib/text-agent-generate";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import {
@@ -367,17 +367,22 @@ export async function processTwilioWhatsAppInbound(
   }
 
   // —— Modo humano —— (si nadie del equipo respondió a tiempo, se devuelve sola a la IA más abajo)
-  if (existing?.handoff_mode === "human" && !shouldAutoReturnToAi(existing.messages ?? [])) {
+  // Agentes human_only nunca vuelven a la IA: el timeout de auto-retorno no aplica.
+  const humanOnly = isTextAgentHumanOnly(agent);
+  if (humanOnly || (existing?.handoff_mode === "human" && !shouldAutoReturnToAi(existing.messages ?? []))) {
     const persisted = await persistUserMessageOnly({
       db,
       userId: channel.user_id,
       agentId: String(agent.id),
       agentName: String(agent.name),
-      conversationId: existing.id,
+      conversationId: existing?.id ?? null,
       userMessage: userDisplay,
       llmModel: model,
       channel: WHATSAPP_CONVERSATION_CHANNEL,
+      contactLabel: existing ? undefined : contactLabel,
       bumpUnread: true,
+      handoffMode: "human",
+      statusLabel: "Esperando asesor",
       ...persistOpts
     });
 
@@ -388,11 +393,28 @@ export async function processTwilioWhatsAppInbound(
       db,
       persisted.conversationId,
       channel.user_id,
-      existing.metadata,
+      existing?.metadata,
       metaPatch
     );
 
     await syncAndEnrichCrmFromInbound(db, channel, persisted.conversationId, inbound, nowIso, optedOutAfter);
+
+    const firstHumanOnlyQueue = humanOnly && existing?.handoff_mode !== "human";
+    if (firstHumanOnlyQueue) {
+      await escalateConversationToHuman({
+        db,
+        userId: channel.user_id,
+        conversationId: persisted.conversationId,
+        organizationId: orgId,
+        reason: "human_only",
+        channel: WHATSAPP_CONVERSATION_CHANNEL,
+        agentName: String(agent.name),
+        contactLabel: existing?.contact_label ? String(existing.contact_label) : contactLabel,
+        visitorMessage: userDisplay,
+        notifyRules: agent.notify_rules,
+        outboundWhatsAppChannel: channel
+      });
+    }
 
     if (orgId) {
       await recordUsageSafe({
@@ -417,13 +439,17 @@ export async function processTwilioWhatsAppInbound(
         `wa_human_media_${inbound.messageSid}`
       );
 
-      // Mensaje nuevo en cola humana — avisa al equipo (no bloquea la respuesta al webhook).
-      void notifyPushForOrg(orgId, {
-        title: contactLabel || "Nuevo mensaje",
-        body: userDisplay.length > 120 ? `${userDisplay.slice(0, 120)}…` : userDisplay,
-        url: `/m/chats/${persisted.conversationId}`,
-        tag: `msg-${persisted.conversationId}`
-      });
+      // En el primer turno de un agente human_only, escalateConversationToHuman
+      // ya avisó al equipo. En los siguientes (o handoff humano normal) sí hay
+      // push por mensaje nuevo.
+      if (!firstHumanOnlyQueue) {
+        void notifyPushForOrg(orgId, {
+          title: contactLabel || "Nuevo mensaje",
+          body: userDisplay.length > 120 ? `${userDisplay.slice(0, 120)}…` : userDisplay,
+          url: `/m/chats/${persisted.conversationId}`,
+          tag: `msg-${persisted.conversationId}`
+        });
+      }
     }
 
     return { ok: true };

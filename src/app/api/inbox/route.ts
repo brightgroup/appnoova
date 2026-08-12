@@ -144,6 +144,12 @@ export async function GET(req: NextRequest) {
 
     const record = toTextConversationRecord(data);
     const textNames = await loadOrgTextAgentNames(db, orgCtx.organizationId);
+    const { data: agentRow } = await db
+      .from("text_agents")
+      .select("human_only")
+      .eq("id", record.text_agent_id)
+      .maybeSingle();
+    const agentHumanOnly = agentRow?.human_only === true;
     const isWhatsApp = record.channel === WHATSAPP_CONVERSATION_CHANNEL;
     const waMeta = readWhatsAppMeta(record.metadata, record.messages);
     const mediaOwnerId = String(data.user_id ?? userId);
@@ -167,6 +173,7 @@ export async function GET(req: NextRequest) {
       agent_name: textNames[record.text_agent_id] ?? String(record.metadata.agent_name ?? "Agente"),
       assigned_to: record.assigned_to,
       handoff_mode: record.handoff_mode,
+      agent_human_only: agentHumanOnly,
       unread_count: record.unread_count,
       status: record.status,
       messages: messagesWithMedia,
@@ -287,6 +294,28 @@ export async function PATCH(req: NextRequest) {
   }
 
   const agentIds = await getOrgTextAgentIds(db, orgCtx.organizationId);
+
+  if (handoffMode === "ai") {
+    const { data: conv } = await db
+      .from("text_agent_conversations")
+      .select("text_agent_id")
+      .eq("id", conversationId)
+      .in("text_agent_id", agentIds)
+      .maybeSingle();
+    if (conv?.text_agent_id) {
+      const { data: agentRow } = await db
+        .from("text_agents")
+        .select("human_only")
+        .eq("id", conv.text_agent_id)
+        .maybeSingle();
+      if (agentRow?.human_only === true) {
+        return NextResponse.json(
+          { error: "Este agente solo atiende con humanos." },
+          { status: 400 }
+        );
+      }
+    }
+  }
   const { data, error } = await db
     .from("text_agent_conversations")
     .update({

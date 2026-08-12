@@ -19,8 +19,17 @@ export function normalizeTextAgentForm(raw: Partial<TextAgentFormData>): TextAge
     max_output_tokens: Number.isFinite(maxOutput) ? Math.min(8192, Math.max(50, maxOutput)) : 1024,
     color: raw.color ?? null,
     notify_rules: normalizeNotifyTeamRules(raw.notify_rules),
-    scheduling_rules: normalizeSchedulingRules(raw.scheduling_rules)
+    scheduling_rules: normalizeSchedulingRules(raw.scheduling_rules),
+    human_only: raw.human_only === true
   };
+}
+
+export function isTextAgentHumanOnly(raw: unknown): boolean {
+  return Boolean(
+    raw &&
+      typeof raw === "object" &&
+      (raw as { human_only?: unknown }).human_only === true
+  );
 }
 
 export function geminiTextTemperature(value: number): number {

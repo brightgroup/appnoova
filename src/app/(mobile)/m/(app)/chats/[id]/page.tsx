@@ -284,12 +284,14 @@ export default function MobileConversationPage() {
         {sendError ? <p className="form-error">{sendError}</p> : null}
         {canReply ? (
           <>
+            {detail.agent_human_only ? null : (
             <div className="composer-top">
               <button type="button" className="return-ia" onClick={() => assign("ai")} disabled={assigningTo !== null}>
                 <UndoIcon />
                 Devolver a la IA
               </button>
             </div>
+            )}
             <form className="composer-inner" onSubmit={handleSend}>
               <button type="button" className="ic-btn" aria-label="Adjuntar" disabled>
                 <AttachIcon />

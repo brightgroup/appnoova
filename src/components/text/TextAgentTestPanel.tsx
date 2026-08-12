@@ -16,6 +16,7 @@ interface TextAgentTestPanelProps {
   agentName: string;
   llmModel: string;
   ready: boolean;
+  humanOnly?: boolean;
   onConversationSaved?: () => void;
 }
 
@@ -30,6 +31,7 @@ export function TextAgentTestPanel({
   agentName,
   llmModel,
   ready,
+  humanOnly = false,
   onConversationSaved
 }: TextAgentTestPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -126,6 +128,17 @@ export function TextAgentTestPanel({
     return (
       <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
         Guarda el agente para poder probarlo en chat.
+      </div>
+    );
+  }
+
+  if (humanOnly) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-center px-6">
+        <p className="text-sm text-gray-400 max-w-md leading-relaxed">
+          Este agente está en modo <strong className="text-white">solo respuesta humana</strong>.
+          No genera respuestas automáticas. Los chats llegan al inbox para que los atienda el equipo.
+        </p>
       </div>
     );
   }

@@ -662,7 +662,8 @@ function InboxPageInner() {
                         <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
                       </button>
                       {assignOpen && (
-                        <NoovaListMenu className="absolute left-0 top-full z-20 mt-1.5 min-w-[200px] lg:right-0 lg:left-auto">
+                          <NoovaListMenu className="absolute left-0 top-full z-20 mt-1.5 min-w-[200px] lg:right-0 lg:left-auto">
+                          {!detail.agent_human_only && (
                           <NoovaListMenuItem
                             active={detail?.handoff_mode !== "human"}
                             onClick={() => assignConversation("ai")}
@@ -672,6 +673,7 @@ function InboxPageInner() {
                               Agente (IA)
                             </span>
                           </NoovaListMenuItem>
+                          )}
                           <NoovaListMenuItem
                             active={
                               detail?.handoff_mode === "human" &&

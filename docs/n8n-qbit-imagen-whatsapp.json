@@ -1,0 +1,95 @@
+{
+  "name": "Qbit — imagen WhatsApp (prueba Noova)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Qué hace este flujo\n\nNoova dispara este webhook cuando un cliente envía una **imagen por WhatsApp**.\n\n1. Recibes el JSON (análisis de la imagen ya hecho por Noova).\n2. Tú decides la respuesta (este Code es solo un ejemplo).\n3. Devuelves el texto a Noova por `callback_url` y Noova lo envía al mismo chat.\n\n### Cómo conectarlo\n\n1. Importa este workflow en tu n8n.\n2. Actívalo.\n3. Abre el nodo **Webhook — Noova** → copia la **URL de producción**.\n4. En Noova 360 → **Conectores** → conector **Webhook** → pega esa URL y guarda.\n5. Envía una imagen de prueba al WhatsApp del canal.\n\n### Headers que manda Noova\n\n- `Content-Type: application/json`\n- `X-Noova-Api-Key` — secreto del conector (puedes usar credencial Header Auth)\n- `X-Noova-Signature` — HMAC-SHA256 hex del body, con el mismo secreto\n\n### JSON que llega (imagen)\n\n```json\n{\n  \"event\": \"whatsapp.image_received\",\n  \"schema_version\": \"1\",\n  \"organization_id\": \"uuid\",\n  \"conversation_id\": \"uuid\",\n  \"correlation_id\": \"conversation_id:message_sid\",\n  \"contact\": { \"phone\": \"+57…\", \"label\": \"Nombre\" },\n  \"callback_url\": \"https://app.noova360.com/api/automations/inbound/TOKEN\",\n  \"image\": {\n    \"url\": \"https://…signed…\",\n    \"analysis\": \"Descripción de la imagen hecha por la IA de Noova\"\n  }\n}\n```\n\nSi el disparador fuera de texto, en vez de `image` llega:\n`\"message\": { \"text\": \"…\" }` y `event` = `whatsapp.text_received`.\n\n### JSON que debes devolver a callback_url\n\n```json\n{\n  \"conversation_id\": \"el mismo uuid que recibiste\",\n  \"reply\": { \"text\": \"Mensaje que verá el cliente en WhatsApp\" }\n}\n```\n\nCampos que **sí o sí** debes conservar en tus próximos flujos: `conversation_id`, `callback_url`, `image.analysis` (o `image.url` si necesitas el archivo).",
+        "height": 760,
+        "width": 420,
+        "color": 5
+      },
+      "id": "sticky-qbit-docs",
+      "name": "Cómo usarlo",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-980, -280]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "qbit-imagen-whatsapp",
+        "options": {}
+      },
+      "id": "webhook-noova-qbit",
+      "name": "Webhook — Noova",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-480, -80]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Payload real de Noova (imagen). En n8n el POST suele llegar en .body;\n// si tu instancia lo pone en la raíz, el fallback cubre ambos casos.\nconst item = $input.item.json;\nconst body = item.body && typeof item.body === \"object\" ? item.body : item;\n\nconst conversationId = body.conversation_id;\nconst callbackUrl = body.callback_url;\nconst event = body.event;\nconst contactPhone = body.contact && body.contact.phone;\nconst contactLabel = body.contact && body.contact.label;\nconst imageUrl = body.image && body.image.url;\nconst analysis = String((body.image && body.image.analysis) || (body.message && body.message.text) || \"\");\n\nif (!conversationId || !callbackUrl) {\n  throw new Error(\"Faltan conversation_id o callback_url. Revisa que el conector de Noova esté pegado a la URL de producción de este webhook.\");\n}\n\n// --- Tu lógica de negocio va aquí ---\n// Noova ya analizó la imagen: usa `analysis`. Solo descarga `imageUrl` si necesitas el archivo.\nconst hayDano = /da[ñn]o|roto|defecto|quebrado|rayado/i.test(analysis);\n\nconst replyText = hayDano\n  ? \"Lamentamos el inconveniente. Ya registramos tu caso y un asesor te contactará para gestionar la garantía.\"\n  : \"¡Gracias por la imagen! Ya la registramos. En un momento un asesor te comparte más detalles.\";\n\nreturn {\n  event,\n  conversation_id: conversationId,\n  callback_url: callbackUrl,\n  contact_phone: contactPhone || \"\",\n  contact_label: contactLabel || \"\",\n  image_url: imageUrl || \"\",\n  analysis,\n  reply_text: replyText\n};"
+      },
+      "id": "code-procesar-imagen",
+      "name": "Procesar imagen (tu lógica)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-240, -80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.callback_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"conversation_id\": \"{{ $json.conversation_id }}\",\n  \"reply\": {\n    \"text\": \"{{ $json.reply_text }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "http-responder-noova",
+      "name": "Responder a Noova",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [20, -80]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook — Noova": {
+      "main": [
+        [
+          {
+            "node": "Procesar imagen (tu lógica)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar imagen (tu lógica)": {
+      "main": [
+        [
+          {
+            "node": "Responder a Noova",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

@@ -10,7 +10,7 @@ export interface HandoffNotifyContext {
   agentName?: string | null;
   contactLabel?: string | null;
   visitorMessage?: string | null;
-  reason: "user_request" | "ai_escalation";
+  reason: "user_request" | "ai_escalation" | "human_only";
 }
 
 function escapeHtml(value: string): string {
@@ -32,9 +32,9 @@ export function channelLabel(channel: string): string {
 }
 
 function reasonLabel(reason: HandoffNotifyContext["reason"]): string {
-  return reason === "user_request"
-    ? "El cliente pidió hablar con un asesor"
-    : "El agente IA escaló la conversación";
+  if (reason === "user_request") return "El cliente pidió hablar con un asesor";
+  if (reason === "human_only") return "Este agente solo atiende con humanos";
+  return "El agente IA escaló la conversación";
 }
 
 async function getOrgTeamEmails(organizationId: string): Promise<{

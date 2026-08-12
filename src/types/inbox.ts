@@ -34,6 +34,8 @@ export interface InboxTextDetail {
   agent_name: string;
   assigned_to: string | null;
   handoff_mode: "ai" | "human";
+  /** El agente de esta conversación no responde con IA. */
+  agent_human_only?: boolean;
   unread_count: number;
   status: string;
   messages: TextChatMessage[];
