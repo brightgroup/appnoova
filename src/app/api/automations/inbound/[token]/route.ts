@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
-import { getConnectionByInboundToken } from "@/lib/automations/connections-db";
 import { getWebhookTriggerByToken } from "@/lib/automations/webhook-triggers-db";
 import { getWorkflowById } from "@/lib/automations/workflows-db";
 import { findSendMessageTargets, resolveJsonPath, resolveJsonPathArray, type SendMessageTarget } from "@/lib/automations/node-types";
@@ -21,7 +20,6 @@ type SendResult = { ok: boolean; error?: string; code?: string };
 interface DeliverParams {
   organizationId: string;
   conversationId: string;
-  connectionId?: string;
   workflowId?: string;
   /** JSON crudo recibido en este callback, tal como lo mandó el sistema externo — para inspección en la UI. */
   requestBody: string;
@@ -49,7 +47,6 @@ async function deliverReply(db: SupabaseClient, params: DeliverParams) {
 
   await db.from("automation_event_log").insert({
     organization_id: params.organizationId,
-    connection_id: params.connectionId ?? null,
     workflow_id: params.workflowId ?? null,
     conversation_id: params.conversationId,
     event_type: "automation.callback",
@@ -112,14 +109,12 @@ function buildSendForTarget(
 /**
  * Callback público (sin sesión) para el "webhook inverso": un sistema externo
  * (n8n u otro) llama esta URL para reenviar una respuesta al cliente final
- * por el mismo chat de WhatsApp. El token de la URL puede resolver a dos
- * cosas distintas:
- *  1. Una `automation_connection` (el callback_url que Noova ya incluye solo
- *     por conectar — modo sin fricción, siempre espera {conversation_id, reply:{text}}).
- *  2. Un nodo `trigger.webhook` dentro de un workflow (URL propia generada al
- *     agregar el nodo) — el mapeo de campos y el tipo de mensaje (texto,
- *     plantilla o media) los define cada nodo `action.send_whatsapp_message`
- *     conectado a ese disparador.
+ * por el mismo chat de WhatsApp. El token de la URL siempre resuelve a un
+ * nodo `trigger.webhook` dentro de un workflow (URL propia generada al
+ * agregar el nodo) — el mapeo de campos y el tipo de mensaje (texto,
+ * plantilla o media) los define cada nodo `action.send_whatsapp_message`
+ * conectado a ese disparador. Los conectores (`automation_connection`) solo
+ * manejan el lado de salida — no tienen callback propio.
  */
 export async function POST(req: NextRequest, ctx: Ctx) {
   const { token } = await ctx.params;
@@ -131,24 +126,6 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     body = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
-
-  const connection = await getConnectionByInboundToken(db, token);
-  if (connection) {
-    const conversationId = String((body as Record<string, unknown>)?.conversation_id ?? "").trim();
-    const replyText = String(
-      ((body as Record<string, unknown>)?.reply as Record<string, unknown> | undefined)?.text ?? ""
-    ).trim();
-    if (!conversationId || !replyText) {
-      return NextResponse.json({ error: "Faltan conversation_id o reply.text" }, { status: 400 });
-    }
-    return deliverReply(db, {
-      organizationId: connection.organizationId,
-      conversationId,
-      connectionId: connection.id,
-      requestBody: rawBody,
-      send: (db, ownerUserId, conversationId) => sendWhatsAppOutboundForConversation(db, ownerUserId, conversationId, replyText)
-    });
   }
 
   const trigger = await getWebhookTriggerByToken(db, token);

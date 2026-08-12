@@ -186,8 +186,8 @@ export function ExploreConnectorsModal({ open, onClose, onConnected }: ExploreCo
         ) : (
           <div className="flex-1 overflow-y-auto px-6 py-5">
             <p className="text-xs text-gray-400 mb-4 leading-relaxed">
-              Noova generará un secreto y una URL de callback para esta conexión — los verás en la
-              pantalla del conector apenas la crees.
+              Noova generará un secreto para firmar cada envío — lo verás en la pantalla del conector apenas
+              lo crees.
             </p>
 
             {formError && (
@@ -217,8 +217,8 @@ export function ExploreConnectorsModal({ open, onClose, onConnected }: ExploreCo
                   className={`${modalInput} font-mono`}
                 />
                 <p className="text-[11px] text-gray-500 mt-1.5">
-                  La URL del disparador que ya tengas armado en tu flujo. La firma secreta y la URL de
-                  callback te las damos nosotros al crear la conexión.
+                  La URL del disparador que ya tengas armado en tu flujo. La firma secreta te la damos
+                  nosotros al crear la conexión.
                 </p>
               </div>
             </div>

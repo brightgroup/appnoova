@@ -22,13 +22,12 @@ import { Badge } from "@/components/ui/Badge";
 import { AutomationEventsTable, type AutomationEventRow } from "@/components/automations/AutomationEventsTable";
 import type { AutomationConnectionRecord } from "@/lib/automations/connections-db";
 
-type Tab = "vista-general" | "autenticacion" | "registros" | "webhooks";
+type Tab = "vista-general" | "autenticacion" | "registros";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "vista-general", label: "Vista general" },
   { id: "autenticacion", label: "Autenticación" },
-  { id: "registros", label: "Registros" },
-  { id: "webhooks", label: "Webhooks" }
+  { id: "registros", label: "Registros" }
 ];
 
 function parseTab(value: string | undefined): Tab {
@@ -58,8 +57,8 @@ export function ConnectorDetailView({
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [savingField, setSavingField] = useState<"webhook" | "callback" | null>(null);
-  const [urlError, setUrlError] = useState<{ webhook?: string; callback?: string }>({});
+  const [savingWebhookUrl, setSavingWebhookUrl] = useState(false);
+  const [webhookUrlError, setWebhookUrlError] = useState("");
 
   const setTab = useCallback(
     (tab: Tab) => {
@@ -126,34 +125,17 @@ export function ConnectorDetailView({
   }
 
   async function saveWebhookUrl(webhookUrl: string) {
-    setSavingField("webhook");
-    setUrlError(prev => ({ ...prev, webhook: undefined }));
+    setSavingWebhookUrl(true);
+    setWebhookUrlError("");
     setTestResult(null);
     const res = await authFetch(`/api/automations/connections/${connectionId}`, {
       method: "PATCH",
       body: JSON.stringify({ webhookUrl })
     });
     const json = await res.json();
-    setSavingField(null);
+    setSavingWebhookUrl(false);
     if (!res.ok) {
-      setUrlError(prev => ({ ...prev, webhook: json.error ?? "No se pudo guardar la URL" }));
-      return false;
-    }
-    setConnection(json.connection);
-    return true;
-  }
-
-  async function saveInboundPath(inboundPath: string) {
-    setSavingField("callback");
-    setUrlError(prev => ({ ...prev, callback: undefined }));
-    const res = await authFetch(`/api/automations/connections/${connectionId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ inboundPath })
-    });
-    const json = await res.json();
-    setSavingField(null);
-    if (!res.ok) {
-      setUrlError(prev => ({ ...prev, callback: json.error ?? "No se pudo guardar el path" }));
+      setWebhookUrlError(json.error ?? "No se pudo guardar la URL");
       return false;
     }
     setConnection(json.connection);
@@ -199,10 +181,6 @@ export function ConnectorDetailView({
       </div>
     );
   }
-
-  const callbackBaseUrl =
-    connection.callbackBaseUrl ||
-    `${typeof window !== "undefined" ? window.location.origin : ""}/api/automations/inbound`;
 
   return (
     <div className="flex-1 flex flex-col bg-noova-main text-gray-100 min-h-0 overflow-hidden">
@@ -275,7 +253,15 @@ export function ConnectorDetailView({
       )}
 
       <div className="flex-1 overflow-y-auto p-6 min-h-0">
-        {activeTab === "vista-general" && <VistaGeneralTab connection={connection} events={events} />}
+        {activeTab === "vista-general" && (
+          <VistaGeneralTab
+            connection={connection}
+            events={events}
+            saving={savingWebhookUrl}
+            error={webhookUrlError}
+            onSaveWebhookUrl={saveWebhookUrl}
+          />
+        )}
         {activeTab === "autenticacion" && (
           <AutenticacionTab
             secret={secret}
@@ -289,19 +275,6 @@ export function ConnectorDetailView({
           />
         )}
         {activeTab === "registros" && <AutomationEventsTable events={events} />}
-        {activeTab === "webhooks" && (
-          <WebhooksTab
-            webhookUrl={connection.webhookUrl}
-            callbackBaseUrl={callbackBaseUrl}
-            inboundPath={connection.inboundToken}
-            copiedField={copiedField}
-            savingField={savingField}
-            urlError={urlError}
-            onCopy={copyText}
-            onSaveWebhookUrl={saveWebhookUrl}
-            onSaveInboundPath={saveInboundPath}
-          />
-        )}
       </div>
     </div>
   );
@@ -315,11 +288,24 @@ function StatusBadge({ status }: { status: AutomationConnectionRecord["status"] 
 
 function VistaGeneralTab({
   connection,
-  events
+  events,
+  saving,
+  error,
+  onSaveWebhookUrl
 }: {
   connection: AutomationConnectionRecord;
   events: AutomationEventRow[];
+  saving: boolean;
+  error: string;
+  onSaveWebhookUrl: (url: string) => Promise<boolean>;
 }) {
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  async function copyText(field: string, value: string) {
+    await navigator.clipboard.writeText(value);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(prev => (prev === field ? null : prev)), 1800);
+  }
+
   const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
   const recent = events.filter(e => new Date(e.created_at).getTime() >= dayAgo);
   const sent = recent.filter(e => e.status === "sent" || e.status === "responded" || e.status === "error");
@@ -329,6 +315,21 @@ function VistaGeneralTab({
 
   return (
     <div className="max-w-3xl space-y-5">
+      <div>
+        <h4 className="text-sm font-semibold text-white mb-1">URL del webhook</h4>
+        <p className="text-xs text-gray-500 mb-3">Noova envía cada evento aquí — este conector solo maneja la salida.</p>
+        <EditableUrlField
+          value={connection.webhookUrl}
+          field="webhook"
+          placeholder="https://tu-instancia.n8n.cloud/webhook/…"
+          copiedField={copiedField}
+          saving={saving}
+          error={error}
+          onCopy={copyText}
+          onSave={onSaveWebhookUrl}
+        />
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-xl border border-white/[.08] bg-white/[.02] p-5">
           <p className="text-xs text-gray-400 mb-1">Envíos · últimas 24 h</p>
@@ -436,136 +437,6 @@ function AutenticacionTab({
   );
 }
 
-
-function WebhooksTab({
-  webhookUrl,
-  callbackBaseUrl,
-  inboundPath,
-  copiedField,
-  savingField,
-  urlError,
-  onCopy,
-  onSaveWebhookUrl,
-  onSaveInboundPath
-}: {
-  webhookUrl: string;
-  callbackBaseUrl: string;
-  inboundPath: string;
-  copiedField: string | null;
-  savingField: "webhook" | "callback" | null;
-  urlError: { webhook?: string; callback?: string };
-  onCopy: (field: string, value: string) => void;
-  onSaveWebhookUrl: (url: string) => Promise<boolean>;
-  onSaveInboundPath: (path: string) => Promise<boolean>;
-}) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl">
-      <div>
-        <h4 className="text-sm font-semibold text-white mb-1">Salida — Noova envía a tu flujo</h4>
-        <p className="text-xs text-gray-500 mb-3">
-          Pega aquí la URL de producción del webhook de n8n (u otro flujo). Si n8n te da otra al activarlo, cámbiala.
-        </p>
-        <EditableUrlField
-          value={webhookUrl}
-          field="webhook"
-          placeholder="https://tu-instancia.n8n.cloud/webhook/…"
-          copiedField={copiedField}
-          saving={savingField === "webhook"}
-          error={urlError.webhook ?? ""}
-          onCopy={onCopy}
-          onSave={onSaveWebhookUrl}
-        />
-      </div>
-      <div>
-        <h4 className="text-sm font-semibold text-white mb-1 flex items-center gap-1.5">
-          <Webhook className="w-3.5 h-3.5 text-gray-400" /> Entrada — tu flujo responde a Noova
-        </h4>
-        <p className="text-xs text-gray-500 mb-3">
-          El dominio es fijo. Solo cambias el nombre del path, como en n8n.
-        </p>
-        <InboundPathField
-          baseUrl={callbackBaseUrl}
-          path={inboundPath}
-          copiedField={copiedField}
-          saving={savingField === "callback"}
-          error={urlError.callback ?? ""}
-          onCopy={onCopy}
-          onSave={onSaveInboundPath}
-        />
-        <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
-          Cuando tu flujo llame a esta URL con la respuesta, Noova la envía por WhatsApp al cliente final —
-          en el mismo chat.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function InboundPathField({
-  baseUrl,
-  path,
-  copiedField,
-  saving,
-  error,
-  onCopy,
-  onSave
-}: {
-  baseUrl: string;
-  path: string;
-  copiedField: string | null;
-  saving: boolean;
-  error: string;
-  onCopy: (field: string, value: string) => void;
-  onSave: (path: string) => Promise<boolean>;
-}) {
-  const [draft, setDraft] = useState(path);
-  const dirty = draft.trim() !== path;
-  const fullUrl = `${baseUrl.replace(/\/$/, "")}/${draft.trim() || path}`;
-
-  useEffect(() => {
-    setDraft(path);
-  }, [path]);
-
-  return (
-    <div>
-      <div className="flex gap-2">
-        <div className="flex min-w-0 flex-1 overflow-hidden rounded-lg border border-white/[.12] bg-white/[.04]">
-          <span className="max-w-[55%] shrink-0 truncate border-r border-white/[.08] bg-black/20 px-3 py-2 text-xs font-mono text-gray-500">
-            {baseUrl.replace(/\/$/, "")}/
-          </span>
-          <input
-            type="text"
-            value={draft}
-            onChange={e => setDraft(e.target.value.replace(/^\//, ""))}
-            placeholder="qbit-imagen"
-            spellCheck={false}
-            className="min-w-0 flex-1 bg-transparent px-3 py-2 text-xs font-mono text-white outline-none"
-          />
-        </div>
-        <button
-          type="button"
-          onClick={() => onCopy("callback", fullUrl)}
-          className="shrink-0 p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/[.08] border border-white/[.08]"
-        >
-          <Copy className="w-4 h-4" />
-        </button>
-      </div>
-      {dirty && (
-        <button
-          type="button"
-          onClick={() => void onSave(draft.trim())}
-          disabled={saving || !draft.trim()}
-          className={`${btnPrimarySm} mt-2`}
-        >
-          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-          Guardar path
-        </button>
-      )}
-      {copiedField === "callback" && <p className="text-[11px] text-emerald-400 mt-1.5">Copiado.</p>}
-      {error && <p className="text-[11px] text-red-400 mt-1.5">{error}</p>}
-    </div>
-  );
-}
 
 function EditableUrlField({
   value,

@@ -13,11 +13,6 @@ export function getWebhookBaseUrl(): string {
   return getAppBaseUrl();
 }
 
-/** Prefijo fijo de la URL de entrada de un conector (el path lo elige el usuario). */
-export function automationInboundBaseUrl(): string {
-  return `${getWebhookBaseUrl()}/api/automations/inbound`;
-}
-
 export function twilioVoiceWebhookUrl(): string {
   return `${getAppBaseUrl()}/api/telephony/webhooks/twilio/voice`;
 }

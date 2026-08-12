@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHmac } from "crypto";
-import { automationInboundBaseUrl } from "@/lib/telephony/app-url";
 import { signedUrlForPath } from "@/lib/whatsapp/media-storage";
 import { getConnectionSecretsById, markConnectionError } from "@/lib/automations/connections-db";
 import { listActiveWorkflowsForOrg } from "@/lib/automations/workflows-db";
@@ -131,7 +130,6 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
 
   const isImage = params.mediaType === "image";
   const eventType = params.eventType;
-  const callbackUrl = `${automationInboundBaseUrl()}/${connection.inboundToken}`;
 
   let method = "POST";
   let extraHeaders: Record<string, string> = {};
@@ -147,8 +145,7 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
       contact_phone: params.contactPhone,
       contact_label: params.contactLabel ?? "",
       message_text: params.analysisText,
-      image_url: params.imageUrl ?? "",
-      callback_url: callbackUrl
+      image_url: params.imageUrl ?? ""
     };
 
     const substitutedBody = substituteTokens(params.requestBodyTemplate, tokens);
@@ -188,8 +185,7 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
       organization_id: params.organizationId,
       conversation_id: params.conversationId,
       correlation_id: `${params.conversationId}:${params.messageSid}`,
-      contact: { phone: params.contactPhone, label: params.contactLabel },
-      callback_url: callbackUrl
+      contact: { phone: params.contactPhone, label: params.contactLabel }
     };
     if (isImage) {
       payload.image = { url: params.imageUrl, analysis: params.analysisText };

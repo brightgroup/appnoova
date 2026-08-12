@@ -8,9 +8,6 @@ export interface AutomationConnectionRecord {
   providerKey: "webhook_generic";
   name: string;
   webhookUrl: string;
-  inboundToken: string;
-  /** Prefijo fijo de la URL de entrada — el usuario solo edita el path. */
-  callbackBaseUrl?: string;
   status: "active" | "disconnected" | "error";
   lastError: string | null;
   lastTestedAt: string | null;
@@ -30,7 +27,6 @@ interface AutomationConnectionRow {
   name: string;
   webhook_url: string;
   secret_enc: string;
-  inbound_token: string;
   status: string;
   last_error: string | null;
   last_tested_at: string | null;
@@ -45,7 +41,6 @@ function toPublicRecord(row: AutomationConnectionRow): AutomationConnectionRecor
     providerKey: row.provider_key as AutomationConnectionRecord["providerKey"],
     name: row.name,
     webhookUrl: row.webhook_url,
-    inboundToken: row.inbound_token,
     status: row.status as AutomationConnectionRecord["status"],
     lastError: row.last_error,
     lastTestedAt: row.last_tested_at,
@@ -108,21 +103,6 @@ export async function getConnectionSecretsById(
     console.error("[automations] no se pudo descifrar el secreto de la conexión:", err);
     return null;
   }
-}
-
-/** Resuelve la conexión que llama al callback entrante a partir del token de la URL. */
-export async function getConnectionByInboundToken(
-  db: SupabaseClient,
-  inboundToken: string
-): Promise<AutomationConnectionRecord | null> {
-  const { data } = await db
-    .from("automation_connections")
-    .select("*")
-    .eq("inbound_token", inboundToken)
-    .neq("status", "disconnected")
-    .maybeSingle();
-
-  return data ? toPublicRecord(data as AutomationConnectionRow) : null;
 }
 
 export interface CreateConnectionInput {
@@ -203,15 +183,6 @@ export async function updateConnectionWebhookUrl(
   webhookUrl: string
 ): Promise<AutomationConnectionRecord | null> {
   return updateConnectionFields(db, organizationId, connectionId, { webhook_url: webhookUrl });
-}
-
-export async function updateConnectionInboundToken(
-  db: SupabaseClient,
-  organizationId: string,
-  connectionId: string,
-  inboundToken: string
-): Promise<AutomationConnectionRecord | null> {
-  return updateConnectionFields(db, organizationId, connectionId, { inbound_token: inboundToken });
 }
 
 async function updateConnectionFields(

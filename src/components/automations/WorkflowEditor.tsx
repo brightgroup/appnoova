@@ -616,8 +616,7 @@ const EXAMPLE_JSON_IMAGE_EVENT = JSON.stringify(
     event: "whatsapp.image_received",
     conversation_id: "5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02",
     contact: { phone: "+573001234567", label: "Juan Pérez" },
-    image: { url: "https://.../foto.jpg", analysis: "Producto con empaque dañado" },
-    callback_url: "https://app.noova360.com/api/automations/inbound/<token>"
+    image: { url: "https://.../foto.jpg", analysis: "Producto con empaque dañado" }
   },
   null,
   2
@@ -628,8 +627,7 @@ const EXAMPLE_JSON_TEXT_EVENT = JSON.stringify(
     event: "whatsapp.text_received",
     conversation_id: "5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02",
     contact: { phone: "+573001234567", label: "Juan Pérez" },
-    message: { text: "¿Tienen disponible la talla M?" },
-    callback_url: "https://app.noova360.com/api/automations/inbound/<token>"
+    message: { text: "¿Tienen disponible la talla M?" }
   },
   null,
   2
@@ -981,8 +979,9 @@ function NodeConfigPanel({
               </p>
             ) : (
               <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
-                El JSON del disparador se envía a la URL de esta conexión — ya incluye una URL de callback lista para
-                usar, sin necesidad de armar el regreso manualmente.
+                El JSON del disparador se envía a la URL de esta conexión. Si necesitas que el sistema externo
+                responda de vuelta, agrega un nodo <strong className="text-gray-300">Webhook entrante</strong> aparte
+                — cada conexión solo maneja la salida.
               </p>
             )}
 
@@ -1023,7 +1022,7 @@ function NodeConfigPanel({
                   <p className="text-[11px] text-gray-500 leading-relaxed">
                     Variables disponibles — deben ir dentro de las comillas del JSON: <code>{"{{conversation_id}}"}</code>,{" "}
                     <code>{"{{contact_phone}}"}</code>, <code>{"{{contact_label}}"}</code>, <code>{"{{message_text}}"}</code>,{" "}
-                    <code>{"{{image_url}}"}</code>, <code>{"{{callback_url}}"}</code>. La firma HMAC y{" "}
+                    <code>{"{{image_url}}"}</code>. La firma HMAC y{" "}
                     <code>Content-Type</code> se agregan siempre, sin importar los headers que pongas aquí.
                   </p>
                 </div>
