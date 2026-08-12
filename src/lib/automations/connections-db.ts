@@ -9,6 +9,8 @@ export interface AutomationConnectionRecord {
   name: string;
   webhookUrl: string;
   inboundToken: string;
+  /** Prefijo fijo de la URL de entrada — el usuario solo edita el path. */
+  callbackBaseUrl?: string;
   status: "active" | "disconnected" | "error";
   lastError: string | null;
   lastTestedAt: string | null;
@@ -192,6 +194,48 @@ export async function markConnectionTested(
       updated_at: new Date().toISOString()
     })
     .eq("id", connectionId);
+}
+
+export async function updateConnectionWebhookUrl(
+  db: SupabaseClient,
+  organizationId: string,
+  connectionId: string,
+  webhookUrl: string
+): Promise<AutomationConnectionRecord | null> {
+  return updateConnectionFields(db, organizationId, connectionId, { webhook_url: webhookUrl });
+}
+
+export async function updateConnectionInboundToken(
+  db: SupabaseClient,
+  organizationId: string,
+  connectionId: string,
+  inboundToken: string
+): Promise<AutomationConnectionRecord | null> {
+  return updateConnectionFields(db, organizationId, connectionId, { inbound_token: inboundToken });
+}
+
+async function updateConnectionFields(
+  db: SupabaseClient,
+  organizationId: string,
+  connectionId: string,
+  patch: Record<string, unknown>
+): Promise<AutomationConnectionRecord | null> {
+  const { data, error } = await db
+    .from("automation_connections")
+    .update({
+      ...patch,
+      last_error: null,
+      status: "active",
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", connectionId)
+    .eq("organization_id", organizationId)
+    .neq("status", "disconnected")
+    .select("*")
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data ? toPublicRecord(data as AutomationConnectionRow) : null;
 }
 
 export async function disconnectConnection(

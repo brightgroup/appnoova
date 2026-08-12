@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHmac } from "crypto";
-import { getWebhookBaseUrl } from "@/lib/telephony/app-url";
+import { automationInboundBaseUrl } from "@/lib/telephony/app-url";
 import { signedUrlForPath } from "@/lib/whatsapp/media-storage";
 import { getConnectionSecretsById, markConnectionError } from "@/lib/automations/connections-db";
 import { listActiveWorkflowsForOrg } from "@/lib/automations/workflows-db";
@@ -131,7 +131,7 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
 
   const isImage = params.mediaType === "image";
   const eventType = params.eventType;
-  const callbackUrl = `${getWebhookBaseUrl()}/api/automations/inbound/${connection.inboundToken}`;
+  const callbackUrl = `${automationInboundBaseUrl()}/${connection.inboundToken}`;
 
   let method = "POST";
   let extraHeaders: Record<string, string> = {};

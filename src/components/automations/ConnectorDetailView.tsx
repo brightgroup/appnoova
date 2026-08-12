@@ -12,11 +12,12 @@ import {
   Unplug,
   CheckCircle2,
   AlertTriangle,
-  Webhook
+  Webhook,
+  Save
 } from "lucide-react";
 import Link from "next/link";
 import { authFetch } from "@/lib/telephony-api";
-import { tabActive, tabIdle } from "@/lib/brand-ui";
+import { tabActive, tabIdle, btnPrimarySm, modalInput } from "@/lib/brand-ui";
 import { Badge } from "@/components/ui/Badge";
 import { AutomationEventsTable, type AutomationEventRow } from "@/components/automations/AutomationEventsTable";
 import type { AutomationConnectionRecord } from "@/lib/automations/connections-db";
@@ -57,6 +58,8 @@ export function ConnectorDetailView({
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [savingField, setSavingField] = useState<"webhook" | "callback" | null>(null);
+  const [urlError, setUrlError] = useState<{ webhook?: string; callback?: string }>({});
 
   const setTab = useCallback(
     (tab: Tab) => {
@@ -122,6 +125,41 @@ export function ConnectorDetailView({
     }
   }
 
+  async function saveWebhookUrl(webhookUrl: string) {
+    setSavingField("webhook");
+    setUrlError(prev => ({ ...prev, webhook: undefined }));
+    setTestResult(null);
+    const res = await authFetch(`/api/automations/connections/${connectionId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ webhookUrl })
+    });
+    const json = await res.json();
+    setSavingField(null);
+    if (!res.ok) {
+      setUrlError(prev => ({ ...prev, webhook: json.error ?? "No se pudo guardar la URL" }));
+      return false;
+    }
+    setConnection(json.connection);
+    return true;
+  }
+
+  async function saveInboundPath(inboundPath: string) {
+    setSavingField("callback");
+    setUrlError(prev => ({ ...prev, callback: undefined }));
+    const res = await authFetch(`/api/automations/connections/${connectionId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ inboundPath })
+    });
+    const json = await res.json();
+    setSavingField(null);
+    if (!res.ok) {
+      setUrlError(prev => ({ ...prev, callback: json.error ?? "No se pudo guardar el path" }));
+      return false;
+    }
+    setConnection(json.connection);
+    return true;
+  }
+
   async function testConnection() {
     setTesting(true);
     setTestResult(null);
@@ -162,7 +200,9 @@ export function ConnectorDetailView({
     );
   }
 
-  const callbackUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/api/automations/inbound/${connection.inboundToken}`;
+  const callbackBaseUrl =
+    connection.callbackBaseUrl ||
+    `${typeof window !== "undefined" ? window.location.origin : ""}/api/automations/inbound`;
 
   return (
     <div className="flex-1 flex flex-col bg-noova-main text-gray-100 min-h-0 overflow-hidden">
@@ -252,9 +292,14 @@ export function ConnectorDetailView({
         {activeTab === "webhooks" && (
           <WebhooksTab
             webhookUrl={connection.webhookUrl}
-            callbackUrl={callbackUrl}
+            callbackBaseUrl={callbackBaseUrl}
+            inboundPath={connection.inboundToken}
             copiedField={copiedField}
+            savingField={savingField}
+            urlError={urlError}
             onCopy={copyText}
+            onSaveWebhookUrl={saveWebhookUrl}
+            onSaveInboundPath={saveInboundPath}
           />
         )}
       </div>
@@ -394,30 +439,59 @@ function AutenticacionTab({
 
 function WebhooksTab({
   webhookUrl,
-  callbackUrl,
+  callbackBaseUrl,
+  inboundPath,
   copiedField,
-  onCopy
+  savingField,
+  urlError,
+  onCopy,
+  onSaveWebhookUrl,
+  onSaveInboundPath
 }: {
   webhookUrl: string;
-  callbackUrl: string;
+  callbackBaseUrl: string;
+  inboundPath: string;
   copiedField: string | null;
+  savingField: "webhook" | "callback" | null;
+  urlError: { webhook?: string; callback?: string };
   onCopy: (field: string, value: string) => void;
+  onSaveWebhookUrl: (url: string) => Promise<boolean>;
+  onSaveInboundPath: (path: string) => Promise<boolean>;
 }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl">
       <div>
         <h4 className="text-sm font-semibold text-white mb-1">Salida — Noova envía a tu flujo</h4>
-        <p className="text-xs text-gray-500 mb-3">La URL del webhook que dispara tu flujo.</p>
-        <UrlField value={webhookUrl} field="webhook" copiedField={copiedField} onCopy={onCopy} />
+        <p className="text-xs text-gray-500 mb-3">
+          Pega aquí la URL de producción del webhook de n8n (u otro flujo). Si n8n te da otra al activarlo, cámbiala.
+        </p>
+        <EditableUrlField
+          value={webhookUrl}
+          field="webhook"
+          placeholder="https://tu-instancia.n8n.cloud/webhook/…"
+          copiedField={copiedField}
+          saving={savingField === "webhook"}
+          error={urlError.webhook ?? ""}
+          onCopy={onCopy}
+          onSave={onSaveWebhookUrl}
+        />
       </div>
       <div>
         <h4 className="text-sm font-semibold text-white mb-1 flex items-center gap-1.5">
           <Webhook className="w-3.5 h-3.5 text-gray-400" /> Entrada — tu flujo responde a Noova
         </h4>
         <p className="text-xs text-gray-500 mb-3">
-          Generada por Noova. Pégala como último paso HTTP Request de tu flujo.
+          El dominio es fijo. Solo cambias el nombre del path, como en n8n.
         </p>
-        <UrlField value={callbackUrl} field="callback" copiedField={copiedField} onCopy={onCopy} />
+        <InboundPathField
+          baseUrl={callbackBaseUrl}
+          path={inboundPath}
+          copiedField={copiedField}
+          saving={savingField === "callback"}
+          error={urlError.callback ?? ""}
+          onCopy={onCopy}
+          onSave={onSaveInboundPath}
+        />
         <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
           Cuando tu flujo llame a esta URL con la respuesta, Noova la envía por WhatsApp al cliente final —
           en el mismo chat.
@@ -427,32 +501,129 @@ function WebhooksTab({
   );
 }
 
-function UrlField({
-  value,
-  field,
+function InboundPathField({
+  baseUrl,
+  path,
   copiedField,
-  onCopy
+  saving,
+  error,
+  onCopy,
+  onSave
 }: {
-  value: string;
-  field: string;
+  baseUrl: string;
+  path: string;
   copiedField: string | null;
+  saving: boolean;
+  error: string;
   onCopy: (field: string, value: string) => void;
+  onSave: (path: string) => Promise<boolean>;
 }) {
+  const [draft, setDraft] = useState(path);
+  const dirty = draft.trim() !== path;
+  const fullUrl = `${baseUrl.replace(/\/$/, "")}/${draft.trim() || path}`;
+
+  useEffect(() => {
+    setDraft(path);
+  }, [path]);
+
   return (
     <div>
       <div className="flex gap-2">
-        <div className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-black/20 border border-white/[.08] text-xs font-mono text-white truncate">
-          {value}
+        <div className="flex min-w-0 flex-1 overflow-hidden rounded-lg border border-white/[.12] bg-white/[.04]">
+          <span className="max-w-[55%] shrink-0 truncate border-r border-white/[.08] bg-black/20 px-3 py-2 text-xs font-mono text-gray-500">
+            {baseUrl.replace(/\/$/, "")}/
+          </span>
+          <input
+            type="text"
+            value={draft}
+            onChange={e => setDraft(e.target.value.replace(/^\//, ""))}
+            placeholder="qbit-imagen"
+            spellCheck={false}
+            className="min-w-0 flex-1 bg-transparent px-3 py-2 text-xs font-mono text-white outline-none"
+          />
         </div>
         <button
           type="button"
-          onClick={() => onCopy(field, value)}
+          onClick={() => onCopy("callback", fullUrl)}
           className="shrink-0 p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/[.08] border border-white/[.08]"
         >
           <Copy className="w-4 h-4" />
         </button>
       </div>
+      {dirty && (
+        <button
+          type="button"
+          onClick={() => void onSave(draft.trim())}
+          disabled={saving || !draft.trim()}
+          className={`${btnPrimarySm} mt-2`}
+        >
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+          Guardar path
+        </button>
+      )}
+      {copiedField === "callback" && <p className="text-[11px] text-emerald-400 mt-1.5">Copiado.</p>}
+      {error && <p className="text-[11px] text-red-400 mt-1.5">{error}</p>}
+    </div>
+  );
+}
+
+function EditableUrlField({
+  value,
+  field,
+  placeholder,
+  copiedField,
+  saving,
+  error,
+  onCopy,
+  onSave
+}: {
+  value: string;
+  field: string;
+  placeholder?: string;
+  copiedField: string | null;
+  saving: boolean;
+  error: string;
+  onCopy: (field: string, value: string) => void;
+  onSave: (url: string) => Promise<boolean>;
+}) {
+  const [draft, setDraft] = useState(value);
+  const dirty = draft.trim() !== value;
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  return (
+    <div>
+      <div className="flex gap-2">
+        <input
+          type="url"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          placeholder={placeholder}
+          className={`${modalInput} font-mono text-xs min-w-0 flex-1`}
+        />
+        <button
+          type="button"
+          onClick={() => onCopy(field, draft.trim() || value)}
+          className="shrink-0 p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/[.08] border border-white/[.08]"
+        >
+          <Copy className="w-4 h-4" />
+        </button>
+      </div>
+      {dirty && (
+        <button
+          type="button"
+          onClick={() => void onSave(draft.trim())}
+          disabled={saving || !draft.trim()}
+          className={`${btnPrimarySm} mt-2`}
+        >
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+          Guardar URL
+        </button>
+      )}
       {copiedField === field && <p className="text-[11px] text-emerald-400 mt-1.5">Copiado.</p>}
+      {error && <p className="text-[11px] text-red-400 mt-1.5">{error}</p>}
     </div>
   );
 }
