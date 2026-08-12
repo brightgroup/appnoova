@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Search, X, Check, Loader2, Webhook, Plus } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
-import { N8nLogo } from "@/components/icons/brands/N8nLogo";
+import { GoogleCalendarLogo } from "@/components/icons/brands/GoogleCalendarLogo";
 import { HubSpotLogo } from "@/components/icons/brands/HubSpotLogo";
 import { Badge } from "@/components/ui/Badge";
 import { btnPrimary, btnGhost, modalInput } from "@/lib/brand-ui";
@@ -18,6 +19,7 @@ interface ExploreConnectorsModalProps {
 type Step = "grid" | { form: { defaultName: string } };
 
 export function ExploreConnectorsModal({ open, onClose, onConnected }: ExploreConnectorsModalProps) {
+  const router = useRouter();
   const [step, setStep] = useState<Step>("grid");
   const [name, setName] = useState("");
   const [webhookUrl, setWebhookUrl] = useState("");
@@ -105,13 +107,20 @@ export function ExploreConnectorsModal({ open, onClose, onConnected }: ExploreCo
 
             <div className="flex-1 overflow-y-auto px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <ConnectorCard
-                icon={<N8nLogo className="w-5 h-5 text-[#ea4b71]" />}
-                iconBg="bg-[#ea4b71]/15"
-                name="n8n"
-                publisher="Por Noova · Automatización"
-                description="Envía eventos a cualquier flujo y recibe una respuesta que Noova reenvía por WhatsApp."
+                icon={<GoogleCalendarLogo className="w-5 h-5 text-[#4285f4]" />}
+                iconBg="bg-[#4285f4]/15"
+                name="Google Calendar"
+                publisher="Por Noova · Calendario"
+                description="Conecta tu calendario de Google para agendar citas directo desde la conversación."
                 action={
-                  <button type="button" onClick={() => openForm("n8n")} className={`${btnPrimary} !px-3 !py-1.5 !text-xs gap-1.5`}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      close();
+                      router.push("/dashboard/conectores/google-calendar");
+                    }}
+                    className={`${btnPrimary} !px-3 !py-1.5 !text-xs gap-1.5`}
+                  >
                     <Plus className="w-3.5 h-3.5" /> Conectar
                   </button>
                 }

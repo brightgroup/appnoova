@@ -18,7 +18,6 @@ import Link from "next/link";
 import { authFetch } from "@/lib/telephony-api";
 import { tabActive, tabIdle } from "@/lib/brand-ui";
 import { Badge } from "@/components/ui/Badge";
-import { N8nLogo } from "@/components/icons/brands/N8nLogo";
 import { AutomationEventsTable, type AutomationEventRow } from "@/components/automations/AutomationEventsTable";
 import type { AutomationConnectionRecord } from "@/lib/automations/connections-db";
 
@@ -172,8 +171,8 @@ export function ConnectorDetailView({
           <Link href="/dashboard/conectores" className="p-1.5 hover:bg-white/[.08] rounded-lg text-gray-400 hover:text-white shrink-0">
             <ChevronLeft className="w-5 h-5" />
           </Link>
-          <div className="w-9 h-9 rounded-xl bg-[#ea4b71]/15 flex items-center justify-center shrink-0">
-            <N8nLogo className="w-[18px] h-[18px] text-[#ea4b71]" />
+          <div className="w-9 h-9 rounded-xl bg-white/[.08] flex items-center justify-center shrink-0">
+            <Webhook className="w-[18px] h-[18px] text-gray-300" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
