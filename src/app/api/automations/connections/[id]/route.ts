@@ -10,7 +10,7 @@ function withCallbackBase<T extends { inboundToken: string }>(connection: T) {
   return { ...connection, callbackBaseUrl: automationInboundBaseUrl() };
 }
 
-export function normalizeInboundPath(raw: string): string | null {
+function normalizeInboundPath(raw: string): string | null {
   const slug = raw.trim().replace(/^\/+|\/+$/g, "").replace(/\s+/g, "-");
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(slug)) return null;
   return slug;
