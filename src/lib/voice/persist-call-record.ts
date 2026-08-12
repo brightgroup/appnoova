@@ -48,14 +48,15 @@ export async function buildCallRecordFields(input: PersistCallInput) {
       analyzed_at: analysis ? now.toISOString() : null,
       ...(input.metadata ?? {})
     },
-    callsCountNext: (input.callsCount ?? 0) + 1
+    callsCountNext: (input.callsCount ?? 0) + 1,
+    analysisUsage: analysis?.usage ?? null
   };
 }
 
-/** Separa campos de BD del contador interno (no es columna de voice_agent_calls). */
+/** Separa campos de BD, contador interno y uso de Gemini del análisis (no son columnas de voice_agent_calls). */
 export function splitCallRecordFields(fields: Awaited<ReturnType<typeof buildCallRecordFields>>) {
-  const { callsCountNext, ...dbFields } = fields;
-  return { dbFields, callsCountNext };
+  const { callsCountNext, analysisUsage, ...dbFields } = fields;
+  return { dbFields, callsCountNext, analysisUsage };
 }
 
 export async function updateAgentCallsCount(

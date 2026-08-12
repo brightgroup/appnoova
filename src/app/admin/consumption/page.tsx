@@ -39,12 +39,19 @@ interface ServiceCell {
   events: number;
 }
 
+interface ProviderCell {
+  cost_usd: number;
+  cost_cop: number;
+  events: number;
+}
+
 interface ClientRow {
   organization_id: string;
   name: string;
   plan_id: string | null;
   status: string | null;
   services: Record<string, ServiceCell>;
+  providers: Record<string, ProviderCell>;
   total_credits: number;
   total_cost_usd: number;
   total_cost_cop: number;
@@ -64,8 +71,11 @@ interface ConsumptionData {
     google_cost_usd: number;
     telnyx_cost_usd: number;
     elevenlabs_cost_usd: number;
+    meta_cost_usd: number;
+    anthropic_cost_usd: number;
   };
   by_service: { key: string; label: string; color: string; credits: number; cost_usd: number; events: number }[];
+  by_provider: { key: string; label: string; color: string; cost_usd: number; events: number }[];
   daily_chart: BillingChartDay[];
   daily_cost_chart: BillingChartDay[];
   daily_cost_usd: { dateKey: string; dayLabel: string; cost_usd: number }[];
@@ -110,6 +120,18 @@ function ServiceCellDisplay({ cell }: { cell: ServiceCell | undefined }) {
     <div className="tabular-nums">
       <p className="text-sm text-white font-medium">{fmtN(cell.credits)} <span className="text-gray-500 font-normal text-xs">cr</span></p>
       <p className="text-xs text-amber-300/90">{fmtUsdShort(cell.cost_usd)}</p>
+    </div>
+  );
+}
+
+function ProviderCellDisplay({ cell }: { cell: ProviderCell | undefined }) {
+  if (!cell || cell.cost_usd === 0) {
+    return <span className="text-gray-600">—</span>;
+  }
+  return (
+    <div className="tabular-nums">
+      <p className="text-sm text-amber-300 font-medium">{fmtUsdShort(cell.cost_usd)}</p>
+      <p className="text-[10px] text-gray-500">{fmtN(cell.events)} eventos</p>
     </div>
   );
 }
@@ -210,6 +232,7 @@ export default function AdminConsumptionPage() {
   const [search, setSearch] = useState("");
   const [pageTab, setPageTab] = useState<PageTabId>("summary");
   const [chartTab, setChartTab] = useState<ChartTabId>("credits");
+  const [clientView, setClientView] = useState<"service" | "provider">("service");
   const [hoverCreditsDay, setHoverCreditsDay] = useState<BillingChartDay | null>(null);
   const [hoverCostDay, setHoverCostDay] = useState<BillingChartDay | null>(null);
 
@@ -284,6 +307,8 @@ export default function AdminConsumptionPage() {
           })
         )
       : BILLING_CHART_CATEGORIES.filter((c) => c.key === serviceFilter);
+
+  const visibleProviderCols = data?.by_provider ?? [];
 
   const hasChartData = creditChart.some((d) => dayTotal(d) > 0) || costChart.some((d) => dayTotal(d) > 0);
 
@@ -374,7 +399,9 @@ export default function AdminConsumptionPage() {
                       </p>
                       <div className="space-y-0.5 text-xs">
                         <div className="flex justify-between text-gray-400"><span>Twilio</span><span className="text-amber-300">{fmtUsdShort(totals.twilio_cost_usd)}</span></div>
+                        <div className="flex justify-between text-gray-400"><span>Meta</span><span className="text-amber-300">{fmtUsdShort(totals.meta_cost_usd)}</span></div>
                         <div className="flex justify-between text-gray-400"><span>Google</span><span className="text-amber-300">{fmtUsdShort(totals.google_cost_usd)}</span></div>
+                        <div className="flex justify-between text-gray-400"><span>Anthropic</span><span className="text-amber-300">{fmtUsdShort(totals.anthropic_cost_usd)}</span></div>
                         <div className="flex justify-between text-gray-400"><span>Telnyx</span><span className="text-amber-300">{fmtUsdShort(totals.telnyx_cost_usd)}</span></div>
                       </div>
                     </div>
@@ -492,6 +519,26 @@ export default function AdminConsumptionPage() {
                   onChange={setServiceFilter}
                   options={SERVICE_FILTER_OPTIONS}
                 />
+                <div className="flex gap-0 rounded-lg border border-white/[.12] p-0.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setClientView("service")}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
+                      clientView === "service" ? "bg-[#5b5bf6] text-white" : "text-gray-400 hover:text-gray-200"
+                    }`}
+                  >
+                    Por servicio
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setClientView("provider")}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
+                      clientView === "provider" ? "bg-[#5b5bf6] text-white" : "text-gray-400 hover:text-gray-200"
+                    }`}
+                  >
+                    Por proveedor
+                  </button>
+                </div>
               </div>
             }
             footer={filteredClients.length > 0 ? (
@@ -520,14 +567,23 @@ export default function AdminConsumptionPage() {
                     <th className={registryTableHeadCell}>Cliente</th>
                     <th className={registryTableHeadCell}>Plan</th>
                     <th className={registryTableHeadCell}>Estado</th>
-                    {visibleServiceCols.map((c) => (
-                      <th key={c.key} className={registryTableHeadCell}>
-                        <span className="flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.color }} />
-                          {c.label}
-                        </span>
-                      </th>
-                    ))}
+                    {clientView === "service"
+                      ? visibleServiceCols.map((c) => (
+                          <th key={c.key} className={registryTableHeadCell}>
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.color }} />
+                              {c.label}
+                            </span>
+                          </th>
+                        ))
+                      : visibleProviderCols.map((p) => (
+                          <th key={p.key} className={registryTableHeadCell}>
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: p.color }} />
+                              {p.label}
+                            </span>
+                          </th>
+                        ))}
                     <th className={`${registryTableHeadCell} text-right`}>Total cr</th>
                     <th className={`${registryTableHeadCell} text-right`}>Costo USD</th>
                     <th className={registryTableHeadCell}></th>
@@ -548,11 +604,17 @@ export default function AdminConsumptionPage() {
                       <td className={registryTableCell}>
                         <AdminStatusBadge status={row.status} />
                       </td>
-                      {visibleServiceCols.map((c) => (
-                        <td key={c.key} className={registryTableCell}>
-                          <ServiceCellDisplay cell={row.services[c.key]} />
-                        </td>
-                      ))}
+                      {clientView === "service"
+                        ? visibleServiceCols.map((c) => (
+                            <td key={c.key} className={registryTableCell}>
+                              <ServiceCellDisplay cell={row.services[c.key]} />
+                            </td>
+                          ))
+                        : visibleProviderCols.map((p) => (
+                            <td key={p.key} className={registryTableCell}>
+                              <ProviderCellDisplay cell={row.providers[p.key]} />
+                            </td>
+                          ))}
                       <td className={`${registryTableCell} text-right font-bold text-white tabular-nums`}>
                         {fmtN(row.total_credits)}
                       </td>

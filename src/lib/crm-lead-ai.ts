@@ -5,7 +5,7 @@ import type {
   CrmMotivoPerdida,
   CrmPipelineStage
 } from "@/types/crm";
-import { runOriJsonPrompt } from "@/lib/crm-gemini";
+import { runOriJsonPrompt, type OriPromptResult } from "@/lib/crm-gemini";
 import {
   DEFAULT_STAGE_AI_CRITERIA,
   detectCommercialIntent,
@@ -59,15 +59,17 @@ function stageCriteriaBlock(stages: CrmPipelineStage[]): string {
     .join("\n");
 }
 
+const EMPTY_USAGE = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+
 export async function analyzeLeadFromConversation(input: {
   messages: TextChatMessage[];
   contact: { id: string; name: string; categorias_interes?: string[] };
   stages: CrmPipelineStage[];
   openLead: CrmLead | null;
-}): Promise<CrmLeadAnalysisResult> {
+}): Promise<OriPromptResult<CrmLeadAnalysisResult>> {
   const transcript = formatTranscriptForAi(input.messages);
   if (!transcript.trim()) {
-    return emptyAnalysis();
+    return { result: emptyAnalysis(), usage: EMPTY_USAGE, model: "" };
   }
 
   const system = `Eres Ori, copiloto comercial de un CRM en Colombia.
@@ -132,7 +134,7 @@ ${leadBlock}
 Conversación:
 ${transcript}`;
 
-  const raw = await runOriJsonPrompt<Partial<CrmLeadAnalysisResult>>(system, prompt);
+  const { result: raw, usage, model } = await runOriJsonPrompt<Partial<CrmLeadAnalysisResult>>(system, prompt);
 
   const outcome =
     raw.outcome === "won" || raw.outcome === "lost" || raw.outcome === "open"
@@ -165,15 +167,19 @@ ${transcript}`;
   }
 
   return {
-    should_create_lead: shouldCreate,
-    create_reason: raw.create_reason ? String(raw.create_reason) : undefined,
-    target_stage_slug: targetSlug,
-    stage_confidence: conf,
-    outcome,
-    motivo_perdida: motivo,
-    field_updates: sanitizeFieldUpdates(raw.field_updates),
-    suggest_ori_quote: Boolean(raw.suggest_ori_quote) || commercialIntent || Boolean(resolved && isQuoteStageSlug(resolved.slug)),
-    reasoning: raw.reasoning ? String(raw.reasoning) : undefined
+    result: {
+      should_create_lead: shouldCreate,
+      create_reason: raw.create_reason ? String(raw.create_reason) : undefined,
+      target_stage_slug: targetSlug,
+      stage_confidence: conf,
+      outcome,
+      motivo_perdida: motivo,
+      field_updates: sanitizeFieldUpdates(raw.field_updates),
+      suggest_ori_quote: Boolean(raw.suggest_ori_quote) || commercialIntent || Boolean(resolved && isQuoteStageSlug(resolved.slug)),
+      reasoning: raw.reasoning ? String(raw.reasoning) : undefined
+    },
+    usage,
+    model
   };
 }
 

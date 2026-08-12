@@ -66,12 +66,28 @@ function toGeminiContents(messages: TextAgentChatMessage[]): Content[] {
 }
 
 /**
- * Genera respuesta del agente de texto.
+ * Genera respuesta del agente de texto. Despacha por proveedor según el prefijo
+ * del modelo guardado en la BD: `claude-*` va a Anthropic (ver
+ * text-agent-generate-claude.ts), cualquier otro valor (por ahora solo
+ * `gemini-*`) sigue el camino de Gemini de siempre. Quien llama no necesita
+ * saber qué proveedor hay detrás.
+ */
+export async function generateTextAgentReply(
+  input: GenerateTextAgentReplyInput
+): Promise<GenerateTextAgentReplyResult> {
+  if (input.model.startsWith("claude-")) {
+    const { generateClaudeAgentReply } = await import("@/lib/text-agent-generate-claude");
+    return generateClaudeAgentReply(input);
+  }
+  return generateGeminiAgentReply(input);
+}
+
+/**
  * Las tools activas (notify_team, agendamiento, y las que se registren después en
  * `ALL_TEXT_AGENT_TOOLS`) se resuelven según las reglas del agente — no hay
  * despacho hardcodeado por nombre de tool aquí.
  */
-export async function generateTextAgentReply(
+async function generateGeminiAgentReply(
   input: GenerateTextAgentReplyInput
 ): Promise<GenerateTextAgentReplyResult> {
   const apiKey = getOriApiKey();

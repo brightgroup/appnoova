@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { getOriApiKey, getOriModel } from "@/lib/google-ai";
+import { readGeminiUsage, type GeminiUsage } from "@/lib/billing/meter";
 
 export function requireOriApiKey(): string {
   const key = getOriApiKey();
@@ -11,10 +12,20 @@ export function requireOriApiKey(): string {
   return key;
 }
 
-export async function runOriTextPrompt(systemInstruction: string, userPrompt: string): Promise<string> {
+export interface OriPromptResult<T> {
+  result: T;
+  usage: GeminiUsage;
+  model: string;
+}
+
+export async function runOriTextPrompt(
+  systemInstruction: string,
+  userPrompt: string
+): Promise<OriPromptResult<string>> {
   const ai = new GoogleGenAI({ apiKey: requireOriApiKey() });
+  const model = getOriModel();
   const response = await ai.models.generateContent({
-    model: getOriModel(),
+    model,
     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
     config: {
       systemInstruction,
@@ -24,13 +35,17 @@ export async function runOriTextPrompt(systemInstruction: string, userPrompt: st
   });
   const text = response.text?.trim();
   if (!text) throw new Error("La IA no generó respuesta");
-  return text;
+  return { result: text, usage: readGeminiUsage(response), model };
 }
 
-export async function runOriJsonPrompt<T>(systemInstruction: string, userPrompt: string): Promise<T> {
+export async function runOriJsonPrompt<T>(
+  systemInstruction: string,
+  userPrompt: string
+): Promise<OriPromptResult<T>> {
   const ai = new GoogleGenAI({ apiKey: requireOriApiKey() });
+  const model = getOriModel();
   const response = await ai.models.generateContent({
-    model: getOriModel(),
+    model,
     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
     config: {
       systemInstruction,
@@ -40,7 +55,7 @@ export async function runOriJsonPrompt<T>(systemInstruction: string, userPrompt:
   });
   const text = response.text?.trim();
   if (!text) throw new Error("La IA no generó JSON");
-  return JSON.parse(text) as T;
+  return { result: JSON.parse(text) as T, usage: readGeminiUsage(response), model };
 }
 
 export async function runOriDocumentExtract<T>(
@@ -48,10 +63,11 @@ export async function runOriDocumentExtract<T>(
   userPrompt: string,
   fileBase64: string,
   mimeType: string
-): Promise<T> {
+): Promise<OriPromptResult<T>> {
   const ai = new GoogleGenAI({ apiKey: requireOriApiKey() });
+  const model = getOriModel();
   const response = await ai.models.generateContent({
-    model: getOriModel(),
+    model,
     contents: [
       {
         role: "user",
@@ -69,5 +85,5 @@ export async function runOriDocumentExtract<T>(
   });
   const text = response.text?.trim();
   if (!text) throw new Error("No se pudo leer el documento");
-  return JSON.parse(text) as T;
+  return { result: JSON.parse(text) as T, usage: readGeminiUsage(response), model };
 }

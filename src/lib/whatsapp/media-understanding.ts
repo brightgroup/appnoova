@@ -1,12 +1,27 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 import { uploadWhatsAppMedia } from "@/lib/whatsapp/media-storage";
+import { readGeminiUsage, type GeminiUsage } from "@/lib/billing/meter";
+import { getAnthropicApiKey, readClaudeUsage } from "@/lib/text-agent-generate-claude";
 import {
   downloadTwilioWhatsAppMedia,
   mediaKindFromContentType,
   mediaKindLabel,
   type TwilioWhatsAppMediaItem
 } from "@/lib/whatsapp/twilio-media";
+
+const ZERO_USAGE: GeminiUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+
+export type MediaProvider = "google" | "anthropic";
+
+function addUsage(a: GeminiUsage, b: GeminiUsage): GeminiUsage {
+  return {
+    promptTokens: a.promptTokens + b.promptTokens,
+    completionTokens: a.completionTokens + b.completionTokens,
+    totalTokens: a.totalTokens + b.totalTokens
+  };
+}
 
 export const WHATSAPP_VIDEO_AI_NOTICE =
   "El cliente envió un archivo de video. No es posible analizar el contenido de videos.";
@@ -18,6 +33,10 @@ export interface ProcessedWhatsAppMedia {
   visibleContent: string;
   mediaStoragePath?: string;
   mediaMime?: string;
+  /** Uso de tokens de este ítem (0 si no se llamó a la IA, p.ej. video). */
+  usage: GeminiUsage;
+  /** Proveedor real que analizó este ítem — "google" si no se llamó a la IA. */
+  provider: MediaProvider;
 }
 
 export interface InboundContentResult {
@@ -27,6 +46,8 @@ export interface InboundContentResult {
   mediaLabel?: string;
   mediaStoragePath?: string;
   mediaMime?: string;
+  /** Uso de tokens de todos los medios analizados, agrupado por proveedor real. */
+  mediaUsageByProvider: Record<MediaProvider, GeminiUsage>;
 }
 
 export interface WhatsAppMediaUploadContext {
@@ -40,7 +61,7 @@ async function geminiUnderstandMedia(
   buffer: Buffer,
   mimeType: string,
   instruction: string
-): Promise<string> {
+): Promise<{ text: string; usage: GeminiUsage }> {
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
@@ -55,7 +76,48 @@ async function geminiUnderstandMedia(
     ],
     config: { temperature: 0.2, maxOutputTokens: 2048 }
   });
-  return response.text?.trim() ?? "";
+  return { text: response.text?.trim() ?? "", usage: readGeminiUsage(response) };
+}
+
+/**
+ * Análisis de imagen/PDF con Claude — usa visión/documentos nativos del Messages API.
+ * NO cubre audio: Claude no tiene forma de recibir audio en su API, a diferencia de
+ * Gemini. Las notas de voz de WhatsApp siempre pasan por `geminiUnderstandMedia`,
+ * sin importar qué modelo tenga configurado el agente.
+ */
+async function claudeUnderstandMedia(
+  model: string,
+  buffer: Buffer,
+  mimeType: string,
+  instruction: string,
+  kind: "image" | "document"
+): Promise<{ text: string; usage: GeminiUsage }> {
+  const client = new Anthropic({ apiKey: getAnthropicApiKey() });
+  const mediaBlock: Anthropic.ContentBlockParam =
+    kind === "image"
+      ? {
+          type: "image",
+          source: { type: "base64", media_type: mimeType as "image/jpeg", data: buffer.toString("base64") }
+        }
+      : {
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: buffer.toString("base64") }
+        };
+
+  const response = await client.messages.create({
+    model,
+    max_tokens: 1024,
+    temperature: 0.2,
+    messages: [{ role: "user", content: [mediaBlock, { type: "text", text: instruction }] }]
+  });
+
+  const text = response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map(b => b.text)
+    .join("\n")
+    .trim();
+
+  return { text, usage: readClaudeUsage(response) };
 }
 
 async function storeMedia(
@@ -69,6 +131,7 @@ async function storeMedia(
 
 async function processOneMediaItem(
   apiKey: string,
+  model: string,
   item: TwilioWhatsAppMediaItem,
   caption: string,
   ctx: WhatsAppMediaUploadContext,
@@ -76,6 +139,7 @@ async function processOneMediaItem(
 ): Promise<ProcessedWhatsAppMedia> {
   const kind = mediaKindFromContentType(item.contentType);
   const label = mediaKindLabel(kind);
+  const useClaude = model.startsWith("claude-");
 
   try {
     const { buffer, contentType } = await downloadTwilioWhatsAppMedia(item.url);
@@ -89,12 +153,15 @@ async function processOneMediaItem(
         textForAi: `[Video]: ${WHATSAPP_VIDEO_AI_NOTICE}`,
         visibleContent: "",
         mediaStoragePath: storagePath ?? undefined,
-        mediaMime: mime
+        mediaMime: mime,
+        usage: ZERO_USAGE,
+        provider: "google"
       };
     }
 
     if (kind === "audio") {
-      const transcript = await geminiUnderstandMedia(
+      // Siempre Gemini: Claude no tiene entrada de audio en su API.
+      const { text: transcript, usage } = await geminiUnderstandMedia(
         apiKey,
         buffer,
         mime,
@@ -107,19 +174,19 @@ async function processOneMediaItem(
         textForAi: `[Nota de voz]: ${text}`,
         visibleContent: "",
         mediaStoragePath: storagePath ?? undefined,
-        mediaMime: mime
+        mediaMime: mime,
+        usage,
+        provider: "google"
       };
     }
 
     if (kind === "image") {
-      const description = await geminiUnderstandMedia(
-        apiKey,
-        buffer,
-        mime,
-        caption.trim()
-          ? `El cliente envió una imagen con este pie de foto: "${caption.trim()}". Describe la imagen en español para atención al cliente e incluye el sentido del caption.`
-          : "Describe esta imagen de WhatsApp en español para un agente de atención al cliente (contenido, texto visible, contexto)."
-      );
+      const instruction = caption.trim()
+        ? `El cliente envió una imagen con este pie de foto: "${caption.trim()}". Describe la imagen en español para atención al cliente e incluye el sentido del caption.`
+        : "Describe esta imagen de WhatsApp en español para un agente de atención al cliente (contenido, texto visible, contexto).";
+      const { text: description, usage } = useClaude
+        ? await claudeUnderstandMedia(model, buffer, mime, instruction, "image")
+        : await geminiUnderstandMedia(apiKey, buffer, mime, instruction);
       const text = description || "(No se pudo interpretar la imagen)";
       return {
         kind,
@@ -127,17 +194,17 @@ async function processOneMediaItem(
         textForAi: `[Imagen${caption.trim() ? ` — ${caption.trim()}` : ""}]: ${text}`,
         visibleContent: caption.trim(),
         mediaStoragePath: storagePath ?? undefined,
-        mediaMime: mime
+        mediaMime: mime,
+        usage,
+        provider: useClaude ? "anthropic" : "google"
       };
     }
 
     if (kind === "document" && mime === "application/pdf") {
-      const summary = await geminiUnderstandMedia(
-        apiKey,
-        buffer,
-        mime,
-        "Resume el contenido principal de este PDF en español para atención al cliente."
-      );
+      const instruction = "Resume el contenido principal de este PDF en español para atención al cliente.";
+      const { text: summary, usage } = useClaude
+        ? await claudeUnderstandMedia(model, buffer, mime, instruction, "document")
+        : await geminiUnderstandMedia(apiKey, buffer, mime, instruction);
       const text = summary || "(PDF recibido)";
       return {
         kind: "document",
@@ -145,7 +212,9 @@ async function processOneMediaItem(
         textForAi: `[Documento PDF]: ${text}`,
         visibleContent: "",
         mediaStoragePath: storagePath ?? undefined,
-        mediaMime: mime
+        mediaMime: mime,
+        usage,
+        provider: useClaude ? "anthropic" : "google"
       };
     }
 
@@ -155,7 +224,9 @@ async function processOneMediaItem(
       textForAi: `[${label} recibido — tipo ${mime}]`,
       visibleContent: "",
       mediaStoragePath: storagePath ?? undefined,
-      mediaMime: mime
+      mediaMime: mime,
+      usage: ZERO_USAGE,
+      provider: "google"
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error al procesar archivo";
@@ -164,14 +235,22 @@ async function processOneMediaItem(
       label,
       textForAi: `[${label}: no procesado — ${msg}]`,
       visibleContent: "",
-      mediaMime: item.contentType
+      mediaMime: item.contentType,
+      usage: ZERO_USAGE,
+      provider: "google"
     };
   }
 }
 
-/** Convierte texto + adjuntos Twilio: userText (IA) vs userVisible (Inbox). */
+/**
+ * Convierte texto + adjuntos Twilio: userText (IA) vs userVisible (Inbox).
+ * `model` es el modelo configurado en el agente — imagen y PDF se analizan con
+ * ese mismo modelo (Gemini o Claude); el audio siempre usa Gemini (ver
+ * claudeUnderstandMedia para el porqué).
+ */
 export async function buildWhatsAppInboundContent(
   apiKey: string,
+  model: string,
   body: string,
   media: TwilioWhatsAppMediaItem[],
   uploadCtx: WhatsAppMediaUploadContext
@@ -189,10 +268,16 @@ export async function buildWhatsAppInboundContent(
     visibleParts.push(caption);
   }
 
+  const mediaUsageByProvider: Record<MediaProvider, GeminiUsage> = {
+    google: ZERO_USAGE,
+    anthropic: ZERO_USAGE
+  };
+
   for (let i = 0; i < media.length; i++) {
-    const processed = await processOneMediaItem(apiKey, media[i], caption, uploadCtx, i);
+    const processed = await processOneMediaItem(apiKey, model, media[i], caption, uploadCtx, i);
     aiParts.push(processed.textForAi);
     if (processed.visibleContent) visibleParts.push(processed.visibleContent);
+    mediaUsageByProvider[processed.provider] = addUsage(mediaUsageByProvider[processed.provider], processed.usage);
     if (!primaryMediaType && processed.kind !== "other") {
       primaryMediaType = processed.kind;
       mediaLabel = processed.label;
@@ -210,6 +295,7 @@ export async function buildWhatsAppInboundContent(
     primaryMediaType,
     mediaLabel,
     mediaStoragePath,
-    mediaMime
+    mediaMime,
+    mediaUsageByProvider
   };
 }

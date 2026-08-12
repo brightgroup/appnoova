@@ -44,7 +44,8 @@ import { buildWhatsAppInboundContent } from "@/lib/whatsapp/media-understanding"
 import {
   sendWhatsAppTextMessage,
   sendWhatsAppMediaMessage,
-  sendWhatsAppTypingIndicator
+  sendWhatsAppTypingIndicator,
+  whatsAppProviderForBilling
 } from "@/lib/whatsapp/send-transport";
 import {
   checkBillingForOrg,
@@ -52,6 +53,7 @@ import {
   recordUsageSafe,
   resolveOrgIdForUser
 } from "@/lib/billing/meter";
+import { providerForLlmModel } from "@/lib/billing/pricing";
 import { getActiveCalendarConnection } from "@/lib/google-calendar/connections-db";
 import { getOrgBusinessHours } from "@/lib/scheduling/business-hours-db";
 import { resolveTextAgentForChannel } from "@/lib/text-agent-resolve";
@@ -75,6 +77,46 @@ async function resolveChannelOrgId(
 ): Promise<string | null> {
   if (channel.organization_id) return channel.organization_id;
   return resolveOrgIdForUser(db, channel.user_id);
+}
+
+/**
+ * El análisis de imagen/audio/PDF ocurre ANTES de decidir si la conversación sigue
+ * a la IA, se va a opt-out, a handoff humano o se bloquea por falta de créditos.
+ * En esos desvíos igual se gastó IA analizando el medio — se deja registrado (sin
+ * cobrar crédito, ya que no hubo turno de IA) para que no desaparezca del costo real.
+ * Puede haber uso en dos proveedores a la vez (imagen/PDF con Claude + audio con
+ * Gemini en el mismo mensaje), así que se registra cada bucket por separado.
+ */
+async function recordDivertedMediaUsage(
+  db: SupabaseClient,
+  orgId: string | null,
+  userId: string,
+  agentModel: string,
+  conversationId: string | null,
+  mediaUsageByProvider: Record<"google" | "anthropic", ReturnType<typeof readGeminiUsage>>,
+  idempotencyKeyPrefix: string
+): Promise<void> {
+  if (!orgId) return;
+  for (const provider of ["google", "anthropic"] as const) {
+    const usage = mediaUsageByProvider[provider];
+    if (!usage || usage.totalTokens <= 0) continue;
+    await recordUsageSafe({
+      db,
+      organizationId: orgId,
+      userId,
+      eventType: "whatsapp_ai",
+      channel: WHATSAPP_CONVERSATION_CHANNEL,
+      provider,
+      // El audio (google) siempre es Gemini Flash; imagen/PDF (anthropic) usa el
+      // modelo real del agente para que el costo se calcule con la tarifa correcta.
+      model: provider === "anthropic" ? agentModel : "gemini-2.5-flash",
+      gemini: usage,
+      creditsOverride: 0,
+      referenceType: "text_agent_conversation",
+      referenceId: conversationId,
+      idempotencyKey: `${idempotencyKeyPrefix}_${provider}`
+    });
+  }
 }
 
 async function syncAndEnrichCrmFromInbound(
@@ -176,8 +218,21 @@ export async function processTwilioWhatsAppInbound(
     return { ok: false, error: "ORI_GOOGLE_AI_KEY no configurada" };
   }
 
+  const orgId = await resolveChannelOrgId(db, channel);
+
+  const { agent, error: agentErr } = await resolveTextAgentForChannel(db, channel);
+
+  if (agentErr || !agent) {
+    return { ok: false, error: agentErr ?? "Agente de texto no encontrado" };
+  }
+
+  // El modelo del agente decide quién lee imagen/PDF también (no solo el texto) —
+  // ver media-understanding.ts para el porqué el audio siempre va por Gemini.
+  const model = String(agent.llm_model || "gemini-2.5-flash");
+
   const inboundContent = await buildWhatsAppInboundContent(
     apiKey,
+    model,
     inbound.body,
     inbound.media,
     { db, userId: channel.user_id, messageSid: inbound.messageSid }
@@ -195,15 +250,6 @@ export async function processTwilioWhatsAppInbound(
   const userMediaType: TextChatMessage["media_type"] =
     inboundContent.primaryMediaType ?? (inbound.media.length ? "document" : "text");
   const userMediaLabel = inboundContent.mediaLabel;
-  const orgId = await resolveChannelOrgId(db, channel);
-
-  const { agent, error: agentErr } = await resolveTextAgentForChannel(db, channel);
-
-  if (agentErr || !agent) {
-    return { ok: false, error: agentErr ?? "Agente de texto no encontrado" };
-  }
-
-  const model = String(agent.llm_model || "gemini-2.5-flash");
   const contactLabel = buildWhatsAppContactLabel(inbound.profileName, inbound.fromE164);
   const existing = await findWhatsAppConversation(
     db,
@@ -234,6 +280,27 @@ export async function processTwilioWhatsAppInbound(
     userInternalContent
   };
 
+  // Automatizaciones (Workflows/Conectores): avisa a los workflows activos de la org sin
+  // bloquear la respuesta al cliente. Se dispara para cualquier mensaje entrante que
+  // matchee el filtro configurado en el nodo disparador, sin importar si en ese momento
+  // la conversación la maneja la IA o un humano (modo handoff) — el trigger describe lo
+  // que el cliente final envió, no quién está respondiendo internamente.
+  const automationMediaType = userMediaType === "image" ? "image" : userMediaType === "text" ? "text" : null;
+  function triggerAutomationEvent(conversationId: string): void {
+    if (!orgId || !automationMediaType) return;
+    void emitAutomationEvent(db, {
+      organizationId: orgId,
+      conversationId,
+      contactPhone: inbound.fromE164,
+      contactLabel,
+      mediaStoragePath: inboundContent.mediaStoragePath ?? null,
+      analysisText: inboundContent.userText,
+      messageSid: inbound.messageSid,
+      channelId: channel.id,
+      mediaType: automationMediaType
+    }).catch(err => console.error("[automations] emit:", err));
+  }
+
   // —— Baja (STOP / CANCELAR) ——
   if (isOptOutRequest) {
     const persisted = await persistUserMessageOnly({
@@ -251,6 +318,7 @@ export async function processTwilioWhatsAppInbound(
     });
 
     if (persisted.error) return { ok: false, error: persisted.error };
+    triggerAutomationEvent(persisted.conversationId);
 
     await updateWhatsAppConversationMetadata(
       db,
@@ -284,6 +352,15 @@ export async function processTwilioWhatsAppInbound(
         referenceId: persisted.conversationId,
         idempotencyKey: `wa_optout_${inbound.messageSid}`
       });
+      await recordDivertedMediaUsage(
+        db,
+        orgId,
+        channel.user_id,
+        model,
+        persisted.conversationId,
+        inboundContent.mediaUsageByProvider,
+        `wa_optout_media_${inbound.messageSid}`
+      );
     }
 
     return { ok: true };
@@ -305,6 +382,7 @@ export async function processTwilioWhatsAppInbound(
     });
 
     if (persisted.error) return { ok: false, error: persisted.error };
+    triggerAutomationEvent(persisted.conversationId);
 
     await updateWhatsAppConversationMetadata(
       db,
@@ -329,6 +407,15 @@ export async function processTwilioWhatsAppInbound(
         referenceId: persisted.conversationId,
         idempotencyKey: `wa_in_${inbound.messageSid}`
       });
+      await recordDivertedMediaUsage(
+        db,
+        orgId,
+        channel.user_id,
+        model,
+        persisted.conversationId,
+        inboundContent.mediaUsageByProvider,
+        `wa_human_media_${inbound.messageSid}`
+      );
 
       // Mensaje nuevo en cola humana — avisa al equipo (no bloquea la respuesta al webhook).
       void notifyPushForOrg(orgId, {
@@ -363,6 +450,7 @@ export async function processTwilioWhatsAppInbound(
         ...persistOpts
       });
       if (!blockedPersist.error) {
+        triggerAutomationEvent(blockedPersist.conversationId);
         await updateWhatsAppConversationMetadata(
           db,
           blockedPersist.conversationId,
@@ -371,6 +459,15 @@ export async function processTwilioWhatsAppInbound(
           metaPatch
         );
         await syncAndEnrichCrmFromInbound(db, channel, blockedPersist.conversationId, inbound, nowIso, optedOutAfter);
+        await recordDivertedMediaUsage(
+          db,
+          orgId,
+          channel.user_id,
+          model,
+          blockedPersist.conversationId,
+          inboundContent.mediaUsageByProvider,
+          `wa_nocredit_media_${inbound.messageSid}`
+        );
       }
       return { ok: true };
     }
@@ -395,6 +492,7 @@ export async function processTwilioWhatsAppInbound(
     });
 
     if (userPersist.error) return { ok: false, error: userPersist.error };
+    triggerAutomationEvent(userPersist.conversationId);
 
     await updateWhatsAppConversationMetadata(
       db,
@@ -454,6 +552,15 @@ export async function processTwilioWhatsAppInbound(
         referenceId: userPersist.conversationId,
         idempotencyKey: `wa_handoff_${inbound.messageSid}`
       });
+      await recordDivertedMediaUsage(
+        db,
+        orgId,
+        channel.user_id,
+        model,
+        userPersist.conversationId,
+        inboundContent.mediaUsageByProvider,
+        `wa_handoff_media_${inbound.messageSid}`
+      );
     }
 
     return { ok: true };
@@ -487,24 +594,7 @@ export async function processTwilioWhatsAppInbound(
   });
 
   if (userPersist.error) return { ok: false, error: userPersist.error };
-
-  // Automatizaciones (Workflows/Conectores): si el cliente final envió una imagen o un
-  // mensaje de texto, avisa a los workflows activos de la org en paralelo con la
-  // generación de la respuesta de la IA — no bloquea ni retrasa el envío al cliente.
-  const automationMediaType = userMediaType === "image" ? "image" : userMediaType === "text" ? "text" : null;
-  if (orgId && automationMediaType) {
-    void emitAutomationEvent(db, {
-      organizationId: orgId,
-      conversationId: userPersist.conversationId,
-      contactPhone: inbound.fromE164,
-      contactLabel,
-      mediaStoragePath: inboundContent.mediaStoragePath ?? null,
-      analysisText: inboundContent.userText,
-      messageSid: inbound.messageSid,
-      channelId: channel.id,
-      mediaType: automationMediaType
-    }).catch(err => console.error("[automations] emit:", err));
-  }
+  triggerAutomationEvent(userPersist.conversationId);
 
   // Best-effort: los "puntos de escribiendo" nativos de WhatsApp mientras el agente genera la respuesta.
   // Se espera a que Twilio confirme el envío (no fire-and-forget) para que quede garantizado
@@ -623,7 +713,18 @@ export async function processTwilioWhatsAppInbound(
     }
     catalogNeedsHuman = guarded.needsHuman;
     reply = guarded.text;
-    geminiUsage = generated.usage;
+    // Suma el uso de analizar imagen/audio/PDF del mensaje entrante al de la respuesta —
+    // antes se descartaba y el turno completo quedaba subfacturado en costo real.
+    // La imagen/PDF puede haberse analizado con el mismo proveedor del agente (se suma
+    // aquí); el audio, si el agente es Claude, quedó en el bucket "google" aparte —
+    // ese sobrante se factura en una línea propia más abajo (mediaOtherProviderUsage).
+    const agentProvider = providerForLlmModel(model);
+    const mediaUsageSameProvider = inboundContent.mediaUsageByProvider[agentProvider];
+    geminiUsage = {
+      promptTokens: generated.usage.promptTokens + mediaUsageSameProvider.promptTokens,
+      completionTokens: generated.usage.completionTokens + mediaUsageSameProvider.completionTokens,
+      totalTokens: generated.usage.totalTokens + mediaUsageSameProvider.totalTokens
+    };
     if (generated.toolResults.length) {
       console.info(
         "[whatsapp/inbound] notify_team:",
@@ -732,20 +833,58 @@ export async function processTwilioWhatsAppInbound(
   }
 
   if (orgId) {
+    // Dos líneas para el mismo turno: el costo real de Gemini (o Claude) queda bajo su
+    // proveedor real, y la entrega (Twilio o Meta directo, según el canal) bajo el suyo —
+    // antes todo se etiquetaba "google", mezclando ambos costos. Los créditos del turno
+    // se cobran una sola vez, en la primera línea.
+    const deliveryProvider = whatsAppProviderForBilling(channel);
     await recordUsageSafe({
       db,
       organizationId: orgId,
       userId: channel.user_id,
       eventType: "whatsapp_ai",
       channel: WHATSAPP_CONVERSATION_CHANNEL,
-      provider: "google",
+      provider: providerForLlmModel(model),
       model,
       gemini: geminiUsage,
-      twilioMessages: 2, // entrante + saliente
       referenceType: "text_agent_conversation",
       referenceId: userPersist.conversationId,
       idempotencyKey: `wa_ai_${inbound.messageSid}`
     });
+    await recordUsageSafe({
+      db,
+      organizationId: orgId,
+      userId: channel.user_id,
+      eventType: "whatsapp_ai",
+      channel: WHATSAPP_CONVERSATION_CHANNEL,
+      provider: deliveryProvider,
+      twilioMessages: 2, // entrante + saliente
+      creditsOverride: 0, // el crédito del turno ya se cobró en la línea de arriba
+      referenceType: "text_agent_conversation",
+      referenceId: userPersist.conversationId,
+      idempotencyKey: `wa_ai_delivery_${inbound.messageSid}`
+    });
+
+    // Sobrante de medios en el OTRO proveedor (p.ej. audio siempre por Gemini
+    // aunque el agente sea Claude) — línea propia, sin cobrar crédito aparte.
+    const otherProvider = providerForLlmModel(model) === "anthropic" ? "google" : "anthropic";
+    const mediaOtherProviderUsage = inboundContent.mediaUsageByProvider[otherProvider];
+    if (mediaOtherProviderUsage.totalTokens > 0) {
+      await recordUsageSafe({
+        db,
+        organizationId: orgId,
+        userId: channel.user_id,
+        eventType: "whatsapp_ai",
+        channel: WHATSAPP_CONVERSATION_CHANNEL,
+        provider: otherProvider,
+        model: otherProvider === "google" ? "gemini-2.5-flash" : model,
+        gemini: mediaOtherProviderUsage,
+        creditsOverride: 0,
+        referenceType: "text_agent_conversation",
+        referenceId: userPersist.conversationId,
+        idempotencyKey: `wa_ai_media_other_${inbound.messageSid}`
+      });
+    }
   }
 
   return { ok: true };

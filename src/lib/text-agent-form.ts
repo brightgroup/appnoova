@@ -1,5 +1,5 @@
 import type { TextAgentFormData } from "@/types/text-agent";
-import { DEFAULT_TEXT_MODEL } from "@/lib/text-agent-options";
+import { resolveTextLlm } from "@/lib/text-agent-options";
 import { resolveBaseTextTemplateId } from "@/lib/text-agent-templates";
 import { normalizeNotifyTeamRules } from "@/lib/text-notify-rules";
 import { normalizeSchedulingRules } from "@/lib/scheduling/rules";
@@ -15,7 +15,7 @@ export function normalizeTextAgentForm(raw: Partial<TextAgentFormData>): TextAge
     company_context_id: raw.company_context_id ?? null,
     data_table_id: raw.data_table_id ?? null,
     temperature: Number.isFinite(temperature) ? Math.min(2, Math.max(0.1, temperature)) : 0.7,
-    llm_model: String(raw.llm_model ?? DEFAULT_TEXT_MODEL).trim() || DEFAULT_TEXT_MODEL,
+    llm_model: resolveTextLlm(raw.llm_model),
     max_output_tokens: Number.isFinite(maxOutput) ? Math.min(8192, Math.max(50, maxOutput)) : 1024,
     color: raw.color ?? null,
     notify_rules: normalizeNotifyTeamRules(raw.notify_rules),

@@ -8,6 +8,7 @@ import {
   DEFAULT_CREDIT_COST,
   DEFAULT_PROVIDER_RATES,
   DEFAULT_TRM_COP,
+  DEFAULT_USAGE_MARGIN_MULTIPLIER,
 } from "@/lib/billing/pricing-defaults";
 import { getPricingConfig } from "@/lib/billing/pricing-config";
 import { creditsFromUsdPrice } from "@/lib/billing/credit-usd";
@@ -29,6 +30,11 @@ export function getUnitPriceUsd(eventType: UsageEventType): number {
   return getPricingConfig().unitPriceUsd[eventType] ?? 0;
 }
 
+/** Múltiplo sobre el costo real que actúa como piso de crédito en turnos caros. */
+export function getUsageMarginMultiplier(): number {
+  return getPricingConfig().usageMarginMultiplier ?? DEFAULT_USAGE_MARGIN_MULTIPLIER;
+}
+
 /** Créditos por tipo de evento (calculados desde price_usd). */
 export function getCreditCost(): Record<UsageEventType, number> {
   const config = getPricingConfig();
@@ -47,6 +53,15 @@ export function getTwilioWaUsdPerMsg(): number {
   return getPricingConfig().providerRates.twilio_wa_per_msg ?? DEFAULT_PROVIDER_RATES.twilio_wa_per_msg;
 }
 
+/**
+ * Tarifa de referencia para WhatsApp vía Meta Cloud API directo (sin Twilio).
+ * Meta en realidad cobra por ventana de conversación (24h), no por mensaje — esto es
+ * una aproximación por mensaje para que el consumo por Meta directo deje de estar en $0.
+ */
+export function getMetaWaUsdPerMsg(): number {
+  return getPricingConfig().providerRates.meta_wa_per_msg ?? DEFAULT_PROVIDER_RATES.meta_wa_per_msg;
+}
+
 export function getVoiceUsdPerMinute(provider: VoiceBillingProvider = "google"): number {
   const rates = getPricingConfig().providerRates;
   return provider === "elevenlabs"
@@ -61,12 +76,13 @@ export const VOICE_USD_PER_MINUTE = DEFAULT_PROVIDER_RATES.voice_standard_per_mi
 /** @deprecated */
 export const VOICE_PREMIUM_USD_PER_MINUTE = DEFAULT_PROVIDER_RATES.voice_premium_per_min;
 
-interface GeminiModelPrice {
+interface LlmModelPrice {
   inputPerM: number;
   outputPerM: number;
 }
 
-function geminiPricesFromConfig(): Record<string, GeminiModelPrice> {
+/** Precios por modelo de LLM (Gemini + Claude), en USD por millón de tokens. */
+function llmPricesFromConfig(): Record<string, LlmModelPrice> {
   const r = getPricingConfig().providerRates;
   return {
     "gemini-2.5-flash": {
@@ -77,27 +93,43 @@ function geminiPricesFromConfig(): Record<string, GeminiModelPrice> {
       inputPerM: r.gemini_pro_input_per_m ?? DEFAULT_PROVIDER_RATES.gemini_pro_input_per_m,
       outputPerM: r.gemini_pro_output_per_m ?? DEFAULT_PROVIDER_RATES.gemini_pro_output_per_m,
     },
+    "claude-haiku-4-5": {
+      inputPerM: r.anthropic_haiku_input_per_m ?? DEFAULT_PROVIDER_RATES.anthropic_haiku_input_per_m,
+      outputPerM: r.anthropic_haiku_output_per_m ?? DEFAULT_PROVIDER_RATES.anthropic_haiku_output_per_m,
+    },
+    "claude-sonnet-5": {
+      inputPerM: r.anthropic_sonnet_input_per_m ?? DEFAULT_PROVIDER_RATES.anthropic_sonnet_input_per_m,
+      outputPerM: r.anthropic_sonnet_output_per_m ?? DEFAULT_PROVIDER_RATES.anthropic_sonnet_output_per_m,
+    },
   };
 }
 
-function geminiPriceFor(model?: string | null): GeminiModelPrice {
-  const prices = geminiPricesFromConfig();
+function llmPriceFor(model?: string | null): LlmModelPrice {
+  const prices = llmPricesFromConfig();
   const fallback = prices["gemini-2.5-flash"];
   if (!model) return fallback;
   const key = Object.keys(prices).find((m) => model.startsWith(m));
   return key ? prices[key] : fallback;
 }
 
-export function geminiCostUsd(
+/** Devuelve "google" o "anthropic" según el modelo — para etiquetar `usage_events.provider`. */
+export function providerForLlmModel(model?: string | null): "google" | "anthropic" {
+  return model?.startsWith("claude-") ? "anthropic" : "google";
+}
+
+export function llmCostUsd(
   model: string | null | undefined,
   promptTokens: number,
   completionTokens: number
 ): number {
-  const price = geminiPriceFor(model);
+  const price = llmPriceFor(model);
   const input = (promptTokens / 1_000_000) * price.inputPerM;
   const output = (completionTokens / 1_000_000) * price.outputPerM;
   return input + output;
 }
+
+/** @deprecated Usa llmCostUsd() — el nombre se quedó corto desde que también cubre Claude. */
+export const geminiCostUsd = llmCostUsd;
 
 /** Convierte USD a COP usando TRM de referencia (solo visualización / legacy). */
 export function usdToCop(usd: number): number {

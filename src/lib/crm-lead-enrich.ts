@@ -3,6 +3,7 @@ import { getOriApiKey } from "@/lib/google-ai";
 import { getDefaultCompanyContextContent } from "@/lib/company-context";
 import { iaProvenanceEntry, generateOriQuote } from "@/lib/crm-ai-extract";
 import { analyzeLeadFromConversation, type CrmLeadAnalysisResult } from "@/lib/crm-lead-ai";
+import { recordOriUsageForUser } from "@/lib/billing/meter";
 import {
   detectCommercialIntent,
   formatTranscriptForAi,
@@ -74,7 +75,7 @@ async function maybeAutoQuote(
   const contact = toCrmContact(contactRow);
 
   try {
-    const quote = await generateOriQuote(contact, {
+    const { result: quote, usage, model } = await generateOriQuote(contact, {
       labels: { categoria: labels.categoria_interes, producto: labels.producto_servicio },
       lead: {
         title: lead.title,
@@ -85,6 +86,20 @@ async function maybeAutoQuote(
         stage_name: lead.stage?.name ?? null
       },
       companyContext
+    });
+    // Cotización generada automáticamente por el pipeline de IA (no el cliente por botón):
+    // costo real visible en /admin/consumption, sin cobrar crédito.
+    await recordOriUsageForUser({
+      db,
+      userId,
+      eventType: "quote",
+      usage,
+      model,
+      creditsOverride: 0,
+      channel: "crm_lead_auto_quote",
+      referenceType: "crm_lead",
+      referenceId: leadId,
+      idempotencyKey: `auto_quote_${quote.id}`
     });
 
     const meta = (leadRow.metadata as Record<string, unknown>) ?? {};
@@ -316,7 +331,7 @@ export async function enrichCrmLeadFromWhatsAppConversation(
 
   let analysis: CrmLeadAnalysisResult;
   try {
-    analysis = await analyzeLeadFromConversation({
+    const analyzed = await analyzeLeadFromConversation({
       messages,
       contact: {
         id: contact.id,
@@ -325,6 +340,20 @@ export async function enrichCrmLeadFromWhatsAppConversation(
       },
       stages,
       openLead
+    });
+    analysis = analyzed.result;
+    // Enriquecimiento automático post-conversación: no es una acción que el cliente pida
+    // explícitamente, así que el costo real queda en /admin/consumption sin cobrar crédito.
+    await recordOriUsageForUser({
+      db,
+      userId,
+      eventType: "ori",
+      usage: analyzed.usage,
+      model: analyzed.model,
+      creditsOverride: 0,
+      channel: "crm_lead_enrich",
+      referenceType: "text_agent_conversation",
+      referenceId: conversationId
     });
   } catch (err) {
     console.error("[crm/lead-enrich] analyze:", err);

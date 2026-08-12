@@ -1,5 +1,5 @@
 import { adminClient } from "@/lib/voice-agents-server";
-import { chargeVoiceCall, chargeVoiceAttempt, resolveOrgIdForUser } from "@/lib/billing/meter";
+import { chargeVoiceCall, chargeVoiceAttempt, recordUsageSafe, resolveOrgIdForUser } from "@/lib/billing/meter";
 import {
   conversationIsVoicemail,
   loadElevenLabsConversationForFinalize,
@@ -208,7 +208,7 @@ export async function finalizeElevenLabsPremiumCall(input: {
       finalized_at: new Date().toISOString(),
     },
   });
-  const { dbFields, callsCountNext } = splitCallRecordFields(built);
+  const { dbFields, callsCountNext, analysisUsage } = splitCallRecordFields(built);
 
   const db = adminClient();
 
@@ -253,20 +253,38 @@ export async function finalizeElevenLabsPremiumCall(input: {
 
   await updateAgentCallsCount(db, session.voice_agent_id, callsCountNext);
 
-  if (billedDuration > 0) {
-    const orgId = await resolveOrgIdForUser(db, session.user_id);
-    if (orgId) {
-      await chargeVoiceCall({
-        db,
-        organizationId: orgId,
-        userId: session.user_id,
-        callId: session.id,
-        durationSec: billedDuration,
-        voiceAgentId: session.voice_agent_id,
-        voiceProvider: "elevenlabs",
-        metadata: { conversation_id: input.conversationId, source: kind },
-      });
-    }
+  const orgIdForAnalysis = await resolveOrgIdForUser(db, session.user_id);
+  if (orgIdForAnalysis && analysisUsage && analysisUsage.totalTokens > 0) {
+    // Análisis post-llamada automático (resumen, sentimiento, datos extraídos) —
+    // costo real visible en /admin/consumption, sin cobrar crédito aparte (ya
+    // se cobró el minuto de la llamada).
+    await recordUsageSafe({
+      db,
+      organizationId: orgIdForAnalysis,
+      userId: session.user_id,
+      eventType: "ori",
+      provider: "google",
+      model: "gemini-2.5-flash",
+      gemini: analysisUsage,
+      creditsOverride: 0,
+      channel: "voice_call_analysis",
+      referenceType: "voice_agent_call",
+      referenceId: session.id,
+      idempotencyKey: `call_analysis_${session.id}`
+    });
+  }
+
+  if (billedDuration > 0 && orgIdForAnalysis) {
+    await chargeVoiceCall({
+      db,
+      organizationId: orgIdForAnalysis,
+      userId: session.user_id,
+      callId: session.id,
+      durationSec: billedDuration,
+      voiceAgentId: session.voice_agent_id,
+      voiceProvider: "elevenlabs",
+      metadata: { conversation_id: input.conversationId, source: kind },
+    });
   }
 
   await updatePhoneTestCallSession(input.conversationId, {

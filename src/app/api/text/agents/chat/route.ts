@@ -14,6 +14,7 @@ import { generateTextAgentReply } from "@/lib/text-agent-generate";
 import { persistChatTurn } from "@/lib/text-conversation-persist";
 import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
 import { checkBillingForUser, recordUsageSafe } from "@/lib/billing/meter";
+import { providerForLlmModel } from "@/lib/billing/pricing";
 import { resolveOrgActiveWhatsAppChannel } from "@/lib/text-notify-team";
 import { getActiveCalendarConnection } from "@/lib/google-calendar/connections-db";
 import { getOrgBusinessHours } from "@/lib/scheduling/business-hours-db";
@@ -195,7 +196,7 @@ export async function POST(req: NextRequest) {
         userId,
         eventType: "text_test",
         channel: "web_test",
-        provider: "google",
+        provider: providerForLlmModel(model),
         model,
         gemini: generated.usage,
         referenceType: "text_agent_conversation",

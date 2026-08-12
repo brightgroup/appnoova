@@ -6,6 +6,7 @@ import {
   type CrmAiFieldSuggestion,
   type CrmExtractableField
 } from "@/lib/crm-ai-extract";
+import { recordOriUsageForUser } from "@/lib/billing/meter";
 import { canAutoUpdateField } from "@/lib/crm-contact-provenance";
 import { toCrmContact } from "@/lib/crm-record";
 import type { CrmContact, CrmFieldProvenance } from "@/types/crm";
@@ -118,8 +119,21 @@ export async function enrichCrmContactFromWhatsAppConversation(
 
   let suggestions: CrmAiFieldSuggestion[];
   try {
-    const result = await extractContactFieldsFromConversation(messages, contact);
-    suggestions = result.suggestions.filter(s => REALTIME_AI_FIELDS.includes(s.field));
+    const extracted = await extractContactFieldsFromConversation(messages, contact);
+    suggestions = extracted.result.suggestions.filter(s => REALTIME_AI_FIELDS.includes(s.field));
+    // Enriquecimiento automático en tiempo real (no un botón que el cliente presionó):
+    // costo real visible en /admin/consumption, sin cobrar crédito.
+    await recordOriUsageForUser({
+      db,
+      userId,
+      eventType: "form_fill",
+      usage: extracted.usage,
+      model: extracted.model,
+      creditsOverride: 0,
+      channel: "crm_contact_realtime_enrich",
+      referenceType: "crm_contact",
+      referenceId: contactId
+    });
   } catch (err) {
     console.error("[crm/enrich] extract:", err);
     return { updated: [] };

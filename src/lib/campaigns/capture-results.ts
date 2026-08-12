@@ -1,6 +1,7 @@
 import { adminClient } from "@/lib/voice-agents-server";
 import { getOriApiKey } from "@/lib/google-ai";
 import { runOriJsonPrompt } from "@/lib/crm-gemini";
+import { recordUsageSafe } from "@/lib/billing/meter";
 import { toVoiceCampaignRecord } from "@/lib/campaigns/record";
 import { primaryOutputField } from "@/lib/campaigns/output-fields";
 import { parseSupresiones } from "@/lib/crm-contactability";
@@ -336,7 +337,7 @@ export async function captureCampaignCallResults(input: {
 
   try {
     const prompt = `Campos a capturar:\n${fieldSpecLines(fields)}\n\nTranscripción de la llamada:\n${dialogue}`;
-    const raw = await runOriJsonPrompt<{ campos?: Record<string, unknown>; no_volver_a_llamar?: boolean }>(
+    const { result: raw, usage, model } = await runOriJsonPrompt<{ campos?: Record<string, unknown>; no_volver_a_llamar?: boolean }>(
       CAPTURE_SYSTEM,
       fields.length > 0
         ? prompt
@@ -344,6 +345,27 @@ export async function captureCampaignCallResults(input: {
     );
     captured = raw.campos ?? {};
     optOut = Boolean(raw.no_volver_a_llamar);
+
+    const organizationId = (campaignRaw as Record<string, unknown>).organization_id;
+    if (organizationId) {
+      // Captura post-llamada automática — el crédito de la llamada ya se cobró; solo
+      // se deja el costo real de este análisis visible en /admin/consumption.
+      await recordUsageSafe({
+        db,
+        organizationId: String(organizationId),
+        userId: (campaignRaw as Record<string, unknown>).user_id
+          ? String((campaignRaw as Record<string, unknown>).user_id)
+          : null,
+        eventType: "ori",
+        provider: "google",
+        model,
+        gemini: usage,
+        creditsOverride: 0,
+        channel: "campaign_capture",
+        referenceType: "campaign_audience_row",
+        referenceId: input.audienceRowId
+      });
+    }
   } catch (err) {
     console.error("[campaign-capture] extract:", err);
     return;

@@ -6,6 +6,7 @@ import {
   extractContactFieldsFromDocument,
   suggestionsToPatch
 } from "@/lib/crm-ai-extract";
+import { recordOriUsageForUser } from "@/lib/billing/meter";
 import { toCrmContact } from "@/lib/crm-record";
 import type { CrmFieldProvenance } from "@/types/crm";
 
@@ -56,7 +57,18 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   const base64 = buffer.toString("base64");
 
   try {
-    const { suggestions } = await extractContactFieldsFromDocument(base64, mimeType, contact);
+    const { result, usage, model } = await extractContactFieldsFromDocument(base64, mimeType, contact);
+    const { suggestions } = result;
+    await recordOriUsageForUser({
+      db,
+      userId,
+      eventType: "doc_scan",
+      usage,
+      model,
+      channel: "crm_document_scan",
+      referenceType: "crm_contact",
+      referenceId: id
+    });
 
     if (!applyFields.length) {
       return NextResponse.json({ suggestions, filename: file.name });

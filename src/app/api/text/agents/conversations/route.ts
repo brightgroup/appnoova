@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isMissingTableError } from "@/lib/supabase-table-error";
 import { analyzeChatConversation, needsChatAnalysis } from "@/lib/text-chat-analysis";
+import { recordOriUsageForUser } from "@/lib/billing/meter";
 import { buildChatFallbackSummary, normalizeChatMessages } from "@/lib/text-chat-utils";
 import { toTextConversationListItem, toTextConversationRecord } from "@/lib/text-conversation-record";
 import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
@@ -114,6 +115,19 @@ export async function POST(req: NextRequest) {
     userSentiment = analysis.user_sentiment;
     extractedData = analysis.extracted_data;
     metadata = { ...metadata, analyzed_at: now.toISOString() };
+    // Análisis automático al finalizar la conversación — costo real visible en
+    // /admin/consumption, sin cobrar crédito aparte.
+    await recordOriUsageForUser({
+      db,
+      userId,
+      eventType: "ori",
+      usage: analysis.usage,
+      model: "gemini-2.5-flash",
+      creditsOverride: 0,
+      channel: "text_conversation_analysis",
+      referenceType: "text_agent_conversation",
+      referenceId: conversationId
+    });
   } else if (!summary) {
     summary = buildChatFallbackSummary(messages);
   }

@@ -2,11 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ensurePricingConfig } from "@/lib/billing/pricing-config";
 import {
   creditsForEvent,
+  creditsFromUsdPrice,
   geminiCostUsd,
   usdToCop,
   voiceBillableMinutes,
   getTwilioWaUsdPerMsg,
+  getMetaWaUsdPerMsg,
   getVoiceUsdPerMinute,
+  getUsageMarginMultiplier,
   creditsForVoiceDuration,
   type UsageEventType,
   type VoiceBillingProvider,
@@ -114,7 +117,7 @@ export interface RecordUsageInput {
   quantity?: number;
   /** Sobrescribe los créditos calculados. */
   creditsOverride?: number;
-  provider?: "google" | "twilio" | "telnyx" | "elevenlabs" | null;
+  provider?: "google" | "twilio" | "meta" | "telnyx" | "elevenlabs" | "anthropic" | null;
   model?: string | null;
   gemini?: GeminiUsage | null;
   /** Mensajes Twilio involucrados (entrante + saliente) para el costo real. */
@@ -145,7 +148,7 @@ export async function recordUsage(input: RecordUsageInput): Promise<RecordUsageR
   await ensurePricingConfig(input.db);
 
   const quantity = input.quantity ?? 1;
-  const credits =
+  const flatCredits =
     input.creditsOverride != null
       ? Math.max(0, Math.round(input.creditsOverride))
       : creditsForEvent(input.eventType, quantity);
@@ -161,7 +164,10 @@ export async function recordUsage(input: RecordUsageInput): Promise<RecordUsageR
       );
     }
     if (input.twilioMessages) {
-      providerCostUsd += input.twilioMessages * getTwilioWaUsdPerMsg();
+      // El campo se llama "twilioMessages" por historia, pero representa mensajes de
+      // WhatsApp en general — la tarifa depende del proveedor real de entrega.
+      const waRate = input.provider === "meta" ? getMetaWaUsdPerMsg() : getTwilioWaUsdPerMsg();
+      providerCostUsd += input.twilioMessages * waRate;
     }
     if (input.voiceMinutes) {
       const voiceProvider: VoiceBillingProvider =
@@ -169,6 +175,19 @@ export async function recordUsage(input: RecordUsageInput): Promise<RecordUsageR
       providerCostUsd += input.voiceMinutes * getVoiceUsdPerMinute(voiceProvider);
     }
   }
+
+  // Piso de margen: si el turno resultó más caro que lo que el precio plano cubre
+  // (imagen/PDF pesado, modelo premium tipo Claude), se cobra según el costo real ×
+  // margen en vez del precio plano — así ningún turno se cobra por debajo de su costo.
+  // No aplica cuando el caller ya fijó un `creditsOverride` explícito (trabajo interno
+  // absorbido, o la línea de "entrega" de un evento ya cobrado en su línea hermana).
+  const credits =
+    input.creditsOverride != null
+      ? flatCredits
+      : Math.max(
+          flatCredits,
+          creditsFromUsdPrice(providerCostUsd * getUsageMarginMultiplier())
+        );
 
   const providerCostCop = usdToCop(providerCostUsd);
 
@@ -231,6 +250,42 @@ export async function recordUsageSafe(input: RecordUsageInput): Promise<void> {
   } catch (err) {
     console.error(`[billing] recordUsage (${input.eventType}) threw:`, err);
   }
+}
+
+/**
+ * Registra el consumo de una llamada Gemini "suelta" (cotización, extracción de campos,
+ * enriquecimiento de lead, captura de campaña) resolviendo la org desde el userId.
+ * `creditsOverride: 0` para trabajo interno/automático que no se le cobra al cliente
+ * (el costo real igual queda visible en /admin/consumption).
+ */
+export async function recordOriUsageForUser(input: {
+  db: SupabaseClient;
+  userId: string;
+  eventType: UsageEventType;
+  usage: GeminiUsage;
+  model: string;
+  creditsOverride?: number;
+  channel?: string | null;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  idempotencyKey?: string | null;
+}): Promise<void> {
+  const orgId = await resolveOrgIdForUser(input.db, input.userId);
+  if (!orgId) return;
+  await recordUsageSafe({
+    db: input.db,
+    organizationId: orgId,
+    userId: input.userId,
+    eventType: input.eventType,
+    channel: input.channel ?? null,
+    provider: "google",
+    model: input.model,
+    gemini: input.usage,
+    creditsOverride: input.creditsOverride,
+    referenceType: input.referenceType ?? null,
+    referenceId: input.referenceId ?? null,
+    idempotencyKey: input.idempotencyKey ?? null
+  });
 }
 
 /** Descuenta créditos de voz por minutos (mín. 1 min si hubo duración). Idempotente por callId. */

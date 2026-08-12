@@ -95,7 +95,8 @@ export async function GET(req: NextRequest) {
   const balances = resolveBillingBalances(wallet, planMonthlyCredits);
   const planPromo = resolvePlanPromo(subscription, catalogPlan, planMonthlyCredits);
 
-  let usage: { event_type: string; events: number; credits: number; cost_cop: number }[] = [];
+  // No incluir cost_cop (costo real de proveedor): el cliente solo ve créditos, nunca costo interno.
+  let usage: { event_type: string; events: number; credits: number }[] = [];
   if (wallet) {
     const { data: summary } = await db.rpc("billing_usage_summary", {
       p_org: orgId,
@@ -106,7 +107,6 @@ export async function GET(req: NextRequest) {
       event_type: String(r.event_type),
       events: Number(r.events ?? 0),
       credits: Number(r.credits ?? 0),
-      cost_cop: Number(r.cost_cop ?? 0),
     }));
   }
 

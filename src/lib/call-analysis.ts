@@ -1,12 +1,16 @@
 import { GoogleGenAI } from "@google/genai";
 import { getOriApiKey, getOriModel } from "@/lib/google-ai";
 import { buildFallbackSummary } from "@/lib/voice-call-utils";
+import { readGeminiUsage, type GeminiUsage } from "@/lib/billing/meter";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
+
+const EMPTY_USAGE: GeminiUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
 export interface CallAnalysisResult {
   summary: string;
   user_sentiment: string;
   extracted_data: Record<string, unknown>;
+  usage: GeminiUsage;
 }
 
 const SENTIMENTS = ["Positivo", "Neutral", "Negativo"] as const;
@@ -101,7 +105,8 @@ export async function analyzeCallTranscript(
   const fallback: CallAnalysisResult = {
     summary: buildFallbackSummary(transcript),
     user_sentiment: "Neutral",
-    extracted_data: buildFallbackExtractedData(transcript)
+    extracted_data: buildFallbackExtractedData(transcript),
+    usage: EMPTY_USAGE
   };
 
   if (!transcript.length) return fallback;
@@ -160,7 +165,8 @@ ${dialogue}`
     return {
       summary: parsed.summary,
       user_sentiment: sentiment,
-      extracted_data: normalizeExtractedData(extractedRaw, transcript)
+      extracted_data: normalizeExtractedData(extractedRaw, transcript),
+      usage: readGeminiUsage(res)
     };
   } catch (err) {
     console.error("[call-analysis] error:", err);

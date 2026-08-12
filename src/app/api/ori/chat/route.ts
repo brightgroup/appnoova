@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 import { getOriApiKey, getOriModel } from "@/lib/google-ai";
+import { getAnthropicApiKey, readClaudeUsage } from "@/lib/text-agent-generate-claude";
+import { resolveTextLlm } from "@/lib/text-agent-options";
 import { buildOriSystemInstruction } from "@/lib/merge-ori-context";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 import { getTimeRules } from "@/lib/call-engine/platform-config";
@@ -15,6 +18,7 @@ import {
   readGeminiUsage,
   recordUsageSafe
 } from "@/lib/billing/meter";
+import { providerForLlmModel } from "@/lib/billing/pricing";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -41,6 +45,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const messages = (body.messages ?? []) as ChatMessage[];
   const companyContextId = body.company_context_id as string | undefined;
+  // Si el usuario no elige modelo, sigue el default de siempre (Gemini vía ORI_GEMINI_MODEL).
+  const model = body.model ? resolveTextLlm(String(body.model)) : getOriModel();
   const lastUser = [...messages].reverse().find(m => m.role === "user");
 
   if (!lastUser?.content?.trim()) {
@@ -99,26 +105,45 @@ export async function POST(req: NextRequest) {
     platformHelp,
     temporal.promptBlock
   );
-  const model = getOriModel();
-  const ai = new GoogleGenAI({ apiKey });
-
-  const contents = messages.map(m => ({
-    role: m.role === "assistant" ? "model" as const : "user" as const,
-    parts: [{ text: m.content }]
-  }));
 
   try {
-    const response = await ai.models.generateContent({
-      model,
-      contents,
-      config: {
-        systemInstruction,
-        temperature: 0.7,
-        maxOutputTokens: 2048
-      }
-    });
+    let reply: string;
+    let usage: ReturnType<typeof readGeminiUsage>;
 
-    const reply = response.text?.trim();
+    if (model.startsWith("claude-")) {
+      const client = new Anthropic({ apiKey: getAnthropicApiKey() });
+      const response = await client.messages.create({
+        model,
+        system: systemInstruction,
+        max_tokens: 2048,
+        temperature: 0.7,
+        messages: messages.map(m => ({ role: m.role, content: m.content }))
+      });
+      reply = response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map(b => b.text)
+        .join("\n")
+        .trim();
+      usage = readClaudeUsage(response);
+    } else {
+      const ai = new GoogleGenAI({ apiKey });
+      const contents = messages.map(m => ({
+        role: m.role === "assistant" ? "model" as const : "user" as const,
+        parts: [{ text: m.content }]
+      }));
+      const response = await ai.models.generateContent({
+        model,
+        contents,
+        config: {
+          systemInstruction,
+          temperature: 0.7,
+          maxOutputTokens: 2048
+        }
+      });
+      reply = response.text?.trim() ?? "";
+      usage = readGeminiUsage(response);
+    }
+
     if (!reply) {
       return NextResponse.json({ error: "Ori no generó respuesta" }, { status: 502 });
     }
@@ -130,9 +155,9 @@ export async function POST(req: NextRequest) {
         userId,
         eventType: "ori",
         channel: "ori",
-        provider: "google",
+        provider: providerForLlmModel(model),
         model,
-        gemini: readGeminiUsage(response)
+        gemini: usage
       });
     }
 

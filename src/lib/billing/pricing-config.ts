@@ -6,6 +6,7 @@ import {
   DEFAULT_PROVIDER_RATE_META,
   DEFAULT_TRM_COP,
   DEFAULT_UNIT_PRICE_META,
+  DEFAULT_USAGE_MARGIN_MULTIPLIER,
   type ProviderRateMeta,
   type UnitPriceMeta,
 } from "@/lib/billing/pricing-defaults";
@@ -20,6 +21,8 @@ export interface PricingConfig {
   unitPriceMeta: UnitPriceMeta[];
   providerRates: Record<string, number>;
   providerRateMeta: ProviderRateMeta[];
+  /** Piso de margen (× costo real) para turnos caros — ver DEFAULT_USAGE_MARGIN_MULTIPLIER. */
+  usageMarginMultiplier: number;
   loadedAt: number;
 }
 
@@ -47,6 +50,7 @@ function buildFromDefaults(): PricingConfig {
     unitPriceMeta: DEFAULT_UNIT_PRICE_META.map((r) => ({ ...r })),
     providerRates: { ...DEFAULT_PROVIDER_RATES },
     providerRateMeta: DEFAULT_PROVIDER_RATE_META.map((r) => ({ ...r })),
+    usageMarginMultiplier: DEFAULT_USAGE_MARGIN_MULTIPLIER,
     loadedAt: Date.now(),
   };
 }
@@ -82,6 +86,10 @@ export async function refreshPricingConfig(db: SupabaseClient): Promise<PricingC
     if (row.key === "credit_usd_value") {
       const v = Number(row.value);
       if (Number.isFinite(v) && v > 0) next.creditUsdValue = v;
+    }
+    if (row.key === "usage_margin_multiplier") {
+      const v = Number(row.value);
+      if (Number.isFinite(v) && v >= 1) next.usageMarginMultiplier = v;
     }
   }
 

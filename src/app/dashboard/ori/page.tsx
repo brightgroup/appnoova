@@ -10,6 +10,9 @@ import { getAuthHeaders } from "@/lib/voice-agents-api";
 import type { CompanyContext } from "@/types/company-context";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import { Badge } from "@/components/ui/Badge";
+import { TEXT_LLM_MODELS, DEFAULT_TEXT_MODEL, resolveTextLlm } from "@/lib/text-agent-options";
+
+const ORI_MODEL_STORAGE_KEY = "noova_ori_model";
 
 interface Message {
   id: string;
@@ -53,6 +56,7 @@ export default function OriCopilotoPage() {
   const [error, setError] = useState("");
   const [contexts, setContexts] = useState<CompanyContext[]>([]);
   const [contextId, setContextId] = useState<string>("");
+  const [model, setModel] = useState<string>(DEFAULT_TEXT_MODEL);
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasChat = messages.length > 0;
@@ -82,6 +86,16 @@ export default function OriCopilotoPage() {
   }, []);
 
   useEffect(() => {
+    const saved = localStorage.getItem(ORI_MODEL_STORAGE_KEY);
+    if (saved) setModel(resolveTextLlm(saved));
+  }, []);
+
+  const handleModelChange = (v: string) => {
+    setModel(v);
+    localStorage.setItem(ORI_MODEL_STORAGE_KEY, v);
+  };
+
+  useEffect(() => {
     if (!hasChat) return;
     const el = chatAreaRef.current;
     if (!el) return;
@@ -106,7 +120,8 @@ export default function OriCopilotoPage() {
         headers,
         body: JSON.stringify({
           messages: nextMessages,
-          company_context_id: contextId || undefined
+          company_context_id: contextId || undefined,
+          model
         })
       });
       const data = await res.json();
@@ -123,7 +138,7 @@ export default function OriCopilotoPage() {
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, contextId]);
+  }, [messages, loading, contextId, model]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -157,6 +172,13 @@ export default function OriCopilotoPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <NoovaSelect
+            value={model}
+            onChange={handleModelChange}
+            allowEmpty={false}
+            className="w-auto min-w-[140px]"
+            options={TEXT_LLM_MODELS.map(m => ({ value: m.id, label: m.label }))}
+          />
           {contexts.length > 0 && (
             <NoovaSelect
               value={contextId}

@@ -8,6 +8,7 @@ import {
   iaProvenanceEntry,
   suggestionsToPatch
 } from "@/lib/crm-ai-extract";
+import { recordOriUsageForUser } from "@/lib/billing/meter";
 import { toCrmContact } from "@/lib/crm-record";
 import type { CrmFieldProvenance } from "@/types/crm";
 
@@ -47,10 +48,20 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
     .maybeSingle();
 
   try {
-    const result = await extractContactFieldsFromConversation(
+    const { result, usage, model } = await extractContactFieldsFromConversation(
       normalizeMessages(conv?.messages),
       contact
     );
+    await recordOriUsageForUser({
+      db,
+      userId,
+      eventType: "form_fill",
+      usage,
+      model,
+      channel: "crm_ai_capture",
+      referenceType: "crm_contact",
+      referenceId: id
+    });
     return NextResponse.json(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error de IA";
@@ -95,7 +106,17 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       normalizeMessages(conv?.messages),
       contact
     );
-    suggestions = extracted.suggestions;
+    suggestions = extracted.result.suggestions;
+    await recordOriUsageForUser({
+      db,
+      userId,
+      eventType: "form_fill",
+      usage: extracted.usage,
+      model: extracted.model,
+      channel: "crm_ai_capture",
+      referenceType: "crm_contact",
+      referenceId: id
+    });
   }
 
   if (!suggestions?.length) {

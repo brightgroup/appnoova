@@ -4,7 +4,7 @@ import { getPhoneTestCallSession, updatePhoneTestCallSession, labelForManagedOut
 import { managedOutboundOutcomeLabel } from "@/lib/telephony/call-outcome";
 import { loadVoiceAgentForCall } from "@/lib/telephony/load-voice-agent";
 import { uploadCallRecording } from "@/lib/voice-call-storage";
-import { chargeVoiceCall, resolveOrgIdForUser } from "@/lib/billing/meter";
+import { chargeVoiceCall, recordUsageSafe, resolveOrgIdForUser } from "@/lib/billing/meter";
 import {
   mapCallToTechnicalDisposition,
   resolveCampaignContextFromSession,
@@ -71,7 +71,7 @@ export async function finalizePhoneTestCall(input: {
       finalized_at: new Date().toISOString()
     }
   });
-  const { dbFields, callsCountNext } = splitCallRecordFields(built);
+  const { dbFields, callsCountNext, analysisUsage } = splitCallRecordFields(built);
 
   const db = adminClient();
   const { error: updateError } = await db
@@ -114,20 +114,35 @@ export async function finalizePhoneTestCall(input: {
 
   await updateAgentCallsCount(db, session.voice_agent_id, callsCountNext);
 
-  if (durationSec > 0) {
-    const orgId = await resolveOrgIdForUser(db, session.user_id);
-    if (orgId) {
-      await chargeVoiceCall({
-        db,
-        organizationId: orgId,
-        userId: session.user_id,
-        callId: session.id,
-        durationSec,
-        voiceAgentId: session.voice_agent_id,
-        voiceProvider: agent.config.voice_provider === "elevenlabs" ? "elevenlabs" : "google",
-        metadata: { call_control_id: input.callControlId, source: "phone_test" }
-      });
-    }
+  const orgIdForAnalysis = await resolveOrgIdForUser(db, session.user_id);
+  if (orgIdForAnalysis && analysisUsage && analysisUsage.totalTokens > 0) {
+    await recordUsageSafe({
+      db,
+      organizationId: orgIdForAnalysis,
+      userId: session.user_id,
+      eventType: "ori",
+      provider: "google",
+      model: "gemini-2.5-flash",
+      gemini: analysisUsage,
+      creditsOverride: 0,
+      channel: "voice_call_analysis",
+      referenceType: "voice_agent_call",
+      referenceId: session.id,
+      idempotencyKey: `call_analysis_${session.id}`
+    });
+  }
+
+  if (durationSec > 0 && orgIdForAnalysis) {
+    await chargeVoiceCall({
+      db,
+      organizationId: orgIdForAnalysis,
+      userId: session.user_id,
+      callId: session.id,
+      durationSec,
+      voiceAgentId: session.voice_agent_id,
+      voiceProvider: agent.config.voice_provider === "elevenlabs" ? "elevenlabs" : "google",
+      metadata: { call_control_id: input.callControlId, source: "phone_test" }
+    });
   }
 
   const kind = managedOutboundKind(meta as unknown as Record<string, unknown>);

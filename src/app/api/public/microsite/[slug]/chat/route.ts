@@ -13,6 +13,7 @@ import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
 import { resolvePublicChatChannel } from "@/lib/widget-channel";
 import { getOriApiKey } from "@/lib/google-ai";
+import { providerForLlmModel } from "@/lib/billing/pricing";
 import { buildDataTableContext } from "@/lib/data-tables/retrieve";
 import { mergeDataTableContext, resolveProductCards } from "@/lib/data-tables/format-context";
 import { enforceCatalogFacts } from "@/lib/data-tables/catalog-guard";
@@ -357,7 +358,7 @@ export async function POST(
         userId,
         eventType: billingEventType,
         channel,
-        provider: "google",
+        provider: providerForLlmModel(model),
         model,
         gemini: generated.usage,
         referenceType: "text_agent_conversation",

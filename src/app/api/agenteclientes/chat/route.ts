@@ -3,13 +3,25 @@ import { GoogleGenAI } from "@google/genai";
 import { getOriApiKey, getOriModel } from "@/lib/google-ai";
 import { ORI_SYSTEM_PROMPT } from "@/lib/ori-prompt";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
+import { getUserIdFromRequest } from "@/lib/voice-agents-server";
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
 
+/**
+ * Demo interna de ventas ("Allianz" hardcodeado en broker-config.ts), no una
+ * función de ningún cliente pagador. Antes era 100% pública y sin límite —
+ * cualquiera podía golpearla gratis usando ORI_GOOGLE_AI_KEY sin dejar rastro
+ * en /admin/consumption. Ahora requiere sesión de Noova.
+ */
 export async function POST(req: NextRequest) {
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) {
+    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+
   const apiKey = getOriApiKey();
   if (!apiKey) {
     return NextResponse.json(

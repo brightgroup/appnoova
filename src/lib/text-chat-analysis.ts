@@ -1,12 +1,16 @@
 import { GoogleGenAI } from "@google/genai";
 import { getOriApiKey, getOriModel } from "@/lib/google-ai";
 import { buildChatFallbackSummary } from "@/lib/text-chat-utils";
+import { readGeminiUsage, type GeminiUsage } from "@/lib/billing/meter";
 import type { TextChatMessage } from "@/types/text-agent-conversation";
+
+const EMPTY_USAGE: GeminiUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
 export interface ChatAnalysisResult {
   summary: string;
   user_sentiment: string;
   extracted_data: Record<string, unknown>;
+  usage: GeminiUsage;
 }
 
 const SENTIMENTS = ["Positivo", "Neutral", "Negativo"] as const;
@@ -99,7 +103,8 @@ export async function analyzeChatConversation(
   const fallback: ChatAnalysisResult = {
     summary: buildChatFallbackSummary(messages),
     user_sentiment: "Neutral",
-    extracted_data: buildFallbackExtractedData(messages)
+    extracted_data: buildFallbackExtractedData(messages),
+    usage: EMPTY_USAGE
   };
 
   if (messages.length < 2) return fallback;
@@ -156,7 +161,8 @@ ${dialogue}`
     return {
       summary: parsed.summary,
       user_sentiment: sentiment,
-      extracted_data: normalizeExtractedData(extractedRaw, messages)
+      extracted_data: normalizeExtractedData(extractedRaw, messages),
+      usage: readGeminiUsage(res)
     };
   } catch (err) {
     console.error("[text-chat-analysis] error:", err);

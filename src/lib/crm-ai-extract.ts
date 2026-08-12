@@ -1,6 +1,6 @@
 import type { TextChatMessage } from "@/types/text-agent-conversation";
 import type { CrmContact, CrmFieldProvenanceEntry } from "@/types/crm";
-import { runOriJsonPrompt } from "@/lib/crm-gemini";
+import { runOriJsonPrompt, type OriPromptResult } from "@/lib/crm-gemini";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
 
 const EXTRACTABLE_FIELDS = [
@@ -46,12 +46,14 @@ function formatTranscript(messages: TextChatMessage[]): string {
     .join("\n");
 }
 
+const EMPTY_USAGE = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+
 export async function extractContactFieldsFromConversation(
   messages: TextChatMessage[],
   current: Partial<CrmContact>
-): Promise<CrmAiExtractResult> {
+): Promise<OriPromptResult<CrmAiExtractResult>> {
   const transcript = formatTranscript(messages);
-  if (!transcript.trim()) return { suggestions: [] };
+  if (!transcript.trim()) return { result: { suggestions: [] }, usage: EMPTY_USAGE, model: "" };
 
   const prompt = `Contacto actual (JSON): ${JSON.stringify({
     name: current.name,
@@ -71,20 +73,23 @@ ${transcript}
 
 Extrae solo campos nuevos o que corrigen datos vacíos/incorrectos.`;
 
-  const raw = await runOriJsonPrompt<{ suggestions?: CrmAiFieldSuggestion[] }>(EXTRACT_SYSTEM, prompt);
+  const { result: raw, usage, model } = await runOriJsonPrompt<{ suggestions?: CrmAiFieldSuggestion[] }>(
+    EXTRACT_SYSTEM,
+    prompt
+  );
   const suggestions = (raw.suggestions ?? []).filter(s =>
     EXTRACTABLE_FIELDS.includes(s.field as CrmExtractableField) &&
     s.value != null &&
     String(s.value).trim() !== ""
   );
-  return { suggestions };
+  return { result: { suggestions }, usage, model };
 }
 
 export async function extractContactFieldsFromDocument(
   fileBase64: string,
   mimeType: string,
   current: Partial<CrmContact>
-): Promise<CrmAiExtractResult> {
+): Promise<OriPromptResult<CrmAiExtractResult>> {
   const { runOriDocumentExtract } = await import("@/lib/crm-gemini");
   const prompt = `Documento del contacto. Datos actuales: ${JSON.stringify({
     name: current.name,
@@ -93,7 +98,7 @@ export async function extractContactFieldsFromDocument(
   })}
 Extrae campos de identidad y contacto visibles en el documento.`;
 
-  const raw = await runOriDocumentExtract<{ suggestions?: CrmAiFieldSuggestion[] }>(
+  const { result: raw, usage, model } = await runOriDocumentExtract<{ suggestions?: CrmAiFieldSuggestion[] }>(
     EXTRACT_SYSTEM,
     prompt,
     fileBase64,
@@ -102,7 +107,7 @@ Extrae campos de identidad y contacto visibles en el documento.`;
   const suggestions = (raw.suggestions ?? []).filter(s =>
     EXTRACTABLE_FIELDS.includes(s.field as CrmExtractableField)
   );
-  return { suggestions };
+  return { result: { suggestions }, usage, model };
 }
 
 export function iaProvenanceEntry(confidence: "alta" | "media" | "baja"): CrmFieldProvenanceEntry {
@@ -175,7 +180,7 @@ export async function generateOriQuote(
       stage_name?: string | null;
     };
   }
-): Promise<CrmQuoteRecord> {
+): Promise<OriPromptResult<CrmQuoteRecord>> {
   const { runOriTextPrompt } = await import("@/lib/crm-gemini");
 
   const baseSystem = `Eres Ori, copiloto comercial en Colombia. Genera cotizaciones claras, profesionales y en español colombiano.
@@ -211,7 +216,7 @@ Responde en dos bloques separados por "---WHATSAPP---":
 1) Cotización completa (para PDF o email)
 2) Mensaje corto para WhatsApp (máx 900 caracteres)`;
 
-  const raw = await runOriTextPrompt(system, prompt);
+  const { result: raw, usage, model } = await runOriTextPrompt(system, prompt);
   const [body, whatsapp_message = ""] = raw.split("---WHATSAPP---").map(s => s.trim());
 
   const title = ctx?.lead
@@ -220,12 +225,16 @@ Responde en dos bloques separados por "---WHATSAPP---":
   const summary = body.split("\n").find(l => l.trim().length > 20)?.slice(0, 120) ?? "Cotización generada por ORI";
 
   return {
-    id: crypto.randomUUID(),
-    created_at: new Date().toISOString(),
-    title,
-    summary,
-    body,
-    whatsapp_message: whatsapp_message || body.slice(0, 900)
+    result: {
+      id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
+      title,
+      summary,
+      body,
+      whatsapp_message: whatsapp_message || body.slice(0, 900)
+    },
+    usage,
+    model
   };
 }
 
@@ -233,6 +242,6 @@ Responde en dos bloques separados por "---WHATSAPP---":
 export async function generateContactQuote(
   contact: CrmContact,
   labels?: { producto?: string; categoria?: string }
-): Promise<CrmQuoteRecord> {
+): Promise<OriPromptResult<CrmQuoteRecord>> {
   return generateOriQuote(contact, { labels });
 }

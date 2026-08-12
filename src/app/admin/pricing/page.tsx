@@ -97,6 +97,8 @@ export default function AdminPricingPage() {
   const [trmCop, setTrmCop] = useState(4200);
   const [creditUsdValue, setCreditUsdValue] = useState(0.0003);
   const [creditUsdDraft, setCreditUsdDraft] = useState("0.0003");
+  const [usageMarginMultiplier, setUsageMarginMultiplier] = useState(3);
+  const [marginDraft, setMarginDraft] = useState("3");
   const [creditsPerUsd, setCreditsPerUsd] = useState(350000 / 82);
   const [unitPrices, setUnitPrices] = useState<UnitPrice[]>([]);
   const [providerRates, setProviderRates] = useState<ProviderRate[]>([]);
@@ -127,6 +129,8 @@ export default function AdminPricingPage() {
       setTrmDraft(String(json.trm_cop ?? 4200));
       setCreditUsdValue(Number(json.credit_usd_value ?? 0.0003));
       setCreditUsdDraft(String(json.credit_usd_value ?? 0.0003));
+      setUsageMarginMultiplier(Number(json.usage_margin_multiplier ?? 3));
+      setMarginDraft(String(json.usage_margin_multiplier ?? 3));
       setTrmEffectiveDate(json.trm_effective_date ?? null);
       if (json.trm_updated) {
         setMsg(`TRM actualizada a ${fmtTrm(Number(json.trm_cop))} COP/USD (oficial)`);
@@ -197,6 +201,19 @@ export default function AdminPricingPage() {
       if (!crRes.ok) {
         const j = await crRes.json();
         setError(j.error ?? "Error al guardar valor del crédito");
+        setSaving(false);
+        return;
+      }
+    }
+
+    if (marginDraft !== String(usageMarginMultiplier)) {
+      const mgRes = await authFetch("/api/admin/pricing", {
+        method: "PATCH",
+        body: JSON.stringify({ usage_margin_multiplier: Number(marginDraft) }),
+      });
+      if (!mgRes.ok) {
+        const j = await mgRes.json();
+        setError(j.error ?? "Error al guardar el multiplicador de margen");
         setSaving(false);
         return;
       }
@@ -477,6 +494,17 @@ export default function AdminPricingPage() {
                     value={trmDraft}
                     onChange={(e) => setTrmDraft(e.target.value)}
                     className={inputSm + " w-28 text-left"}
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-gray-400" title="Piso de crédito para turnos caros (imagen/PDF pesado, modelo premium): se cobra el mayor entre el precio plano y costo real × este multiplicador">
+                  <span className="text-xs">Margen mín. (×costo)</span>
+                  <input
+                    type="number"
+                    min={1}
+                    step="0.1"
+                    value={marginDraft}
+                    onChange={(e) => setMarginDraft(e.target.value)}
+                    className={inputSm + " w-20 text-left"}
                   />
                 </label>
                 <span className="text-xs text-gray-500">

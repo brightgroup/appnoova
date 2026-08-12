@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     trm_cop: config.trmCop,
     credit_usd_value: config.creditUsdValue,
+    usage_margin_multiplier: config.usageMarginMultiplier,
     trm_effective_date: trmSync.effectiveFrom,
     trm_official_source: trmSync.source,
     trm_updated: trmSync.updated,
@@ -93,6 +94,21 @@ export async function PATCH(req: NextRequest) {
       });
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     }
+  }
+
+  if (body.usage_margin_multiplier != null) {
+    const m = Number(body.usage_margin_multiplier);
+    if (!Number.isFinite(m) || m < 1) {
+      return NextResponse.json({ error: "Multiplicador de margen inválido (mínimo 1)" }, { status: 400 });
+    }
+    const now = new Date().toISOString();
+    const { error } = await db.from("billing_settings").upsert({
+      key: "usage_margin_multiplier",
+      value: m,
+      updated_at: now,
+      updated_by: auth.userId,
+    });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   if (body.trm_cop != null) {

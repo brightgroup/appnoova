@@ -7,6 +7,7 @@ import {
   createEmptyChartDay,
   type BillingChartDay,
 } from "@/lib/billing/chart-categories";
+import { PROVIDER_LABELS } from "@/lib/billing/provider-labels";
 import { resolveConsumptionRange } from "@/lib/billing/consumption-range";
 import { ensurePricingConfig } from "@/lib/billing/pricing-config";
 
@@ -22,9 +23,27 @@ interface OrgConsumptionRow {
   cost_cop: number;
 }
 
+interface OrgProviderConsumptionRow {
+  organization_id: string;
+  org_name: string;
+  plan_id: string | null;
+  sub_status: string | null;
+  provider: string;
+  events: number;
+  credits: number;
+  cost_usd: number;
+  cost_cop: number;
+}
+
 interface ServiceCell {
   credits: number;
   cost_usd: number;
+  events: number;
+}
+
+interface ProviderCell {
+  cost_usd: number;
+  cost_cop: number;
   events: number;
 }
 
@@ -34,6 +53,7 @@ export interface AdminConsumptionClientRow {
   plan_id: string | null;
   status: string | null;
   services: Record<string, ServiceCell>;
+  providers: Record<string, ProviderCell>;
   total_credits: number;
   total_cost_usd: number;
   total_cost_cop: number;
@@ -66,8 +86,12 @@ export async function GET(req: NextRequest) {
   const db = adminClient();
   const pricing = await ensurePricingConfig(db);
 
-  const [byOrgRes, totalsRes, dailyRes] = await Promise.all([
+  const [byOrgRes, byOrgProviderRes, totalsRes, dailyRes] = await Promise.all([
     db.rpc("billing_admin_consumption_by_org", {
+      p_from: range.from,
+      p_to: range.to,
+    }),
+    db.rpc("billing_admin_consumption_by_org_provider", {
       p_from: range.from,
       p_to: range.to,
     }),
@@ -84,6 +108,9 @@ export async function GET(req: NextRequest) {
   if (byOrgRes.error) {
     return NextResponse.json({ error: byOrgRes.error.message }, { status: 500 });
   }
+  if (byOrgProviderRes.error) {
+    return NextResponse.json({ error: byOrgProviderRes.error.message }, { status: 500 });
+  }
   if (totalsRes.error) {
     return NextResponse.json({ error: totalsRes.error.message }, { status: 500 });
   }
@@ -94,16 +121,21 @@ export async function GET(req: NextRequest) {
   const rawRows = (byOrgRes.data ?? []) as OrgConsumptionRow[];
   const clientMap = new Map<string, AdminConsumptionClientRow>();
 
-  for (const row of rawRows) {
-    const orgId = String(row.organization_id);
+  function getOrCreateClient(
+    orgId: string,
+    name: string,
+    planId: string | null,
+    status: string | null
+  ): AdminConsumptionClientRow {
     let client = clientMap.get(orgId);
     if (!client) {
       client = {
         organization_id: orgId,
-        name: row.org_name,
-        plan_id: row.plan_id,
-        status: row.sub_status,
+        name,
+        plan_id: planId,
+        status,
         services: {},
+        providers: {},
         total_credits: 0,
         total_cost_usd: 0,
         total_cost_cop: 0,
@@ -111,6 +143,12 @@ export async function GET(req: NextRequest) {
       };
       clientMap.set(orgId, client);
     }
+    return client;
+  }
+
+  for (const row of rawRows) {
+    const orgId = String(row.organization_id);
+    const client = getOrCreateClient(orgId, row.org_name, row.plan_id, row.sub_status);
 
     const chartKey = chartKeyForEvent(row.event_type);
     const serviceKey = chartKey ?? row.event_type;
@@ -132,6 +170,19 @@ export async function GET(req: NextRequest) {
     client.total_events += events;
   }
 
+  // Segunda pasada — mismo total de costo, agrupado por proveedor real en vez de servicio.
+  // No suma a total_cost_usd de nuevo (ya viene de la pasada por servicio) para no duplicar.
+  const providerRows = (byOrgProviderRes.data ?? []) as OrgProviderConsumptionRow[];
+  for (const row of providerRows) {
+    const orgId = String(row.organization_id);
+    const client = getOrCreateClient(orgId, row.org_name, row.plan_id, row.sub_status);
+    client.providers[row.provider] = {
+      cost_usd: Number(row.cost_usd ?? 0),
+      cost_cop: Number(row.cost_cop ?? 0),
+      events: Number(row.events ?? 0),
+    };
+  }
+
   const clients = Array.from(clientMap.values()).sort(
     (a, b) => b.total_cost_usd - a.total_cost_usd || b.total_credits - a.total_credits
   );
@@ -149,6 +200,26 @@ export async function GET(req: NextRequest) {
     }
     return { key: cat.key, label: cat.label, color: cat.color, credits, cost_usd, events };
   }).filter((s) => s.credits > 0 || s.cost_usd > 0);
+
+  const providerKeysSeen = new Set<string>();
+  for (const client of clients) {
+    for (const key of Object.keys(client.providers)) providerKeysSeen.add(key);
+  }
+  const byProvider = Array.from(providerKeysSeen)
+    .map((key) => {
+      const meta = PROVIDER_LABELS[key] ?? { label: key, color: "#6b7280" };
+      let cost_usd = 0;
+      let events = 0;
+      for (const client of clients) {
+        const cell = client.providers[key];
+        if (!cell) continue;
+        cost_usd += cell.cost_usd;
+        events += cell.events;
+      }
+      return { key, label: meta.label, color: meta.color, cost_usd, events };
+    })
+    .filter((p) => p.cost_usd > 0)
+    .sort((a, b) => b.cost_usd - a.cost_usd);
 
   const daysMap = buildChartDays(range.from, range.to);
   for (const row of dailyRes.data ?? []) {
@@ -203,8 +274,11 @@ export async function GET(req: NextRequest) {
       google_cost_usd: Number(t.google_cost_usd ?? 0),
       telnyx_cost_usd: Number(t.telnyx_cost_usd ?? 0),
       elevenlabs_cost_usd: Number(t.elevenlabs_cost_usd ?? 0),
+      meta_cost_usd: Number(t.meta_cost_usd ?? 0),
+      anthropic_cost_usd: Number(t.anthropic_cost_usd ?? 0),
     },
     by_service: byService,
+    by_provider: byProvider,
     daily_chart: dailyChart,
     daily_cost_chart: dailyCostChart,
     daily_cost_usd: dailyCostUsd,

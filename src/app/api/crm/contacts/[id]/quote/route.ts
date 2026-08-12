@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
 import { getCrmUserId } from "@/lib/crm-auth";
 import { generateOriQuote, type CrmQuoteRecord } from "@/lib/crm-ai-extract";
+import { recordOriUsageForUser } from "@/lib/billing/meter";
 import { getDefaultCompanyContextContent } from "@/lib/company-context";
 import { getTenantLabels } from "@/lib/crm-labels";
 import { toCrmContact } from "@/lib/crm-record";
@@ -40,12 +41,23 @@ export async function POST(_req: NextRequest, ctx: Ctx) {
   const contact = toCrmContact(row);
 
   try {
-    const quote = await generateOriQuote(contact, {
+    const { result: quote, usage, model } = await generateOriQuote(contact, {
       labels: {
         categoria: labels.categoria_interes,
         producto: labels.producto_servicio
       },
       companyContext
+    });
+    await recordOriUsageForUser({
+      db,
+      userId,
+      eventType: "quote",
+      usage,
+      model,
+      channel: "crm_quote",
+      referenceType: "crm_contact",
+      referenceId: id,
+      idempotencyKey: `quote_${quote.id}`
     });
 
     const meta = (row.metadata as Record<string, unknown>) ?? {};
