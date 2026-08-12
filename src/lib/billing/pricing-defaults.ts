@@ -23,6 +23,10 @@ export const DEFAULT_CREDIT_COST: Record<UsageEventType, number> = {
   text_test: 10,
   whatsapp_ai: 60,
   whatsapp_manual: 30,
+  // Imagen/PDF por WhatsApp — antes iba escondido dentro del precio plano de
+  // whatsapp_ai, sin línea propia editable. 90 créditos cubre con margen sano
+  // tanto Gemini Flash como Claude Sonnet (el más caro de analizar).
+  whatsapp_media_ai: 90,
   voice: 900,
   voice_premium: 1200,
   voice_voicemail: 270,
@@ -84,6 +88,7 @@ export const DEFAULT_UNIT_PRICE_META: UnitPriceMeta[] = [
   { event_type: "text_test", label: "Prueba de agente", description: "Editor de agente", unit_label: "por mensaje", category: "milink", price_usd: usdFromCopCredits(10), credits_cop: 10, sort_order: 22, is_active: true },
   { event_type: "whatsapp_ai", label: "WhatsApp con IA", description: "Turno IA completo", unit_label: "por turno", category: "whatsapp", price_usd: usdFromCopCredits(60), credits_cop: 60, sort_order: 30, is_active: true },
   { event_type: "whatsapp_manual", label: "WhatsApp manual", description: "Sin IA", unit_label: "por mensaje", category: "whatsapp", price_usd: usdFromCopCredits(30), credits_cop: 30, sort_order: 31, is_active: true },
+  { event_type: "whatsapp_media_ai", label: "Imagen/PDF por WhatsApp", description: "Análisis de imagen o documento adjunto (Gemini o Claude, según el modelo del agente)", unit_label: "por archivo", category: "whatsapp", price_usd: usdFromCopCredits(90), credits_cop: 90, sort_order: 32, is_active: true },
   { event_type: "voice", label: "Voz estándar", description: "Gemini Live + Telnyx", unit_label: "por minuto", category: "voice", price_usd: usdFromCopCredits(900), credits_cop: 900, sort_order: 40, is_active: true },
   { event_type: "voice_premium", label: "Voz premium", description: "ElevenLabs + Telnyx", unit_label: "por minuto", category: "voice", price_usd: usdFromCopCredits(1200), credits_cop: 1200, sort_order: 41, is_active: true },
   { event_type: "voice_voicemail", label: "Buzón de voz", description: "Intento campaña — contestadora detectada", unit_label: "por intento", category: "voice", price_usd: usdFromCopCredits(270), credits_cop: 270, sort_order: 42, is_active: true },

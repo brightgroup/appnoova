@@ -84,8 +84,9 @@ async function resolveChannelOrgId(
  * a la IA, se va a opt-out, a handoff humano o se bloquea por falta de créditos.
  * En esos desvíos igual se gastó IA analizando el medio — se deja registrado (sin
  * cobrar crédito, ya que no hubo turno de IA) para que no desaparezca del costo real.
- * Puede haber uso en dos proveedores a la vez (imagen/PDF con Claude + audio con
- * Gemini en el mismo mensaje), así que se registra cada bucket por separado.
+ * Audio va a whatsapp_ai (como antes); imagen/PDF va a whatsapp_media_ai — misma
+ * separación que en el camino normal, para que /admin/consumption sea consistente
+ * sin importar por qué desvío pasó la conversación.
  */
 async function recordDivertedMediaUsage(
   db: SupabaseClient,
@@ -93,28 +94,47 @@ async function recordDivertedMediaUsage(
   userId: string,
   agentModel: string,
   conversationId: string | null,
-  mediaUsageByProvider: Record<"google" | "anthropic", ReturnType<typeof readGeminiUsage>>,
+  audioUsage: ReturnType<typeof readGeminiUsage>,
+  visualUsageByProvider: Record<"google" | "anthropic", ReturnType<typeof readGeminiUsage>>,
+  visualItemCount: number,
   idempotencyKeyPrefix: string
 ): Promise<void> {
   if (!orgId) return;
-  for (const provider of ["google", "anthropic"] as const) {
-    const usage = mediaUsageByProvider[provider];
-    if (!usage || usage.totalTokens <= 0) continue;
+
+  if (audioUsage.totalTokens > 0) {
     await recordUsageSafe({
       db,
       organizationId: orgId,
       userId,
       eventType: "whatsapp_ai",
       channel: WHATSAPP_CONVERSATION_CHANNEL,
+      provider: "google",
+      model: "gemini-2.5-flash",
+      gemini: audioUsage,
+      creditsOverride: 0,
+      referenceType: "text_agent_conversation",
+      referenceId: conversationId,
+      idempotencyKey: `${idempotencyKeyPrefix}_audio`
+    });
+  }
+
+  for (const provider of ["google", "anthropic"] as const) {
+    const usage = visualUsageByProvider[provider];
+    if (!usage || usage.totalTokens <= 0) continue;
+    await recordUsageSafe({
+      db,
+      organizationId: orgId,
+      userId,
+      eventType: "whatsapp_media_ai",
+      channel: WHATSAPP_CONVERSATION_CHANNEL,
       provider,
-      // El audio (google) siempre es Gemini Flash; imagen/PDF (anthropic) usa el
-      // modelo real del agente para que el costo se calcule con la tarifa correcta.
       model: provider === "anthropic" ? agentModel : "gemini-2.5-flash",
+      quantity: visualItemCount || 1,
       gemini: usage,
       creditsOverride: 0,
       referenceType: "text_agent_conversation",
       referenceId: conversationId,
-      idempotencyKey: `${idempotencyKeyPrefix}_${provider}`
+      idempotencyKey: `${idempotencyKeyPrefix}_visual_${provider}`
     });
   }
 }
@@ -358,7 +378,9 @@ export async function processTwilioWhatsAppInbound(
         channel.user_id,
         model,
         persisted.conversationId,
-        inboundContent.mediaUsageByProvider,
+        inboundContent.audioUsage,
+        inboundContent.visualUsageByProvider,
+        inboundContent.visualItemCount,
         `wa_optout_media_${inbound.messageSid}`
       );
     }
@@ -435,7 +457,9 @@ export async function processTwilioWhatsAppInbound(
         channel.user_id,
         model,
         persisted.conversationId,
-        inboundContent.mediaUsageByProvider,
+        inboundContent.audioUsage,
+        inboundContent.visualUsageByProvider,
+        inboundContent.visualItemCount,
         `wa_human_media_${inbound.messageSid}`
       );
 
@@ -491,7 +515,9 @@ export async function processTwilioWhatsAppInbound(
           channel.user_id,
           model,
           blockedPersist.conversationId,
-          inboundContent.mediaUsageByProvider,
+          inboundContent.audioUsage,
+          inboundContent.visualUsageByProvider,
+          inboundContent.visualItemCount,
           `wa_nocredit_media_${inbound.messageSid}`
         );
       }
@@ -584,7 +610,9 @@ export async function processTwilioWhatsAppInbound(
         channel.user_id,
         model,
         userPersist.conversationId,
-        inboundContent.mediaUsageByProvider,
+        inboundContent.audioUsage,
+        inboundContent.visualUsageByProvider,
+        inboundContent.visualItemCount,
         `wa_handoff_media_${inbound.messageSid}`
       );
     }
@@ -739,17 +767,14 @@ export async function processTwilioWhatsAppInbound(
     }
     catalogNeedsHuman = guarded.needsHuman;
     reply = guarded.text;
-    // Suma el uso de analizar imagen/audio/PDF del mensaje entrante al de la respuesta —
-    // antes se descartaba y el turno completo quedaba subfacturado en costo real.
-    // La imagen/PDF puede haberse analizado con el mismo proveedor del agente (se suma
-    // aquí); el audio, si el agente es Claude, quedó en el bucket "google" aparte —
-    // ese sobrante se factura en una línea propia más abajo (mediaOtherProviderUsage).
-    const agentProvider = providerForLlmModel(model);
-    const mediaUsageSameProvider = inboundContent.mediaUsageByProvider[agentProvider];
+    // El audio (transcripción, siempre Gemini) se suma al turno de texto — antes se
+    // descartaba y el turno quedaba subfacturado. La imagen/PDF NO se suma aquí: se
+    // factura aparte como whatsapp_media_ai (línea propia, editable en /admin/pricing)
+    // más abajo, para que tengas visibilidad y control real de ese costo específico.
     geminiUsage = {
-      promptTokens: generated.usage.promptTokens + mediaUsageSameProvider.promptTokens,
-      completionTokens: generated.usage.completionTokens + mediaUsageSameProvider.completionTokens,
-      totalTokens: generated.usage.totalTokens + mediaUsageSameProvider.totalTokens
+      promptTokens: generated.usage.promptTokens + inboundContent.audioUsage.promptTokens,
+      completionTokens: generated.usage.completionTokens + inboundContent.audioUsage.completionTokens,
+      totalTokens: generated.usage.totalTokens + inboundContent.audioUsage.totalTokens
     };
     if (generated.toolResults.length) {
       console.info(
@@ -891,24 +916,26 @@ export async function processTwilioWhatsAppInbound(
       idempotencyKey: `wa_ai_delivery_${inbound.messageSid}`
     });
 
-    // Sobrante de medios en el OTRO proveedor (p.ej. audio siempre por Gemini
-    // aunque el agente sea Claude) — línea propia, sin cobrar crédito aparte.
-    const otherProvider = providerForLlmModel(model) === "anthropic" ? "google" : "anthropic";
-    const mediaOtherProviderUsage = inboundContent.mediaUsageByProvider[otherProvider];
-    if (mediaOtherProviderUsage.totalTokens > 0) {
+    // Imagen/PDF analizados en este turno — línea propia (whatsapp_media_ai), con
+    // precio visible y editable en /admin/pricing, cobrando por archivo. Sigue el
+    // modelo real del agente (Gemini o Claude), y el piso de margen dinámico de
+    // recordUsage protege si ese modelo resultó más caro que el precio plano.
+    for (const provider of ["google", "anthropic"] as const) {
+      const visualUsage = inboundContent.visualUsageByProvider[provider];
+      if (!visualUsage || visualUsage.totalTokens <= 0) continue;
       await recordUsageSafe({
         db,
         organizationId: orgId,
         userId: channel.user_id,
-        eventType: "whatsapp_ai",
+        eventType: "whatsapp_media_ai",
         channel: WHATSAPP_CONVERSATION_CHANNEL,
-        provider: otherProvider,
-        model: otherProvider === "google" ? "gemini-2.5-flash" : model,
-        gemini: mediaOtherProviderUsage,
-        creditsOverride: 0,
+        provider,
+        model: provider === "anthropic" ? model : "gemini-2.5-flash",
+        quantity: inboundContent.visualItemCount || 1,
+        gemini: visualUsage,
         referenceType: "text_agent_conversation",
         referenceId: userPersist.conversationId,
-        idempotencyKey: `wa_ai_media_other_${inbound.messageSid}`
+        idempotencyKey: `wa_media_${inbound.messageSid}_${provider}`
       });
     }
   }

@@ -36,36 +36,13 @@ for (const unit of DEFAULT_UNIT_PRICE_META) {
   printRow(unit.event_type, unit.price_usd, cost);
 }
 
-console.log("\n=== 2. WhatsApp con IA + medios pesados (Gemini Flash) — el hueco real ===\n");
-console.log("Perfil base whatsapp_ai (texto + entrega Twilio): ~900 in / ~650 out tokens + 2 mensajes.\n");
+console.log("\n=== 2. Turno de texto (sin medios) con distintos modelos — ¿el precio plano alcanza? ===\n");
+console.log("Perfil ~900 in / ~650 out tokens + entrega (2 mensajes Twilio/Meta).\n");
 
 const whatsappAiPrice = DEFAULT_UNIT_PRICE_META.find(u => u.event_type === "whatsapp_ai")!.price_usd;
-// El turno real hoy son 2 usage_events (Fase 2): la línea de Gemini (cobra el crédito) +
-// la línea de entrega Twilio/Meta (creditsOverride: 0). El costo TOTAL del turno es la suma
-// de ambas — así se compara contra lo mismo que compara la sección 1.
+// El turno real son 2 usage_events (Fase 2): la línea del modelo (cobra el crédito) +
+// la línea de entrega Twilio/Meta (creditsOverride: 0). Costo TOTAL = suma de ambas.
 const deliveryCostUsd = 2 * DEFAULT_PROVIDER_RATES.twilio_wa_per_msg;
-
-const imageScenario = { promptTokens: 900 + 1500, completionTokens: 650 }; // + imagen
-const pdfScenario = { promptTokens: 900 + 6000, completionTokens: 650 }; // + PDF varias páginas
-
-for (const [label, { promptTokens, completionTokens }] of [
-  ["+ 1 imagen", imageScenario],
-  ["+ 1 PDF (varias páginas)", pdfScenario]
-] as const) {
-  const geminiCostUsd = llmCostUsd("gemini-2.5-flash", promptTokens, completionTokens);
-  const totalCostUsd = geminiCostUsd + deliveryCostUsd;
-  const dynamicCredits = creditsFromUsdPrice(geminiCostUsd * MARGIN_MULTIPLIER);
-  const dynamicUsd = dynamicCredits * 0.0003; // DEFAULT_CREDIT_USD_VALUE — solo la línea de Gemini
-  const coveredByFlat = geminiCostUsd <= whatsappAiPrice;
-  printRow(
-    `whatsapp_ai ${label}`,
-    whatsappAiPrice,
-    totalCostUsd,
-    coveredByFlat ? "" : `→ piso dinámico cobra ${fmtUsd(dynamicUsd)} (${dynamicCredits} cr) en la línea Gemini`
-  );
-}
-
-console.log("\n=== 3. Agentes de texto con Claude (mismo perfil de conversación, ~900 in / ~650 out) ===\n");
 
 for (const model of ["gemini-2.5-flash", "claude-haiku-4-5", "claude-sonnet-5"] as const) {
   const modelCostUsd = llmCostUsd(model, 900, 650);
@@ -78,6 +55,23 @@ for (const model of ["gemini-2.5-flash", "claude-haiku-4-5", "claude-sonnet-5"] 
     whatsappAiPrice,
     totalCostUsd,
     coveredByFlat ? "" : `→ piso dinámico cobra ${fmtUsd(dynamicUsd)} (${dynamicCredits} cr) en la línea del modelo`
+  );
+}
+
+console.log("\n=== 3. whatsapp_media_ai — línea propia de imagen/PDF por WhatsApp ===\n");
+const mediaPrice = DEFAULT_UNIT_PRICE_META.find(u => u.event_type === "whatsapp_media_ai")!.price_usd;
+const mediaProfile = { promptTokens: 1600, completionTokens: 250 }; // 1 imagen típica
+
+for (const model of ["gemini-2.5-flash", "claude-haiku-4-5", "claude-sonnet-5"] as const) {
+  const costUsd = llmCostUsd(model, mediaProfile.promptTokens, mediaProfile.completionTokens);
+  const dynamicCredits = creditsFromUsdPrice(costUsd * MARGIN_MULTIPLIER);
+  const dynamicUsd = dynamicCredits * 0.0003;
+  const coveredByFlat = costUsd <= mediaPrice;
+  printRow(
+    `whatsapp_media_ai (${model})`,
+    mediaPrice,
+    costUsd,
+    coveredByFlat ? "" : `→ piso dinámico cobra ${fmtUsd(dynamicUsd)} (${dynamicCredits} cr)`
   );
 }
 

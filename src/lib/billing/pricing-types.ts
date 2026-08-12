@@ -5,6 +5,7 @@ export type UsageEventType =
   | "text_test"
   | "whatsapp_ai"
   | "whatsapp_manual"
+  | "whatsapp_media_ai"
   | "voice"
   | "voice_premium"
   | "voice_voicemail"

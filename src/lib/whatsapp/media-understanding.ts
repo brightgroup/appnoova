@@ -37,6 +37,12 @@ export interface ProcessedWhatsAppMedia {
   usage: GeminiUsage;
   /** Proveedor real que analizó este ítem — "google" si no se llamó a la IA. */
   provider: MediaProvider;
+  /**
+   * true para imagen/documento (se factura aparte como whatsapp_media_ai, con
+   * línea propia editable en /admin/pricing). false para audio/video/otro —
+   * el audio se factura junto al turno whatsapp_ai como antes.
+   */
+  isVisual: boolean;
 }
 
 export interface InboundContentResult {
@@ -46,8 +52,15 @@ export interface InboundContentResult {
   mediaLabel?: string;
   mediaStoragePath?: string;
   mediaMime?: string;
-  /** Uso de tokens de todos los medios analizados, agrupado por proveedor real. */
-  mediaUsageByProvider: Record<MediaProvider, GeminiUsage>;
+  /** Uso de audio (transcripción) — siempre Gemini, se suma al turno whatsapp_ai. */
+  audioUsage: GeminiUsage;
+  /**
+   * Uso de imagen/PDF por proveedor real — se factura aparte como
+   * whatsapp_media_ai (línea propia, visible y editable en /admin/pricing).
+   */
+  visualUsageByProvider: Record<MediaProvider, GeminiUsage>;
+  /** Cantidad de imágenes/PDF analizados en este mensaje (whatsapp_media_ai cobra por archivo). */
+  visualItemCount: number;
 }
 
 export interface WhatsAppMediaUploadContext {
@@ -155,7 +168,8 @@ async function processOneMediaItem(
         mediaStoragePath: storagePath ?? undefined,
         mediaMime: mime,
         usage: ZERO_USAGE,
-        provider: "google"
+        provider: "google",
+        isVisual: false
       };
     }
 
@@ -176,7 +190,8 @@ async function processOneMediaItem(
         mediaStoragePath: storagePath ?? undefined,
         mediaMime: mime,
         usage,
-        provider: "google"
+        provider: "google",
+        isVisual: false
       };
     }
 
@@ -196,7 +211,8 @@ async function processOneMediaItem(
         mediaStoragePath: storagePath ?? undefined,
         mediaMime: mime,
         usage,
-        provider: useClaude ? "anthropic" : "google"
+        provider: useClaude ? "anthropic" : "google",
+        isVisual: true
       };
     }
 
@@ -214,7 +230,8 @@ async function processOneMediaItem(
         mediaStoragePath: storagePath ?? undefined,
         mediaMime: mime,
         usage,
-        provider: useClaude ? "anthropic" : "google"
+        provider: useClaude ? "anthropic" : "google",
+        isVisual: true
       };
     }
 
@@ -226,7 +243,8 @@ async function processOneMediaItem(
       mediaStoragePath: storagePath ?? undefined,
       mediaMime: mime,
       usage: ZERO_USAGE,
-      provider: "google"
+      provider: "google",
+      isVisual: false
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error al procesar archivo";
@@ -237,7 +255,8 @@ async function processOneMediaItem(
       visibleContent: "",
       mediaMime: item.contentType,
       usage: ZERO_USAGE,
-      provider: "google"
+      provider: "google",
+      isVisual: false
     };
   }
 }
@@ -268,16 +287,23 @@ export async function buildWhatsAppInboundContent(
     visibleParts.push(caption);
   }
 
-  const mediaUsageByProvider: Record<MediaProvider, GeminiUsage> = {
+  let audioUsage: GeminiUsage = ZERO_USAGE;
+  const visualUsageByProvider: Record<MediaProvider, GeminiUsage> = {
     google: ZERO_USAGE,
     anthropic: ZERO_USAGE
   };
+  let visualItemCount = 0;
 
   for (let i = 0; i < media.length; i++) {
     const processed = await processOneMediaItem(apiKey, model, media[i], caption, uploadCtx, i);
     aiParts.push(processed.textForAi);
     if (processed.visibleContent) visibleParts.push(processed.visibleContent);
-    mediaUsageByProvider[processed.provider] = addUsage(mediaUsageByProvider[processed.provider], processed.usage);
+    if (processed.isVisual) {
+      visualUsageByProvider[processed.provider] = addUsage(visualUsageByProvider[processed.provider], processed.usage);
+      if (processed.usage.totalTokens > 0) visualItemCount += 1;
+    } else {
+      audioUsage = addUsage(audioUsage, processed.usage);
+    }
     if (!primaryMediaType && processed.kind !== "other") {
       primaryMediaType = processed.kind;
       mediaLabel = processed.label;
@@ -296,6 +322,8 @@ export async function buildWhatsAppInboundContent(
     mediaLabel,
     mediaStoragePath,
     mediaMime,
-    mediaUsageByProvider
+    audioUsage,
+    visualUsageByProvider,
+    visualItemCount
   };
 }

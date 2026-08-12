@@ -3,7 +3,7 @@
 export const BILLING_CHART_CATEGORIES = [
   { key: "ori",          label: "ORI",             color: "#5b5bf6", events: ["ori"] as const },
   { key: "milink",       label: "Mi Link",         color: "#818cf8", events: ["milink", "widget", "text_test"] as const },
-  { key: "whatsapp",     label: "WhatsApp",        color: "#22c55e", events: ["whatsapp_ai", "whatsapp_manual"] as const },
+  { key: "whatsapp",     label: "WhatsApp",        color: "#22c55e", events: ["whatsapp_ai", "whatsapp_manual", "whatsapp_media_ai"] as const },
   { key: "voz",          label: "Agentes de Voz",  color: "#c084fc", events: ["voice"] as const },
   { key: "documentos",   label: "Documentos",      color: "#006e80", events: ["doc_scan"] as const },
   { key: "formularios",  label: "Formularios",     color: "#06b6d4", events: ["form_fill"] as const },
@@ -73,6 +73,7 @@ export const USAGE_TYPE_LABELS: Record<string, string> = {
   text_test: "Mi Link",
   whatsapp_ai: "WhatsApp",
   whatsapp_manual: "WhatsApp",
+  whatsapp_media_ai: "WhatsApp — Imagen/PDF",
   voice: "Agentes de Voz",
   doc_scan: "Documentos",
   form_fill: "Formularios",

@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
   )];
   const textIds = [...new Set(
     events
-      .filter((e) => ["whatsapp_ai", "whatsapp_manual", "widget", "milink"].includes(e.event_type) && e.reference_id)
+      .filter((e) => ["whatsapp_ai", "whatsapp_manual", "whatsapp_media_ai", "widget", "milink"].includes(e.event_type) && e.reference_id)
       .map((e) => e.reference_id!)
   )];
 
@@ -167,6 +167,9 @@ export async function GET(req: NextRequest) {
         break;
       case "whatsapp_manual":
         name = agentName ? `${agentName} — WhatsApp` : "WhatsApp manual";
+        break;
+      case "whatsapp_media_ai":
+        name = agentName ? `${agentName} — Imagen/PDF WhatsApp` : "Imagen/PDF por WhatsApp";
         break;
       case "widget":
         name = agentName ? `${agentName} — Widget` : "Widget web";

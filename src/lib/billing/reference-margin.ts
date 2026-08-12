@@ -17,6 +17,9 @@ const REFERENCE_USAGE: Record<UsageEventType, ReferenceUsageProfile> = {
   text_test: { geminiModel: "flash", promptTokens: 400, completionTokens: 250 },
   whatsapp_manual: { twilioMessages: 1 },
   whatsapp_ai: { twilioMessages: 2, geminiModel: "flash", promptTokens: 900, completionTokens: 650 },
+  // Referencia con Gemini Flash (el caso típico); con Claude Sonnet el costo real
+  // es ~8x más por token — cubierto aparte por el piso de margen dinámico en recordUsage.
+  whatsapp_media_ai: { geminiModel: "flash", promptTokens: 1600, completionTokens: 250 },
   voice: { voiceMinutes: 1 },
   voice_premium: { voiceMinutes: 1, voicePremium: true },
   voice_voicemail: { voiceMinutes: 0.05, voicePremium: true },
