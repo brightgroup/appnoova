@@ -31,7 +31,9 @@ import {
   Info,
   Pencil,
   Trash2,
-  Radio
+  Radio,
+  Undo2,
+  Redo2
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { tabActive, tabIdle } from "@/lib/brand-ui";
@@ -90,6 +92,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(true);
+  const [saveError, setSaveError] = useState("");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteSearch, setPaletteSearch] = useState("");
   const [configNodeId, setConfigNodeId] = useState<string | null>(null);
@@ -101,6 +104,63 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
 
   const [nodes, setNodes, onNodesChangeBase] = useNodesState<Node<WorkflowNodeData>>([]);
   const [edges, setEdges, onEdgesChangeBase] = useEdgesState<Edge>([]);
+
+  // Deshacer/rehacer (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z) — historial en memoria, no persiste tras recargar la página.
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
+  useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+  useEffect(() => { edgesRef.current = edges; }, [edges]);
+  const historyRef = useRef<{ past: { nodes: typeof nodes; edges: typeof edges }[]; future: { nodes: typeof nodes; edges: typeof edges }[] }>({
+    past: [],
+    future: []
+  });
+  const [historyTick, setHistoryTick] = useState(0);
+  const coalesceKeyRef = useRef<string | null>(null);
+  const coalesceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const pushHistory = useCallback(() => {
+    historyRef.current.past.push({ nodes: nodesRef.current, edges: edgesRef.current });
+    if (historyRef.current.past.length > 50) historyRef.current.past.shift();
+    historyRef.current.future = [];
+    setHistoryTick(t => t + 1);
+  }, []);
+
+  const undo = useCallback(() => {
+    const prev = historyRef.current.past.pop();
+    if (!prev) return;
+    historyRef.current.future.push({ nodes: nodesRef.current, edges: edgesRef.current });
+    setNodes(prev.nodes);
+    setEdges(prev.edges);
+    setSaved(false);
+    coalesceKeyRef.current = null; // que la próxima edición abra su propio paso de historial, no se pegue al de antes de deshacer
+    setHistoryTick(t => t + 1);
+  }, [setNodes, setEdges]);
+
+  const redo = useCallback(() => {
+    const next = historyRef.current.future.pop();
+    if (!next) return;
+    historyRef.current.past.push({ nodes: nodesRef.current, edges: edgesRef.current });
+    setNodes(next.nodes);
+    setEdges(next.edges);
+    setSaved(false);
+    coalesceKeyRef.current = null;
+    setHistoryTick(t => t + 1);
+  }, [setNodes, setEdges]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      // Dentro de un campo de texto, deja que el navegador maneje su propio deshacer.
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
+      e.preventDefault();
+      if (e.shiftKey) redo();
+      else undo();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undo, redo]);
 
   const setTab = useCallback(
     (tab: Tab) => {
@@ -130,6 +190,8 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
     setNodes(wfJson.workflow.graph.nodes);
     setEdges(wfJson.workflow.graph.edges);
     setSaved(true);
+    historyRef.current = { past: [], future: [] };
+    setHistoryTick(t => t + 1);
 
     if (connRes.ok) setConnections((await connRes.json()).connections ?? []);
     if (evRes.ok) setEvents((await evRes.json()).events ?? []);
@@ -142,24 +204,29 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
 
   const onNodesChange = useCallback(
     (changes: Parameters<typeof onNodesChangeBase>[0]) => {
+      const meaningful = changes.some(c => c.type === "remove" || (c.type === "position" && c.dragging === false));
+      if (meaningful) pushHistory();
       onNodesChangeBase(changes);
       setSaved(false);
     },
-    [onNodesChangeBase]
+    [onNodesChangeBase, pushHistory]
   );
   const onEdgesChange = useCallback(
     (changes: Parameters<typeof onEdgesChangeBase>[0]) => {
+      const meaningful = changes.some(c => c.type === "remove");
+      if (meaningful) pushHistory();
       onEdgesChangeBase(changes);
       setSaved(false);
     },
-    [onEdgesChangeBase]
+    [onEdgesChangeBase, pushHistory]
   );
   const onConnect = useCallback(
     (connection: Connection) => {
+      pushHistory();
       setEdges(eds => addEdge(connection, eds));
       setSaved(false);
     },
-    [setEdges]
+    [setEdges, pushHistory]
   );
 
   const onNodeDoubleClick = useCallback<NodeMouseHandler>((_event, node) => {
@@ -168,6 +235,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
   }, []);
 
   function addNode(type: WorkflowNodeType) {
+    pushHistory();
     const id = crypto.randomUUID();
     // El nodo Webhook entrante genera su URL propia de inmediato — sin fricción, sin esperar a Guardar.
     const data: WorkflowNodeData = type === "trigger.webhook" ? { webhookToken: crypto.randomUUID().replace(/-/g, "") } : {};
@@ -183,6 +251,14 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
   const configNode = useMemo(() => nodes.find(n => n.id === configNodeId) ?? null, [nodes, configNodeId]);
 
   function setNodeData(nodeId: string, patch: Partial<WorkflowNodeData>) {
+    // Coalesce: varias ediciones seguidas al mismo nodo (ej. tecleando en un campo) cuentan como un solo paso de deshacer.
+    if (coalesceKeyRef.current !== nodeId) {
+      pushHistory();
+      coalesceKeyRef.current = nodeId;
+    }
+    if (coalesceTimerRef.current) clearTimeout(coalesceTimerRef.current);
+    coalesceTimerRef.current = setTimeout(() => { coalesceKeyRef.current = null; }, 600);
+
     setNodes(nds => nds.map(n => (n.id === nodeId ? { ...n, data: { ...n.data, ...patch } } : n)));
     setSaved(false);
   }
@@ -216,6 +292,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
 
   async function handleSave() {
     setSaving(true);
+    setSaveError("");
     const graph = {
       nodes: nodes.map(n => ({ id: n.id, type: n.type, position: n.position, data: n.data })),
       edges: edges.map(e => ({ id: e.id, source: e.source, target: e.target }))
@@ -225,7 +302,12 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
       body: JSON.stringify({ graph })
     });
     setSaving(false);
-    if (res.ok) setSaved(true);
+    if (res.ok) {
+      setSaved(true);
+    } else {
+      const json = await res.json().catch(() => ({}));
+      setSaveError(json.error ?? "No se pudo guardar el workflow");
+    }
   }
 
   if (loading) {
@@ -291,6 +373,30 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {activeTab === "editor" && (
+            <>
+              <button
+                type="button"
+                onClick={undo}
+                disabled={historyTick >= 0 && historyRef.current.past.length === 0}
+                title="Deshacer (Ctrl/Cmd+Z)"
+                aria-label="Deshacer"
+                className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/[.08] disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <Undo2 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={redo}
+                disabled={historyTick >= 0 && historyRef.current.future.length === 0}
+                title="Rehacer (Ctrl/Cmd+Shift+Z)"
+                aria-label="Rehacer"
+                className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/[.08] disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <Redo2 className="w-4 h-4" />
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={() => setDeleteOpen(true)}
@@ -318,6 +424,12 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
         onClose={() => setDeleteOpen(false)}
         onConfirm={() => void handleDelete()}
       />
+
+      {saveError && (
+        <div className="mx-6 mt-3 p-3 rounded-xl text-xs border shrink-0 bg-red-500/10 border-red-500/20 text-red-400">
+          {saveError}
+        </div>
+      )}
 
       <div className="border-b border-white/[.08] px-6 flex gap-1 overflow-x-auto shrink-0">
         {TABS.map(tab => (
@@ -717,6 +829,80 @@ function ChannelSelectField({
   );
 }
 
+/** "qbit-imagen" desde " Qbit Imagen " — recorta espacios en los bordes y los cambia por guiones en el resto. */
+function normalizeWebhookSlug(raw: string): string {
+  return raw.trim().replace(/^\/+|\/+$/g, "").replace(/\s+/g, "-");
+}
+
+function isValidWebhookSlug(slug: string): boolean {
+  return /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(slug);
+}
+
+/**
+ * URL del nodo "Webhook entrante": dominio fijo (no editable, siempre el de Noova) + un nombre que sí elige el
+ * usuario, igual que el campo "path" del nodo Webhook de n8n. La unicidad real la garantiza la base de datos
+ * (token es llave primaria) — acá solo se valida el formato; si el nombre ya está en uso en otro workflow, el
+ * error llega al guardar.
+ */
+function WebhookSlugField({
+  baseUrl,
+  value,
+  onChange
+}: {
+  baseUrl: string;
+  value: string;
+  onChange: (token: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [error, setError] = useState("");
+
+  useEffect(() => { setDraft(value); }, [value]);
+
+  function commit(raw: string) {
+    const normalized = normalizeWebhookSlug(raw);
+    if (!normalized) {
+      // No puede quedar vacío — el webhook siempre necesita un nombre. Vuelve al valor anterior.
+      setDraft(value);
+      setError("");
+      return;
+    }
+    setDraft(normalized);
+    if (normalized === value) {
+      setError("");
+      return;
+    }
+    if (!isValidWebhookSlug(normalized)) {
+      setError("Solo letras, números, punto, guion y guion bajo.");
+      return;
+    }
+    setError("");
+    onChange(normalized);
+  }
+
+  const fullUrl = `${baseUrl.replace(/\/$/, "")}/${draft || value}`;
+
+  return (
+    <div>
+      <div className="flex min-w-0 overflow-hidden rounded-lg border border-white/[.12] bg-white/[.04]">
+        <span className="max-w-[45%] shrink-0 truncate border-r border-white/[.08] bg-black/20 px-3 py-2 text-[11px] font-mono text-gray-500">
+          {baseUrl.replace(/\/$/, "")}/
+        </span>
+        <input
+          type="text"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={e => commit(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+          spellCheck={false}
+          className="min-w-0 flex-1 bg-transparent px-3 py-2 text-[11px] font-mono text-white outline-none"
+        />
+        <CopyButton value={fullUrl} />
+      </div>
+      {error && <p className="text-[11px] text-red-400 mt-1.5">{error}</p>}
+    </div>
+  );
+}
+
 /** Campo de mapeo por dot-path dentro de un JSON entrante — reutilizable para cualquier acción que necesite leer un campo variable. */
 function JsonPathField({
   label,
@@ -827,10 +1013,7 @@ function NodeConfigPanel({
   const type = node.type as WorkflowNodeType;
   const color = NODE_BRAND_COLOR[type];
   const isTrigger = TRIGGER_TYPES.includes(type);
-  const webhookUrl =
-    typeof window !== "undefined" && node.data.webhookToken
-      ? `${window.location.origin}/api/automations/inbound/${node.data.webhookToken}`
-      : "";
+  const webhookBaseUrl = typeof window !== "undefined" ? `${window.location.origin}/api/automations/inbound` : "";
 
   const displayLabel = resolveNodeLabel(type, node.data, channels, connections);
   const [editingLabel, setEditingLabel] = useState(false);
@@ -947,13 +1130,14 @@ function NodeConfigPanel({
               </InfoNote>
               <TestListenButton workflowId={workflowId} matches={webhookEventMatches} onCaptured={setCapturedExample} />
               <label className="block text-xs font-semibold text-gray-400 mb-1.5">URL del webhook</label>
-              <div className="flex items-center gap-1.5 rounded-lg border border-white/[.12] bg-white/[.04] px-2.5 py-2">
-                <code className="flex-1 text-[11px] text-gray-300 truncate">{webhookUrl}</code>
-                <CopyButton value={webhookUrl} />
-              </div>
+              <WebhookSlugField
+                baseUrl={webhookBaseUrl}
+                value={node.data.webhookToken ?? ""}
+                onChange={token => onSetData({ webhookToken: token })}
+              />
               <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
-                Fija y única — no cambia aunque renombres el nodo, y nunca se repite entre workflows ni clientes.
-                Para identificarla en tu lista, cámbiale el nombre con el lápiz junto al título de arriba.
+                El dominio es fijo — solo el nombre al final es tuyo, como en n8n. Nunca se repite entre workflows
+                ni clientes: si el nombre que eliges ya está en uso, Noova te avisa al guardar.
               </p>
               <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
                 Conéctala a cualquier nodo de acción: <strong className="text-gray-300">Enviar mensaje de WhatsApp</strong> para

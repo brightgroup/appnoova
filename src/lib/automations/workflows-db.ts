@@ -109,6 +109,10 @@ export async function updateWorkflowGraph(
 ): Promise<WorkflowRecord | null> {
   const graphWithTokens = ensureWebhookTokens(graph);
 
+  // Primero el índice de webhooks — si un nombre choca con el de otro workflow, lanza antes de tocar el grafo
+  // guardado, para no dejar el grafo y el índice desincronizados.
+  await syncWebhookTriggers(db, organizationId, workflowId, graphWithTokens);
+
   const { data } = await db
     .from("workflows")
     .update({ graph: graphWithTokens, updated_at: new Date().toISOString() })
@@ -117,9 +121,7 @@ export async function updateWorkflowGraph(
     .select("*")
     .maybeSingle();
 
-  if (!data) return null;
-  await syncWebhookTriggers(db, organizationId, workflowId, graphWithTokens);
-  return toRecord(data as WorkflowRow);
+  return data ? toRecord(data as WorkflowRow) : null;
 }
 
 export async function setWorkflowStatus(

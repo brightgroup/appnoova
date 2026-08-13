@@ -243,12 +243,15 @@ export function findWebhookActionConfigs(
  * tenga uno (el editor ya lo genera al crear el nodo — esto es solo un
  * resguardo del lado del servidor antes de persistir el grafo).
  */
+/** Mismo formato que valida el campo del editor — letras, números, punto, guion y guion bajo. */
+const VALID_WEBHOOK_SLUG = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
+
 export function ensureWebhookTokens(graph: WorkflowGraph): WorkflowGraph {
   let changed = false;
   const nodes = graph.nodes.map((n) => {
-    if (n.type !== "trigger.webhook" || (typeof n.data.webhookToken === "string" && n.data.webhookToken)) {
-      return n;
-    }
+    if (n.type !== "trigger.webhook") return n;
+    const token = n.data.webhookToken;
+    if (typeof token === "string" && VALID_WEBHOOK_SLUG.test(token)) return n;
     changed = true;
     return { ...n, data: { ...n.data, webhookToken: crypto.randomUUID().replace(/-/g, "") } };
   });

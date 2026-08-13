@@ -7,6 +7,14 @@ export interface WebhookTriggerLookup {
   nodeId: string;
 }
 
+/** El nombre de un webhook entrante ya lo usa otro workflow — `token` es llave primaria en `workflow_webhook_triggers`. */
+export class DuplicateWebhookTokenError extends Error {
+  constructor(public readonly token: string) {
+    super(`El nombre de webhook "${token}" ya está en uso en otro workflow.`);
+    this.name = "DuplicateWebhookTokenError";
+  }
+}
+
 /**
  * Reescribe el índice `workflow_webhook_triggers` de un workflow a partir de
  * su grafo ya guardado — se llama después de cada `updateWorkflowGraph`. La
@@ -31,8 +39,15 @@ export async function syncWebhookTriggers(
       node_id: n.id
     }));
 
-  if (rows.length > 0) {
-    await db.from("workflow_webhook_triggers").insert(rows);
+  if (rows.length === 0) return;
+
+  const { error } = await db.from("workflow_webhook_triggers").insert(rows);
+  if (error) {
+    if (error.code === "23505") {
+      const duplicate = rows.find((r) => error.message.includes(r.token)) ?? rows[0];
+      throw new DuplicateWebhookTokenError(duplicate.token);
+    }
+    throw new Error(error.message);
   }
 }
 

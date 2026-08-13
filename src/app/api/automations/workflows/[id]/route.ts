@@ -9,6 +9,7 @@ import {
   deleteWorkflow
 } from "@/lib/automations/workflows-db";
 import { normalizeWorkflowGraph } from "@/lib/automations/node-types";
+import { DuplicateWebhookTokenError } from "@/lib/automations/webhook-triggers-db";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -40,7 +41,14 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   }
 
   if (body?.graph !== undefined) {
-    workflow = await updateWorkflowGraph(db, orgCtx.organizationId, id, normalizeWorkflowGraph(body.graph));
+    try {
+      workflow = await updateWorkflowGraph(db, orgCtx.organizationId, id, normalizeWorkflowGraph(body.graph));
+    } catch (err) {
+      if (err instanceof DuplicateWebhookTokenError) {
+        return NextResponse.json({ error: err.message }, { status: 409 });
+      }
+      throw err;
+    }
   }
   if (body?.status === "active" || body?.status === "paused") {
     workflow = await setWorkflowStatus(db, orgCtx.organizationId, id, body.status);
