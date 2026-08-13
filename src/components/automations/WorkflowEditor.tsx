@@ -952,8 +952,13 @@ function NodeConfigPanel({
                 <CopyButton value={webhookUrl} />
               </div>
               <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
-                Conéctala a un nodo <strong className="text-gray-300">Enviar mensaje de WhatsApp</strong> para decirle a Noova
-                qué responder y a quién.
+                Fija y única — no cambia aunque renombres el nodo, y nunca se repite entre workflows ni clientes.
+                Para identificarla en tu lista, cámbiale el nombre con el lápiz junto al título de arriba.
+              </p>
+              <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+                Conéctala a cualquier nodo de acción: <strong className="text-gray-300">Enviar mensaje de WhatsApp</strong> para
+                responderle al cliente, o <strong className="text-gray-300">HTTP Request</strong> para reenviar el aviso a otro
+                sistema — no es exclusiva de WhatsApp.
               </p>
             </div>
           );
