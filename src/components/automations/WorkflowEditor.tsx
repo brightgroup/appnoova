@@ -36,6 +36,7 @@ import {
   Redo2
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
+import { supabase } from "@/lib/supabase";
 import { tabActive, tabIdle } from "@/lib/brand-ui";
 import { Badge } from "@/components/ui/Badge";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
@@ -205,14 +206,26 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
     if (res.ok) setEvents((await res.json()).events ?? []);
   }, [workflowId]);
 
-  // Mientras la pestaña "Ejecuciones" está abierta, refresca sola cada pocos segundos — para no
-  // tener que recargar la página a mano cada vez que llega un evento nuevo.
+  // Mientras la pestaña "Ejecuciones" está abierta: carga lo que ya pasó, y desde ahí se suscribe a
+  // Supabase Realtime — la fila aparece sola apenas se inserta, sin sondear el servidor cada tanto.
   useEffect(() => {
     if (activeTab !== "ejecuciones") return;
     void refreshEvents();
-    const interval = setInterval(() => void refreshEvents(), 4000);
-    return () => clearInterval(interval);
-  }, [activeTab, refreshEvents]);
+
+    const channel = supabase
+      .channel(`workflow-events-${workflowId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "automation_event_log", filter: `workflow_id=eq.${workflowId}` },
+        payload => {
+          const row = payload.new as AutomationEventRow;
+          setEvents(prev => (prev.some(e => e.id === row.id) ? prev : [row, ...prev]));
+        }
+      )
+      .subscribe();
+
+    return () => { void supabase.removeChannel(channel); };
+  }, [activeTab, workflowId, refreshEvents]);
 
   useEffect(() => { void load(); }, [load]);
 
