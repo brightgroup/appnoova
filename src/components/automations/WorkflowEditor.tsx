@@ -200,6 +200,20 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
     setLoading(false);
   }, [workflowId, setNodes, setEdges]);
 
+  const refreshEvents = useCallback(async () => {
+    const res = await authFetch(`/api/automations/workflows/${workflowId}/events`);
+    if (res.ok) setEvents((await res.json()).events ?? []);
+  }, [workflowId]);
+
+  // Mientras la pestaña "Ejecuciones" está abierta, refresca sola cada pocos segundos — para no
+  // tener que recargar la página a mano cada vez que llega un evento nuevo.
+  useEffect(() => {
+    if (activeTab !== "ejecuciones") return;
+    void refreshEvents();
+    const interval = setInterval(() => void refreshEvents(), 4000);
+    return () => clearInterval(interval);
+  }, [activeTab, refreshEvents]);
+
   useEffect(() => { void load(); }, [load]);
 
   const onNodesChange = useCallback(
@@ -1136,13 +1150,11 @@ function NodeConfigPanel({
                 onChange={token => onSetData({ webhookToken: token })}
               />
               <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
-                El dominio es fijo — solo el nombre al final es tuyo, como en n8n. Nunca se repite entre workflows
-                ni clientes: si el nombre que eliges ya está en uso, Noova te avisa al guardar.
+                Puedes cambiar el nombre al final de la URL. Si ya está en uso, te avisamos al guardar.
               </p>
               <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
-                Conéctala a cualquier nodo de acción: <strong className="text-gray-300">Enviar mensaje de WhatsApp</strong> para
-                responderle al cliente, o <strong className="text-gray-300">HTTP Request</strong> para reenviar el aviso a otro
-                sistema — no es exclusiva de WhatsApp.
+                Conéctala al nodo <strong className="text-gray-300">Enviar mensaje de WhatsApp</strong> para responderle al
+                cliente, o a <strong className="text-gray-300">HTTP Request</strong> para avisarle a otro sistema.
               </p>
             </div>
           );
