@@ -47,7 +47,7 @@ import {
   CopyButton
 } from "@/components/automations/workflow-nodes";
 import { DeleteWorkflowModal } from "@/components/automations/DeleteWorkflowModal";
-import { AutomationEventsTable, prettyPrint, type AutomationEventRow } from "@/components/automations/AutomationEventsTable";
+import { ExecutionsTable, groupEventsByExecution, prettyPrint, type AutomationEventRow } from "@/components/automations/AutomationEventsTable";
 import { WhatsAppLogo } from "@/components/icons/brands/WhatsAppLogo";
 import { NODE_CATALOG, type WorkflowNodeType, type WorkflowNodeData } from "@/lib/automations/node-types";
 import type { WorkflowRecord } from "@/lib/automations/workflows-db";
@@ -286,7 +286,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
               {workflow.status === "active" ? <Badge variant="emerald">Activo</Badge> : <Badge variant="neutral">Pausado</Badge>}
             </div>
             <p className="text-xs text-gray-400">
-              {events.length} ejecuciones registradas{!saved && " · Sin guardar"}
+              {groupEventsByExecution(events).length} ejecuciones registradas{!saved && " · Sin guardar"}
             </p>
           </div>
         </div>
@@ -465,7 +465,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto p-6 min-h-0">
-          <AutomationEventsTable events={events} emptyLabel="Sin ejecuciones todavía." />
+          <ExecutionsTable events={events} emptyLabel="Sin ejecuciones todavía." />
         </div>
       )}
     </div>
