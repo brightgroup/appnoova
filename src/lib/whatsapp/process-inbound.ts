@@ -26,8 +26,10 @@ import {
 import {
   allConversationMessagesForGemini,
   buildWhatsAppContactLabel,
+  contactMetaKey,
   findWhatsAppConversation
 } from "@/lib/whatsapp/conversation-thread";
+import { withConversationLock } from "@/lib/whatsapp/conversation-lock";
 import { mergeWhatsAppMetadata } from "@/lib/whatsapp/conversation-meta";
 import { notifyPushForOrg } from "@/lib/push/send";
 import { emitAutomationEvent } from "@/lib/automations/events";
@@ -41,6 +43,7 @@ import {
   WHATSAPP_OPT_OUT_CONFIRMATION
 } from "@/lib/whatsapp/compliance";
 import { buildWhatsAppInboundContent } from "@/lib/whatsapp/media-understanding";
+import { splitWhatsAppMessage } from "@/lib/whatsapp/message-chunk";
 import {
   sendWhatsAppTextMessage,
   sendWhatsAppMediaMessage,
@@ -205,15 +208,24 @@ async function sendWhatsAppIfAllowed(
   body: string,
   lastInboundAt: string,
   optedOut: boolean
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; sentCount?: number }> {
   const gate = canSendWhatsAppSessionMessage({ lastInboundAt, optedOut });
   if (!gate.allowed) {
     return { ok: false, error: gate.reason };
   }
 
+  // Una respuesta más larga que el límite de un solo mensaje (Twilio: 1.600
+  // caracteres) se parte en varios envíos secuenciales — antes se mandaba
+  // entera, Twilio la rechazaba (error 21617) y el cliente se quedaba sin
+  // respuesta, sin que nada en el sistema lo notara.
+  const parts = splitWhatsAppMessage(body);
+  if (parts.length === 0) return { ok: true, sentCount: 0 };
+
   try {
-    await sendWhatsAppTextMessage({ db, channel, toE164, body });
-    return { ok: true };
+    for (const part of parts) {
+      await sendWhatsAppTextMessage({ db, channel, toE164, body: part });
+    }
+    return { ok: true, sentCount: parts.length };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error al enviar WhatsApp";
     return { ok: false, error: msg };
@@ -221,6 +233,16 @@ async function sendWhatsAppIfAllowed(
 }
 
 export async function processTwilioWhatsAppInbound(
+  db: SupabaseClient,
+  channel: WhatsAppChannelRecord,
+  inbound: TwilioWhatsAppInbound
+): Promise<{ ok: boolean; error?: string }> {
+  return withConversationLock(contactMetaKey(channel.id, inbound.fromE164), () =>
+    processTwilioWhatsAppInboundLocked(db, channel, inbound)
+  );
+}
+
+async function processTwilioWhatsAppInboundLocked(
   db: SupabaseClient,
   channel: WhatsAppChannelRecord,
   inbound: TwilioWhatsAppInbound
@@ -909,7 +931,9 @@ export async function processTwilioWhatsAppInbound(
       eventType: "whatsapp_ai",
       channel: WHATSAPP_CONVERSATION_CHANNEL,
       provider: deliveryProvider,
-      twilioMessages: 2, // entrante + saliente
+      // entrante + saliente: si la respuesta se partió en varios mensajes por
+      // exceder el límite de WhatsApp, cada parte es un envío real de Twilio.
+      twilioMessages: 1 + (sendResult.sentCount ?? 1),
       creditsOverride: 0, // el crédito del turno ya se cobró en la línea de arriba
       referenceType: "text_agent_conversation",
       referenceId: userPersist.conversationId,
@@ -1038,8 +1062,13 @@ export async function sendWhatsAppOutboundForConversation(
   if (!resolved.ok) return resolved;
   const { channel, channelRaw, contactE164, outboundOrgId } = resolved.ctx;
 
+  const parts = splitWhatsAppMessage(body);
+  if (parts.length === 0) return { ok: true };
+
   try {
-    await sendWhatsAppTextMessage({ db, channel, channelRaw, toE164: contactE164, body });
+    for (const part of parts) {
+      await sendWhatsAppTextMessage({ db, channel, channelRaw, toE164: contactE164, body: part });
+    }
 
     if (outboundOrgId) {
       await recordUsageSafe({
@@ -1049,7 +1078,7 @@ export async function sendWhatsAppOutboundForConversation(
         eventType: "whatsapp_manual",
         channel: WHATSAPP_CONVERSATION_CHANNEL,
         provider: "twilio",
-        twilioMessages: 1,
+        twilioMessages: parts.length,
         referenceType: "text_agent_conversation",
         referenceId: conversationId
       });
