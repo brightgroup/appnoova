@@ -1087,21 +1087,19 @@ function ExtractFieldRow({
         </button>
       </div>
       {/* El selector va en su propia línea: algunas etiquetas ("Lista — un objeto por
-          elemento encontrado") son largas y un <select> nativo suele dimensionarse por
-          la opción más ancha — compartir fila con el nombre lo dejaba sin espacio visible. */}
-      <select
+          elemento encontrado") son largas y compartir fila con el nombre lo dejaba sin
+          espacio visible. NoovaSelect (no un <select> nativo) para que se vea igual que
+          el resto de los desplegables del panel, como "Se activa con". */}
+      <NoovaSelect
         value={field.type}
-        onChange={e => {
-          const nextType = e.target.value as ExtractFieldType;
+        onChange={v => {
+          const nextType = v as ExtractFieldType;
           const nowComposite = isCompositeExtractType(nextType);
           onChange({ ...field, type: nextType, fields: nowComposite ? children : undefined });
         }}
-        className="w-full min-w-0 rounded-md border border-white/[.12] bg-[#13141c] px-2 py-1.5 text-[11px] text-gray-300"
-      >
-        {EXTRACT_TYPE_OPTIONS.map(o => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
+        options={EXTRACT_TYPE_OPTIONS}
+        allowEmpty={false}
+      />
       <textarea
         value={field.instruction}
         onChange={e => onChange({ ...field, instruction: e.target.value })}
