@@ -356,6 +356,36 @@ section("Listado de presentaciones y productos que no están en el catálogo");
 *Enlace:* www.edileyer.com`);
   check("un enlace de otro bloque no se reescribe con el del producto vecino",
     r.text.includes("www.edileyer.com") && !r.text.includes(String(anotada.data.link)), r.text);
+
+  // Conversación real (WhatsApp, Alejandra T., 14-ago-2026): la ficha de
+  // *Código Civil Bolsillo* salió con el precio, la edición y el enlace real de
+  // *Código Civil Básico* — el propio encabezado ya dice de qué producto se
+  // trata, y ese enlace corrupto no puede desviar la fila que usa el resto de
+  // la ficha para validarse. Catálogo aparte para no interferir con los casos
+  // de "Bolsillo"/"Básico" genéricos de arriba.
+  const civilBasico = row("civil2", "Código Civil Básico", 122000, {
+    autor_catalogo: "Tafur González, Álvaro",
+    autor_completo: "Álvaro Tafur González",
+    ed: 42,
+  });
+  const civilBolsillo = row("civil3", "Código Civil Bolsillo", 85000, {
+    autor_catalogo: "Tafur González, Álvaro",
+    autor_completo: "Álvaro Tafur González",
+    ed: 10,
+  });
+  r = guard(`*Código Civil Básico*
+*Precio:* $122.000
+*Edición/Año:* 42 / 2026
+*Compra directa:* ${civilBasico.data.link}
+
+*Código Civil Bolsillo*
+*Precio:* $122.000
+*Edición/Año:* 42 / 2026
+*Compra directa:* ${civilBasico.data.link}`, [civilBasico, civilBolsillo]);
+  check("ficha cruzada: el encabezado manda sobre el enlace robado de la hermana",
+    r.text.includes("$85.000") && r.text.includes("10 / 2026") &&
+    r.text.includes(String(civilBolsillo.data.link)) &&
+    !r.text.includes(`Bolsillo*\n*Precio:* $122.000`), r.text);
 }
 
 // ---------------------------------------------------------------------------

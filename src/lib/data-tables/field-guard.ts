@@ -252,12 +252,21 @@ export function enforceCatalogFields(
   let carriedRows = rows.length === 1 ? rows : [];
 
   for (const block of blocks) {
-    const blockRows = rowsReferredIn(block, rows, nameCol, strongCols);
-    if (blockRows.length > 0) carriedRows = blockRows;
     // Ver `resolveNamedRows`: un bloque que nombra a varias hermanas no se
     // puede atribuir a una sola, o se reescribe la ficha de una presentación
     // con el enlace y la edición de otra.
     const named = resolveNamedRows(block, rows, nameCol);
+    // Un encabezado que nombra a un solo producto completo ("*Código Civil
+    // Bolsillo*") manda sobre cualquier enlace o código "fuerte" que aparezca
+    // dentro del mismo bloque: si el modelo pegó ahí el enlace real de OTRA
+    // presentación (la ficha de Bolsillo con el link de Básico, mismo precio,
+    // misma edición), ese enlace es justo el dato corrupto que hay que
+    // detectar — dejar que identifique la fila del bloque validaría cada
+    // línea contra el producto equivocado y la ficha entera pasaría por buena.
+    const headingRow =
+      blockOpensWithProductHeading(block) && named.rows.length === 1 ? named.rows[0] : null;
+    const blockRows = headingRow ? [headingRow] : rowsReferredIn(block, rows, nameCol, strongCols);
+    if (blockRows.length > 0) carriedRows = blockRows;
     // Ver el guardián de importes: un bloque que presenta un producto propio y
     // no lo encuentra en el catálogo no hereda la fila del bloque anterior.
     const inherited =
@@ -283,10 +292,15 @@ export function enforceCatalogFields(
         continue;
       }
 
-      const scope = rowsReferredIn(line, rows, nameCol, strongCols);
-      const sibling = rowForLineInFamily(line, named.family, nameCol);
+      // Un bloque con encabezado de producto único (headingRow) ya tiene fila
+      // confirmada por el nombre completo: una línea suya no puede desviarse a
+      // otra fila aunque lleve un enlace o código fuerte de una hermana — sería
+      // precisamente el dato corrupto que el encabezado ya desmiente.
+      const scope = headingRow ? [] : rowsReferredIn(line, rows, nameCol, strongCols);
+      const sibling = headingRow ? null : rowForLineInFamily(line, named.family, nameCol);
       const row =
-        scope.length === 1
+        headingRow ??
+        (scope.length === 1
           ? scope[0]
           : sibling
             ? sibling
@@ -296,7 +310,7 @@ export function enforceCatalogFields(
                 ? blockRows[0]
                 : inherited.length === 1
                   ? inherited[0]
-                  : null;
+                  : null);
       if (!row) {
         keptLines.push(line);
         continue;
