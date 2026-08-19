@@ -36,11 +36,16 @@ next-env.d.ts
 backups/*.sql
 backups/*.dump
 backups/*.log
+backups/*.txt
 backups/restore-tmp/
 !backups/.gitkeep
 
 # Supabase CLI (estado local al hacer `supabase link`; no commitear)
 supabase/.temp/
 
-# Scripts temporales de debug (prefijo _)
+# Scripts temporales de debug (prefijo _ o tmp-)
 scripts/_*.ts
+scripts/tmp-*
+
+# Claude Code (config local + worktrees de agentes)
+.claude/
