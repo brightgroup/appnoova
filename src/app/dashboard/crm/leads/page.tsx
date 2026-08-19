@@ -184,10 +184,11 @@ export default function CrmLeadsPage() {
           ) : view === "kanban" ? (
             kanbanFilters.includes(filter) ? (
               <CrmLeadsKanban
-                leads={filteredLeads}
                 stages={stages}
-                onLeadsChange={setLeads}
+                outcome={filter as "open" | "mine"}
+                currentUserName={currentUserName}
                 onSelectLead={id => router.push(`/dashboard/crm/leads/${id}`)}
+                onLeadMoved={lead => setLeads(prev => prev.map(l => (l.id === lead.id ? lead : l)))}
               />
             ) : (
               <div className={registryTableEmpty}>

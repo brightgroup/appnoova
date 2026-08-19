@@ -1,7 +1,20 @@
 import type { Metadata, Viewport } from "next";
+import { Poppins } from "next/font/google";
 import "./mobile-app.css";
 import { MOBILE_THEME_INIT_SCRIPT } from "./mobile-theme";
 import { ServiceWorkerRegister } from "./ServiceWorkerRegister";
+
+// Misma tipografía de marca que el dashboard (src/app/layout.tsx), cargada
+// aparte para no depender de un archivo fuera de /m — Next dedupea la
+// descarga de Google Fonts en build. Expuesta como variable para que
+// mobile-app.css la use puntualmente (precios de leads), sin migrar todo
+// /m fuera de su stack de sistema (--font-ui).
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["600", "700"],
+  variable: "--font-noova",
+  display: "swap"
+});
 
 // Metadata específica de /m — Next.js la fusiona con la del layout raíz sin
 // tocar src/app/layout.tsx; icons/manifest de acá reemplazan a los del
@@ -45,7 +58,7 @@ export const viewport: Viewport = {
 
 export default function MobileLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div id="nv-m-root" className="nv-m-app" suppressHydrationWarning>
+    <div id="nv-m-root" className={`nv-m-app ${poppins.variable}`} suppressHydrationWarning>
       <script dangerouslySetInnerHTML={{ __html: MOBILE_THEME_INIT_SCRIPT }} />
       <ServiceWorkerRegister />
       {children}
