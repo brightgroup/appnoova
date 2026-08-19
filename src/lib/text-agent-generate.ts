@@ -1,6 +1,7 @@
 import { GoogleGenAI, type Content, type Part } from "@google/genai";
 import { getOriApiKey } from "@/lib/google-ai";
 import { readGeminiUsage, type GeminiUsage } from "@/lib/billing/meter";
+import { withGeminiTimeout } from "@/lib/gemini-timeout";
 import { normalizeNotifyTeamRules, type NotifyTeamRules } from "@/lib/text-notify-rules";
 import { normalizeSchedulingRules, normalizeOrgBusinessHours, type SchedulingRules, type OrgBusinessHours } from "@/lib/scheduling/rules";
 import { ALL_TEXT_AGENT_TOOLS } from "@/lib/agent-tools/all-text-tools";
@@ -137,11 +138,13 @@ async function generateGeminiAgentReply(
   };
 
   let response = await withOneRetryOnOverload(() =>
-    ai.models.generateContent({
-      model: input.model,
-      contents,
-      config: baseConfig
-    })
+    withGeminiTimeout(abortSignal =>
+      ai.models.generateContent({
+        model: input.model,
+        contents,
+        config: { ...baseConfig, abortSignal }
+      })
+    )
   );
 
   let rounds = 0;
@@ -181,11 +184,13 @@ async function generateGeminiAgentReply(
     contents.push({ role: "user", parts: functionResponseParts });
 
     response = await withOneRetryOnOverload(() =>
-      ai.models.generateContent({
-        model: input.model,
-        contents,
-        config: baseConfig
-      })
+      withGeminiTimeout(abortSignal =>
+        ai.models.generateContent({
+          model: input.model,
+          contents,
+          config: { ...baseConfig, abortSignal }
+        })
+      )
     );
   }
 

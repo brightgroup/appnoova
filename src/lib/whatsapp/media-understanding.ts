@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 import { uploadWhatsAppMedia } from "@/lib/whatsapp/media-storage";
 import { readGeminiUsage, type GeminiUsage } from "@/lib/billing/meter";
+import { withGeminiTimeout } from "@/lib/gemini-timeout";
 import { getAnthropicApiKey, readClaudeUsage } from "@/lib/text-agent-generate-claude";
 import {
   downloadTwilioWhatsAppMedia,
@@ -76,19 +77,21 @@ async function geminiUnderstandMedia(
   instruction: string
 ): Promise<{ text: string; usage: GeminiUsage }> {
   const ai = new GoogleGenAI({ apiKey });
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { inlineData: { mimeType, data: buffer.toString("base64") } },
-          { text: instruction }
-        ]
-      }
-    ],
-    config: { temperature: 0.2, maxOutputTokens: 2048 }
-  });
+  const response = await withGeminiTimeout(abortSignal =>
+    ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { inlineData: { mimeType, data: buffer.toString("base64") } },
+            { text: instruction }
+          ]
+        }
+      ],
+      config: { temperature: 0.2, maxOutputTokens: 2048, abortSignal }
+    })
+  );
   return { text: response.text?.trim() ?? "", usage: readGeminiUsage(response) };
 }
 
