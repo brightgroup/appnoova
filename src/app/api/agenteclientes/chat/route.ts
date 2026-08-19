@@ -3,7 +3,8 @@ import { GoogleGenAI } from "@google/genai";
 import { getOriApiKey, getOriModel } from "@/lib/google-ai";
 import { ORI_SYSTEM_PROMPT } from "@/lib/ori-prompt";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
-import { getUserIdFromRequest } from "@/lib/voice-agents-server";
+import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
+import { readGeminiUsage, recordUsageSafe, resolveOrgIdForUser } from "@/lib/billing/meter";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -62,6 +63,23 @@ export async function POST(req: NextRequest) {
     const reply = response.text?.trim();
     if (!reply) {
       return NextResponse.json({ error: "No se generó respuesta" }, { status: 502 });
+    }
+
+    const db = adminClient();
+    const organizationId = await resolveOrgIdForUser(db, userId);
+    if (organizationId) {
+      await recordUsageSafe({
+        db,
+        organizationId,
+        userId,
+        eventType: "ori",
+        channel: "agenteclientes_demo",
+        provider: "google",
+        model,
+        gemini: readGeminiUsage(response),
+        creditsOverride: 0,
+        referenceType: "agenteclientes_demo"
+      });
     }
 
     return NextResponse.json({ reply, model });

@@ -2,7 +2,8 @@ import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 import { fetchWebsiteText } from "@/lib/fetch-website-text";
 import { getOriApiKey, getOriModel } from "@/lib/google-ai";
-import { getUserIdFromRequest } from "@/lib/voice-agents-server";
+import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
+import { readGeminiUsage, recordUsageSafe, resolveOrgIdForUser } from "@/lib/billing/meter";
 
 const SUMMARY_PROMPT = `Eres un experto en redacción de contexto empresarial para agentes de IA. Lee el sitio web y genera UN SOLO documento de contexto listo para copiar y pegar en un agente de IA (voz o texto).
 
@@ -90,6 +91,23 @@ export async function POST(req: NextRequest) {
     const summary = response.text?.trim();
     if (!summary) {
       return NextResponse.json({ error: "La IA no generó un resumen" }, { status: 502 });
+    }
+
+    const db = adminClient();
+    const organizationId = await resolveOrgIdForUser(db, userId);
+    if (organizationId) {
+      await recordUsageSafe({
+        db,
+        organizationId,
+        userId,
+        eventType: "ori",
+        channel: "company_context_generate_url",
+        provider: "google",
+        model: getOriModel(),
+        gemini: readGeminiUsage(response),
+        creditsOverride: 0,
+        referenceType: "company_context_generate_url"
+      });
     }
 
     const suggestedName =
