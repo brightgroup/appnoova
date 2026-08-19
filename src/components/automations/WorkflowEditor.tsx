@@ -53,6 +53,12 @@ import { DeleteWorkflowModal } from "@/components/automations/DeleteWorkflowModa
 import { ExecutionsTable, groupEventsByExecution, prettyPrint, type AutomationEventRow } from "@/components/automations/AutomationEventsTable";
 import { WhatsAppLogo } from "@/components/icons/brands/WhatsAppLogo";
 import { NODE_CATALOG, type WorkflowNodeType, type WorkflowNodeData } from "@/lib/automations/node-types";
+import {
+  createEmptyExtractField,
+  readExtractSchema,
+  type ExtractFieldDef,
+  type ExtractFieldType
+} from "@/lib/automations/extract-schema";
 import type { WorkflowRecord } from "@/lib/automations/workflows-db";
 import type { AutomationConnectionRecord } from "@/lib/automations/connections-db";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
@@ -1018,6 +1024,155 @@ function JsonTextareaField({
   );
 }
 
+const EXTRACT_TYPE_OPTIONS: { value: ExtractFieldType; label: string }[] = [
+  { value: "text", label: "Texto" },
+  { value: "number", label: "Número" },
+  { value: "boolean", label: "Verdadero/falso" },
+  { value: "date", label: "Fecha" },
+  { value: "object", label: "Objeto (varios datos agrupados)" },
+  { value: "array_of_objects", label: "Lista — un objeto por elemento encontrado" }
+];
+
+function isCompositeExtractType(type: ExtractFieldType): boolean {
+  return type === "object" || type === "array_of_objects";
+}
+
+/**
+ * Una fila del editor de "campos a extraer" — nombre, tipo e instrucción,
+ * igual de idea al criterio IA de una etapa del CRM pero con tipo y, si el
+ * tipo es "objeto" o "lista", sus propios sub-campos (recursivo: un
+ * "comprobante" puede tener un "monto" que a su vez tiene "valor"/"moneda").
+ */
+function ExtractFieldRow({
+  field,
+  onChange,
+  onRemove
+}: {
+  field: ExtractFieldDef;
+  onChange: (next: ExtractFieldDef) => void;
+  onRemove: () => void;
+}) {
+  const composite = isCompositeExtractType(field.type);
+  const children = field.fields ?? [];
+
+  function updateChild(index: number, next: ExtractFieldDef) {
+    const copy = children.slice();
+    copy[index] = next;
+    onChange({ ...field, fields: copy });
+  }
+  function removeChild(index: number) {
+    onChange({ ...field, fields: children.filter((_, i) => i !== index) });
+  }
+  function addChild() {
+    onChange({ ...field, fields: [...children, createEmptyExtractField()] });
+  }
+
+  return (
+    <div className="rounded-lg border border-white/[.10] bg-white/[.03] p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={field.name}
+          onChange={e => onChange({ ...field, name: e.target.value })}
+          placeholder="nombre_del_campo"
+          spellCheck={false}
+          className="min-w-0 flex-1 rounded-md border border-white/[.12] bg-white/[.04] px-2.5 py-1.5 text-xs font-mono text-white placeholder:text-gray-600"
+        />
+        <button
+          type="button"
+          onClick={onRemove}
+          className="shrink-0 p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      {/* El selector va en su propia línea: algunas etiquetas ("Lista — un objeto por
+          elemento encontrado") son largas y un <select> nativo suele dimensionarse por
+          la opción más ancha — compartir fila con el nombre lo dejaba sin espacio visible. */}
+      <select
+        value={field.type}
+        onChange={e => {
+          const nextType = e.target.value as ExtractFieldType;
+          const nowComposite = isCompositeExtractType(nextType);
+          onChange({ ...field, type: nextType, fields: nowComposite ? children : undefined });
+        }}
+        className="w-full min-w-0 rounded-md border border-white/[.12] bg-[#13141c] px-2 py-1.5 text-[11px] text-gray-300"
+      >
+        {EXTRACT_TYPE_OPTIONS.map(o => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <textarea
+        value={field.instruction}
+        onChange={e => onChange({ ...field, instruction: e.target.value })}
+        placeholder="Qué debe poner la IA aquí — ej. la fecha del comprobante en formato YYYY-MM-DD"
+        rows={2}
+        className="w-full rounded-md border border-white/[.12] bg-white/[.04] px-2.5 py-1.5 text-[11px] text-gray-300 placeholder:text-gray-600 resize-y leading-relaxed"
+      />
+      {composite && (
+        <div className="pl-3 border-l-2 border-white/[.08] space-y-2">
+          {children.map((child, i) => (
+            <ExtractFieldRow
+              key={i}
+              field={child}
+              onChange={next => updateChild(i, next)}
+              onRemove={() => removeChild(i)}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={addChild}
+            className="text-[11px] text-[#5b5bf6] hover:underline flex items-center gap-1"
+          >
+            <Plus className="w-3 h-3" /> Agregar sub-campo
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Lista de campos de nivel superior a extraer con IA — mismo patrón que "Agregar etapa" en el CRM. */
+function ExtractFieldsEditor({
+  fields,
+  onChange
+}: {
+  fields: ExtractFieldDef[];
+  onChange: (fields: ExtractFieldDef[]) => void;
+}) {
+  function updateField(index: number, next: ExtractFieldDef) {
+    const copy = fields.slice();
+    copy[index] = next;
+    onChange(copy);
+  }
+  function removeField(index: number) {
+    onChange(fields.filter((_, i) => i !== index));
+  }
+  function addField() {
+    onChange([...fields, createEmptyExtractField()]);
+  }
+
+  return (
+    <div className="space-y-2">
+      {fields.map((field, i) => (
+        <ExtractFieldRow
+          key={i}
+          field={field}
+          onChange={next => updateField(i, next)}
+          onRemove={() => removeField(i)}
+        />
+      ))}
+      <button
+        type="button"
+        onClick={addField}
+        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-white/[.16] text-xs text-gray-400 hover:text-white hover:border-white/[.28]"
+      >
+        <Plus className="w-3.5 h-3.5" /> Agregar campo
+      </button>
+    </div>
+  );
+}
+
 function NodeConfigPanel({
   node,
   connections,
@@ -1138,6 +1293,23 @@ function NodeConfigPanel({
                   onChange={channelId => onSetData({ channelId })}
                   kindLabel={kindLabel}
                 />
+              </div>
+
+              <div className="mt-5 pt-4 border-t border-white/[.08]">
+                <ToggleField
+                  label="Extraer datos estructurados con IA"
+                  description="Además de la descripción libre, la IA llena estos campos exactos y los manda al webhook — nunca se muestran en la respuesta al cliente."
+                  checked={Boolean(node.data.extractFields)}
+                  onChange={extractFields => onSetData({ extractFields })}
+                />
+                {node.data.extractFields && (
+                  <div className="mt-4">
+                    <ExtractFieldsEditor
+                      fields={readExtractSchema(node.data.extractSchema)}
+                      onChange={extractSchema => onSetData({ extractSchema })}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           );

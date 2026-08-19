@@ -6,9 +6,12 @@ import { listActiveWorkflowsForOrg } from "@/lib/automations/workflows-db";
 import {
   findWebhookActionConfigs,
   findMatchingWhatsAppTriggerNodeIds,
+  getTriggerExtractConfig,
   type WebhookActionConfig,
   type WhatsAppEventMediaType
 } from "@/lib/automations/node-types";
+import { runFieldExtraction } from "@/lib/automations/extract";
+import { recordUsageSafe } from "@/lib/billing/meter";
 
 const WEBHOOK_TIMEOUT_MS = 8000;
 /** Cuánto del payload/respuesta se guarda para inspección en la UI — evita que un conector que devuelva HTML gigante llene la tabla. */
@@ -58,9 +61,42 @@ export async function emitAutomationEvent(
     const matchingTriggerIds = findMatchingWhatsAppTriggerNodeIds(workflow.graph, params.mediaType, params.channelId);
     if (matchingTriggerIds.length === 0) continue;
 
+    // Extracción estructurada con IA (opcional, configurada por el tenant en
+    // el disparador): corre una sola vez por workflow, antes de armar el
+    // payload — nunca bloquea ni se mezcla con la respuesta al cliente final,
+    // que ya salió por otro camino antes de llegar acá.
+    const extractConfig = getTriggerExtractConfig(workflow.graph, matchingTriggerIds[0]);
+    let extracted: Record<string, unknown> | null = null;
+    let extractError: string | undefined;
+    if (extractConfig) {
+      const extraction = await runFieldExtraction(extractConfig.fields, params.analysisText, params.mediaType);
+      extracted = extraction.extracted;
+      extractError = extraction.error;
+      if (extractError) {
+        console.warn("[automations] extracción de campos falló:", JSON.stringify({ workflowId: workflow.id, extractError }));
+      }
+      // Consumo real de Gemini — se cobra siempre que la llamada realmente se hizo
+      // (haya devuelto JSON o no), sin importar si el evento termina en un webhook
+      // conectado o solo queda "capturado" para pruebas en el editor.
+      if (extraction.model) {
+        await recordUsageSafe({
+          db,
+          organizationId: params.organizationId,
+          eventType: "automation_extract",
+          channel: "automations",
+          provider: "google",
+          model: extraction.model,
+          gemini: extraction.usage,
+          referenceType: "text_agent_conversation",
+          referenceId: params.conversationId,
+          idempotencyKey: `automation_extract_${workflow.id}_${params.messageSid}`
+        });
+      }
+    }
+
     const actionConfigs = findWebhookActionConfigs(workflow.graph, params.mediaType, params.channelId);
     if (actionConfigs.length === 0) {
-      await logCapturedTriggerEvent(db, { workflowId: workflow.id, imageUrl, eventType, ...params });
+      await logCapturedTriggerEvent(db, { workflowId: workflow.id, imageUrl, eventType, extracted, extractError, ...params });
       continue;
     }
 
@@ -69,6 +105,8 @@ export async function emitAutomationEvent(
         workflowId: workflow.id,
         imageUrl,
         eventType,
+        extracted,
+        extractError,
         ...params,
         ...config
       });
@@ -80,25 +118,22 @@ interface CapturedTriggerEventParams extends EmitWhatsAppEventParams {
   workflowId: string;
   imageUrl: string | null;
   eventType: string;
+  extracted: Record<string, unknown> | null;
+  extractError?: string;
 }
 
 /** Deja constancia de que un disparador de WhatsApp se activó con datos reales, aunque todavía no esté conectado a ningún conector. */
 async function logCapturedTriggerEvent(db: SupabaseClient, params: CapturedTriggerEventParams): Promise<void> {
-  const requestBody = JSON.stringify(
-    params.eventType === "whatsapp.image_received"
-      ? {
-          event: params.eventType,
-          conversation_id: params.conversationId,
-          contact: { phone: params.contactPhone, label: params.contactLabel },
-          image: { url: params.imageUrl, analysis: params.analysisText }
-        }
-      : {
-          event: params.eventType,
-          conversation_id: params.conversationId,
-          contact: { phone: params.contactPhone, label: params.contactLabel },
-          message: { text: params.analysisText }
-        }
-  );
+  const requestBody = JSON.stringify({
+    event: params.eventType,
+    conversation_id: params.conversationId,
+    contact: { phone: params.contactPhone, label: params.contactLabel },
+    ...(params.eventType === "whatsapp.image_received"
+      ? { image: { url: params.imageUrl, analysis: params.analysisText } }
+      : { message: { text: params.analysisText } }),
+    ...(params.extracted ? { extracted: params.extracted } : {}),
+    ...(params.extractError ? { extract_error: params.extractError } : {})
+  });
 
   await db.from("automation_event_log").insert({
     organization_id: params.organizationId,
@@ -114,6 +149,8 @@ interface SendWebhookEventParams extends EmitWhatsAppEventParams, WebhookActionC
   workflowId: string;
   imageUrl: string | null;
   eventType: string;
+  extracted: Record<string, unknown> | null;
+  extractError?: string;
 }
 
 /** Reemplaza tokens `{{nombre}}` por su valor, JSON-escapado — para usar dentro de comillas de un JSON ya armado por el usuario. */
@@ -192,6 +229,8 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
     } else {
       payload.message = { text: params.analysisText };
     }
+    if (params.extracted) payload.extracted = params.extracted;
+    if (params.extractError) payload.extract_error = params.extractError;
     body = JSON.stringify(payload);
   }
 

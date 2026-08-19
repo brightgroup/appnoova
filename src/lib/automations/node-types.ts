@@ -6,6 +6,9 @@
  * action.webhook. Nuevos tipos se agregan aquí sin tocar el resto del motor.
  */
 
+import { readExtractSchema, type ExtractFieldDef } from "@/lib/automations/extract-schema";
+export type { ExtractFieldDef, ExtractFieldType } from "@/lib/automations/extract-schema";
+
 export const NODE_TYPES = [
   "trigger.whatsapp_message",
   "trigger.webhook",
@@ -35,6 +38,10 @@ export interface WorkflowNodeData {
   channelId?: string;
   /** Solo aplica a trigger.whatsapp_message: qué lo activa. Default "any" (imagen o texto). */
   mediaFilter?: "image" | "text" | "any";
+  /** Solo aplica a trigger.whatsapp_message: si está activo, se corre una extracción de datos estructurados con IA antes de emitir el evento — separada por completo de la respuesta conversacional del agente al cliente. */
+  extractFields?: boolean;
+  /** Solo aplica a trigger.whatsapp_message con extractFields activo: forma del JSON a extraer, definida por el tenant (nombre + tipo + instrucción por campo, con anidamiento). */
+  extractSchema?: ExtractFieldDef[];
   /** Solo aplica a trigger.webhook: token único de este nodo — la URL pública es /api/automations/inbound/{webhookToken}. Se genera al crear el nodo. */
   webhookToken?: string;
   /** Solo aplica a action.send_whatsapp_message: qué tipo de contenido envía. Default "text". */
@@ -197,6 +204,23 @@ export function findMatchingWhatsAppTriggerNodeIds(
     .filter((n) => !n.data.channelId || n.data.channelId === channelId)
     .filter((n) => !n.data.mediaFilter || n.data.mediaFilter === "any" || n.data.mediaFilter === eventMediaType)
     .map((n) => n.id);
+}
+
+/**
+ * Configuración de extracción con IA del primer disparador de WhatsApp que
+ * aplique a este evento — nombre, tipo e instrucción de cada campo que el
+ * tenant definió, con su anidamiento. `null` si el disparador no tiene la
+ * extracción activada o no definió ningún campo.
+ */
+export function getTriggerExtractConfig(
+  graph: WorkflowGraph,
+  triggerNodeId: string
+): { fields: ExtractFieldDef[] } | null {
+  const node = graph.nodes.find((n) => n.id === triggerNodeId);
+  if (!node || node.data.extractFields !== true) return null;
+  const fields = readExtractSchema(node.data.extractSchema);
+  if (fields.length === 0) return null;
+  return { fields };
 }
 
 /**
