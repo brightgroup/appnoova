@@ -84,7 +84,7 @@ export function ImageDropzone({
         onClick={() => !uploading && inputRef.current?.click()}
         className={`relative rounded-xl border-2 border-dashed transition-colors cursor-pointer ${
           dragging
-            ? "border-[#5b5bf6] bg-[#5b5bf6]/10"
+            ? "border-[#0f7eff] bg-[#0f7eff]/10"
             : "border-white/[.12] hover:border-white/[.22] bg-white/[.02]"
         } ${compact ? "p-3" : "p-5"}`}
       >
@@ -109,7 +109,7 @@ export function ImageDropzone({
             <div className="flex-1 min-w-0">
               <p className="text-xs text-gray-300 font-medium">Archivo cargado</p>
               <p className="text-[11px] text-gray-500 truncate mt-0.5">{value.split("/").pop()}</p>
-              <p className="text-[11px] text-[#5b5bf6] mt-2">Arrastra otro archivo o haz clic para reemplazar</p>
+              <p className="text-[11px] text-[#0f7eff] mt-2">Arrastra otro archivo o haz clic para reemplazar</p>
             </div>
             <button
               type="button"
@@ -123,13 +123,13 @@ export function ImageDropzone({
         ) : (
           <div className="flex flex-col items-center justify-center py-6 text-center">
             <div className="w-10 h-10 rounded-full bg-white/[.06] flex items-center justify-center mb-3">
-              {dragging ? <Upload className="w-5 h-5 text-[#5b5bf6]" /> : <ImageIcon className="w-5 h-5 text-gray-400" />}
+              {dragging ? <Upload className="w-5 h-5 text-[#0f7eff]" /> : <ImageIcon className="w-5 h-5 text-gray-400" />}
             </div>
             <p className="text-sm text-gray-300 font-medium">
               Arrastra tu imagen aquí
             </p>
             <p className="text-xs text-gray-500 mt-1">
-              o <span className="text-[#5b5bf6]">adjunta desde tu PC</span>
+              o <span className="text-[#0f7eff]">adjunta desde tu PC</span>
             </p>
             {hint && <p className="text-[11px] text-gray-600 mt-2">{hint}</p>}
           </div>

@@ -192,7 +192,7 @@ export default function AdminBillingPage() {
                         </div>
                         <div className="h-1.5 rounded-full bg-white/[.08] overflow-hidden">
                           <div
-                            className={`h-full ${r.used_pct >= 90 ? "bg-red-500" : r.used_pct >= 70 ? "bg-amber-500" : "bg-[#5b5bf6]"}`}
+                            className={`h-full ${r.used_pct >= 90 ? "bg-red-500" : r.used_pct >= 70 ? "bg-amber-500" : "bg-[#0f7eff]"}`}
                             style={{ width: `${r.used_pct}%` }}
                           />
                         </div>

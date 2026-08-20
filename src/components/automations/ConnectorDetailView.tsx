@@ -177,7 +177,7 @@ export function ConnectorDetailView({
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-noova-main text-gray-400 text-sm gap-3">
         <p>{error || "Conector no encontrado"}</p>
-        <Link href="/dashboard/conectores" className="text-[#5b5bf6] hover:underline">Volver a Conectores</Link>
+        <Link href="/dashboard/conectores" className="text-[#0f7eff] hover:underline">Volver a Conectores</Link>
       </div>
     );
   }

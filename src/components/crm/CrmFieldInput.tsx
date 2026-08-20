@@ -3,7 +3,7 @@ import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import { CrmToggleChip } from "@/components/crm/CrmToggleChip";
 
 const inputClass =
-  "w-full rounded-xl border border-white/[.12] bg-noova-surface px-4 py-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-[#5b5bf6]/45 focus:ring-1 focus:ring-[#5b5bf6]/20 transition-colors";
+  "w-full rounded-xl border border-white/[.12] bg-noova-surface px-4 py-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-[#0f7eff]/45 focus:ring-1 focus:ring-[#0f7eff]/20 transition-colors";
 
 interface CrmFieldInputProps {
   definition: Pick<CrmPropertyDefinition, "field_key" | "label" | "field_type" | "options" | "is_required">;

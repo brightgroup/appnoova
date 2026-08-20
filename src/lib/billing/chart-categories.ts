@@ -1,7 +1,7 @@
 /** Categorías del gráfico de consumo — alineadas con CREDIT_COST en pricing.ts */
 
 export const BILLING_CHART_CATEGORIES = [
-  { key: "ori",          label: "ORI",             color: "#5b5bf6", events: ["ori"] as const },
+  { key: "ori",          label: "ORI",             color: "#0f7eff", events: ["ori"] as const },
   { key: "milink",       label: "Mi Link",         color: "#818cf8", events: ["milink", "widget", "text_test"] as const },
   { key: "whatsapp",     label: "WhatsApp",        color: "#22c55e", events: ["whatsapp_ai", "whatsapp_manual", "whatsapp_media_ai", "automation_extract"] as const },
   { key: "voz",          label: "Agentes de Voz",  color: "#c084fc", events: ["voice"] as const },

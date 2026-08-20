@@ -13,7 +13,7 @@ import { CrmToggleChip } from "@/components/crm/CrmToggleChip";
 import type { CrmContact, CrmLead, CrmPropertyDefinition, CrmSuppression, CrmTenantLabels, TipoContacto } from "@/types/crm";
 
 const inputClass =
-  "w-full rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-[#5b5bf6]/50";
+  "w-full rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-[#0f7eff]/50";
 
 /** Campos builtin de metadata que ya tienen columna propia en el contacto. */
 const BUILTIN_COLUMN_KEYS = new Set(["ciudad"]);
@@ -257,9 +257,9 @@ export function CrmContactForm({
           <ul className="divide-y divide-white/[.06]">
             {leads.map(lead => (
               <li key={lead.id}>
-                <Link href={`/dashboard/crm/leads/${lead.id}`} className="flex items-center justify-between gap-3 py-2.5 text-sm hover:text-[#a5a5ff]">
+                <Link href={`/dashboard/crm/leads/${lead.id}`} className="flex items-center justify-between gap-3 py-2.5 text-sm hover:text-[#99c9ff]">
                   <span className="text-white truncate">{lead.title}</span>
-                  <span className="text-xs text-[#a5a5ff] shrink-0">{formatLeadValue(lead.value_amount, lead.currency)}</span>
+                  <span className="text-xs text-[#99c9ff] shrink-0">{formatLeadValue(lead.value_amount, lead.currency)}</span>
                 </Link>
               </li>
             ))}

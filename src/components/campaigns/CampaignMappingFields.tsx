@@ -24,7 +24,7 @@ function formatPreviewCell(value: unknown): string {
 
 function VariableChip({ token }: { token: string }) {
   return (
-    <span className="text-[11px] px-2 py-1 rounded-md border border-[#5b5bf6]/25 bg-[#5b5bf6]/8 text-[#a5a5ff] font-mono">
+    <span className="text-[11px] px-2 py-1 rounded-md border border-[#0f7eff]/25 bg-[#072b55]/60 text-[#2f8fff] font-mono">
       {`{{${token}}}`}
     </span>
   );
@@ -118,7 +118,7 @@ export function CampaignMappingFields({
           type="button"
           onClick={() => void runAutoMap()}
           disabled={autoMapping}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-[#a5a5ff] hover:bg-[#5b5bf6]/10 disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-[#99c9ff] hover:bg-[#0f7eff]/10 disabled:opacity-40"
         >
           {autoMapping ? (
             <Loader2 className="w-3 h-3 animate-spin" />
@@ -229,8 +229,8 @@ export function CampaignMappingFields({
                 </td>
                 <td className="px-3 py-2 align-middle">
                   <div className="flex items-center gap-1.5">
-                    <div className="flex items-center flex-1 min-w-0 rounded-md border border-[#5b5bf6]/25 bg-[#5b5bf6]/8 px-2 py-1.5 focus-within:border-[#5b5bf6]/50">
-                      <span className="text-[#a5a5ff]/60 text-xs font-mono shrink-0">{"{{"}</span>
+                    <div className="flex items-center flex-1 min-w-0 rounded-md border border-[#0f7eff]/25 bg-[#0f7eff]/8 px-2 py-1.5 focus-within:border-[#0f7eff]/50">
+                      <span className="text-[#99c9ff]/60 text-xs font-mono shrink-0">{"{{"}</span>
                       <input
                         value={field.variable_key ?? slugifyVariableKey(field.label || field.column_key)}
                         onChange={e => {
@@ -238,9 +238,9 @@ export function CampaignMappingFields({
                           next[i] = { ...next[i], variable_key: slugifyVariableKey(e.target.value) };
                           onChange({ ...mapping, custom_fields: next });
                         }}
-                        className="w-full min-w-0 bg-transparent px-0.5 text-xs text-[#a5a5ff] font-mono focus:outline-none"
+                        className="w-full min-w-0 bg-transparent px-0.5 text-xs text-[#99c9ff] font-mono focus:outline-none"
                       />
-                      <span className="text-[#a5a5ff]/60 text-xs font-mono shrink-0">{"}}"}</span>
+                      <span className="text-[#99c9ff]/60 text-xs font-mono shrink-0">{"}}"}</span>
                     </div>
                     <button
                       type="button"
@@ -260,7 +260,7 @@ export function CampaignMappingFields({
       <button
         type="button"
         onClick={addCustomField}
-        className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#a5a5ff] hover:text-white"
+        className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#99c9ff] hover:text-white"
       >
         <Plus className="w-3.5 h-3.5" /> Agregar campo
       </button>

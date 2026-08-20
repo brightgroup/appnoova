@@ -293,7 +293,7 @@ export default function FacturacionPage() {
       <div className="shrink-0 bg-noova-main border-b border-white/[.08]">
         <div className="px-5 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-[#5b5bf6]" />
+            <CreditCard className="w-5 h-5 text-[#0f7eff]" />
             <h1 className="text-xl font-bold tracking-tight">Facturación</h1>
           </div>
           <button onClick={load} className={btnIcon} title="Actualizar">
@@ -307,7 +307,7 @@ export default function FacturacionPage() {
               onClick={() => setTab(t.id)}
               className={`px-4 pb-3 pt-1 font-medium transition-colors border-b-2 whitespace-nowrap ${
                 tab === t.id
-                  ? "text-white border-[#5b5bf6]"
+                  ? "text-white border-[#0f7eff]"
                   : "text-gray-400 border-transparent hover:text-gray-200"
               }`}
             >
@@ -335,7 +335,7 @@ export default function FacturacionPage() {
 
         {loading && !data ? (
           <div className="flex items-center justify-center py-32 text-gray-400">
-            <RefreshCw className="w-5 h-5 animate-spin mr-2 text-[#5b5bf6]" /> Cargando…
+            <RefreshCw className="w-5 h-5 animate-spin mr-2 text-[#0f7eff]" /> Cargando…
           </div>
         ) : !data ? null : (
 
@@ -347,10 +347,10 @@ export default function FacturacionPage() {
               <div className="space-y-5 max-w-5xl">
 
                 {planPromo && (
-                  <div className="rounded-xl border border-[#5b5bf6]/30 bg-gradient-to-r from-[#5b5bf6]/15 to-[#7070f8]/5 p-4 flex items-start gap-3">
-                    <Zap className="w-5 h-5 text-[#a5a5ff] shrink-0 mt-0.5" />
+                  <div className="rounded-xl border border-[#0f7eff]/30 bg-gradient-to-r from-[#0f7eff]/15 to-[#3392ff]/5 p-4 flex items-start gap-3">
+                    <Zap className="w-5 h-5 text-[#99c9ff] shrink-0 mt-0.5" />
                     <div className="min-w-0">
-                      <p className="font-semibold text-[#a5a5ff]">Beneficio activo en tu plan</p>
+                      <p className="font-semibold text-[#99c9ff]">Beneficio activo en tu plan</p>
                       <p className="text-sm text-gray-300 mt-1">{planPromo.headline}</p>
                       <div className="flex flex-wrap gap-2 mt-2.5">
                         {planPromo.price_discount_pct != null && planPromo.price_discount_pct > 0 && (
@@ -360,7 +360,7 @@ export default function FacturacionPage() {
                           </span>
                         )}
                         {planPromo.credits_bonus_pct != null && planPromo.credits_bonus_pct > 0 && (
-                          <span className="text-xs font-medium bg-[#5b5bf6]/15 text-[#a5a5ff] px-2.5 py-1 rounded-full">
+                          <span className="text-xs font-medium bg-[#072b55]/60 text-[#2f8fff] px-2.5 py-1 rounded-full">
                             +{planPromo.credits_bonus_pct}% créditos · {fmtN(planPromo.monthly_credits)}/mes
                           </span>
                         )}
@@ -400,7 +400,7 @@ export default function FacturacionPage() {
                     <div className="flex flex-wrap items-center gap-2 mt-2">
                       <Badge variant={sBadge.variant}>{sBadge.label}</Badge>
                       {planPromo?.label && (
-                        <span className="text-[10px] text-[#a5a5ff] bg-[#5b5bf6]/10 px-2 py-0.5 rounded-md font-medium">
+                        <span className="text-[10px] text-[#2f8fff] bg-[#072b55]/60 px-2 py-0.5 rounded-md font-medium">
                           {planPromo.label}
                         </span>
                       )}
@@ -420,7 +420,7 @@ export default function FacturacionPage() {
                           <p className="text-sm text-gray-400">${fmtN(effectivePriceUsd)} USD/mes</p>
                         ) : null}
                         {planPromo?.credits_bonus_pct != null && planPromo.credits_bonus_pct > 0 && (
-                          <p className="text-[11px] text-[#a5a5ff]/80 mt-1">
+                          <p className="text-[11px] text-[#99c9ff]/80 mt-1">
                             {fmtN(planPromo.monthly_credits)} cr/mes
                             <span className="text-gray-500 line-through ml-1">{fmtN(planPromo.monthly_credits_catalog)}</span>
                           </p>
@@ -451,8 +451,8 @@ export default function FacturacionPage() {
 
                   <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-6">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-xl bg-[#5b5bf6]/15 border border-[#5b5bf6]/25">
-                        <TrendingUp className="w-5 h-5 text-[#a5a5ff]" />
+                      <div className="p-2 rounded-xl bg-[#0f7eff]/15 border border-[#0f7eff]/25">
+                        <TrendingUp className="w-5 h-5 text-[#99c9ff]" />
                       </div>
                       <div>
                         <h2 className="text-base font-bold">Consumo del periodo</h2>
@@ -581,14 +581,14 @@ export default function FacturacionPage() {
                   {[
                     { label: "Promedio diario", value: fmtN(rangeStats.avg), sub: `últimos ${chartRange} días`, color: "text-white" },
                     { label: "Día pico", value: fmtN(rangeStats.peak), sub: rangeStats.peakLabel, color: "text-white" },
-                    { label: "Total periodo", value: fmtN(rangeStats.total), sub: "créditos", color: "text-[#a5a5ff]" },
+                    { label: "Total periodo", value: fmtN(rangeStats.total), sub: "créditos", color: "text-[#99c9ff]" },
                     ...BILLING_CHART_CATEGORIES.filter((c) => rangeStats.total > 0 && chartFiltered.some((d) => d[c.key] > 0))
                       .slice(0, 2)
                       .map((c) => ({
                         label: c.label,
                         value: fmtN(chartFiltered.reduce((s, d) => s + d[c.key], 0)),
                         sub: "créditos",
-                        color: c.key === "whatsapp" ? "text-green-400" : c.key === "voz" ? "text-purple-400" : "text-[#a5a5ff]",
+                        color: c.key === "whatsapp" ? "text-green-400" : c.key === "voz" ? "text-purple-400" : "text-[#99c9ff]",
                       })),
                   ].slice(0, 5).map((s) => (
                     <div key={s.label} className="bg-white/[.02] border border-white/[.08] rounded-xl p-5 hover:bg-white/[.04] transition-colors">
@@ -601,12 +601,12 @@ export default function FacturacionPage() {
 
                 {/* Banner prueba */}
                 {sub?.status === "trialing" && sub.trial_ends_at && (
-                  <div className="rounded-xl border border-[#5b5bf6]/25 bg-gradient-to-br from-[#5b5bf6]/12 to-[#7070f8]/5 p-5 flex items-center justify-between gap-4">
+                  <div className="rounded-xl border border-[#0f7eff]/25 bg-gradient-to-br from-[#0f7eff]/12 to-[#3392ff]/5 p-5 flex items-center justify-between gap-4">
                     <div>
                       <p className="font-semibold">Estás en periodo de prueba</p>
                       <p className={`text-sm ${textMuted} mt-0.5`}>Termina el {fmtDate(sub.trial_ends_at)}. Activa un plan para continuar sin interrupciones.</p>
                     </div>
-                    <button onClick={() => setTab("plans")} className="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#5b5bf6] hover:bg-[#7070f8] text-white text-sm font-semibold transition-colors">
+                    <button onClick={() => setTab("plans")} className="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0f7eff] hover:bg-[#3392ff] text-white text-sm font-semibold transition-colors">
                       Ver planes <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -839,7 +839,7 @@ export default function FacturacionPage() {
                           <ul className="space-y-1.5 text-xs">
                             {copy.features.map(f => (
                               <li key={f} className="flex items-start gap-2">
-                                <CheckCircle2 className="w-3 h-3 text-[#5b5bf6] shrink-0 mt-0.5" />
+                                <CheckCircle2 className="w-3 h-3 text-[#0f7eff] shrink-0 mt-0.5" />
                                 <span className="text-[var(--nv-text-muted)]">{f}</span>
                               </li>
                             ))}
@@ -873,11 +873,11 @@ export default function FacturacionPage() {
 
                 {/* Nota informativa */}
                 <div className="rounded-xl border border-[var(--nv-border)] bg-[var(--nv-bg-control)] p-4 flex items-start gap-3 text-sm text-[var(--nv-text-muted)]">
-                  <Info className="w-4 h-4 text-[#5b5bf6] shrink-0 mt-0.5" />
+                  <Info className="w-4 h-4 text-[#0f7eff] shrink-0 mt-0.5" />
                   <p>
                     Los planes se activan manualmente por tu asesor.
                     Escríbenos a{" "}
-                    <a href="mailto:info@bgsoluciones.com.co" className="text-[#a5a5ff] hover:underline">info@bgsoluciones.com.co</a>
+                    <a href="mailto:info@bgsoluciones.com.co" className="text-[#99c9ff] hover:underline">info@bgsoluciones.com.co</a>
                     {" "}para cambiar de plan, solicitar descuentos o resolver dudas.
                   </p>
                 </div>
@@ -944,7 +944,7 @@ export default function FacturacionPage() {
                           const typeCls =
                                 u.type === "Agentes de Voz" ? "bg-purple-500/15 text-purple-300" :
                             u.type === "WhatsApp"           ? "bg-green-500/15 text-green-300" :
-                            u.type === "ORI"                ? "bg-[#5b5bf6]/15 text-[#a5a5ff]" :
+                            u.type === "ORI"                ? "bg-[#0f7eff]/15 text-[#99c9ff]" :
                             u.type === "Mi Link"            ? "bg-indigo-500/15 text-indigo-300" :
                             u.type === "Documentos"         ? "bg-amber-500/15 text-amber-300" :
                             u.type === "Formularios"        ? "bg-cyan-500/15 text-cyan-300" :
@@ -985,7 +985,7 @@ export default function FacturacionPage() {
                     />
                   </div>
                   <div className="flex items-center gap-2 text-sm font-bold text-[var(--nv-text)] shrink-0 whitespace-nowrap">
-                    <Receipt className="w-4 h-4 text-[#5b5bf6] shrink-0" />
+                    <Receipt className="w-4 h-4 text-[#0f7eff] shrink-0" />
                     <span>
                       Total:{" "}
                       <span className="tabular-nums text-[var(--nv-hubspot-teal)]">
@@ -1047,7 +1047,7 @@ export default function FacturacionPage() {
                     { step: 3, title: "Tope mensual",     desc: "Sin superar el presupuesto definido" },
                   ].map(({ step, title, desc }) => (
                     <div key={step} className="rounded-xl border border-white/[.06] bg-white/[.02] p-4">
-                      <span className="inline-flex w-5 h-5 items-center justify-center rounded-full bg-[#5b5bf6]/15 text-[#a5a5ff] text-[10px] font-bold mb-3">{step}</span>
+                      <span className="inline-flex w-5 h-5 items-center justify-center rounded-full bg-[#072b55]/60 text-[#2f8fff] text-[10px] font-bold mb-3">{step}</span>
                       <p className="text-xs font-semibold text-white mb-1">{title}</p>
                       <p className="text-[10px] text-gray-500 leading-relaxed">{desc}</p>
                     </div>

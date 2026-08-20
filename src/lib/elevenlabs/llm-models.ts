@@ -13,14 +13,15 @@ export interface ElevenLabsLlmOption {
   label: string;
 }
 
+/** Agrupados por proveedor (Claude · Gemini · GPT) para que el selector se vea organizado. */
 export const ELEVENLABS_LLM_MODELS: ElevenLabsLlmOption[] = [
-  { id: "claude-haiku-4-5", label: "Claude Haiku 4.5 — recomendado (rápido, sin fugas de idioma)" },
-  { id: "gpt-4o-mini", label: "GPT-4o mini — rápido y económico" },
+  { id: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
+  { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
   { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  { id: "gpt-4o-mini", label: "GPT-4o mini" },
   { id: "gpt-4.1-mini", label: "GPT-4.1 mini" },
-  { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5 — más inteligente, algo más lento" },
-  { id: "gpt-4o", label: "GPT-4o — potente, mayor costo/latencia" },
-  { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash (antiguo)" },
+  { id: "gpt-4o", label: "GPT-4o" },
 ];
 
 /** Modelo por defecto para agentes premium nuevos. */

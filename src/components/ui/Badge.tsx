@@ -24,7 +24,7 @@ export type BadgeSize = "sm" | "md";
 /** Fondo oscuro + texto suave del mismo matiz — sin borde ni sombra. */
 const VARIANT_CLASS: Record<BadgeVariant, string> = {
   neutral: "bg-white/[.08] text-gray-400",
-  accent: "bg-[#5b5bf6]/20 text-[#c4c4ff]",
+  accent: "bg-[#072b55]/60 text-[#2f8fff]",
   emerald: "bg-emerald-950/60 text-emerald-400",
   violet: "bg-violet-950/60 text-violet-300",
   sky: "bg-sky-950/60 text-sky-300",

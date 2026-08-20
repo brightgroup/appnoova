@@ -90,8 +90,8 @@ export function CampaignPromptEditor({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-gray-400 flex items-center gap-1.5">
-          <Variable className="w-3.5 h-3.5 text-[#a5a5ff]" />
-          Escribe <code className="text-[#a5a5ff]">/</code> para insertar una variable
+          <Variable className="w-3.5 h-3.5 text-[#99c9ff]" />
+          Escribe <code className="text-[#99c9ff]">/</code> para insertar una variable
         </p>
         {sampleValues && (
           <button
@@ -113,7 +113,7 @@ export function CampaignPromptEditor({
               type="button"
               onClick={() => insertToken(v.key)}
               title={v.label}
-              className="text-[11px] px-2 py-1 rounded-md border border-[#5b5bf6]/25 bg-[#5b5bf6]/8 text-[#a5a5ff] hover:bg-[#5b5bf6]/15 transition-colors"
+              className="text-[11px] px-2 py-1 rounded-md border border-[#0f7eff]/25 bg-[#072b55]/60 text-[#2f8fff] hover:bg-[#072b55]/80 transition-colors"
             >
               {`{{${v.key}}}`}
             </button>
@@ -144,7 +144,7 @@ export function CampaignPromptEditor({
             onBlur={() => setTimeout(() => setMenu(null), 150)}
             spellCheck={false}
             placeholder="Escribe el guion de la llamada. Usa / para insertar variables como el nombre del contacto…"
-            className="w-full min-h-[280px] rounded-lg border border-white/[.10] bg-white/[.02] px-4 py-3 text-sm text-gray-200 font-mono leading-relaxed resize-y focus:outline-none focus:border-[#5b5bf6]/50"
+            className="w-full min-h-[280px] rounded-lg border border-white/[.10] bg-white/[.02] px-4 py-3 text-sm text-gray-200 font-mono leading-relaxed resize-y focus:outline-none focus:border-[#0f7eff]/50"
           />
 
           {menu && filtered.length > 0 && (
@@ -160,7 +160,7 @@ export function CampaignPromptEditor({
                   className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-white/[.06]"
                 >
                   <span className="text-sm text-white truncate">{v.label}</span>
-                  <span className="text-[11px] text-[#a5a5ff] shrink-0">{`{{${v.key}}}`}</span>
+                  <span className="text-[11px] text-[#99c9ff] shrink-0">{`{{${v.key}}}`}</span>
                 </button>
               ))}
             </div>

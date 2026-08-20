@@ -60,12 +60,12 @@ export function InboxTemplateComposer({
                 onClick={() => onSelectTemplate(tpl.id)}
                 className={`rounded-xl border px-3 py-3 text-left transition-all ${
                   active
-                    ? "border-[#5b5bf6]/50 bg-[var(--nv-accent-muted)] shadow-[0_0_20px_rgba(91,91,246,0.12)]"
+                    ? "border-[#0f7eff]/50 bg-[var(--nv-accent-muted)] shadow-[0_0_20px_rgba(15,126,255,0.12)]"
                     : "border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] hover:border-[var(--nv-border-strong)] hover:bg-[var(--nv-bg-control-hover)]"
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <FileText className={`h-4 w-4 shrink-0 ${active ? "text-[#a5a5ff]" : "text-white/40"}`} />
+                  <FileText className={`h-4 w-4 shrink-0 ${active ? "text-[#99c9ff]" : "text-white/40"}`} />
                   <span className="truncate text-sm font-medium text-white">{tpl.template_name}</span>
                 </div>
                 <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-white/45">
@@ -85,7 +85,7 @@ export function InboxTemplateComposer({
               <button
                 type="button"
                 onClick={onAutofillFromContact}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#5b5bf6]/30 bg-[#5b5bf6]/10 px-2.5 py-1 text-[11px] font-medium text-[#c4c4ff] hover:bg-[#5b5bf6]/20"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#0f7eff]/30 bg-[#0f7eff]/10 px-2.5 py-1 text-[11px] font-medium text-[#b3d6ff] hover:bg-[#0f7eff]/20"
               >
                 <Sparkles className="h-3 w-3" />
                 Rellenar desde contacto
@@ -106,7 +106,7 @@ export function InboxTemplateComposer({
                   value={variableValues[i] ?? ""}
                   onChange={e => onVariableChange(i, e.target.value)}
                   placeholder={`Valor para ${label}`}
-                  className="w-full rounded-xl border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] px-3 py-2.5 text-sm text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] focus:border-[#5b5bf6]/40 focus:outline-none focus:ring-1 focus:ring-[#5b5bf6]/20"
+                  className="w-full rounded-xl border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] px-3 py-2.5 text-sm text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] focus:border-[#0f7eff]/40 focus:outline-none focus:ring-1 focus:ring-[#0f7eff]/20"
                 />
               </div>
             ))}
@@ -132,7 +132,7 @@ export function InboxTemplateComposer({
         type="button"
         onClick={onSend}
         disabled={!selectedTemplateId || !varsComplete || sending || !canSend}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#5b5bf6] px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#7070f8] disabled:opacity-40"
+        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0f7eff] px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#3392ff] disabled:opacity-40"
       >
         {sending ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -147,7 +147,7 @@ export function InboxTemplateComposer({
       {templates.length === 0 && (
         <p className="text-center text-xs text-white/40">
           No tienes plantillas aprobadas.{" "}
-          <Link href="/dashboard/canales/whatsapp/plantillas" className="text-[#a5a5ff] hover:underline">
+          <Link href="/dashboard/canales/whatsapp/plantillas" className="text-[#99c9ff] hover:underline">
             Crear plantillas
           </Link>
         </p>

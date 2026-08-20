@@ -267,7 +267,7 @@ export function AdminWhatsAppPanel() {
           <button type="button" onClick={() => setTab("requests")} className={tab === "requests" ? btnFilterActive : btnFilterIdle}>
             Solicitudes
             {pendingRequestsCount > 0 && (
-              <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#5b5bf6] px-1 text-[10px] font-bold text-white">
+              <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#0f7eff] px-1 text-[10px] font-bold text-white">
                 {pendingRequestsCount}
               </span>
             )}
@@ -452,7 +452,7 @@ export function AdminWhatsAppPanel() {
                     <tr key={tpl.id} className={registryTableRow}>
                       <td className={`${registryTableCell} text-sm`}>
                         <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-[#5b5bf6] shrink-0" />
+                          <FileText className="w-4 h-4 text-[#0f7eff] shrink-0" />
                           <span className="font-medium">{tpl.template_name}</span>
                         </div>
                         <div className={`${textMuted} text-xs mt-1 line-clamp-2 max-w-sm`}>{tpl.body_source ?? tpl.body_preview}</div>

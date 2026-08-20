@@ -139,7 +139,7 @@ export function CampaignStepSchedule({
                           type="checkbox"
                           checked={slot.enabled}
                           onChange={e => updateSlot(day, { enabled: e.target.checked })}
-                          className="rounded border-white/20 bg-white/5 text-[#5b5bf6]"
+                          className="rounded border-white/20 bg-white/5 text-[#0f7eff]"
                         />
                         <span className="text-sm text-gray-300">{CAMPAIGN_DAY_LABELS[day]}</span>
                       </label>
@@ -201,7 +201,7 @@ export function CampaignStepSchedule({
               onClick={() => onTriggerChange({ ...trigger, type: opt.type })}
               className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${
                 trigger.type === opt.type
-                  ? "border-[#5b5bf6]/50 bg-[#5b5bf6]/12 ring-1 ring-[#5b5bf6]/25"
+                  ? "border-[#0f7eff]/50 bg-[#0f7eff]/12 ring-1 ring-[#0f7eff]/25"
                   : "border-white/[.08] bg-white/[.02] hover:bg-white/[.04] hover:border-white/[.14]"
               }`}
             >

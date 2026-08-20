@@ -121,8 +121,8 @@ export function MicrositePreviewFrame({
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-lg mx-auto px-6 py-8 flex flex-col items-center">
         <div className="flex items-start gap-3 mb-8 w-full max-w-md">
-          <div className="w-10 h-10 rounded-xl bg-[#5b5bf6]/15 border border-[#5b5bf6]/25 flex items-center justify-center shrink-0">
-            <Eye className="w-5 h-5 text-[#a5a5ff]" />
+          <div className="w-10 h-10 rounded-xl bg-[#0f7eff]/15 border border-[#0f7eff]/25 flex items-center justify-center shrink-0">
+            <Eye className="w-5 h-5 text-[#99c9ff]" />
           </div>
           <div>
             <h2 className="text-base font-semibold text-white leading-snug">

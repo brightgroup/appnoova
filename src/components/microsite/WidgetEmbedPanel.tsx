@@ -40,7 +40,7 @@ export function WidgetEmbedPanel({
               <button
                 type="button"
                 onClick={onCopy}
-                className="flex items-center gap-1 mt-2.5 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]"
+                className="flex items-center gap-1 mt-2.5 text-[11px] text-[#0f7eff] hover:text-[#99c9ff]"
               >
                 <Copy className="w-3 h-3" />
                 {copied ? "Copiado" : "Copiar código"}

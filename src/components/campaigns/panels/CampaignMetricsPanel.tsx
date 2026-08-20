@@ -50,7 +50,7 @@ export function CampaignMetricsPanel({ campaignId }: CampaignMetricsPanelProps) 
   ];
 
   const funnel = [
-    { label: "Total de contactos", pct: 100, color: "bg-[#5b5bf6]" },
+    { label: "Total de contactos", pct: 100, color: "bg-[#0f7eff]" },
     {
       label: "Conectado (RPC)",
       pct: stats.connection_rate,
@@ -99,8 +99,8 @@ export function CampaignMetricsPanel({ campaignId }: CampaignMetricsPanelProps) 
               key={card.label}
               className="rounded-xl border border-white/[.08] bg-white/[.02] p-4"
             >
-              <div className="w-8 h-8 rounded-lg bg-[#5b5bf6]/15 flex items-center justify-center mb-3">
-                <Icon className="w-4 h-4 text-[#a5a5ff]" />
+              <div className="w-8 h-8 rounded-lg bg-[#0f7eff]/15 flex items-center justify-center mb-3">
+                <Icon className="w-4 h-4 text-[#99c9ff]" />
               </div>
               <p className="text-[11px] text-gray-500">{card.label}</p>
               <p className="text-2xl font-bold text-white mt-1 tabular-nums">{card.value}</p>

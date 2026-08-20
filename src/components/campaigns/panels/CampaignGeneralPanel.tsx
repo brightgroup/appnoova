@@ -112,7 +112,7 @@ export function CampaignGeneralPanel({ campaign, onChange }: CampaignGeneralPane
                 disabled={locked && campaign.campaign_type !== type}
                 className={`rounded-xl border p-3.5 text-left transition-colors disabled:opacity-40 ${
                   campaign.campaign_type === type
-                    ? "border-[#5b5bf6]/40 bg-[#5b5bf6]/8"
+                    ? "border-[#0f7eff]/40 bg-[#0f7eff]/8"
                     : "border-white/[.08] bg-white/[.02] hover:bg-white/[.04]"
                 }`}
               >

@@ -199,7 +199,7 @@ export default function AdminOrganizationsPage() {
                       <td className={registryTableCellFirst}>
                         <p className="text-sm font-medium text-white flex items-center gap-1.5 flex-wrap">
                           {o.name}
-                          {protected_ && <Shield className="w-3.5 h-3.5 text-[#5b5bf6]" aria-label="Protegida" />}
+                          {protected_ && <Shield className="w-3.5 h-3.5 text-[#0f7eff]" aria-label="Protegida" />}
                           {whiteLabel && (
                             <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-white/[.08] text-gray-400">
                               Sin logo
@@ -223,7 +223,7 @@ export default function AdminOrganizationsPage() {
                       <td className={registryTableCellMuted}>{formatDate(o.created_at)}</td>
                       <td className={registryTableCell}>
                         {busyId === o.id ? (
-                          <RefreshCw className="w-4 h-4 animate-spin text-[#5b5bf6]" />
+                          <RefreshCw className="w-4 h-4 animate-spin text-[#0f7eff]" />
                         ) : (
                           <NoovaAnchoredMenu
                             open={menuId === o.id}

@@ -178,11 +178,11 @@ export function DataTableImportDialog({
                 onClick={() => fileRef.current?.click()}
                 className={`rounded-xl border-2 border-dashed p-10 text-center cursor-pointer transition-colors ${
                   dragOver
-                    ? "border-[#5b5bf6] bg-[#5b5bf6]/10"
+                    ? "border-[#0f7eff] bg-[#0f7eff]/10"
                     : "border-white/[.12] bg-white/[.02] hover:border-white/[.20] hover:bg-white/[.04]"
                 }`}
               >
-                <Upload className="w-8 h-8 mx-auto mb-3 text-[#5b5bf6]" />
+                <Upload className="w-8 h-8 mx-auto mb-3 text-[#0f7eff]" />
                 <p className="text-sm text-white font-medium">Arrastra tu Excel aquí</p>
                 <p className="text-xs text-gray-500 mt-1">o haz clic para seleccionar · .xlsx, .xls, .csv · máx. 1.000 registros</p>
                 <p className="text-[10px] text-gray-600 mt-2 leading-relaxed">
@@ -205,7 +205,7 @@ export function DataTableImportDialog({
 
           {loadingPreview && (
             <div className="flex items-center justify-center py-12 text-gray-400 text-sm">
-              <Loader2 className="w-5 h-5 animate-spin mr-2 text-[#5b5bf6]" />
+              <Loader2 className="w-5 h-5 animate-spin mr-2 text-[#0f7eff]" />
               Analizando archivo…
             </div>
           )}
@@ -213,7 +213,7 @@ export function DataTableImportDialog({
           {preview && (
             <div className="space-y-4">
               <div className="flex items-start gap-3 rounded-xl border border-white/[.08] bg-white/[.03] p-4">
-                <FileSpreadsheet className="w-5 h-5 text-[#5b5bf6] shrink-0 mt-0.5" />
+                <FileSpreadsheet className="w-5 h-5 text-[#0f7eff] shrink-0 mt-0.5" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-white truncate">{file?.name}</p>
                   <p className="text-xs text-gray-500 mt-0.5">Hoja: {preview.sheet_name}</p>
@@ -361,7 +361,7 @@ export function DataTableImportDialog({
                       className="text-[10px] px-2 py-1 rounded-full border border-white/[.08] bg-white/[.03] text-gray-300"
                     >
                       {c.label}
-                      {c.filterable && <span className="text-[#a5a5ff] ml-1">filtro</span>}
+                      {c.filterable && <span className="text-[#99c9ff] ml-1">filtro</span>}
                     </span>
                   ))}
                 </div>

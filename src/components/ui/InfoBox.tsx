@@ -23,10 +23,10 @@ const VARIANT_STYLES: Record<InfoBoxVariant, { border: string; bg: string; label
     icon: "text-gray-400",
   },
   accent: {
-    border: "border-[#5b5bf6]/40",
-    bg: "bg-[#5b5bf6]/[.07]",
-    label: "text-[#a5a5ff]",
-    icon: "text-[#a5a5ff]",
+    border: "border-[#0f7eff]/40",
+    bg: "bg-[#0f7eff]/[.07]",
+    label: "text-[#2f8fff]",
+    icon: "text-[#2f8fff]",
   },
   success: {
     border: "border-emerald-500/40",

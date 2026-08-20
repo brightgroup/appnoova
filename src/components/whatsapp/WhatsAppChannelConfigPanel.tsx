@@ -298,7 +298,7 @@ export function WhatsAppChannelConfigPanel({ channelId }: { channelId: string })
         </p>
         <Link
           href="/dashboard/inbox"
-          className="inline-flex items-center gap-1 mt-2 text-xs text-[#a5a5ff] hover:text-white"
+          className="inline-flex items-center gap-1 mt-2 text-xs text-[#99c9ff] hover:text-white"
         >
           Ir al Inbox <ExternalLink className="w-3.5 h-3.5" />
         </Link>

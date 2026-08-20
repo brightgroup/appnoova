@@ -212,7 +212,7 @@ export default function EquipoPage() {
           <p className={`text-sm ${textMuted} max-w-md`}>
             Tu rol no tiene permiso para ver usuarios de la organización. Contacta al administrador de tu cuenta.
           </p>
-          <Link href="/dashboard" className="mt-4 text-sm text-[#5b5bf6] hover:underline">
+          <Link href="/dashboard" className="mt-4 text-sm text-[#0f7eff] hover:underline">
             Volver al dashboard
           </Link>
         </div>
@@ -278,7 +278,7 @@ export default function EquipoPage() {
           <div className="mb-4 p-4 rounded-xl border border-amber-500/25 bg-amber-500/10">
             <p className="text-sm text-amber-200">
               Tu plan permite hasta {seatLimit?.max} usuarios y ya están en uso. Para agregar gerentes o asesores,{" "}
-              <Link href="/dashboard/facturacion" className="text-[#5b5bf6] hover:underline font-medium">
+              <Link href="/dashboard/facturacion" className="text-[#0f7eff] hover:underline font-medium">
                 actualiza el plan en Facturación
               </Link>
               .
@@ -347,7 +347,7 @@ export default function EquipoPage() {
                       <td className={registryTableCellFirst}>
                         <div className="flex items-center gap-3">
                           <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
-                            m.is_owner ? "bg-[#5b5bf6]/20 text-[#5b5bf6]" : "bg-white/[.08] text-gray-400"
+                            m.is_owner ? "bg-[#0f7eff]/20 text-[#0f7eff]" : "bg-white/[.08] text-gray-400"
                           }`}>
                             {(m.full_name ?? m.email)?.[0]?.toUpperCase() ?? "?"}
                           </div>
@@ -372,7 +372,7 @@ export default function EquipoPage() {
                       {canManage && (
                         <td className={registryTableCell}>
                           {busyId === m.id ? (
-                            <RefreshCw className="w-4 h-4 animate-spin text-[#5b5bf6]" />
+                            <RefreshCw className="w-4 h-4 animate-spin text-[#0f7eff]" />
                           ) : m.is_owner ? (
                             <span className="text-xs text-gray-600">Propietario</span>
                           ) : (

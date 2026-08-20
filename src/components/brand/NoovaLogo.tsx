@@ -4,7 +4,6 @@ import Image from "next/image";
 
 const LOGO_ON_DARK = "/logo-noova-dark.webp";
 const LOGO_ON_LIGHT = "/logo-noova-light.png";
-const LOGO_SIDEBAR = "/logo-noova-white.webp";
 
 /** Proporción del logo nuevo (1024×220). */
 const LOGO_ASPECT = 220 / 1024;
@@ -15,8 +14,12 @@ interface NoovaLogoProps {
   height?: number;
   priority?: boolean;
   /**
-   * `sidebar` — logo claro sobre la barra azul (tema claro del dashboard).
+   * `sidebar` — sidebar oscuro en tema oscuro, gris muy claro en tema claro
+   * (no siempre es la "barra azul" — el fondo del sidebar cambia con el tema).
    * `default` — light en tema claro, dark en tema oscuro (`html.dark`).
+   * Ambas variantes usan el mismo truco: las dos imágenes se renderizan
+   * siempre, y CSS (`.noova-logo-light`/`.noova-logo-dark`) muestra la que
+   * corresponde — así se evita useTheme() y el hydration mismatch que trae.
    */
   variant?: "default" | "sidebar";
 }
@@ -35,11 +38,20 @@ export function NoovaLogo({
     return (
       <span className="noova-logo-wrap inline-flex">
         <Image
-          src={LOGO_SIDEBAR}
+          src={LOGO_ON_LIGHT}
           alt="Noova 360"
           width={width}
           height={h}
-          className={`${className} noova-logo-blend`}
+          className={`noova-logo-light ${className} noova-logo-blend`}
+          priority={priority}
+        />
+        <Image
+          src={LOGO_ON_DARK}
+          alt=""
+          aria-hidden
+          width={width}
+          height={h}
+          className={`noova-logo-dark ${className} noova-logo-blend`}
           priority={priority}
           unoptimized
         />

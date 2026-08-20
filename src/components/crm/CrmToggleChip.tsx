@@ -5,13 +5,13 @@ import { Check } from "lucide-react";
 type Tone = "neutral" | "danger" | "success";
 
 const toneActive: Record<Tone, string> = {
-  neutral: "border-[#a5a5ff]/40 bg-[#a5a5ff]/10 text-[#c4c4ff]",
+  neutral: "border-[#0f7eff]/35 bg-[#0f7eff]/10 text-[#2f8fff]",
   danger: "border-red-500/35 bg-red-500/10 text-red-300",
   success: "border-emerald-500/35 bg-emerald-500/10 text-emerald-300"
 };
 
 const toneCheck: Record<Tone, string> = {
-  neutral: "bg-[#a5a5ff] border-[#a5a5ff]",
+  neutral: "bg-[#0f7eff] border-[#0f7eff]",
   danger: "bg-red-500 border-red-500",
   success: "bg-emerald-500 border-emerald-500"
 };

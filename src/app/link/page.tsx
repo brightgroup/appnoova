@@ -12,7 +12,7 @@ export default function LinkSubdomainHomePage() {
       </p>
       <Link
         href={appUrl}
-        className="text-sm font-medium text-[#5b5bf6] hover:underline"
+        className="text-sm font-medium text-[#0f7eff] hover:underline"
       >
         Ir a Noova 360 →
       </Link>

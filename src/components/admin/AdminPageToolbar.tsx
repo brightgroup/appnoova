@@ -61,7 +61,7 @@ export function AdminPageToolbar({
 
         <div className="shrink-0 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
-            {Icon ? <Icon className="w-5 h-5 text-[#5b5bf6] shrink-0" /> : null}
+            {Icon ? <Icon className="w-5 h-5 text-[#0f7eff] shrink-0" /> : null}
             <h1 className="text-xl font-bold tracking-tight truncate">{title}</h1>
           </div>
           {subtitle ? <p className={`text-xs ${textMuted} truncate`}>{subtitle}</p> : null}

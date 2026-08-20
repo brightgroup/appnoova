@@ -337,7 +337,7 @@ export default function AdminConsumptionPage() {
               onClick={() => setPageTab(t.id)}
               className={`flex items-center gap-2 px-4 pb-3 pt-2 font-medium border-b-2 transition-colors ${
                 pageTab === t.id
-                  ? "text-white border-[#5b5bf6]"
+                  ? "text-white border-[#0f7eff]"
                   : "text-gray-400 border-transparent hover:text-gray-200"
               }`}
             >
@@ -428,7 +428,7 @@ export default function AdminConsumptionPage() {
                           onClick={() => setServiceFilter(serviceFilter === s.key ? "todos" : s.key)}
                           className={`rounded-lg border p-3 text-left transition-colors ${
                             serviceFilter === s.key
-                              ? "border-[#5b5bf6]/50 bg-[#5b5bf6]/10"
+                              ? "border-[#0f7eff]/50 bg-[#0f7eff]/10"
                               : "border-white/[.06] bg-white/[.02] hover:bg-white/[.04]"
                           }`}
                         >
@@ -456,7 +456,7 @@ export default function AdminConsumptionPage() {
                             onClick={() => setChartTab(t.id)}
                             className={`px-3 pb-2 pt-0.5 font-medium transition-colors border-b-2 whitespace-nowrap ${
                               chartTab === t.id
-                                ? "text-white border-[#5b5bf6]"
+                                ? "text-white border-[#0f7eff]"
                                 : "text-gray-400 border-transparent hover:text-gray-200"
                             }`}
                           >
@@ -526,7 +526,7 @@ export default function AdminConsumptionPage() {
                     type="button"
                     onClick={() => setClientView("service")}
                     className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
-                      clientView === "service" ? "bg-[#5b5bf6] text-white" : "text-gray-400 hover:text-gray-200"
+                      clientView === "service" ? "bg-[#0f7eff] text-white" : "text-gray-400 hover:text-gray-200"
                     }`}
                   >
                     Por servicio
@@ -535,7 +535,7 @@ export default function AdminConsumptionPage() {
                     type="button"
                     onClick={() => setClientView("provider")}
                     className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
-                      clientView === "provider" ? "bg-[#5b5bf6] text-white" : "text-gray-400 hover:text-gray-200"
+                      clientView === "provider" ? "bg-[#0f7eff] text-white" : "text-gray-400 hover:text-gray-200"
                     }`}
                   >
                     Por proveedor

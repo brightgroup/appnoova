@@ -60,7 +60,7 @@ function SidebarSubMenu({
                 aria-hidden
                 className={`shrink-0 rounded-[3px] transition-all duration-200 ${
                   active
-                    ? "h-2 w-2 bg-[#5b5bf6] shadow-[0_0_8px_rgba(91,91,246,0.4)]"
+                    ? "h-2 w-2 bg-[#0f7eff] shadow-[0_0_8px_rgba(15,126,255,0.4)]"
                     : "h-1.5 w-1.5 bg-white/20 group-hover:bg-white/35"
                 }`}
               />
@@ -548,7 +548,7 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
                   {billing?.planName ?? "—"}
                 </p>
                 {billing?.promoLabel && (
-                  <p className="text-[10px] text-[#a5a5ff] font-medium mb-1 truncate" title={billing.promoLabel}>
+                  <p className="text-[10px] text-[#99c9ff] font-medium mb-1 truncate" title={billing.promoLabel}>
                     {billing.promoLabel}
                   </p>
                 )}
@@ -572,7 +572,7 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
                   </div>
                   <div className="h-[3px] rounded-full bg-[var(--nv-border)] overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-[var(--nv-hubspot-teal)]" : "bg-[#5b5bf6]"}`}
+                      className={`h-full rounded-full transition-all ${pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-[var(--nv-hubspot-teal)]" : "bg-[#0f7eff]"}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>

@@ -20,9 +20,9 @@ export function CampaignWizardStepper({ currentStep }: CampaignWizardStepperProp
                 <div
                   className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
                     done
-                      ? "nv-wizard-step-done bg-[#5b5bf6] text-white"
+                      ? "nv-wizard-step-done bg-[#0f7eff] text-white"
                       : active
-                        ? "nv-wizard-step-active bg-[#5b5bf6] text-white ring-2 ring-[#5b5bf6]/40"
+                        ? "nv-wizard-step-active bg-[#0f7eff] text-white ring-2 ring-[#0f7eff]/40"
                         : "bg-white/[.06] text-gray-500 border border-white/[.10]"
                   }`}
                 >
@@ -40,7 +40,7 @@ export function CampaignWizardStepper({ currentStep }: CampaignWizardStepperProp
               {i < CAMPAIGN_WIZARD_STEPS.length - 1 && (
                 <div
                   className={`flex-1 h-px mx-3 min-w-[12px] ${
-                    done ? "nv-wizard-step-line-done bg-[#5b5bf6]/60" : "nv-wizard-step-line-pending bg-white/[.10]"
+                    done ? "nv-wizard-step-line-done bg-[#0f7eff]/60" : "nv-wizard-step-line-pending bg-white/[.10]"
                   }`}
                 />
               )}

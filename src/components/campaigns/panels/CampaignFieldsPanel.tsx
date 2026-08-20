@@ -121,7 +121,7 @@ export function CampaignFieldsPanel({ campaign, onChange }: CampaignFieldsPanelP
         </div>
 
         {showImport && !locked && (
-          <div className="rounded-xl border border-[#5b5bf6]/25 bg-[#5b5bf6]/[.04] p-4 space-y-3">
+          <div className="rounded-xl border border-[#0f7eff]/25 bg-[#0f7eff]/[.04] p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-medium text-white">Importar campos desde JSON</p>
@@ -162,7 +162,7 @@ export function CampaignFieldsPanel({ campaign, onChange }: CampaignFieldsPanelP
               <button
                 type="button"
                 onClick={importFields}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#5b5bf6] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#4a4ae0]"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f7eff] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#4a4ae0]"
               >
                 <FileJson className="w-3.5 h-3.5" /> Cargar campos
               </button>
@@ -209,7 +209,7 @@ export function CampaignFieldsPanel({ campaign, onChange }: CampaignFieldsPanelP
               <div
                 key={i}
                 className={`rounded-xl border bg-white/[.02] p-4 space-y-3 overflow-hidden ${
-                  field.is_primary ? "border-[#5b5bf6]/40" : "border-white/[.08]"
+                  field.is_primary ? "border-[#0f7eff]/40" : "border-white/[.08]"
                 }`}
               >
                 <div className="flex items-start gap-2">
@@ -295,7 +295,7 @@ export function CampaignFieldsPanel({ campaign, onChange }: CampaignFieldsPanelP
                       type="checkbox"
                       checked={field.required}
                       onChange={e => update(i, { required: e.target.checked })}
-                      className="accent-[#5b5bf6]"
+                      className="accent-[#0f7eff]"
                     />
                     Obligatorio
                   </label>
@@ -311,12 +311,12 @@ export function CampaignFieldsPanel({ campaign, onChange }: CampaignFieldsPanelP
                     }
                     className={`inline-flex items-center gap-1.5 text-xs transition-colors disabled:opacity-40 shrink-0 ${
                       field.is_primary
-                        ? "text-[#a5a5ff] font-medium"
+                        ? "text-[#99c9ff] font-medium"
                         : "text-gray-500 hover:text-gray-300"
                     }`}
                   >
                     <Star
-                      className={`w-3.5 h-3.5 ${field.is_primary ? "fill-[#5b5bf6] text-[#5b5bf6]" : ""}`}
+                      className={`w-3.5 h-3.5 ${field.is_primary ? "fill-[#0f7eff] text-[#0f7eff]" : ""}`}
                     />
                     Tipificación principal
                   </button>
@@ -380,7 +380,7 @@ export function CampaignFieldsPanel({ campaign, onChange }: CampaignFieldsPanelP
           <button
             type="button"
             onClick={addField}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-[#a5a5ff] hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-[#99c9ff] hover:text-white transition-colors"
           >
             <Plus className="w-3.5 h-3.5" /> Agregar campo
           </button>

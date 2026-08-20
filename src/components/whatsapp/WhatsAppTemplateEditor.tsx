@@ -338,7 +338,7 @@ export function WhatsAppTemplateEditor({
                       onClick={() => applyPreset(preset)}
                       className={`text-left rounded-xl border px-3.5 py-3 transition-colors ${
                         appliedPreset === preset.template_name
-                          ? "border-[#5b5bf6]/50 bg-[#5b5bf6]/[.10]"
+                          ? "border-[#0f7eff]/50 bg-[#0f7eff]/[.10]"
                           : "border-white/[.08] bg-white/[.02] hover:border-white/[.16] hover:bg-white/[.04]"
                       }`}
                     >

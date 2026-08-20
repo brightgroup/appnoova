@@ -197,7 +197,7 @@ export default function MobileLeadDetailPage() {
               <span className="k">Etapa</span>
               {lead.outcome === "open" ? (
                 <button type="button" className="stage-pill-btn" onClick={() => setSheetOpen(true)}>
-                  <span className="stage-dot" style={{ backgroundColor: lead.stage?.color ?? "#5b5bf6" }} />
+                  <span className="stage-dot" style={{ backgroundColor: lead.stage?.color ?? "#0f7eff" }} />
                   {lead.stage?.name ?? "—"}
                   <ChevronDownIcon />
                 </button>

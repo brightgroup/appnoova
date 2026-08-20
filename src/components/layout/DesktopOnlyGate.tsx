@@ -23,8 +23,8 @@ function DesktopOnlyMessage({ neutralBranding }: { neutralBranding?: boolean }) 
       )}
 
       <div className="relative z-10 w-full max-w-md rounded-3xl border border-[var(--nv-border-strong)] bg-[var(--nv-bg-surface)] p-8 shadow-nv-lg">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#5b5bf6]/15 border border-[#5b5bf6]/25">
-          <Monitor className="h-6 w-6 text-[#a5a5ff]" />
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0f7eff]/15 border border-[#0f7eff]/25">
+          <Monitor className="h-6 w-6 text-[#99c9ff]" />
         </div>
         <p className="text-sm text-[var(--nv-text-muted)] leading-relaxed">
           {neutralBranding
@@ -34,7 +34,7 @@ function DesktopOnlyMessage({ neutralBranding }: { neutralBranding?: boolean }) 
         {!neutralBranding && (
           <a
             href={marketingUrl}
-            className="mt-6 inline-flex text-xs font-semibold text-[var(--nv-accent-text)] hover:text-[#5b5bf6] transition-colors"
+            className="mt-6 inline-flex text-xs font-semibold text-[var(--nv-accent-text)] hover:text-[#0f7eff] transition-colors"
           >
             Volver al sitio
           </a>

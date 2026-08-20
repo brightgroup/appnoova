@@ -92,7 +92,7 @@ export function AdminUserModal({
       <div className="w-full max-w-md rounded-2xl bg-[#12131a] border border-white/[.1] shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[.08] sticky top-0 bg-[#12131a] z-10">
           <div className="flex items-center gap-2">
-            {isEdit ? <Pencil className="w-5 h-5 text-[#5b5bf6]" /> : <UserPlus className="w-5 h-5 text-[#5b5bf6]" />}
+            {isEdit ? <Pencil className="w-5 h-5 text-[#0f7eff]" /> : <UserPlus className="w-5 h-5 text-[#0f7eff]" />}
             <h2 className="text-lg font-semibold">{isEdit ? "Editar usuario" : "Agregar usuario"}</h2>
           </div>
           <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-white/[.08] text-gray-400">

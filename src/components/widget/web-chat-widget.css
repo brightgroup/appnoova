@@ -10,8 +10,8 @@ body {
 }
 
 .nw-root {
-  --nw-accent: #5b5bf6;
-  --nw-button: #5b5bf6;
+  --nw-accent: #0f7eff;
+  --nw-button: #0f7eff;
   box-sizing: border-box;
   min-height: 100%;
   min-height: 100vh;

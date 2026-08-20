@@ -58,7 +58,7 @@ export function CrmOriQuotePanel({
       : undefined;
 
   return (
-    <div className="rounded-xl border border-[#5b5bf6]/20 bg-[#5b5bf6]/[.06] p-4 space-y-3">
+    <div className="rounded-xl border border-[#0f7eff]/20 bg-[#0f7eff]/[.06] p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-white">Asistente de cotización ORI</h3>

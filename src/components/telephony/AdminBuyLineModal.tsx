@@ -30,7 +30,7 @@ interface AdminBuyLineModalProps {
 type Step = 1 | 2 | 3;
 
 const selectCls =
-  "w-full bg-noova-main border border-white/[.12] rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50";
+  "w-full bg-noova-main border border-white/[.12] rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50";
 
 const STEPS = [
   { n: 1, label: "Cliente" },
@@ -190,13 +190,13 @@ export function AdminBuyLineModal({ open, onClose, onSuccess, preselectedUserId 
           wideModal ? "max-w-5xl w-full" : "max-w-lg w-full"
         }`}
       >
-        <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#5b5bf6]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#0f7eff]/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Header */}
         <div className="relative px-8 pt-8 pb-4 shrink-0">
           <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="w-4 h-4 text-[#5b5bf6]" />
-            <span className="text-xs font-medium text-[#5b5bf6]">Telnyx · Compra de línea</span>
+            <Sparkles className="w-4 h-4 text-[#0f7eff]" />
+            <span className="text-xs font-medium text-[#0f7eff]">Telnyx · Compra de línea</span>
           </div>
           <h2 className="text-xl font-bold text-white">Comprar línea telefónica</h2>
           <p className={`text-sm ${textMuted} mt-1`}>
@@ -214,7 +214,7 @@ export function AdminBuyLineModal({ open, onClose, onSuccess, preselectedUserId 
                     step > s.n
                       ? "bg-emerald-500/20 text-emerald-400"
                       : step === s.n
-                        ? "bg-[#5b5bf6] text-white"
+                        ? "bg-[#0f7eff] text-white"
                         : "bg-white/[.06] text-gray-500"
                   }`}
                 >
@@ -344,7 +344,7 @@ export function AdminBuyLineModal({ open, onClose, onSuccess, preselectedUserId 
                     {totalResults != null && totalResults > available.length ? ` de ${totalResults}` : ""} · {formatNumberType(numberType === "all" ? "local" : numberType)} · {countryInfo?.label}
                   </span>
                   {selectedE164 && (
-                    <span className="text-[#5b5bf6] font-mono font-medium">{selectedE164}</span>
+                    <span className="text-[#0f7eff] font-mono font-medium">{selectedE164}</span>
                   )}
                 </div>
               )}
@@ -377,12 +377,12 @@ export function AdminBuyLineModal({ open, onClose, onSuccess, preselectedUserId 
                             <tr
                               key={n.e164}
                               onClick={() => setSelectedE164(n.e164)}
-                              className={`${registryTableRowClickable} ${selected ? "bg-[#5b5bf6]/[.06]" : ""}`}
+                              className={`${registryTableRowClickable} ${selected ? "bg-[#0f7eff]/[.06]" : ""}`}
                             >
                               <td className={registryTableCell}>
                                 <span
                                   className={`block w-4 h-4 rounded-full border-2 ${
-                                    selected ? "border-[#5b5bf6] bg-[#5b5bf6]" : "border-white/20"
+                                    selected ? "border-[#0f7eff] bg-[#0f7eff]" : "border-white/20"
                                   }`}
                                 >
                                   {selected && (

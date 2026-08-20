@@ -25,5 +25,5 @@ export function numberUsageBadgeClass(type: PhoneNumberType | string): string {
   if (isVerifiedNumber(type)) {
     return "bg-amber-500/15 text-amber-300";
   }
-  return "bg-[#5b5bf6]/15 text-[#a5a5ff]";
+  return "bg-[#0f7eff]/15 text-[#99c9ff]";
 }

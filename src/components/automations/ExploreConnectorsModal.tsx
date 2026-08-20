@@ -78,7 +78,7 @@ export function ExploreConnectorsModal({ open, onClose, onConnected }: ExploreCo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-3xl max-h-[86vh] rounded-2xl border border-white/[.12] bg-noova-surface shadow-2xl overflow-hidden flex flex-col">
-        <div className="shrink-0 bg-gradient-to-r from-[#5b5bf6] to-[#7070f8] px-6 py-5 flex items-center justify-between">
+        <div className="shrink-0 bg-gradient-to-r from-[#0f7eff] to-[#3392ff] px-6 py-5 flex items-center justify-between">
           <h3 className="text-lg font-bold text-white">
             {typeof step === "object" ? "Conectar" : "Explorar conectores"}
           </h3>

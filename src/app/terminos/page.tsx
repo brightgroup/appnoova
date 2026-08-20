@@ -94,7 +94,7 @@ const SECTIONS = [
           Los precios pueden cambiar; si un cambio te afecta, te avisaremos con al menos 30 días de
           anticipación antes de que aplique a tu próxima renovación. El detalle completo de cancelaciones
           y reembolsos está en nuestra{" "}
-          <Link href="/reembolsos" className="text-[#a5a5ff] hover:underline">
+          <Link href="/reembolsos" className="text-[#99c9ff] hover:underline">
             Política de Reembolsos
           </Link>
           .
@@ -132,7 +132,7 @@ const SECTIONS = [
               href="https://www.whatsapp.com/legal/business-policy/"
               target="_blank"
               rel="noreferrer"
-              className="text-[#a5a5ff] hover:underline"
+              className="text-[#99c9ff] hover:underline"
             >
               políticas de WhatsApp Business Platform de Meta
             </a>{" "}
@@ -190,7 +190,7 @@ const SECTIONS = [
       <>
         <p>
           El tratamiento de datos personales, tuyos y de tus usuarios finales, se rige por nuestra{" "}
-          <Link href="/privacy" className="text-[#a5a5ff] hover:underline">
+          <Link href="/privacy" className="text-[#99c9ff] hover:underline">
             Política de Privacidad
           </Link>
           , que forma parte de este acuerdo.
@@ -353,7 +353,7 @@ const SECTIONS = [
         <ul className="list-disc pl-5 space-y-1.5">
           <li>
             <strong>Correo:</strong>{" "}
-            <a href="mailto:info@bgsoluciones.com.co" className="text-[#a5a5ff] hover:underline">
+            <a href="mailto:info@bgsoluciones.com.co" className="text-[#99c9ff] hover:underline">
               info@bgsoluciones.com.co
             </a>
           </li>
@@ -361,7 +361,7 @@ const SECTIONS = [
           <li><strong>Ciudad:</strong> Bogotá, Colombia</li>
           <li>
             <strong>Sitio web:</strong>{" "}
-            <a href="https://app.noova360.com" className="text-[#a5a5ff] hover:underline">
+            <a href="https://app.noova360.com" className="text-[#99c9ff] hover:underline">
               app.noova360.com
             </a>
           </li>
@@ -401,7 +401,7 @@ export default function TermsOfServicePage() {
           Última actualización: 31 de julio de 2026 · Vigente desde: 31 de julio de 2026
         </p>
 
-        <div className="rounded-xl border border-[#5b5bf6]/25 bg-[#5b5bf6]/[.08] px-5 py-4 mb-10 text-sm text-gray-300 leading-relaxed">
+        <div className="rounded-xl border border-[#0f7eff]/25 bg-[#0f7eff]/[.08] px-5 py-4 mb-10 text-sm text-gray-300 leading-relaxed">
           Estos términos regulan el uso de Noova 360, la plataforma de atención al cliente e inteligencia
           artificial operada por DOMAL SAS. Junto con nuestra Política de Privacidad y Política de
           Reembolsos, forman el acuerdo completo entre tu empresa y nosotros.
@@ -411,7 +411,7 @@ export default function TermsOfServicePage() {
           {SECTIONS.map((section) => (
             <section key={section.num}>
               <h2 className="flex items-center gap-3 text-lg font-bold text-white mb-4 pb-3 border-b border-white/[.08]">
-                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#5b5bf6] text-xs font-bold text-white shrink-0">
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#0f7eff] text-xs font-bold text-white shrink-0">
                   {section.num}
                 </span>
                 {section.title}
@@ -426,11 +426,11 @@ export default function TermsOfServicePage() {
 
       <footer className="border-t border-white/[.06] py-8 px-6 text-center text-sm text-gray-500 leading-relaxed">
         <p className="mb-3 space-x-3">
-          <Link href="/privacy" className="text-[#a5a5ff] hover:underline">Política de Privacidad</Link>
+          <Link href="/privacy" className="text-[#99c9ff] hover:underline">Política de Privacidad</Link>
           <span>·</span>
-          <Link href="/terminos" className="text-[#a5a5ff] hover:underline">Términos de Servicio</Link>
+          <Link href="/terminos" className="text-[#99c9ff] hover:underline">Términos de Servicio</Link>
           <span>·</span>
-          <Link href="/reembolsos" className="text-[#a5a5ff] hover:underline">Política de Reembolsos</Link>
+          <Link href="/reembolsos" className="text-[#99c9ff] hover:underline">Política de Reembolsos</Link>
         </p>
         <p>© 2026 Noova 360 · DOMAL SAS · Bogotá, Colombia</p>
         <p className="mt-2 text-xs text-gray-600 max-w-xl mx-auto">

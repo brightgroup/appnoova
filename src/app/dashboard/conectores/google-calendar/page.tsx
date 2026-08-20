@@ -150,8 +150,8 @@ function GoogleCalendarConectorContent() {
       ) : (
         <div className="rounded-2xl border border-white/[.08] bg-noova-surface p-6">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-[#5b5bf6]/15 flex items-center justify-center shrink-0">
-              <Calendar className="w-6 h-6 text-[#5b5bf6]" />
+            <div className="w-12 h-12 rounded-xl bg-[#0f7eff]/15 flex items-center justify-center shrink-0">
+              <Calendar className="w-6 h-6 text-[#0f7eff]" />
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-sm font-semibold text-white">Google Calendar</h2>
@@ -210,12 +210,12 @@ function GoogleCalendarConectorContent() {
                   value={hostedEmail}
                   onChange={e => setHostedEmail(e.target.value)}
                   placeholder="tu-correo@empresa.com"
-                  className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-black/20 border border-white/[.08] text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-[#5b5bf6]/50"
+                  className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-black/20 border border-white/[.08] text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-[#0f7eff]/50"
                 />
                 <button
                   onClick={handleCreateHosted}
                   disabled={creatingHosted || !hostedEmail.trim()}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-white bg-[#5b5bf6]/15 hover:bg-[#5b5bf6]/25 border border-[#5b5bf6]/30 disabled:opacity-50"
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-white bg-[#0f7eff]/15 hover:bg-[#0f7eff]/25 border border-[#0f7eff]/30 disabled:opacity-50"
                 >
                   {creatingHosted ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Calendar className="w-3.5 h-3.5" />}
                   Usar calendario de Noova

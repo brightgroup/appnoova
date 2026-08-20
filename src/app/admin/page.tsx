@@ -180,13 +180,13 @@ export default function AdminDashboard() {
             <span>
               {pendingTotal} pendiente{pendingTotal !== 1 ? "s" : ""} requiere{pendingTotal === 1 ? "" : "n"} atención
               {(stats?.pending_telephony_requests ?? 0) > 0 && (
-                <> · <Link href="/admin/telephony?tab=solicitudes" className="text-[#a5a5ff] hover:underline">{stats?.pending_telephony_requests} solicitud{stats?.pending_telephony_requests !== 1 ? "es" : ""} de línea</Link></>
+                <> · <Link href="/admin/telephony?tab=solicitudes" className="text-[#99c9ff] hover:underline">{stats?.pending_telephony_requests} solicitud{stats?.pending_telephony_requests !== 1 ? "es" : ""} de línea</Link></>
               )}
               {(stats?.pending_whatsapp_requests ?? 0) > 0 && (
-                <> · <Link href="/admin/whatsapp?tab=requests" className="text-[#a5a5ff] hover:underline">{stats?.pending_whatsapp_requests} activación{stats?.pending_whatsapp_requests !== 1 ? "es" : ""} WA</Link></>
+                <> · <Link href="/admin/whatsapp?tab=requests" className="text-[#99c9ff] hover:underline">{stats?.pending_whatsapp_requests} activación{stats?.pending_whatsapp_requests !== 1 ? "es" : ""} WA</Link></>
               )}
               {(stats?.pending_whatsapp_templates ?? 0) > 0 && (
-                <> · <Link href="/admin/whatsapp?tab=aprobaciones" className="text-[#a5a5ff] hover:underline">{stats?.pending_whatsapp_templates} plantilla{stats?.pending_whatsapp_templates !== 1 ? "s" : ""} WA</Link></>
+                <> · <Link href="/admin/whatsapp?tab=aprobaciones" className="text-[#99c9ff] hover:underline">{stats?.pending_whatsapp_templates} plantilla{stats?.pending_whatsapp_templates !== 1 ? "s" : ""} WA</Link></>
               )}
             </span>
           </div>
@@ -207,12 +207,12 @@ export default function AdminDashboard() {
                 <Link
                   key={stat.label}
                   href={stat.href}
-                  className="bg-white/[.02] border border-white/[.08] rounded-xl p-6 hover:border-[#5b5bf6]/40 hover:bg-white/[.04] transition-all"
+                  className="bg-white/[.02] border border-white/[.08] rounded-xl p-6 hover:border-[#0f7eff]/40 hover:bg-white/[.04] transition-all"
                 >
                   <div className="flex items-center justify-between mb-4">
                     <p className="text-gray-400 text-sm">{stat.label}</p>
                     <Icon className={`w-5 h-5 ${
-                      stat.color === "primary" ? "text-[#5b5bf6]" :
+                      stat.color === "primary" ? "text-[#0f7eff]" :
                       stat.color === "blue" ? "text-blue-400" :
                       stat.color === "cyan" ? "text-cyan-400" :
                       "text-green-400"
@@ -240,12 +240,12 @@ export default function AdminDashboard() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="group relative overflow-hidden rounded-xl bg-white/[.02] border border-white/[.08] p-6 hover:border-[#5b5bf6]/50 hover:bg-white/[.04] transition-all"
+                  className="group relative overflow-hidden rounded-xl bg-white/[.02] border border-white/[.08] p-6 hover:border-[#0f7eff]/50 hover:bg-white/[.04] transition-all"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#5b5bf6]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#0f7eff]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="relative">
                     <div className="flex items-start justify-between mb-3">
-                      <Icon className="w-8 h-8 text-[#5b5bf6]" />
+                      <Icon className="w-8 h-8 text-[#0f7eff]" />
                       {item.alert && item.badge ? (
                         <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-amber-500 text-[10px] font-bold text-black">
                           {item.badge}

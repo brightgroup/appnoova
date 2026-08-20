@@ -124,7 +124,7 @@ export function AdminOrgModal({
       <div className="w-full max-w-lg rounded-2xl bg-[#12131a] border border-white/[.1] shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[.08] sticky top-0 bg-[#12131a] z-10">
           <div className="flex items-center gap-2">
-            {isEdit ? <Pencil className="w-5 h-5 text-[#5b5bf6]" /> : <Building2 className="w-5 h-5 text-[#5b5bf6]" />}
+            {isEdit ? <Pencil className="w-5 h-5 text-[#0f7eff]" /> : <Building2 className="w-5 h-5 text-[#0f7eff]" />}
             <h2 className="text-lg font-semibold">{isEdit ? "Editar organización" : "Crear organización"}</h2>
           </div>
           <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-white/[.08] text-gray-400">
@@ -170,7 +170,7 @@ export function AdminOrgModal({
                   onClick={() => setOwnerMode("new")}
                   className={`flex-1 px-3 py-2 rounded-xl text-xs border transition-colors ${
                     ownerMode === "new"
-                      ? "border-[#5b5bf6]/40 bg-[#5b5bf6]/10 text-[#a5a5ff]"
+                      ? "border-[#0f7eff]/40 bg-[#0f7eff]/10 text-[#99c9ff]"
                       : "border-white/[.08] text-gray-400 hover:text-white"
                   }`}
                 >
@@ -181,7 +181,7 @@ export function AdminOrgModal({
                   onClick={() => setOwnerMode("existing")}
                   className={`flex-1 px-3 py-2 rounded-xl text-xs border transition-colors ${
                     ownerMode === "existing"
-                      ? "border-[#5b5bf6]/40 bg-[#5b5bf6]/10 text-[#a5a5ff]"
+                      ? "border-[#0f7eff]/40 bg-[#0f7eff]/10 text-[#99c9ff]"
                       : "border-white/[.08] text-gray-400 hover:text-white"
                   }`}
                 >
@@ -252,7 +252,7 @@ export function AdminOrgModal({
                 type="checkbox"
                 checked={hideNoovaLogo}
                 onChange={e => setHideNoovaLogo(e.target.checked)}
-                className="mt-0.5 rounded border-white/20 bg-[#12131a] text-[#5b5bf6] focus:ring-[#5b5bf6]/40"
+                className="mt-0.5 rounded border-white/20 bg-[#12131a] text-[#0f7eff] focus:ring-[#0f7eff]/40"
               />
               <span>
                 <span className="block text-sm font-medium text-white">Cliente agencia (sin logo Noova)</span>

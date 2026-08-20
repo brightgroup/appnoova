@@ -8,7 +8,7 @@ export const BROKER = {
   initials: "AZ",
   logoUrl: "/logos/allianz.png",
   faviconUrl: "/logos/allianz-icon.png",
-  accent: "#5b5bf6"
+  accent: "#0f7eff"
 };
 
 const DEMO_QUICK_ACTIONS: MicrositeQuickAction[] = [

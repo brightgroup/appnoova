@@ -24,7 +24,7 @@
   --muted: #9aa2ac;
   --faint: #6f7883;
 
-  --accent: #3b59fe;
+  --accent: #0f7eff;
   --accent-strong: #5470ff;
   --accent-ink: #ffffff;
   --accent-text: #8fa6ff;
@@ -117,7 +117,7 @@
   --faint: #6f7883;
   --border: #2a2e35;
   --surface-2: #202329;
-  --accent: #3b59fe;
+  --accent: #0f7eff;
   --accent-strong: #5470ff;
   --accent-ink: #ffffff;
   --accent-text: #8fa6ff;
@@ -162,7 +162,7 @@ html:has(.nv-m-app) body {
    Causa real de la "franja gris" en la PWA instalada en iOS: en modo
    standalone, la zona del home indicator queda FUERA del viewport — ahí ningún
    position:fixed puede pintar; WebKit solo muestra el background propagado de
-   <html>/<body>, que globals.css define en #212121 (el gris del dashboard).
+   <html>/<body>, que globals.css define en #161616 (el gris del dashboard).
    Otras PWAs no lo muestran porque su body coincide con su diseño. Estas
    reglas pintan el lienzo con el color de la pantalla visible de /m, y solo
    aplican cuando .nv-m-app existe en el DOM (cero efecto sobre el dashboard). */

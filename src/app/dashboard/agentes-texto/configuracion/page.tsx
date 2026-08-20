@@ -13,6 +13,7 @@ import { getAuthHeaders } from "@/lib/text-agents-api";
 import { getTextTemplateMeta } from "@/lib/text-agent-templates";
 import { normalizeTextAgentForm } from "@/lib/text-agent-form";
 import { TEXT_LLM_MODELS, TEXT_OUTPUT_TOKEN_OPTIONS } from "@/lib/text-agent-options";
+import { llmModelIcon } from "@/lib/llm/provider-icon";
 import type { TextAgentFormData, TextAgentRecord } from "@/types/text-agent";
 import type { CompanyContext } from "@/types/company-context";
 import type { DataTableRecord } from "@/types/data-table";
@@ -21,6 +22,7 @@ import { ChatRegistryPanel } from "@/components/text/ChatRegistryPanel";
 import { NotifyTeamRulesEditor } from "@/components/text/NotifyTeamRulesEditor";
 import { SchedulingRulesEditor } from "@/components/scheduling/SchedulingRulesEditor";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
+import { Switch } from "@/components/ui/Switch";
 import { defaultNotifyTeamRules, hasIncompleteWhatsAppNotifyRule } from "@/lib/text-notify-rules";
 import { defaultSchedulingRules } from "@/lib/scheduling/rules";
 
@@ -184,7 +186,7 @@ function ConfigContent() {
         </p>
         <Link
           href="/dashboard/agentes-texto"
-          className="mt-4 px-4 py-2 rounded-lg bg-[#5b5bf6] hover:bg-[#7070f8] text-white text-sm font-semibold"
+          className="mt-4 px-4 py-2 rounded-lg bg-[#0f7eff] hover:bg-[#3392ff] text-white text-sm font-semibold"
         >
           Ir a mis agentes
         </Link>
@@ -271,23 +273,21 @@ function ConfigContent() {
             <h2 className="text-sm font-semibold text-gray-300 mb-4">Configuración del agente</h2>
 
             <div className="space-y-4">
-              <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-white/[.08] bg-white/[.03] px-3 py-3">
-                <input
-                  type="checkbox"
-                  checked={form.human_only === true}
-                  onChange={e => setForm(f => ({ ...f, human_only: e.target.checked }))}
-                  className="mt-0.5 rounded border-white/20 w-4 h-4"
-                />
-                <span>
-                  <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-100">
-                    <Users className="w-3.5 h-3.5 text-[#67e8f9]" />
+              <div className="rounded-xl border border-white/[.08] bg-white/[.03] px-3 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-gray-100">
+                    <Users className="w-4 h-4 text-[var(--nv-text)] shrink-0" />
                     Solo respuesta humana
                   </span>
-                  <span className="block text-[10px] text-gray-500 leading-relaxed mt-1">
-                    La IA no responde. Los mensajes de WhatsApp, widget o Mi Link quedan en el inbox para que los atienda el equipo.
-                  </span>
-                </span>
-              </label>
+                  <Switch
+                    checked={form.human_only === true}
+                    onChange={v => setForm(f => ({ ...f, human_only: v }))}
+                  />
+                </div>
+                <p className="text-[10px] text-gray-500 leading-relaxed mt-1.5">
+                  La IA no responde. Los mensajes de WhatsApp, widget o Mi Link quedan en el inbox para que los atienda el equipo.
+                </p>
+              </div>
 
               <Field label="Marca / contexto">
                 <NoovaSelect
@@ -305,7 +305,7 @@ function ConfigContent() {
                 />
                 <Link
                   href="/dashboard/contextos"
-                  className="inline-block mt-2 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]"
+                  className="inline-block mt-2 text-[11px] text-[#0f7eff] hover:text-[#99c9ff]"
                 >
                   Gestionar contextos de marca →
                 </Link>
@@ -327,7 +327,7 @@ function ConfigContent() {
                 />
                 <Link
                   href="/dashboard/tablas"
-                  className="inline-block mt-2 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]"
+                  className="inline-block mt-2 text-[11px] text-[#0f7eff] hover:text-[#99c9ff]"
                 >
                   Gestionar tablas de datos →
                 </Link>
@@ -352,7 +352,7 @@ function ConfigContent() {
                   value={form.llm_model}
                   onChange={v => setForm(f => ({ ...f, llm_model: v }))}
                   allowEmpty={false}
-                  options={TEXT_LLM_MODELS.map(m => ({ value: m.id, label: m.label }))}
+                  options={TEXT_LLM_MODELS.map(m => ({ value: m.id, label: m.label, icon: llmModelIcon(m.id) }))}
                 />
               </Field>
 
@@ -394,7 +394,7 @@ function ConfigContent() {
                 <input
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  className="w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
+                  className="w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50"
                 />
               </Field>
               <div className="flex gap-1 ml-4 shrink-0">
@@ -419,7 +419,7 @@ function ConfigContent() {
                 <textarea
                   value={form.prompt}
                   onChange={e => setForm(f => ({ ...f, prompt: e.target.value }))}
-                  className="w-full h-full min-h-[400px] bg-noova-surface border border-white/[.08] rounded-xl p-4 text-sm text-gray-200 font-mono leading-relaxed resize-none focus:outline-none focus:border-[#5b5bf6]/40"
+                  className="w-full h-full min-h-[400px] bg-noova-surface border border-white/[.08] rounded-xl p-4 text-sm text-gray-200 font-mono leading-relaxed resize-none focus:outline-none focus:border-[#0f7eff]/40"
                   spellCheck={false}
                 />
               ) : (

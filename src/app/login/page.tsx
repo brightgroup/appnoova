@@ -56,7 +56,7 @@ export default function LoginPage() {
   };
 
   const inputClass =
-    "w-full rounded-xl border border-[var(--nv-input-border)] bg-[var(--nv-input-bg)] px-4 py-3 text-sm text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] outline-none transition focus:border-[#5b5bf6]/50 focus:ring-2 focus:ring-[#5b5bf6]/15";
+    "w-full rounded-xl border border-[var(--nv-input-border)] bg-[var(--nv-input-bg)] px-4 py-3 text-sm text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] outline-none transition focus:border-[#0f7eff]/50 focus:ring-2 focus:ring-[#0f7eff]/15";
 
   return (
     <DesktopOnlyGate>
@@ -134,7 +134,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#5b5bf6] py-3 text-sm font-semibold text-white transition-all hover:bg-[#7070f8] hover:shadow-[0_8px_24px_var(--nv-accent-glow)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0f7eff] py-3 text-sm font-semibold text-white transition-all hover:bg-[#3392ff] hover:shadow-[0_8px_24px_var(--nv-accent-glow)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? (
               <>
@@ -152,7 +152,7 @@ export default function LoginPage() {
           ¿Aún no tiene acceso?{" "}
           <a
             href={`${marketingUrl}/?solicitar=acceso`}
-            className="text-[var(--nv-accent-text)] hover:text-[#5b5bf6] transition-colors font-semibold"
+            className="text-[var(--nv-accent-text)] hover:text-[#0f7eff] transition-colors font-semibold"
           >
             Solicitar acceso
           </a>

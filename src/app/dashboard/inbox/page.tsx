@@ -482,7 +482,7 @@ function InboxPageInner() {
               role="switch"
               aria-checked={!offline}
               onClick={() => setOffline(v => !v)}
-              className={`relative h-6 w-11 rounded-full transition-colors ${offline ? "bg-white/10" : "bg-[#5b5bf6]"}`}
+              className={`relative h-6 w-11 rounded-full transition-colors ${offline ? "bg-white/10" : "bg-[#0f7eff]"}`}
             >
               <span
                 className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${offline ? "left-0.5" : "left-[22px]"}`}
@@ -526,7 +526,7 @@ function InboxPageInner() {
               onClick={() => setFilter(tab.id)}
               className={`rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors sm:px-4 sm:py-2 sm:text-sm ${
                 filter === tab.id
-                  ? "bg-[#5b5bf6] text-white"
+                  ? "bg-[#0f7eff] text-white"
                   : "bg-white/[.10] text-white/60 hover:text-white/90"
               }`}
             >
@@ -563,9 +563,9 @@ function InboxPageInner() {
                     active
                       ? "bg-white/[.08]"
                       : hasUnread
-                        ? "bg-[#5b5bf6]/[.12] hover:bg-[#5b5bf6]/[.16]"
+                        ? "bg-[#0f7eff]/[.12] hover:bg-[#0f7eff]/[.16]"
                         : "hover:bg-white/[.04]"
-                  } ${hasUnread ? "border-l-2 border-l-[#5b5bf6]" : "border-l-2 border-l-transparent"}`}
+                  } ${hasUnread ? "border-l-2 border-l-[#0f7eff]" : "border-l-2 border-l-transparent"}`}
                 >
                   <div className="mb-1.5 flex items-start justify-between gap-2">
                     <span
@@ -593,7 +593,7 @@ function InboxPageInner() {
                       <span className="text-xs text-white/50">{item.agent_name}</span>
                     </div>
                     {hasUnread && (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#5b5bf6] px-1.5 text-[11px] font-bold text-white shadow-[0_0_12px_rgba(91,91,246,0.5)]">
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0f7eff] px-1.5 text-[11px] font-bold text-white shadow-[0_0_12px_rgba(15,126,255,0.5)]">
                         {item.unread_count > 9 ? "9+" : item.unread_count}
                       </span>
                     )}
@@ -669,7 +669,7 @@ function InboxPageInner() {
                             onClick={() => assignConversation("ai")}
                           >
                             <span className="flex items-center gap-2.5">
-                              <Bot className="h-4 w-4 text-[#5b5bf6]" />
+                              <Bot className="h-4 w-4 text-[#0f7eff]" />
                               Agente (IA)
                             </span>
                           </NoovaListMenuItem>
@@ -783,13 +783,13 @@ function InboxPageInner() {
                       }}
                       rows={2}
                       placeholder="Escribe como asesor humano..."
-                      className="flex-1 resize-none rounded-2xl border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] px-4 py-3 text-sm text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] focus:border-[#5b5bf6]/40 focus:outline-none"
+                      className="flex-1 resize-none rounded-2xl border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] px-4 py-3 text-sm text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] focus:border-[#0f7eff]/40 focus:outline-none"
                     />
                     <button
                       type="button"
                       onClick={sendReply}
                       disabled={!reply.trim() || sending}
-                      className="w-full shrink-0 rounded-2xl bg-[#5b5bf6] px-5 py-3 text-sm font-medium text-white disabled:opacity-40 sm:w-auto"
+                      className="w-full shrink-0 rounded-2xl bg-[#0f7eff] px-5 py-3 text-sm font-medium text-white disabled:opacity-40 sm:w-auto"
                     >
                       {sending ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Enviar"}
                     </button>

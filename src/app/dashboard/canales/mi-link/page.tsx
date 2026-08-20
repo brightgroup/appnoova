@@ -97,7 +97,7 @@ export default function MiLinkListPage() {
             >
               <td className={registryTableCellFirst}>
                 <div className="flex items-center gap-3">
-                  <Link2 className="w-4 h-4 text-[#a5a5ff]" />
+                  <Link2 className="w-4 h-4 text-[#99c9ff]" />
                   <div>
                     <div className="text-sm font-medium text-white">{displayName}</div>
                     <div className="text-[10px] text-gray-500 font-mono">/{microsite.slug}</div>

@@ -22,7 +22,7 @@ const KIND_META: Record<
 > = {
   conversation_lapse: { icon: MessageSquare, accent: "text-emerald-300", dot: "bg-emerald-400" },
   message_in: { icon: MessageSquare, accent: "text-emerald-300", dot: "bg-emerald-400" },
-  message_out: { icon: MessageSquare, accent: "text-[#a5a5ff]", dot: "bg-[#5b5bf6]" },
+  message_out: { icon: MessageSquare, accent: "text-[#99c9ff]", dot: "bg-[#0f7eff]" },
   call: { icon: Phone, accent: "text-sky-300", dot: "bg-sky-400" },
   lead: { icon: Sparkles, accent: "text-amber-300", dot: "bg-amber-400" },
   contact_created: { icon: UserPlus, accent: "text-gray-400", dot: "bg-gray-500" },
@@ -64,7 +64,7 @@ export function CrmContactTimeline({ contactId, inboxConversationId, leads = [] 
         <Clock className="w-8 h-8 text-gray-600 mx-auto mb-3" />
         <p className="text-sm text-gray-400">Sin actividad registrada todavía.</p>
         {inboxConversationId && (
-          <Link href={`/dashboard/inbox?id=${inboxConversationId}`} className="inline-block mt-3 text-xs text-[#a5a5ff] hover:text-white">
+          <Link href={`/dashboard/inbox?id=${inboxConversationId}`} className="inline-block mt-3 text-xs text-[#99c9ff] hover:text-white">
             Ver conversación en inbox →
           </Link>
         )}
@@ -92,7 +92,7 @@ export function CrmContactTimeline({ contactId, inboxConversationId, leads = [] 
                       {formatCrmDateTime(lead.created_at)}
                     </p>
                   </div>
-                  <span className="text-xs text-[#a5a5ff] shrink-0">{formatLeadValue(lead.value_amount, lead.currency)}</span>
+                  <span className="text-xs text-[#99c9ff] shrink-0">{formatLeadValue(lead.value_amount, lead.currency)}</span>
                 </Link>
               </li>
             ))}
@@ -105,7 +105,7 @@ export function CrmContactTimeline({ contactId, inboxConversationId, leads = [] 
           <div className="flex items-center justify-between gap-3 mb-4">
             <h3 className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Historial</h3>
             {inboxConversationId && (
-              <Link href={`/dashboard/inbox?id=${inboxConversationId}`} className="text-[10px] text-[#a5a5ff] hover:text-white">
+              <Link href={`/dashboard/inbox?id=${inboxConversationId}`} className="text-[10px] text-[#99c9ff] hover:text-white">
                 Ver conversación completa →
               </Link>
             )}
@@ -141,7 +141,7 @@ export function CrmContactTimeline({ contactId, inboxConversationId, leads = [] 
                       {ev.kind === "conversation_lapse" && inboxConversationId && (
                         <Link
                           href={`/dashboard/inbox?id=${inboxConversationId}`}
-                          className="mt-2 inline-block text-[10px] font-medium text-[#a5a5ff] hover:text-white"
+                          className="mt-2 inline-block text-[10px] font-medium text-[#99c9ff] hover:text-white"
                         >
                           Abrir en inbox →
                         </Link>
@@ -164,13 +164,13 @@ interface CrmContactNextStepProps {
 
 export function CrmContactNextStep({ message, href }: CrmContactNextStepProps) {
   return (
-    <div className="mb-6 rounded-xl border border-[#5b5bf6]/20 bg-[#5b5bf6]/[.06] px-4 py-3 flex items-start gap-3">
-      <Sparkles className="w-4 h-4 text-[#a5a5ff] shrink-0 mt-0.5" />
+    <div className="mb-6 rounded-xl border border-[#0f7eff]/20 bg-[#0f7eff]/[.06] px-4 py-3 flex items-start gap-3">
+      <Sparkles className="w-4 h-4 text-[#99c9ff] shrink-0 mt-0.5" />
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a5a5ff] mb-0.5">Próximo paso</p>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-[#99c9ff] mb-0.5">Próximo paso</p>
         <p className="text-sm text-gray-200">{message}</p>
         {href && (
-          <Link href={href} className="inline-block mt-2 text-xs font-medium text-[#a5a5ff] hover:text-white">
+          <Link href={href} className="inline-block mt-2 text-xs font-medium text-[#99c9ff] hover:text-white">
             Ir →
           </Link>
         )}

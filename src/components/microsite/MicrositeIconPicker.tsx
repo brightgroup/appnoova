@@ -11,7 +11,7 @@ interface MicrositeIconPickerProps {
   onChange: (icon: string) => void;
 }
 
-export function MicrositeIconPicker({ value, accentColor = "#5b5bf6", onChange }: MicrositeIconPickerProps) {
+export function MicrositeIconPicker({ value, accentColor = "#0f7eff", onChange }: MicrositeIconPickerProps) {
   const [open, setOpen] = useState(false);
   const SelectedIcon = resolveMicrositeIcon(value);
 
@@ -54,7 +54,7 @@ export function MicrositeIconPicker({ value, accentColor = "#5b5bf6", onChange }
                     onClick={() => { onChange(name); setOpen(false); }}
                     className={`relative flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${
                       selected
-                        ? "bg-[#5b5bf6]/20 ring-1 ring-[#5b5bf6]/50"
+                        ? "bg-[#0f7eff]/20 ring-1 ring-[#0f7eff]/50"
                         : "hover:bg-white/[.06]"
                     }`}
                   >
@@ -71,7 +71,7 @@ export function MicrositeIconPicker({ value, accentColor = "#5b5bf6", onChange }
                       {name.replace(/([A-Z])/g, " $1").trim()}
                     </span>
                     {selected && (
-                      <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#5b5bf6] flex items-center justify-center">
+                      <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#0f7eff] flex items-center justify-center">
                         <Check className="w-2.5 h-2.5 text-white" />
                       </span>
                     )}

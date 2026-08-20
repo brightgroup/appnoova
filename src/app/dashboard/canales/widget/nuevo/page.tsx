@@ -128,7 +128,7 @@ export default function WidgetNuevoPage() {
               </div>
             </div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-[#5b5bf6] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-[#0f7eff] flex items-center justify-center">
                 <Code2 className="w-5 h-5 text-white" />
               </div>
               <h2 className="text-xl font-bold text-white">Elige la URL del widget</h2>
@@ -154,7 +154,7 @@ export default function WidgetNuevoPage() {
               <input
                 value={slug}
                 onChange={e => setSlug(slugifyBrandName(e.target.value))}
-                className="flex-1 bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
+                className="flex-1 bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50"
                 placeholder="mi-empresa"
                 autoFocus
               />

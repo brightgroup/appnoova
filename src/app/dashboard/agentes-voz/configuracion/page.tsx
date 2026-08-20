@@ -24,6 +24,7 @@ import { CallRegistryPanel } from "@/components/voice/CallRegistryPanel";
 import { AgentPhoneChannelPanel } from "@/components/telephony/AgentPhoneChannelPanel";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import { InfoBox } from "@/components/ui/InfoBox";
+import { llmModelIcon } from "@/lib/llm/provider-icon";
 
 type TabId = "probar" | "config" | "analisis" | "registro" | "metrica" | "canales";
 
@@ -218,7 +219,7 @@ function ConfigContent() {
         </p>
         <Link
           href="/dashboard/agentes-voz"
-          className="mt-4 px-4 py-2 rounded-lg bg-[#5b5bf6] hover:bg-[#7070f8] text-white text-sm font-semibold"
+          className="mt-4 px-4 py-2 rounded-lg bg-[#0f7eff] hover:bg-[#3392ff] text-white text-sm font-semibold"
         >
           Ir a mis agentes
         </Link>
@@ -257,12 +258,12 @@ function ConfigContent() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {callActive && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#5b5bf6]/[.08] border border-[#5b5bf6]/25">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0f7eff]/[.08] border border-[#0f7eff]/25">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#5b5bf6] opacity-60" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#5b5bf6]" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0f7eff] opacity-60" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0f7eff]" />
               </span>
-              <span className="text-xs font-semibold text-[#5b5bf6] tabular-nums">
+              <span className="text-xs font-semibold text-[#0f7eff] tabular-nums">
                 {String(Math.floor(callDuration / 60)).padStart(2, "0")}:{String(callDuration % 60).padStart(2, "0")}
               </span>
             </div>
@@ -349,7 +350,7 @@ function ConfigContent() {
                 </p>
                 <Link
                   href="/dashboard/contextos"
-                  className="inline-block mt-2 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]"
+                  className="inline-block mt-2 text-[11px] text-[#0f7eff] hover:text-[#99c9ff]"
                 >
                   Gestionar contextos de marca →
                 </Link>
@@ -383,7 +384,7 @@ function ConfigContent() {
                       value={form.model}
                       onChange={v => setForm(f => ({ ...f, model: v }))}
                       allowEmpty={false}
-                      options={VOICE_MODELS.map(m => ({ value: m.id, label: m.label }))}
+                      options={VOICE_MODELS.map(m => ({ value: m.id, label: m.label, icon: llmModelIcon(m.id) }))}
                     />
                   </Field>
                 </>
@@ -415,7 +416,7 @@ function ConfigContent() {
                   value={form.llm_model}
                   onChange={v => setForm(f => ({ ...f, llm_model: v }))}
                   allowEmpty={false}
-                  options={LLM_MODELS.map(m => ({ value: m.id, label: m.label }))}
+                  options={LLM_MODELS.map(m => ({ value: m.id, label: m.label, icon: llmModelIcon(m.id) }))}
                 />
               </Field>
               </>
@@ -427,12 +428,8 @@ function ConfigContent() {
                     value={isElevenLabsLlm(form.llm_model) ? form.llm_model : ELEVENLABS_RECOMMENDED_LLM}
                     onChange={v => setForm(f => ({ ...f, llm_model: v }))}
                     allowEmpty={false}
-                    options={ELEVENLABS_LLM_MODELS.map(m => ({ value: m.id, label: m.label }))}
+                    options={ELEVENLABS_LLM_MODELS.map(m => ({ value: m.id, label: m.label, icon: llmModelIcon(m.id) }))}
                   />
-                  <p className="text-[10px] text-gray-500 mt-1.5">
-                    Modelo que razona y conversa en la llamada. Claude Haiku 4.5 es el recomendado
-                    (rápido y sin errores de idioma). Al cambiarlo, guarda para aplicarlo.
-                  </p>
                 </Field>
               )}
 
@@ -464,7 +461,7 @@ function ConfigContent() {
                 <input
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  className="w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
+                  className="w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50"
                 />
               </Field>
               <div className="flex gap-1 ml-4 shrink-0">
@@ -493,7 +490,7 @@ function ConfigContent() {
                   type="button"
                   onClick={restoreTemplate}
                   disabled={callActive}
-                  className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#5b5bf6]/30 bg-[#5b5bf6]/15 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-[#5b5bf6]/25 disabled:opacity-50"
+                  className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#0f7eff]/30 bg-[#0f7eff]/15 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-[#0f7eff]/25 disabled:opacity-50"
                 >
                   <RefreshCw className="w-3.5 h-3.5" /> Restaurar plantilla
                 </button>
@@ -507,7 +504,7 @@ function ConfigContent() {
                 <textarea
                   value={form.prompt}
                   onChange={e => setForm(f => ({ ...f, prompt: e.target.value }))}
-                  className="w-full h-full min-h-[400px] bg-noova-surface border border-white/[.08] rounded-xl p-4 text-sm text-gray-200 font-mono leading-relaxed resize-none focus:outline-none focus:border-[#5b5bf6]/40"
+                  className="w-full h-full min-h-[400px] bg-noova-surface border border-white/[.08] rounded-xl p-4 text-sm text-gray-200 font-mono leading-relaxed resize-none focus:outline-none focus:border-[#0f7eff]/40"
                   spellCheck={false}
                 />
               ) : (

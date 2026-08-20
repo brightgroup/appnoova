@@ -33,7 +33,7 @@ const SECTIONS = [
         </p>
         <p>
           Contacto:{" "}
-          <a href="mailto:info@bgsoluciones.com.co" className="text-[#a5a5ff] hover:underline">
+          <a href="mailto:info@bgsoluciones.com.co" className="text-[#99c9ff] hover:underline">
             info@bgsoluciones.com.co
           </a>
         </p>
@@ -104,7 +104,7 @@ const SECTIONS = [
             href="https://myaccount.google.com/permissions"
             target="_blank"
             rel="noreferrer"
-            className="text-[#a5a5ff] hover:underline"
+            className="text-[#99c9ff] hover:underline"
           >
             myaccount.google.com/permissions
           </a>
@@ -158,7 +158,7 @@ const SECTIONS = [
         <p>
           Los clientes pueden solicitar la eliminación anticipada de sus datos y los de sus usuarios finales
           escribiendo a{" "}
-          <a href="mailto:info@bgsoluciones.com.co" className="text-[#a5a5ff] hover:underline">
+          <a href="mailto:info@bgsoluciones.com.co" className="text-[#99c9ff] hover:underline">
             info@bgsoluciones.com.co
           </a>.
         </p>
@@ -241,7 +241,7 @@ const SECTIONS = [
         </ul>
         <p>
           Para ejercer estos derechos, escríbenos a{" "}
-          <a href="mailto:info@bgsoluciones.com.co" className="text-[#a5a5ff] hover:underline">
+          <a href="mailto:info@bgsoluciones.com.co" className="text-[#99c9ff] hover:underline">
             info@bgsoluciones.com.co
           </a>
           . Responderemos en un plazo máximo de 15 días hábiles.
@@ -281,7 +281,7 @@ const SECTIONS = [
         <ul className="list-disc pl-5 space-y-1.5">
           <li>
             <strong>Email:</strong>{" "}
-            <a href="mailto:info@bgsoluciones.com.co" className="text-[#a5a5ff] hover:underline">
+            <a href="mailto:info@bgsoluciones.com.co" className="text-[#99c9ff] hover:underline">
               info@bgsoluciones.com.co
             </a>
           </li>
@@ -289,7 +289,7 @@ const SECTIONS = [
           <li><strong>Ciudad:</strong> Bogotá, Colombia</li>
           <li>
             <strong>Sitio web:</strong>{" "}
-            <a href="https://app.noova360.com" className="text-[#a5a5ff] hover:underline">
+            <a href="https://app.noova360.com" className="text-[#99c9ff] hover:underline">
               app.noova360.com
             </a>
           </li>
@@ -329,7 +329,7 @@ export default function PrivacyPolicyPage() {
           Última actualización: 23 de julio de 2026 · Vigente desde: 15 de junio de 2026
         </p>
 
-        <div className="rounded-xl border border-[#5b5bf6]/25 bg-[#5b5bf6]/[.08] px-5 py-4 mb-10 text-sm text-gray-300 leading-relaxed">
+        <div className="rounded-xl border border-[#0f7eff]/25 bg-[#0f7eff]/[.08] px-5 py-4 mb-10 text-sm text-gray-300 leading-relaxed">
           Noova 360 es una plataforma de automatización e inteligencia artificial para empresas. Esta política
           explica qué datos recopilamos, cómo los usamos y cómo los protegemos, tanto de nuestros clientes (los
           negocios que contratan el servicio) como de los usuarios finales con quienes esos negocios se comunican
@@ -340,7 +340,7 @@ export default function PrivacyPolicyPage() {
           {SECTIONS.map((section) => (
             <section key={section.num}>
               <h2 className="flex items-center gap-3 text-lg font-bold text-white mb-4 pb-3 border-b border-white/[.08]">
-                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#5b5bf6] text-xs font-bold text-white shrink-0">
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#0f7eff] text-xs font-bold text-white shrink-0">
                   {section.num}
                 </span>
                 {section.title}
@@ -355,11 +355,11 @@ export default function PrivacyPolicyPage() {
 
       <footer className="border-t border-white/[.06] py-8 px-6 text-center text-sm text-gray-500 leading-relaxed">
         <p className="mb-3 space-x-3">
-          <Link href="/privacy" className="text-[#a5a5ff] hover:underline">Política de Privacidad</Link>
+          <Link href="/privacy" className="text-[#99c9ff] hover:underline">Política de Privacidad</Link>
           <span>·</span>
-          <Link href="/terminos" className="text-[#a5a5ff] hover:underline">Términos de Servicio</Link>
+          <Link href="/terminos" className="text-[#99c9ff] hover:underline">Términos de Servicio</Link>
           <span>·</span>
-          <Link href="/reembolsos" className="text-[#a5a5ff] hover:underline">Política de Reembolsos</Link>
+          <Link href="/reembolsos" className="text-[#99c9ff] hover:underline">Política de Reembolsos</Link>
         </p>
         <p>© 2026 Noova 360 · BG Soluciones · Bogotá, Colombia</p>
         <p className="mt-2 text-xs text-gray-600 max-w-xl mx-auto">

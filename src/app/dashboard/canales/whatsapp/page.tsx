@@ -322,7 +322,7 @@ export default function WhatsAppListPage() {
               </button>
               <p className="text-xs text-gray-600 mt-4">
                 ¿Necesitas ayuda manual?{" "}
-                <button type="button" onClick={() => setModalOpen(true)} className="text-[#a5a5ff] hover:underline">
+                <button type="button" onClick={() => setModalOpen(true)} className="text-[#99c9ff] hover:underline">
                   Solicitar activación asistida
                 </button>
               </p>

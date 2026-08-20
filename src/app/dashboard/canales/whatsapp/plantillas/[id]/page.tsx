@@ -57,7 +57,7 @@ export default function EditDashboardWhatsAppTemplatePage() {
         <p className="text-red-400 mb-4">{error || "Plantilla no encontrada"}</p>
         <Link
           href="/dashboard/canales/whatsapp/plantillas"
-          className="inline-flex items-center gap-2 text-[#a5a5ff] hover:text-white"
+          className="inline-flex items-center gap-2 text-[#99c9ff] hover:text-white"
         >
           <ChevronLeft className="w-4 h-4" />
           Volver a plantillas

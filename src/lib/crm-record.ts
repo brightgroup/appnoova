@@ -23,7 +23,7 @@ export const DEFAULT_CRM_STAGES: Omit<CrmPipelineStage, "id" | "user_id" | "crea
   {
     name: "Nuevo",
     slug: "nuevo",
-    color: "#5b5bf6",
+    color: "#0f7eff",
     sort_order: 0,
     is_won: false,
     is_lost: false,
@@ -222,7 +222,7 @@ export function toCrmStage(raw: Record<string, unknown>): CrmPipelineStage {
     user_id: String(raw.user_id),
     name: String(raw.name),
     slug: String(raw.slug),
-    color: String(raw.color ?? "#5b5bf6"),
+    color: String(raw.color ?? "#0f7eff"),
     sort_order: Number(raw.sort_order ?? 0),
     is_won: Boolean(raw.is_won),
     is_lost: Boolean(raw.is_lost),

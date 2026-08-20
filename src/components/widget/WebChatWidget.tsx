@@ -40,7 +40,7 @@ export default function WebChatWidget({ config, previewMode = false }: WebChatWi
   const prevCountRef = useRef(0);
   const chatHydratedRef = useRef(false);
 
-  const accent = config.accent || "#5b5bf6";
+  const accent = config.accent || "#0f7eff";
   const buttonColor = config.buttonColor || accent;
   const quickActions = enabledQuickActions(config);
 

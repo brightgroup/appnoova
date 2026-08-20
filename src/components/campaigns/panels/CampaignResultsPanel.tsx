@@ -242,7 +242,7 @@ export function CampaignResultsPanel({ campaign }: { campaign: VoiceCampaignReco
                   {fields.some(f => f.is_primary) && (
                     <td className={registryTableCell}>
                       {row.result_primary ? (
-                        <span className="inline-flex items-center rounded-full border border-[#5b5bf6]/30 bg-[#5b5bf6]/10 px-2 py-0.5 text-[10px] font-medium text-[#c8c8ff]">
+                        <span className="inline-flex items-center rounded-full border border-[#0f7eff]/30 bg-[#0f7eff]/10 px-2 py-0.5 text-[10px] font-medium text-[#c8c8ff]">
                           {row.result_primary}
                         </span>
                       ) : (

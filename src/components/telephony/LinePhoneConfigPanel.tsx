@@ -99,8 +99,8 @@ export function LinePhoneConfigPanel({ lineId }: { lineId: string }) {
     <div className="space-y-6">
       <div className="rounded-xl border border-white/[.10] bg-white/[.02] p-5 space-y-4">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#5b5bf6]/15 flex items-center justify-center shrink-0">
-            <Phone className="w-5 h-5 text-[#a5a5ff]" />
+          <div className="w-10 h-10 rounded-xl bg-[#0f7eff]/15 flex items-center justify-center shrink-0">
+            <Phone className="w-5 h-5 text-[#99c9ff]" />
           </div>
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Línea telefónica</p>
@@ -170,7 +170,7 @@ export function LinePhoneConfigPanel({ lineId }: { lineId: string }) {
             emptyLabel="Sin asignar"
             options={agents.map(a => ({ value: a.id, label: a.name }))}
           />
-          <Link href="/dashboard/agentes-voz" className="inline-block mt-2 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]">
+          <Link href="/dashboard/agentes-voz" className="inline-block mt-2 text-[11px] text-[#0f7eff] hover:text-[#99c9ff]">
             Gestionar agentes de voz →
           </Link>
         </div>

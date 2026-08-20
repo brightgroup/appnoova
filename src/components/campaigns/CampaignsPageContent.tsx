@@ -98,7 +98,7 @@ export function CampaignsPageContent({ initialWizardId = null }: CampaignsPageCo
       draft: "bg-gray-500/20 text-gray-400 border-gray-500/30",
       active: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
       paused: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-      completed: "bg-[#5b5bf6]/15 text-[#a5a5ff] border-[#5b5bf6]/30",
+      completed: "bg-[#0f7eff]/15 text-[#99c9ff] border-[#0f7eff]/30",
     };
     return (
       <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${colors[status]}`}>
@@ -217,7 +217,7 @@ export function CampaignsPageContent({ initialWizardId = null }: CampaignsPageCo
               >
                 <td className={registryTableCellFirst}>
                   <div className="flex items-center gap-3">
-                    <Target className="w-4 h-4 text-[#a5a5ff] shrink-0" />
+                    <Target className="w-4 h-4 text-[#99c9ff] shrink-0" />
                     <div className="min-w-0">
                       <div className="text-sm font-medium text-white truncate">{c.name}</div>
                       {c.goal && (

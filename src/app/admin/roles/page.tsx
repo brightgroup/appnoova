@@ -117,9 +117,9 @@ export default function AdminRolesPage() {
       />
 
       <div className={`${adminRegistryContent} space-y-4`}>
-        <div className="p-4 rounded-xl bg-[#5b5bf6]/10 border border-[#5b5bf6]/25">
+        <div className="p-4 rounded-xl bg-[#0f7eff]/10 border border-[#0f7eff]/25">
           <div className="flex items-start gap-3">
-            <Lock className="w-5 h-5 text-[#5b5bf6] mt-0.5 shrink-0" />
+            <Lock className="w-5 h-5 text-[#0f7eff] mt-0.5 shrink-0" />
             <div>
               <p className="text-sm font-semibold text-white">Superadministrador</p>
               <p className="text-xs text-gray-400 mt-1">
@@ -171,7 +171,7 @@ export default function AdminRolesPage() {
                         <p className="text-xs text-gray-500 mt-0.5">
                           {role.description ?? role.slug}
                           {role.slug === "org_admin" && (
-                            <span className="ml-2 text-[#5b5bf6]">· Empresa suscriptora</span>
+                            <span className="ml-2 text-[#0f7eff]">· Empresa suscriptora</span>
                           )}
                         </p>
                         {role.is_system && (

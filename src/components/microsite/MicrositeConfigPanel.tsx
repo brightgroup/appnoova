@@ -339,7 +339,7 @@ function ConfigContent({
               <p className="text-[10px] text-gray-500 mt-1.5 leading-snug">
                 El agente ya incluye su contexto de marca y personalidad.
               </p>
-              <Link href="/dashboard/agentes-texto" className="inline-block mt-2 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]">
+              <Link href="/dashboard/agentes-texto" className="inline-block mt-2 text-[11px] text-[#0f7eff] hover:text-[#99c9ff]">
                 Gestionar agentes →
               </Link>
             </Field>
@@ -532,8 +532,8 @@ function PublicUrlPanel({
   return (
     <div className="rounded-xl border border-white/[.10] bg-white/[.02] p-4">
       <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg bg-[#5b5bf6]/15 flex items-center justify-center shrink-0">
-          <Link2 className="w-4 h-4 text-[#a5a5ff]" />
+        <div className="w-9 h-9 rounded-lg bg-[#0f7eff]/15 flex items-center justify-center shrink-0">
+          <Link2 className="w-4 h-4 text-[#99c9ff]" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
@@ -544,7 +544,7 @@ function PublicUrlPanel({
             <button
               type="button"
               onClick={onCopy}
-              className="flex items-center gap-1 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]"
+              className="flex items-center gap-1 text-[11px] text-[#0f7eff] hover:text-[#99c9ff]"
             >
               <Copy className="w-3 h-3" />
               {copied ? "Copiado" : "Copiar link"}
@@ -554,7 +554,7 @@ function PublicUrlPanel({
                 href={publicUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff]"
+                className="flex items-center gap-1 text-[11px] text-[#0f7eff] hover:text-[#99c9ff]"
               >
                 <ExternalLink className="w-3 h-3" />
                 Abrir link
@@ -610,12 +610,12 @@ function PublishStatusCard({
             onClick={() => onSelect(false)}
             className={`w-full text-left rounded-lg border p-3 transition-colors ${
               !isPublished
-                ? "border-[#5b5bf6]/50 bg-[#5b5bf6]/10 ring-1 ring-[#5b5bf6]/30"
+                ? "border-[#0f7eff]/50 bg-[#0f7eff]/10 ring-1 ring-[#0f7eff]/30"
                 : "border-white/[.08] hover:border-white/[.15] bg-white/[.02]"
             }`}
           >
             <div className="flex items-start gap-3">
-              <Lock className={`w-4 h-4 mt-0.5 shrink-0 ${!isPublished ? "text-[#a5a5ff]" : "text-gray-500"}`} />
+              <Lock className={`w-4 h-4 mt-0.5 shrink-0 ${!isPublished ? "text-[#99c9ff]" : "text-gray-500"}`} />
               <div>
                 <p className="text-sm font-medium text-white">Borrador</p>
                 <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">
@@ -703,7 +703,7 @@ function ColorInput({ value, onChange }: { value: string; onChange: (v: string) 
 }
 
 const inputCls =
-  "w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50";
+  "w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50";
 
 export function MicrositeConfigPanel(props: MicrositeConfigPanelProps = {}) {
   return (

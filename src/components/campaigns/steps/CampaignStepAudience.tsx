@@ -295,11 +295,11 @@ export function CampaignStepAudience({
       onClick={() => setMode(id)}
       className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
         mode === id
-          ? "border-[#5b5bf6]/40 bg-[#5b5bf6]/8"
+          ? "border-[#0f7eff]/40 bg-[#0f7eff]/8"
           : "border-white/[.08] bg-white/[.02] hover:bg-white/[.04]"
       }`}
     >
-      <span className="text-[#a5a5ff] shrink-0">{icon}</span>
+      <span className="text-[#99c9ff] shrink-0">{icon}</span>
       <span>
         <span className="block text-sm font-medium text-white">{title}</span>
         <span className="block text-[11px] text-gray-500 mt-0.5">{desc}</span>
@@ -366,7 +366,7 @@ export function CampaignStepAudience({
       <button
         type="button"
         onClick={addContactField}
-        className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#a5a5ff] hover:text-white"
+        className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#99c9ff] hover:text-white"
       >
         <Plus className="w-3.5 h-3.5" /> Vincular columna a la ficha
       </button>
@@ -445,7 +445,7 @@ export function CampaignStepAudience({
             <button
               type="button"
               onClick={downloadRejected}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-[#a5a5ff] hover:text-white"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-[#99c9ff] hover:text-white"
             >
               <Download className="w-3.5 h-3.5" /> Descargar filas rechazadas con su motivo
             </button>
@@ -483,14 +483,14 @@ export function CampaignStepAudience({
                   onClick={() => fileRef.current?.click()}
                   className={`rounded-lg border-2 border-dashed p-8 text-center cursor-pointer transition-colors ${
                     dragOver
-                      ? "border-[#5b5bf6]/50 bg-[#5b5bf6]/5"
+                      ? "border-[#0f7eff]/50 bg-[#0f7eff]/5"
                       : "border-white/[.10] hover:border-white/[.18] bg-white/[.02]"
                   }`}
                 >
                   {loading ? (
                     <Loader2 className="w-7 h-7 text-gray-500 animate-spin mx-auto" />
                   ) : (
-                    <Upload className="w-7 h-7 text-[#5b5bf6] mx-auto" />
+                    <Upload className="w-7 h-7 text-[#0f7eff] mx-auto" />
                   )}
                   <p className="text-sm text-white font-medium mt-3">Arrastra tu Excel aquí</p>
                   <p className="text-[11px] text-gray-500 mt-1">o haz clic para seleccionar</p>
@@ -500,7 +500,7 @@ export function CampaignStepAudience({
               {preview && phase === "map" && (
                 <div className="space-y-4">
                   <div className="flex items-start gap-3 rounded-lg border border-white/[.08] bg-white/[.02] px-4 py-3">
-                    <FileSpreadsheet className="w-4 h-4 text-[#5b5bf6] shrink-0 mt-0.5" />
+                    <FileSpreadsheet className="w-4 h-4 text-[#0f7eff] shrink-0 mt-0.5" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-white truncate">{file?.name}</p>
                       <p className="text-[11px] text-gray-500 mt-0.5">
@@ -532,7 +532,7 @@ export function CampaignStepAudience({
                     type="button"
                     onClick={() => void analyze()}
                     disabled={loading}
-                    className="text-sm font-medium text-[#a5a5ff] hover:text-white disabled:opacity-40"
+                    className="text-sm font-medium text-[#99c9ff] hover:text-white disabled:opacity-40"
                   >
                     {loading ? "Analizando contra el CRM…" : "Analizar contra el CRM →"}
                   </button>
@@ -582,7 +582,7 @@ export function CampaignStepAudience({
                     <button
                       type="button"
                       onClick={downloadRejected}
-                      className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#a5a5ff] hover:text-white"
+                      className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#99c9ff] hover:text-white"
                     >
                       <Download className="w-3.5 h-3.5" /> Descargar filas con teléfono inválido
                     </button>
@@ -615,7 +615,7 @@ export function CampaignStepAudience({
                         <label
                           key={opt.id}
                           className={`flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer transition-colors ${
-                            policy === opt.id ? "bg-[#5b5bf6]/10" : "hover:bg-white/[.03]"
+                            policy === opt.id ? "bg-[#0f7eff]/10" : "hover:bg-white/[.03]"
                           }`}
                         >
                           <input
@@ -623,7 +623,7 @@ export function CampaignStepAudience({
                             name="contact_policy"
                             checked={policy === opt.id}
                             onChange={() => setPolicy(opt.id)}
-                            className="mt-0.5 accent-[#5b5bf6]"
+                            className="mt-0.5 accent-[#0f7eff]"
                           />
                           <span>
                             <span className="block text-xs font-medium text-white">{opt.label}</span>
@@ -646,7 +646,7 @@ export function CampaignStepAudience({
                       type="button"
                       onClick={() => void confirmImport()}
                       disabled={loading}
-                      className="text-sm font-medium text-[#a5a5ff] hover:text-white disabled:opacity-40"
+                      className="text-sm font-medium text-[#99c9ff] hover:text-white disabled:opacity-40"
                     >
                       {loading
                         ? "Importando…"
@@ -693,7 +693,7 @@ export function CampaignStepAudience({
                     type="button"
                     onClick={() => void linkExisting()}
                     disabled={!selectedTableId || loading}
-                    className="text-sm font-medium text-[#a5a5ff] hover:text-white disabled:opacity-40"
+                    className="text-sm font-medium text-[#99c9ff] hover:text-white disabled:opacity-40"
                   >
                     {loading ? "Vinculando…" : "Usar esta tabla →"}
                   </button>

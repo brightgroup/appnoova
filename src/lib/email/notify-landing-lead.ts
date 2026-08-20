@@ -32,7 +32,7 @@ function buildHtml(lead: LandingLeadRecord): string {
 
   return `
     <div style="font-family:system-ui,sans-serif;max-width:560px;color:#111">
-      <h2 style="color:#5b5bf6;margin:0 0 12px">Nuevo lead — Noova 360</h2>
+      <h2 style="color:#0f7eff;margin:0 0 12px">Nuevo lead — Noova 360</h2>
       <p style="color:#444;margin:0 0 20px">Solicitud desde la landing.</p>
       <table style="width:100%;border-collapse:collapse;font-size:14px">
         <tr><td style="padding:8px 0;color:#666">Origen</td><td style="padding:8px 0"><strong>${sourceLabel(lead.source)}</strong></td></tr>

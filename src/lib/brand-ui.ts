@@ -1,13 +1,13 @@
-/** Colores de marca Noova — primario #3b59fe */
+/** Colores de marca Noova — primario #0f7eff */
 export const brand = {
-  primary: "#3b59fe",
-  primaryHover: "#4d68ff",
+  primary: "#0f7eff",
+  primaryHover: "#3392ff",
   primaryText: "#ffffff",
-  primaryMuted: "rgba(91, 91, 246, 0.12)",
-  primaryBorder: "rgba(91, 91, 246, 0.35)",
+  primaryMuted: "rgba(15,126,255, 0.12)",
+  primaryBorder: "rgba(15,126,255, 0.35)",
   /** Fondos mate — de la paleta del usuario (invertidos) */
-  bgMain: "#212121",
-  bgSurface: "#2d2d2d",
+  bgMain: "#161616",
+  bgSurface: "#1e1e1e",
 } as const;
 
 /* ── Superficies ── */
@@ -60,31 +60,31 @@ export const btnFilterIdle =
   "px-3 sm:px-4 py-2 text-xs font-medium text-gray-300 hover:text-white hover:bg-white/[.06] transition-colors whitespace-nowrap shrink-0";
 
 /* ── Tabs ── */
-export const tabActive = "text-white border-[#5b5bf6]";
+export const tabActive = "text-white border-[#0f7eff]";
 export const tabIdle = "text-gray-300 border-transparent hover:text-white";
 
 /* ── Sidebar — acento azul vivo, minimalista ── */
 export const sidebarNavActive =
-  "text-white bg-[#5b5bf6]/[.14] nv-nav-active";
+  "text-white bg-[#0f7eff]/[.14] nv-nav-active";
 
 export const sidebarNavIdle =
   "text-gray-300 hover:text-white hover:bg-white/[.06] nv-nav-idle";
 
-export const sidebarIconActive = "text-[#5b5bf6]";
+export const sidebarIconActive = "text-[#0f7eff]";
 
 export const sidebarPlanCard =
   "nv-sidebar-plan-card rounded-xl p-3.5 border transition-all duration-150";
 
 /* ── Acento de marca (reemplaza violet/indigo en toda la app) ── */
-export const accentText = "text-[#5b5bf6]";
-export const accentTextHover = "hover:text-[#7070f8]";
-export const accentTextLight = "text-[#a5a5ff]";
-export const accentBgSubtle = "bg-[#5b5bf6]/10";
-export const accentBgMedium = "bg-[#5b5bf6]/14";
-export const accentBorder = "border-[#5b5bf6]/20";
-export const accentBorderMedium = "border-[#5b5bf6]/30";
+export const accentText = "text-[#0f7eff]";
+export const accentTextHover = "hover:text-[#3392ff]";
+export const accentTextLight = "text-[#99c9ff]";
+export const accentBgSubtle = "bg-[#0f7eff]/10";
+export const accentBgMedium = "bg-[#0f7eff]/14";
+export const accentBorder = "border-[#0f7eff]/20";
+export const accentBorderMedium = "border-[#0f7eff]/30";
 export const accentFocus =
-  "focus:border-[#5b5bf6]/50 focus:ring-1 focus:ring-[#5b5bf6]/20 focus:outline-none";
+  "focus:border-[#0f7eff]/50 focus:ring-1 focus:ring-[#0f7eff]/20 focus:outline-none";
 export const accentBadge =
   "nv-badge-internal text-xs px-2 py-0.5 rounded-full font-semibold border";
 
@@ -115,17 +115,17 @@ export const noticeWarning =
 export const promoCard = "nv-promo-card rounded-2xl p-6";
 
 export const tagNeonAccent =
-  `${tagNeonBase} nv-tag-neon-accent border-0 bg-[#5b5bf6]/20 text-white`;
+  `${tagNeonBase} nv-tag-neon-accent border-0 bg-[#0f7eff]/20 text-white`;
 
 export const tagNeonBlue =
   `${tagNeonBase} nv-tag-neon-blue border-0 bg-blue-500/20 text-white`;
 
-export const accentGradientIcon = "bg-gradient-to-br from-[#5b5bf6] to-[#7070f8]";
-export const accentGlow = "bg-[#5b5bf6]/10";
+export const accentGradientIcon = "bg-gradient-to-br from-[#0f7eff] to-[#3392ff]";
+export const accentGlow = "bg-[#0f7eff]/10";
 export const accentCard =
-  "bg-[#5b5bf6]/10 border border-[#5b5bf6]/20";
+  "bg-[#0f7eff]/10 border border-[#0f7eff]/20";
 export const accentNavActive =
-  "bg-[#5b5bf6]/14 text-white border border-[#5b5bf6]/20";
+  "bg-[#0f7eff]/14 text-white border border-[#0f7eff]/20";
 
 /* ── Inputs ── */
 export const nvControl =
@@ -201,7 +201,7 @@ export const registryTableRowClickable =
   "border-b border-white/[.06] hover:bg-white/[.03] cursor-pointer transition-colors group";
 
 export const registryTableRowSelected =
-  "bg-[#5b5bf6]/[.08]";
+  "bg-[#0f7eff]/[.08]";
 
 export const registryTableCellFirst =
   "px-5 py-3.5";

@@ -67,7 +67,7 @@ export function InviteMemberModal({
       <div className="w-full max-w-md rounded-2xl bg-[var(--nv-bg-surface,#12131a)] border border-[var(--nv-border,white/10)] shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--nv-border,white/08)]">
           <div className="flex items-center gap-2">
-            <UserPlus className="w-5 h-5 text-[#5b5bf6]" />
+            <UserPlus className="w-5 h-5 text-[#0f7eff]" />
             <h2 className="text-lg font-semibold text-[var(--nv-text,white)]">Agregar al equipo</h2>
           </div>
           <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-white/[.08] text-gray-400">

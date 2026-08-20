@@ -63,8 +63,8 @@ export function NotifyTeamRulesEditor({ value, onChange }: NotifyTeamRulesEditor
   return (
     <div className="max-w-2xl space-y-6">
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-xl bg-[#5b5bf6]/15 flex items-center justify-center shrink-0">
-          <Bell className="w-5 h-5 text-[#5b5bf6]" />
+        <div className="w-10 h-10 rounded-xl bg-[#0f7eff]/15 flex items-center justify-center shrink-0">
+          <Bell className="w-5 h-5 text-[#0f7eff]" />
         </div>
         <div>
           <h2 className="text-sm font-semibold text-white">Notificaciones al equipo</h2>
@@ -228,7 +228,7 @@ function ChannelToggle({
         disabled
           ? "bg-white/[.01] border-white/[.06] text-gray-600 cursor-not-allowed"
           : active
-            ? "bg-[#5b5bf6]/15 border-[#5b5bf6]/40 text-white cursor-pointer"
+            ? "bg-[#0f7eff]/15 border-[#0f7eff]/40 text-white cursor-pointer"
             : "bg-white/[.02] border-white/[.10] text-gray-400 hover:text-gray-200 cursor-pointer"
       }`}
     >

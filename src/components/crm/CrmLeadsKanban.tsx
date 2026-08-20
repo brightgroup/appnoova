@@ -197,7 +197,7 @@ export function CrmLeadsKanban({ stages, outcome, currentUserName, onSelectLead,
               <div
                 key={stage.id}
                 className={`w-[280px] shrink-0 flex flex-col rounded-xl border transition-colors duration-200 ${
-                  isOver ? "border-[#5b5bf6]/40 bg-[#5b5bf6]/[.04]" : "border-white/[.08] bg-white/[.02]"
+                  isOver ? "border-[#0f7eff]/40 bg-[#0f7eff]/[.04]" : "border-white/[.08] bg-white/[.02]"
                 }`}
                 onDragOver={e => {
                   e.preventDefault();
@@ -223,7 +223,7 @@ export function CrmLeadsKanban({ stages, outcome, currentUserName, onSelectLead,
                       <b className="text-gray-400 font-medium">{stageSummary?.count ?? stageLeads.length}</b> leads
                     </span>
                     {!!stageSummary?.sum && (
-                      <span className="text-xs font-semibold text-[#a5a5ff] tabular-nums shrink-0">
+                      <span className="text-xs font-semibold text-[#99c9ff] tabular-nums shrink-0">
                         {formatLeadValue(stageSummary.sum, "COP")}
                       </span>
                     )}
@@ -278,7 +278,7 @@ export function CrmLeadsKanban({ stages, outcome, currentUserName, onSelectLead,
                             ? `${lead.dias_en_etapa}d en etapa`
                             : "—"}
                         </span>
-                        <span className="text-xs font-semibold text-[#a5a5ff] tabular-nums shrink-0">
+                        <span className="text-xs font-semibold text-[#99c9ff] tabular-nums shrink-0">
                           {formatLeadValue(lead.value_amount, lead.currency)}
                         </span>
                       </div>
@@ -299,7 +299,7 @@ export function CrmLeadsKanban({ stages, outcome, currentUserName, onSelectLead,
                       type="button"
                       onClick={() => loadMore(stage.id)}
                       disabled={col.loadingMore}
-                      className="w-full rounded-lg border border-dashed border-white/[.14] bg-white/[.02] py-2 text-[11px] font-semibold text-gray-400 hover:text-white hover:bg-white/[.05] hover:border-[#5b5bf6]/50 transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5"
+                      className="w-full rounded-lg border border-dashed border-white/[.14] bg-white/[.02] py-2 text-[11px] font-semibold text-gray-400 hover:text-white hover:bg-white/[.05] hover:border-[#0f7eff]/50 transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5"
                     >
                       {col.loadingMore ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />

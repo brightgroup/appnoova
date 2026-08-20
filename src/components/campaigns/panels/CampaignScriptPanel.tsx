@@ -90,7 +90,7 @@ export function CampaignScriptPanel({ campaign, onChange }: CampaignScriptPanelP
               : "Sin agente asignado. "}
             Las variables se reemplazan con los datos de cada contacto en la llamada.
           </p>
-          <p className="text-xs text-[#a5a5ff]/80 mt-2">{VOICE_BUSINESS_PROMPT_GUIDE}</p>
+          <p className="text-xs text-[#99c9ff]/80 mt-2">{VOICE_BUSINESS_PROMPT_GUIDE}</p>
         </div>
 
         {!campaign.voice_agent_id ? (
@@ -100,11 +100,11 @@ export function CampaignScriptPanel({ campaign, onChange }: CampaignScriptPanelP
           </div>
         ) : linked ? (
           <>
-            <div className="p-3 rounded-xl bg-[#5b5bf6]/10 border border-[#5b5bf6]/25 text-xs text-[#c9c9ff] flex items-start gap-2">
+            <div className="p-3 rounded-xl bg-[#0f7eff]/10 border border-[#0f7eff]/25 text-xs text-[#c9c9ff] flex items-start gap-2">
               <Link2 className="w-4 h-4 mt-0.5 shrink-0" />
               <div className="flex-1">
                 <p className="font-medium text-white">Sincronizado con el agente</p>
-                <p className="text-[#a5a5ff]/80">
+                <p className="text-[#99c9ff]/80">
                   Este guion usa el prompt del agente. Cualquier cambio que hagas en el agente se
                   reflejará automáticamente en la campaña.
                 </p>
@@ -112,7 +112,7 @@ export function CampaignScriptPanel({ campaign, onChange }: CampaignScriptPanelP
               <button
                 type="button"
                 onClick={() => onChange({ prompt_template: agentPrompt })}
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#5b5bf6]/30 bg-[#5b5bf6]/15 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-[#5b5bf6]/25"
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#0f7eff]/30 bg-[#0f7eff]/15 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-[#0f7eff]/25"
               >
                 <Link2Off className="w-3.5 h-3.5" /> Personalizar
               </button>
@@ -133,7 +133,7 @@ export function CampaignScriptPanel({ campaign, onChange }: CampaignScriptPanelP
               <button
                 type="button"
                 onClick={() => onChange({ prompt_template: null })}
-                className="inline-flex items-center gap-1.5 text-[11px] text-[#a5a5ff] hover:text-white"
+                className="inline-flex items-center gap-1.5 text-[11px] text-[#99c9ff] hover:text-white"
               >
                 <Link2 className="w-3.5 h-3.5" /> Volver a sincronizar con el agente
               </button>

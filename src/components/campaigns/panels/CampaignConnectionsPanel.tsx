@@ -12,8 +12,8 @@ export function CampaignConnectionsPanel() {
 
         <div className="grid gap-3">
           <div className="rounded-xl border border-white/[.08] bg-white/[.02] p-4 flex items-start gap-4 opacity-60">
-            <div className="w-10 h-10 rounded-lg bg-[#5b5bf6]/15 flex items-center justify-center shrink-0">
-              <Database className="w-5 h-5 text-[#a5a5ff]" />
+            <div className="w-10 h-10 rounded-lg bg-[#0f7eff]/15 flex items-center justify-center shrink-0">
+              <Database className="w-5 h-5 text-[#99c9ff]" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white">CRM Noova</p>

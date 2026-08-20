@@ -111,8 +111,8 @@ export default function WorkflowsPage() {
               <tr key={w.id} className={registryTableRowClickable} onClick={() => router.push(`/dashboard/workflows/${w.id}`)}>
                 <td className={registryTableCellFirst}>
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-[#5b5bf6]/15 flex items-center justify-center shrink-0">
-                      <WorkflowIcon className="w-[18px] h-[18px] text-[#5b5bf6]" />
+                    <div className="w-9 h-9 rounded-xl bg-[#0f7eff]/15 flex items-center justify-center shrink-0">
+                      <WorkflowIcon className="w-[18px] h-[18px] text-[#0f7eff]" />
                     </div>
                     <div className="text-sm font-medium text-white truncate">{w.name}</div>
                   </div>
@@ -147,7 +147,7 @@ function StatusToggle({ active, disabled, onToggle }: { active: boolean; disable
       onClick={onToggle}
       disabled={disabled}
       aria-label={active ? "Pausar workflow" : "Activar workflow"}
-      className={`relative w-8 h-[18px] rounded-full transition-colors disabled:opacity-50 ${active ? "bg-[#5b5bf6]" : "bg-white/[.14]"}`}
+      className={`relative w-8 h-[18px] rounded-full transition-colors disabled:opacity-50 ${active ? "bg-[#0f7eff]" : "bg-white/[.14]"}`}
     >
       <span
         className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${active ? "translate-x-[14px]" : ""}`}

@@ -14,13 +14,13 @@ interface CreateStageModalProps {
 
 export function CreateStageModal({ open, saving, error, onClose, onCreate }: CreateStageModalProps) {
   const [name, setName] = useState("");
-  const [color, setColor] = useState("#5b5bf6");
+  const [color, setColor] = useState("#0f7eff");
   const [aiCriteria, setAiCriteria] = useState("");
 
   useEffect(() => {
     if (open) {
       setName("");
-      setColor("#5b5bf6");
+      setColor("#0f7eff");
       setAiCriteria("");
     }
   }, [open]);
@@ -32,7 +32,7 @@ export function CreateStageModal({ open, saving, error, onClose, onCreate }: Cre
       <div className="w-full max-w-md rounded-2xl bg-[#13141c] border border-white/[.10] shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[.08]">
           <div className="flex items-center gap-2">
-            <Plus className="w-5 h-5 text-[#5b5bf6]" />
+            <Plus className="w-5 h-5 text-[#0f7eff]" />
             <h2 className="text-lg font-semibold text-white">Nueva etapa</h2>
           </div>
           <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-white/[.08] text-gray-400">

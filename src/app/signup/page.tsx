@@ -21,11 +21,11 @@ export default function SignupPage() {
         style={{
           background: "linear-gradient(145deg, rgba(16,17,28,.97) 0%, rgba(10,11,20,.9) 100%)",
           border: "1px solid rgba(255,255,255,.08)",
-          boxShadow: "0 0 0 1px rgba(91,91,246,.12), 0 24px 64px rgba(0,0,0,.6)",
+          boxShadow: "0 0 0 1px rgba(15,126,255,.12), 0 24px 64px rgba(0,0,0,.6)",
         }}
       >
-        <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#5b5bf6]/15 border border-[#5b5bf6]/25">
-          <Lock className="h-5 w-5 text-[#a5a5ff]" />
+        <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0f7eff]/15 border border-[#0f7eff]/25">
+          <Lock className="h-5 w-5 text-[#99c9ff]" />
         </div>
 
         <h1 className="text-xl font-bold text-white mb-2">Registro con invitación</h1>
@@ -36,7 +36,7 @@ export default function SignupPage() {
 
         <a
           href={marketingPath("/?solicitar=acceso")}
-          className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#5b5bf6] py-3 text-sm font-semibold text-white transition-all hover:bg-[#7070f8]"
+          className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0f7eff] py-3 text-sm font-semibold text-white transition-all hover:bg-[#3392ff]"
         >
           Solicitar acceso
           <ArrowRight className="h-4 w-4" />

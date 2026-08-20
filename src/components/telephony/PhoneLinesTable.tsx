@@ -118,7 +118,7 @@ export function PhoneLinesTable({
                           e.stopPropagation();
                           onTransfer(row);
                         }}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-[#5b5bf6] hover:bg-[#5b5bf6]/10"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-[#0f7eff] hover:bg-[#0f7eff]/10"
                         title="Transferir a otro cliente"
                       >
                         <ArrowRightLeft className="w-3 h-3" />

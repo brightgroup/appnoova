@@ -59,7 +59,7 @@ export default function AgencyAccessLoginPage() {
   };
 
   const inputClass =
-    "w-full rounded-xl border border-[var(--nv-input-border)] bg-[var(--nv-input-bg)] px-4 py-3 text-sm text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] outline-none transition focus:border-[#5b5bf6]/50 focus:ring-2 focus:ring-[#5b5bf6]/15";
+    "w-full rounded-xl border border-[var(--nv-input-border)] bg-[var(--nv-input-bg)] px-4 py-3 text-sm text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] outline-none transition focus:border-[#0f7eff]/50 focus:ring-2 focus:ring-[#0f7eff]/15";
 
   return (
     <DesktopOnlyGate neutralBranding>
@@ -127,7 +127,7 @@ export default function AgencyAccessLoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#5b5bf6] py-3 text-sm font-semibold text-white transition-all hover:bg-[#7070f8] hover:shadow-[0_8px_24px_var(--nv-accent-glow)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0f7eff] py-3 text-sm font-semibold text-white transition-all hover:bg-[#3392ff] hover:shadow-[0_8px_24px_var(--nv-accent-glow)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? (
                 <>

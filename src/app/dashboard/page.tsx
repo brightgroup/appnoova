@@ -145,7 +145,7 @@ export default function Dashboard() {
                   <div className="bg-white/[.02] border border-white/[.08] rounded-xl p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg font-bold">Leads Recientes</h2>
-                      <Link href="/dashboard/crm/leads" className="text-xs text-[#a5a5ff] hover:underline">
+                      <Link href="/dashboard/crm/leads" className="text-xs text-[#99c9ff] hover:underline">
                         Ver todos
                       </Link>
                     </div>
@@ -164,7 +164,7 @@ export default function Dashboard() {
                               <p className="text-xs text-gray-500">{lead.subtitle}</p>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className="text-xs px-2 py-1 rounded-full bg-[#5b5bf6]/20 text-[#a5a5ff]">
+                              <span className="text-xs px-2 py-1 rounded-full bg-[#072b55]/60 text-[#2f8fff]">
                                 {lead.status}
                               </span>
                               <span className="text-xs text-gray-500">{lead.dateLabel}</span>
@@ -202,7 +202,7 @@ export default function Dashboard() {
                   <div className={promoCard}>
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-10 h-10 rounded-full bg-[var(--nv-accent)] flex items-center justify-center shrink-0">
-                        <Sparkles className="w-5 h-5 text-white" />
+                        <Sparkles className="nv-icon-on-accent w-5 h-5 text-white" />
                       </div>
                       <p className="nv-promo-title text-base font-bold">Pro Tip</p>
                     </div>

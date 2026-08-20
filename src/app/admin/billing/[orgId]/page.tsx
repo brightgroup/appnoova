@@ -71,7 +71,7 @@ const num = (n: number) => new Intl.NumberFormat("es-CO").format(Math.round(n));
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
-const inputCls = "w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#5b5bf6]/60 focus:ring-1 focus:ring-[#5b5bf6]/20";
+const inputCls = "w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#0f7eff]/60 focus:ring-1 focus:ring-[#0f7eff]/20";
 const labelCls = "block text-xs text-gray-400 mb-1.5 font-medium";
 
 // ── Componente ────────────────────────────────────────────────────────────────
@@ -197,7 +197,7 @@ export default function AdminBillingDetailPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-32 text-gray-400">
-          <RefreshCw className="w-5 h-5 animate-spin mr-2 text-[#5b5bf6]" /> Cargando…
+          <RefreshCw className="w-5 h-5 animate-spin mr-2 text-[#0f7eff]" /> Cargando…
         </div>
       ) : (
         <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto w-full">
@@ -237,7 +237,7 @@ export default function AdminBillingDetailPage() {
                   </p>
                   <p className="text-lg font-bold">{num(row.included_credits - row.used_credits)}</p>
                   <div className="mt-1.5 h-1 rounded-full bg-white/[.08] overflow-hidden">
-                    <div className={`h-full ${row.used_pct >= 90 ? "bg-red-500" : row.used_pct >= 70 ? "bg-amber-500" : "bg-[#5b5bf6]"}`}
+                    <div className={`h-full ${row.used_pct >= 90 ? "bg-red-500" : row.used_pct >= 70 ? "bg-amber-500" : "bg-[#0f7eff]"}`}
                       style={{ width: `${row.used_pct}%` }} />
                   </div>
                   <p className="text-[10px] text-gray-500 mt-1">{row.used_pct}% usado</p>
@@ -248,7 +248,7 @@ export default function AdminBillingDetailPage() {
             {/* Consumo del periodo */}
             <div className="rounded-xl border border-white/[.08] bg-white/[.02] p-5">
               <div className="flex items-center gap-2 mb-4">
-                <TrendingUp className="w-4 h-4 text-[#5b5bf6]" />
+                <TrendingUp className="w-4 h-4 text-[#0f7eff]" />
                 <h2 className="text-sm font-semibold">Consumo del periodo</h2>
                 <span className="text-xs text-gray-500 ml-auto">
                   {fmtDate(wallet?.period_start ?? null)} — {fmtDate(wallet?.period_end ?? null)}
@@ -277,7 +277,7 @@ export default function AdminBillingDetailPage() {
             {/* Facturas */}
             <div className="rounded-xl border border-white/[.08] bg-white/[.02] overflow-hidden">
               <div className="flex items-center gap-2 px-5 py-4 border-b border-white/[.06]">
-                <Receipt className="w-4 h-4 text-[#5b5bf6]" />
+                <Receipt className="w-4 h-4 text-[#0f7eff]" />
                 <h2 className="text-sm font-semibold">Facturas</h2>
               </div>
               {(detail?.invoices ?? []).length === 0 ? (
@@ -346,10 +346,10 @@ export default function AdminBillingDetailPage() {
           <div className="space-y-5">
 
             {/* Gestión del plan */}
-            <div className="rounded-xl border border-[#5b5bf6]/25 bg-[#5b5bf6]/[.04] p-5">
+            <div className="rounded-xl border border-[#0f7eff]/25 bg-[#0f7eff]/[.04] p-5">
               <div className="flex items-center gap-2 mb-5">
-                <Settings2 className="w-4 h-4 text-[#5b5bf6]" />
-                <h3 className="text-sm font-semibold text-[#a5a5ff]">Gestión del plan</h3>
+                <Settings2 className="w-4 h-4 text-[#0f7eff]" />
+                <h3 className="text-sm font-semibold text-[#99c9ff]">Gestión del plan</h3>
               </div>
 
               <div className="space-y-3">
@@ -497,7 +497,7 @@ export default function AdminBillingDetailPage() {
                   <div className="flex justify-between"><span className="text-gray-400">Top-up / extra</span><span className="font-medium text-green-300">{num(topup)}</span></div>
                   <div className="flex justify-between border-t border-white/[.06] pt-1.5"><span className="text-gray-400">Disponibles</span><span className="font-bold text-white">{num(totalCr - used)}</span></div>
                   <div className="h-1.5 rounded-full bg-white/[.08] overflow-hidden mt-2">
-                    <div className={`h-full ${usedPct >= 90 ? "bg-red-500" : usedPct >= 70 ? "bg-amber-500" : "bg-[#5b5bf6]"}`} style={{ width: `${usedPct}%` }} />
+                    <div className={`h-full ${usedPct >= 90 ? "bg-red-500" : usedPct >= 70 ? "bg-amber-500" : "bg-[#0f7eff]"}`} style={{ width: `${usedPct}%` }} />
                   </div>
                   <p className="text-[10px] text-gray-600 text-right">{usedPct}% consumido</p>
                 </div>

@@ -146,8 +146,8 @@ export function BusinessHoursEditor() {
   return (
     <div className="space-y-6">
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-xl bg-[#5b5bf6]/15 flex items-center justify-center shrink-0">
-          <CalendarClock className="w-5 h-5 text-[#5b5bf6]" />
+        <div className="w-10 h-10 rounded-xl bg-[#0f7eff]/15 flex items-center justify-center shrink-0">
+          <CalendarClock className="w-5 h-5 text-[#0f7eff]" />
         </div>
         <div>
           <h2 className="text-sm font-semibold text-white">Horario de atención</h2>
@@ -170,7 +170,7 @@ export function BusinessHoursEditor() {
           <span className="text-xs font-semibold text-gray-300 uppercase tracking-wide">Días y horarios</span>
           <button
             onClick={copyMondayToWeekdays}
-            className="inline-flex items-center gap-1.5 text-[11px] text-[#5b5bf6] hover:text-[#a5a5ff] font-medium"
+            className="inline-flex items-center gap-1.5 text-[11px] text-[#0f7eff] hover:text-[#99c9ff] font-medium"
           >
             <Copy className="w-3 h-3" /> Copiar lunes a martes–viernes
           </button>

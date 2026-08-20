@@ -114,7 +114,7 @@ export default function TablasPage() {
                 >
                   <td className={registryTableCellFirst}>
                     <div className="flex items-center gap-3">
-                      <Database className="w-4 h-4 text-[#a5a5ff] shrink-0" />
+                      <Database className="w-4 h-4 text-[#99c9ff] shrink-0" />
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-white truncate">{t.name}</div>
                         {t.description && (

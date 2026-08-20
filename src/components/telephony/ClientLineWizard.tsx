@@ -22,7 +22,7 @@ interface ClientLineWizardProps {
 }
 
 const selectCls =
-  "w-full bg-noova-main border border-white/[.12] rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50";
+  "w-full bg-noova-main border border-white/[.12] rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50";
 
 export function ClientLineWizard({ open, onClose, onSuccess, voiceAgentId }: ClientLineWizardProps) {
   const [flow, setFlow] = useState<Flow>("choose");
@@ -74,7 +74,7 @@ export function ClientLineWizard({ open, onClose, onSuccess, voiceAgentId }: Cli
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl p-4">
       <div className="relative bg-noova-surface border border-white/[.10] rounded-3xl p-8 max-w-lg w-full shadow-2xl overflow-hidden">
-        <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#5b5bf6]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#0f7eff]/10 rounded-full blur-3xl pointer-events-none" />
 
         {done ? (
           <div className="text-center py-6">
@@ -87,8 +87,8 @@ export function ClientLineWizard({ open, onClose, onSuccess, voiceAgentId }: Cli
           <>
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-4 h-4 text-[#5b5bf6]" />
-                <span className="text-xs font-medium text-[#5b5bf6]">Teléfono</span>
+                <Sparkles className="w-4 h-4 text-[#0f7eff]" />
+                <span className="text-xs font-medium text-[#0f7eff]">Teléfono</span>
               </div>
               <h2 className="text-xl font-bold text-white">¿Qué necesitas?</h2>
               <p className={`text-sm ${textMuted} mt-1`}>Elige cómo quieres conectar tu línea</p>
@@ -96,10 +96,10 @@ export function ClientLineWizard({ open, onClose, onSuccess, voiceAgentId }: Cli
             <div className="grid grid-cols-1 gap-3 mb-6">
               <button
                 onClick={() => setFlow("purchase")}
-                className="group flex items-start gap-4 p-5 rounded-2xl border border-white/[.08] hover:border-[#5b5bf6]/40 hover:bg-white/[.03] text-left transition-all"
+                className="group flex items-start gap-4 p-5 rounded-2xl border border-white/[.08] hover:border-[#0f7eff]/40 hover:bg-white/[.03] text-left transition-all"
               >
-                <div className="w-11 h-11 rounded-xl bg-[#5b5bf6]/20 flex items-center justify-center shrink-0">
-                  <ShoppingCart className="w-5 h-5 text-[#5b5bf6]" />
+                <div className="w-11 h-11 rounded-xl bg-[#0f7eff]/20 flex items-center justify-center shrink-0">
+                  <ShoppingCart className="w-5 h-5 text-[#0f7eff]" />
                 </div>
                 <div className="flex-1">
                   <h3 className="font-semibold text-white text-sm">Solicitar línea Noova</h3>
@@ -111,7 +111,7 @@ export function ClientLineWizard({ open, onClose, onSuccess, voiceAgentId }: Cli
               </button>
               <button
                 onClick={() => setFlow("verify")}
-                className="group flex items-start gap-4 p-5 rounded-2xl border border-white/[.08] hover:border-[#5b5bf6]/40 hover:bg-white/[.03] text-left transition-all"
+                className="group flex items-start gap-4 p-5 rounded-2xl border border-white/[.08] hover:border-[#0f7eff]/40 hover:bg-white/[.03] text-left transition-all"
               >
                 <div className="w-11 h-11 rounded-xl bg-cyan-500/20 flex items-center justify-center shrink-0">
                   <Link2 className="w-5 h-5 text-cyan-400" />
@@ -130,7 +130,7 @@ export function ClientLineWizard({ open, onClose, onSuccess, voiceAgentId }: Cli
         ) : flow === "purchase" ? (
           <>
             <div className="mb-4">
-              <span className="text-xs text-[#5b5bf6]">Solicitar línea · Paso {purchaseStep}/3</span>
+              <span className="text-xs text-[#0f7eff]">Solicitar línea · Paso {purchaseStep}/3</span>
               <h2 className="text-lg font-bold text-white mt-1">
                 {purchaseStep === 1 && "País de la línea"}
                 {purchaseStep === 2 && "Detalles adicionales"}

@@ -245,7 +245,7 @@ export function AdminTelephonyPanel({ preselectedUserId, initialTab }: AdminTele
               </div>
               <button
                 onClick={() => setTab("requests")}
-                className="text-[#5b5bf6] hover:text-[#7070f8] font-medium shrink-0"
+                className="text-[#0f7eff] hover:text-[#3392ff] font-medium shrink-0"
               >
                 Ver solicitudes →
               </button>

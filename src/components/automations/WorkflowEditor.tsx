@@ -53,6 +53,7 @@ import {
 import { DeleteWorkflowModal } from "@/components/automations/DeleteWorkflowModal";
 import { ExecutionsTable, groupEventsByExecution, prettyPrint, type AutomationEventRow } from "@/components/automations/AutomationEventsTable";
 import { WhatsAppLogo } from "@/components/icons/brands/WhatsAppLogo";
+import { llmModelIcon } from "@/lib/llm/provider-icon";
 import { NODE_CATALOG, type WorkflowNodeType, type WorkflowNodeData } from "@/lib/automations/node-types";
 import {
   createEmptyExtractField,
@@ -371,7 +372,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-noova-main text-gray-400 text-sm gap-3">
         <p>{error || "Workflow no encontrado"}</p>
-        <Link href="/dashboard/workflows" className="text-[#5b5bf6] hover:underline">Volver a Workflows</Link>
+        <Link href="/dashboard/workflows" className="text-[#0f7eff] hover:underline">Volver a Workflows</Link>
       </div>
     );
   }
@@ -397,7 +398,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
                     if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                     if (e.key === "Escape") setEditingName(false);
                   }}
-                  className="text-lg font-bold bg-white/[.06] border border-white/[.16] rounded-lg px-2 py-0.5 outline-none focus:border-[#5b5bf6] min-w-0"
+                  className="text-lg font-bold bg-white/[.06] border border-white/[.16] rounded-lg px-2 py-0.5 outline-none focus:border-[#0f7eff] min-w-0"
                 />
               ) : (
                 <button
@@ -459,7 +460,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
             type="button"
             onClick={() => void handleSave()}
             disabled={saving || saved}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#5b5bf6] hover:bg-[#7070f8] disabled:opacity-50 px-4 py-2 text-sm font-semibold text-white"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#0f7eff] hover:bg-[#3392ff] disabled:opacity-50 px-4 py-2 text-sm font-semibold text-white"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
             {saving ? "Guardando…" : "Guardar"}
@@ -531,7 +532,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
             title="Agregar nodo"
             className={`absolute top-4 left-4 w-9 h-9 rounded-lg border flex items-center justify-center shadow-lg transition-colors ${
               paletteOpen
-                ? "bg-[#5b5bf6] border-[#5b5bf6] text-white"
+                ? "bg-[#0f7eff] border-[#0f7eff] text-white"
                 : "bg-[#16171e] border-white/[.12] text-gray-300 hover:bg-[#1c1d27] hover:text-white"
             }`}
           >
@@ -717,7 +718,7 @@ function TestListenButton({
           disabled={listening}
           className={`flex-1 inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-default ${
             listening
-              ? "border-[#5b5bf6]/40 bg-[#5b5bf6]/10 text-[#c4c4ff]"
+              ? "border-[#0f7eff]/40 bg-[#0f7eff]/10 text-[#b3d6ff]"
               : "border-white/[.12] bg-white/[.04] text-white hover:bg-white/[.08]"
           }`}
         >
@@ -850,7 +851,7 @@ function SelectField({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; icon?: React.ReactNode }[];
   allowEmpty?: boolean;
   emptyLabel?: string;
 }) {
@@ -888,7 +889,7 @@ function ChannelSelectField({
       {channels.length === 0 ? (
         <p className="text-[11px] text-gray-500 mt-2">
           Todavía no tienes líneas de WhatsApp conectadas.{" "}
-          <Link href="/dashboard/canales/whatsapp" className="text-[#5b5bf6] hover:underline">Conecta una</Link>.
+          <Link href="/dashboard/canales/whatsapp" className="text-[#0f7eff] hover:underline">Conecta una</Link>.
         </p>
       ) : (
         <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
@@ -1024,7 +1025,7 @@ function ToggleField({
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative w-8 h-[18px] rounded-full transition-colors shrink-0 mt-0.5 ${checked ? "bg-[#5b5bf6]" : "bg-white/[.14]"}`}
+        className={`relative w-8 h-[18px] rounded-full transition-colors shrink-0 mt-0.5 ${checked ? "bg-[#0f7eff]" : "bg-white/[.14]"}`}
       >
         <span
           className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${checked ? "translate-x-[14px]" : ""}`}
@@ -1159,7 +1160,7 @@ function ExtractFieldRow({
           <button
             type="button"
             onClick={addChild}
-            className="text-[11px] text-[#5b5bf6] hover:underline flex items-center gap-1"
+            className="text-[11px] text-[#0f7eff] hover:underline flex items-center gap-1"
           >
             <Plus className="w-3 h-3" /> Agregar sub-campo
           </button>
@@ -1279,7 +1280,7 @@ function NodeConfigPanel({
                 if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                 if (e.key === "Escape") setEditingLabel(false);
               }}
-              className="text-sm font-bold bg-white/[.06] border border-white/[.16] rounded-md px-1.5 py-0.5 outline-none focus:border-[#5b5bf6] w-full -ml-1.5"
+              className="text-sm font-bold bg-white/[.06] border border-white/[.16] rounded-md px-1.5 py-0.5 outline-none focus:border-[#0f7eff] w-full -ml-1.5"
             />
           ) : (
             <button type="button" onClick={startEditingLabel} className="group flex items-center gap-1.5 min-w-0 -ml-0.5">
@@ -1396,7 +1397,7 @@ function NodeConfigPanel({
                 label="Modelo de IA"
                 value={currentModel}
                 onChange={aiModel => onSetData({ aiModel })}
-                options={modelOptions}
+                options={modelOptions.map(o => ({ ...o, icon: llmModelIcon(o.value) }))}
               />
               <div className="mt-4">
                 <ExtractFieldsEditor
@@ -1454,7 +1455,7 @@ function NodeConfigPanel({
             />
             {connections.length === 0 ? (
               <p className="text-[11px] text-gray-500 mt-2">
-                Todavía no tienes conectores. <Link href="/dashboard/conectores" className="text-[#5b5bf6] hover:underline">Crea uno</Link>.
+                Todavía no tienes conectores. <Link href="/dashboard/conectores" className="text-[#0f7eff] hover:underline">Crea uno</Link>.
               </p>
             ) : (
               <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
@@ -1563,7 +1564,7 @@ function NodeConfigPanel({
                       />
                       {templates.length === 0 ? (
                         <p className="text-[11px] text-gray-500 mt-2">
-                          Todavía no tienes plantillas aprobadas. <Link href="/dashboard/canales/whatsapp" className="text-[#5b5bf6] hover:underline">Créalas en Canales</Link>.
+                          Todavía no tienes plantillas aprobadas. <Link href="/dashboard/canales/whatsapp" className="text-[#0f7eff] hover:underline">Créalas en Canales</Link>.
                         </p>
                       ) : selectedTemplate ? (
                         <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">

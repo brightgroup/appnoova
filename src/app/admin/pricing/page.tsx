@@ -70,9 +70,9 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 const inputCls =
-  "w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50";
+  "w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50";
 const inputSm =
-  "w-28 rounded-lg border border-white/[.12] bg-white/[.04] px-2 py-1.5 text-sm text-white text-right tabular-nums focus:outline-none focus:border-[#5b5bf6]/50";
+  "w-28 rounded-lg border border-white/[.12] bg-white/[.04] px-2 py-1.5 text-sm text-white text-right tabular-nums focus:outline-none focus:border-[#0f7eff]/50";
 
 const fmtUsd = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 6 }).format(n);
@@ -375,7 +375,7 @@ export default function AdminPricingPage() {
               key={t.id}
               onClick={() => { setTab(t.id); setMsg(""); setError(""); }}
               className={`flex items-center gap-2 px-4 pb-3 pt-2 font-medium border-b-2 transition-colors ${
-                tab === t.id ? "text-white border-[#5b5bf6]" : "text-gray-400 border-transparent hover:text-gray-200"
+                tab === t.id ? "text-white border-[#0f7eff]" : "text-gray-400 border-transparent hover:text-gray-200"
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -689,7 +689,7 @@ export default function AdminPricingPage() {
                 <button
                   type="button"
                   onClick={applySuggestedCredits}
-                  className="text-xs text-[#a5a5ff] hover:text-white transition-colors"
+                  className="text-xs text-[#99c9ff] hover:text-white transition-colors"
                 >
                   Usar sugerido del promedio ({fmtN(previewPlanCredits)} cr · {fmtN(Math.round(creditsPerUsd))} cr/USD)
                 </button>
@@ -715,7 +715,7 @@ export default function AdminPricingPage() {
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-500 uppercase tracking-wide">Cr / USD</p>
-                  <p className="text-sm font-bold text-[#a5a5ff] tabular-nums mt-1">
+                  <p className="text-sm font-bold text-[#99c9ff] tabular-nums mt-1">
                     {planFormMetrics.credits_per_usd != null
                       ? fmtN(Math.round(planFormMetrics.credits_per_usd))
                       : "—"}

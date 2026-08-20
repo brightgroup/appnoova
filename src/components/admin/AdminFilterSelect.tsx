@@ -119,12 +119,12 @@ export function AdminFilterSelect({
               }}
               className={`w-full px-3 py-2 text-sm text-left transition-colors flex items-center justify-between gap-2 ${
                 active
-                  ? "text-[#a5a5ff] bg-[#5b5bf6]/10"
+                  ? "text-[#99c9ff] bg-[#0f7eff]/10"
                   : "text-gray-200 hover:bg-white/[.06]"
               }`}
             >
               <span className="truncate">{opt.label}</span>
-              {active && <Check className="w-3.5 h-3.5 text-[#5b5bf6] shrink-0" />}
+              {active && <Check className="w-3.5 h-3.5 text-[#0f7eff] shrink-0" />}
             </button>
           );
         })}
@@ -145,7 +145,7 @@ export function AdminFilterSelect({
         aria-expanded={open}
         className={`inline-flex items-center gap-2 h-8 pl-2.5 pr-2 rounded-lg border text-sm transition-colors ${
           open
-            ? "border-[#5b5bf6]/35 bg-white/[.06] text-white"
+            ? "border-[#0f7eff]/35 bg-white/[.06] text-white"
             : "border-white/[.08] bg-white/[.02] text-white hover:bg-white/[.05] hover:border-white/[.12]"
         }`}
       >

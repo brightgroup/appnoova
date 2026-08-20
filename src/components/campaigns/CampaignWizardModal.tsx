@@ -275,8 +275,8 @@ export function CampaignWizardModal({
           </button>
 
           <div className="flex items-center gap-3 pr-10 pb-3">
-            <div className="w-8 h-8 rounded-lg bg-[#5b5bf6]/15 flex items-center justify-center shrink-0">
-              <Target className="w-4 h-4 text-[#a5a5ff]" />
+            <div className="w-8 h-8 rounded-lg bg-[#0f7eff]/15 flex items-center justify-center shrink-0">
+              <Target className="w-4 h-4 text-[#99c9ff]" />
             </div>
             <div className="min-w-0">
               <h2 className="text-sm font-semibold text-white truncate">

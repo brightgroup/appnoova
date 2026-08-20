@@ -376,7 +376,7 @@ export function CampaignDetailView({ campaignId, initialTab = "general" }: Campa
       </div>
 
       {campaign.status === "completed" && (
-        <div className="mx-6 mt-4 p-3 rounded-xl bg-[#5b5bf6]/10 border border-[#5b5bf6]/25 text-xs text-[#c8c8ff] shrink-0">
+        <div className="mx-6 mt-4 p-3 rounded-xl bg-[#0f7eff]/10 border border-[#0f7eff]/25 text-xs text-[#c8c8ff] shrink-0">
           <strong className="font-medium">Campaña finalizada.</strong>{" "}
           Todos los contactos fueron procesados
           {campaign.completed_at ? ` el ${formatDatetimeCol(campaign.completed_at)}` : ""}

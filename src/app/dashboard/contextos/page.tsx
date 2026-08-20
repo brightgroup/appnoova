@@ -142,7 +142,7 @@ export default function ContextosPage() {
     <div className="flex-1 flex flex-col bg-noova-main text-gray-100 min-h-0">
       <div className="border-b border-white/[.08] px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <Building2 className="w-5 h-5 text-[#5b5bf6]" />
+          <Building2 className="w-5 h-5 text-[#0f7eff]" />
           <div>
             <h1 className="text-lg font-bold">Contextos de marca</h1>
             <p className="text-xs text-gray-400">
@@ -189,7 +189,7 @@ export default function ContextosPage() {
                     onClick={() => selectContext(ctx)}
                     className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2 ${
                       selectedId === ctx.id
-                        ? "bg-[#5b5bf6]/20 text-white border border-[#5b5bf6]/30"
+                        ? "bg-[#0f7eff]/20 text-white border border-[#0f7eff]/30"
                         : "text-gray-400 hover:text-white hover:bg-white/[.06]"
                     }`}
                   >
@@ -233,7 +233,7 @@ export default function ContextosPage() {
                       type="button"
                       onClick={handleGenerateFromUrl}
                       disabled={generating || !form.website_url.trim()}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5b5bf6] hover:bg-[#7070f8] text-sm font-semibold whitespace-nowrap disabled:opacity-40 shrink-0 text-white"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0f7eff] hover:bg-[#3392ff] text-sm font-semibold whitespace-nowrap disabled:opacity-40 shrink-0 text-white"
                     >
                       {generating ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -317,4 +317,4 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const inputCls =
-  "w-full bg-noova-surface border border-white/[.08] rounded-xl px-4 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-[#5b5bf6]/40";
+  "w-full bg-noova-surface border border-white/[.08] rounded-xl px-4 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-[#0f7eff]/40";

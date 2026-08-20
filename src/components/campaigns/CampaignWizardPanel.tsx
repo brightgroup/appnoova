@@ -35,7 +35,7 @@ export function CampaignFieldLabel({
 }
 
 const fieldClass =
-  "w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-[#5b5bf6]/50 transition-colors";
+  "w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-[#0f7eff]/50 transition-colors";
 
 export function CampaignInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`${fieldClass} ${props.className ?? ""}`} />;

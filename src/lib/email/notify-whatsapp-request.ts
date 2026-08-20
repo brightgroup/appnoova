@@ -35,7 +35,7 @@ function buildHtml(ctx: WhatsAppRequestNotifyContext): string {
 
   return `
     <div style="font-family:system-ui,sans-serif;max-width:560px;color:#111">
-      <h2 style="color:#5b5bf6;margin:0 0 12px">Nueva solicitud de línea WhatsApp</h2>
+      <h2 style="color:#0f7eff;margin:0 0 12px">Nueva solicitud de línea WhatsApp</h2>
       <p style="color:#444;margin:0 0 20px">Un cliente solicitó activación de WhatsApp Business.</p>
       <table style="width:100%;border-collapse:collapse;font-size:14px">
         <tr><td style="padding:8px 0;color:#666">Organización</td><td style="padding:8px 0"><strong>${organizationName ?? "—"}</strong></td></tr>
@@ -48,7 +48,7 @@ function buildHtml(ctx: WhatsAppRequestNotifyContext): string {
         <tr><td style="padding:8px 0;color:#666">Fecha</td><td style="padding:8px 0">${date}</td></tr>
       </table>
       <p style="margin:24px 0 0">
-        <a href="${adminUrl}" style="display:inline-block;background:#5b5bf6;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">
+        <a href="${adminUrl}" style="display:inline-block;background:#0f7eff;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">
           Revisar en admin
         </a>
       </p>

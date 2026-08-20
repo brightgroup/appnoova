@@ -118,16 +118,16 @@ export default function MiLinkNuevoPage() {
 
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="relative w-full max-w-lg rounded-3xl border border-white/[.10] bg-noova-surface p-8 shadow-2xl overflow-hidden">
-          <div className="absolute -top-16 -right-16 w-48 h-48 bg-[#5b5bf6]/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -top-16 -right-16 w-48 h-48 bg-[#0f7eff]/10 rounded-full blur-3xl pointer-events-none" />
           <div className="relative">
             <div className="flex items-center gap-2 mb-6">
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#5b5bf6]/10 border border-[#5b5bf6]/20">
-                <Sparkles className="w-3 h-3 text-[#5b5bf6]" />
-                <span className="text-xs font-medium text-[#5b5bf6]">Un link por cuenta</span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#0f7eff]/10 border border-[#0f7eff]/20">
+                <Sparkles className="w-3 h-3 text-[#0f7eff]" />
+                <span className="text-xs font-medium text-[#0f7eff]">Un link por cuenta</span>
               </div>
             </div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5b5bf6] to-[#7070f8] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center">
                 <Link2 className="w-5 h-5 text-white" />
               </div>
               <h2 className="text-xl font-bold text-white">Elige tu URL pública</h2>
@@ -144,12 +144,12 @@ export default function MiLinkNuevoPage() {
               <input
                 value={slug}
                 onChange={e => setSlug(slugifyBrandName(e.target.value))}
-                className="flex-1 bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
+                className="flex-1 bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50"
                 placeholder="mi-empresa"
                 autoFocus
               />
             </div>
-            {previewUrl && <p className="text-[11px] text-[#a5a5ff] mb-6 font-mono truncate">{previewUrl}</p>}
+            {previewUrl && <p className="text-[11px] text-[#99c9ff] mb-6 font-mono truncate">{previewUrl}</p>}
             <button onClick={handleCreate} disabled={creating || !slug.trim()} className={`${btnPrimary} w-full justify-center py-3`}>
               {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Crear mi link <ArrowRight className="w-4 h-4" /></>}
             </button>

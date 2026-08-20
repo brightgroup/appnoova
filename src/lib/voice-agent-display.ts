@@ -6,7 +6,7 @@ const AGENT_COLOR_GRADIENTS: Record<string, [string, string]> = {
   "from-[#1e40af] to-[#67e8f9]": ["#1e40af", "#67e8f9"],
   // legacy → azul corporativo + neón
   "from-[#7c3dff] to-[#e040fb]": ["#1d4ed8", "#38bdf8"],
-  "from-[#5b5bf6] to-[#7070f8]": ["#1d4ed8", "#38bdf8"],
+  "from-[#0f7eff] to-[#3392ff]": ["#1d4ed8", "#38bdf8"],
   "from-[#00eaff] to-[#2979ff]": ["#0369a1", "#00eaff"],
   "from-cyan-500 to-blue-600": ["#0369a1", "#00eaff"],
   "from-blue-500 to-indigo-600": ["#1e40af", "#67e8f9"],

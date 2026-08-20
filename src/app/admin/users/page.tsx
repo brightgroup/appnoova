@@ -212,14 +212,14 @@ export default function AdminUsers() {
                       <td className={registryTableCellFirst}>
                         <div className="flex items-center gap-3">
                           <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
-                            protected_ ? "bg-[#5b5bf6]/20 text-[#5b5bf6]" : "bg-white/[.08] text-gray-400"
+                            protected_ ? "bg-[#0f7eff]/20 text-[#0f7eff]" : "bg-white/[.08] text-gray-400"
                           }`}>
                             {name[0]?.toUpperCase() ?? "?"}
                           </div>
                           <div>
                             <p className="text-sm font-medium text-white flex items-center gap-1.5">
                               {name}
-                              {protected_ && <Shield className="w-3 h-3 text-[#5b5bf6]" aria-label="Superadmin" />}
+                              {protected_ && <Shield className="w-3 h-3 text-[#0f7eff]" aria-label="Superadmin" />}
                             </p>
                             <p className="text-xs text-gray-600">{u.email}</p>
                           </div>
@@ -241,10 +241,10 @@ export default function AdminUsers() {
                       </td>
                       <td className={registryTableCell}>
                         {busyId === u.id ? (
-                          <RefreshCw className="w-4 h-4 animate-spin text-[#5b5bf6]" />
+                          <RefreshCw className="w-4 h-4 animate-spin text-[#0f7eff]" />
                         ) : (
                           <div className="flex items-center gap-1">
-                            <Link href={`/admin/telephony?user_id=${u.id}`} className="p-1.5 rounded-lg text-[#5b5bf6] hover:bg-[#5b5bf6]/10" title="Línea">
+                            <Link href={`/admin/telephony?user_id=${u.id}`} className="p-1.5 rounded-lg text-[#0f7eff] hover:bg-[#0f7eff]/10" title="Línea">
                               <Phone className="w-4 h-4" />
                             </Link>
                             {u.email_confirmed === false && (

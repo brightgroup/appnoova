@@ -40,7 +40,7 @@ export function DashboardRouteGuard({ children }: { children: React.ReactNode })
           </p>
           <Link
             href="/dashboard"
-            className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[#5b5bf6] text-white text-sm font-medium hover:bg-[#4a4ae5]"
+            className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[#0f7eff] text-white text-sm font-medium hover:bg-[#4a4ae5]"
           >
             Volver al dashboard
           </Link>

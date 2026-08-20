@@ -140,7 +140,7 @@ export function CrmLeadForm({
                 </button>
                 <Link
                   href={`/dashboard/inbox?id=${inboxId}`}
-                  className="rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-xs text-[#a5a5ff] hover:bg-white/[.08]"
+                  className="rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-xs text-[#99c9ff] hover:bg-white/[.08]"
                 >
                   Abrir inbox →
                 </Link>
@@ -148,7 +148,7 @@ export function CrmLeadForm({
             )}
             <Link
               href={`/dashboard/crm/contactos/${draft.contact_id}`}
-              className="rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-xs text-[#a5a5ff] hover:bg-white/[.08]"
+              className="rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-xs text-[#99c9ff] hover:bg-white/[.08]"
             >
               Ver contacto →
             </Link>
@@ -257,7 +257,7 @@ export function CrmLeadForm({
               {CRM_TEMPERATURA_LABELS[draft.temperatura]}
             </Badge>
           )}
-          <span className="text-[#a5a5ff] font-semibold tabular-nums ml-auto text-sm">
+          <span className="text-[#99c9ff] font-semibold tabular-nums ml-auto text-sm">
             {formatLeadValue(draft.value_amount ?? null, draft.currency ?? "COP")}
           </span>
         </div>

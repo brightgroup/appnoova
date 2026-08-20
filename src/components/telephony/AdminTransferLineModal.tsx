@@ -111,7 +111,7 @@ export function AdminTransferLineModal({
       <div className="w-full max-w-md rounded-xl border border-white/[.12] bg-[#12121a] shadow-xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/[.08]">
           <div className="flex items-center gap-2">
-            <ArrowRightLeft className="w-4 h-4 text-[#5b5bf6]" />
+            <ArrowRightLeft className="w-4 h-4 text-[#0f7eff]" />
             <h2 className="text-sm font-semibold text-white">Transferir línea</h2>
           </div>
           <button type="button" onClick={onClose} className="p-1 text-gray-400 hover:text-white">
@@ -136,7 +136,7 @@ export function AdminTransferLineModal({
             <select
               value={targetUserId}
               onChange={e => setTargetUserId(e.target.value)}
-              className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
+              className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50"
             >
               <option value="">Seleccionar…</option>
               {users.map(u => (
@@ -153,7 +153,7 @@ export function AdminTransferLineModal({
               value={agentId}
               onChange={e => setAgentId(e.target.value)}
               disabled={!targetUserId || loadingAgents}
-              className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50 disabled:opacity-50"
+              className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50 disabled:opacity-50"
             >
               <option value="">Sin agente asignado</option>
               {agents.map(a => (

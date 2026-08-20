@@ -16,7 +16,7 @@ export function CrmFormSection({ title, description, icon: Icon, children, aside
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="flex items-start gap-2.5 min-w-0">
           {Icon && (
-            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#a5a5ff]/10 text-[#a5a5ff]">
+            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#99c9ff]/10 text-[#99c9ff]">
               <Icon className="h-3.5 w-3.5" />
             </span>
           )}

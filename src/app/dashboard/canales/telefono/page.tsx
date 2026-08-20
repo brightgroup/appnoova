@@ -127,7 +127,7 @@ export default function TelefonoListPage() {
                 >
                   <td className={registryTableCellFirst}>
                     <div className="flex items-center gap-3">
-                      <Phone className="w-4 h-4 text-[#a5a5ff]" />
+                      <Phone className="w-4 h-4 text-[#99c9ff]" />
                       <span className="text-sm font-medium text-white">
                         {line.friendly_name || "Línea telefónica"}
                       </span>

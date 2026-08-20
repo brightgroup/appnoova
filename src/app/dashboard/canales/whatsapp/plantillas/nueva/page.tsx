@@ -35,7 +35,7 @@ export default function NewDashboardWhatsAppTemplatePage() {
         <p className="text-gray-400 mb-4">Primero necesitas una línea WhatsApp activa.</p>
         <Link
           href="/dashboard/canales/whatsapp"
-          className="inline-flex items-center gap-2 text-[#a5a5ff] hover:text-white"
+          className="inline-flex items-center gap-2 text-[#99c9ff] hover:text-white"
         >
           <ChevronLeft className="w-4 h-4" />
           Ver líneas WhatsApp

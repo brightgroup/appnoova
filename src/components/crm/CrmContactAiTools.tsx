@@ -61,7 +61,7 @@ function SuggestionsList({
 
   return (
     <div className="space-y-2">
-      <button type="button" onClick={onToggleAll} className="text-xs text-[#a5a5ff] hover:text-white">
+      <button type="button" onClick={onToggleAll} className="text-xs text-[#99c9ff] hover:text-white">
         {selected.size === suggestions.length ? "Desmarcar todos" : "Seleccionar todos"}
       </button>
       <ul className="divide-y divide-white/[.06]">
@@ -74,12 +74,12 @@ function SuggestionsList({
                   type="button"
                   onClick={() => onToggle(s.field)}
                   className={`w-full flex items-start gap-3 py-2.5 text-left transition-colors ${
-                    active ? "text-[#a5a5ff]" : "hover:text-white"
+                    active ? "text-[#99c9ff]" : "hover:text-white"
                   }`}
                 >
                   <span
                     className={`mt-0.5 w-4 h-4 shrink-0 rounded-md border flex items-center justify-center ${
-                      active ? "bg-[#5b5bf6] border-[#5b5bf6]" : "border-white/20"
+                      active ? "bg-[#0f7eff] border-[#0f7eff]" : "border-white/20"
                     }`}
                   >
                     {active && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}

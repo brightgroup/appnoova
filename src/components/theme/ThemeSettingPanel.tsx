@@ -42,7 +42,7 @@ export function ThemeSettingPanel() {
               onClick={() => setPreference(id)}
               className={`rounded-xl border p-4 text-left transition-all ${
                 active
-                  ? "border-[#5b5bf6]/40 bg-[var(--nv-accent-muted)] ring-1 ring-[#5b5bf6]/20 shadow-[0_0_20px_-4px_var(--nv-accent-glow)]"
+                  ? "border-[#0f7eff]/40 bg-[var(--nv-accent-muted)] ring-1 ring-[#0f7eff]/20 shadow-[0_0_20px_-4px_var(--nv-accent-glow)]"
                   : "border-[var(--nv-border-strong)] bg-[var(--nv-hover)] hover:border-[var(--nv-border-strong)] hover:bg-[var(--nv-hover-strong)]"
               }`}
             >

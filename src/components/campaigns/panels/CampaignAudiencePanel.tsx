@@ -541,7 +541,7 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
                                   if (e.key === "Enter") void commitEdit();
                                   if (e.key === "Escape") setEditing(null);
                                 }}
-                                className="w-full min-w-[100px] rounded-md border border-[#5b5bf6]/40 bg-white/[.06] px-2 py-1 text-xs text-white focus:outline-none"
+                                className="w-full min-w-[100px] rounded-md border border-[#0f7eff]/40 bg-white/[.06] px-2 py-1 text-xs text-white focus:outline-none"
                               />
                               <button type="button" onClick={() => void commitEdit()} disabled={busy} className="p-1 text-emerald-400">
                                 <Check className="w-3.5 h-3.5" />
@@ -554,7 +554,7 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
                             <button
                               type="button"
                               onClick={() => startEdit(row.id, "__contact_name__", row.contact_name)}
-                              className="w-full text-left text-white hover:text-[#5b5bf6] text-sm"
+                              className="w-full text-left text-white hover:text-[#0f7eff] text-sm"
                             >
                               {row.contact_name?.trim() || "—"}
                             </button>
@@ -571,7 +571,7 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
                                   if (e.key === "Enter") void commitEdit();
                                   if (e.key === "Escape") setEditing(null);
                                 }}
-                                className="w-full min-w-[120px] rounded-md border border-[#5b5bf6]/40 bg-white/[.06] px-2 py-1 text-xs text-white focus:outline-none"
+                                className="w-full min-w-[120px] rounded-md border border-[#0f7eff]/40 bg-white/[.06] px-2 py-1 text-xs text-white focus:outline-none"
                               />
                               <button type="button" onClick={() => void commitEdit()} disabled={busy} className="p-1 text-emerald-400">
                                 <Check className="w-3.5 h-3.5" />
@@ -584,7 +584,7 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
                             <button
                               type="button"
                               onClick={() => startEdit(row.id, "__phone_e164__", row.phone_e164)}
-                              className="w-full text-left hover:text-[#5b5bf6]"
+                              className="w-full text-left hover:text-[#0f7eff]"
                             >
                               {row.phone_e164 || "—"}
                             </button>
@@ -615,7 +615,7 @@ export function CampaignAudiencePanel({ campaign, onChange }: CampaignAudiencePa
                                       if (e.key === "Enter") void commitEdit();
                                       if (e.key === "Escape") setEditing(null);
                                     }}
-                                    className="w-full min-w-[100px] rounded-md border border-[#5b5bf6]/40 bg-white/[.06] px-2 py-1 text-xs text-white focus:outline-none"
+                                    className="w-full min-w-[100px] rounded-md border border-[#0f7eff]/40 bg-white/[.06] px-2 py-1 text-xs text-white focus:outline-none"
                                   />
                                   <button
                                     type="button"

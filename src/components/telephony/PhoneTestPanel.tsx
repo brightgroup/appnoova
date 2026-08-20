@@ -52,7 +52,7 @@ const CONNECTED_PHASES: CallPhase[] = ["answered", "speaking", "connected", "end
 function phaseColor(phase: CallPhase): string {
   if (phase === "failed") return "bg-red-400";
   if (phase === "ended") return "bg-gray-500";
-  if (phase === "speaking") return "bg-[#5b5bf6] animate-pulse";
+  if (phase === "speaking") return "bg-[#0f7eff] animate-pulse";
   if (phase === "connected" || phase === "answered") return "bg-emerald-400";
   return "bg-[var(--nv-accent)] animate-pulse";
 }
@@ -280,11 +280,11 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
               <div className="relative mb-5">
                 {isLive && (
                   <>
-                    <div className="absolute -inset-3 rounded-full bg-[#5b5bf6]/20 blur-lg" />
-                    <div className="absolute inset-0 rounded-full border border-[#5b5bf6]/30 animate-pulse" />
+                    <div className="absolute -inset-3 rounded-full bg-[#0f7eff]/20 blur-lg" />
+                    <div className="absolute inset-0 rounded-full border border-[#0f7eff]/30 animate-pulse" />
                   </>
                 )}
-                <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-[#5b5bf6] to-[#7070f8] flex items-center justify-center shadow-lg">
+                <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shadow-lg">
                   <Phone className="w-8 h-8 text-white" />
                 </div>
               </div>
@@ -365,7 +365,7 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
                   </p>
                   <Link
                     href={`/dashboard/agentes-voz/configuracion?id=${agentId}&tab=canales`}
-                    className="inline-block mt-2 text-xs text-[#5b5bf6] hover:underline"
+                    className="inline-block mt-2 text-xs text-[#0f7eff] hover:underline"
                   >
                     Ir a Canales →
                   </Link>
@@ -411,11 +411,11 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
                     <tr
                       key={line.id}
                       onClick={() => setSelectedLineId(line.id)}
-                      className={`${registryTableRowClickable} ${selected ? "bg-[#5b5bf6]/[.06]" : ""}`}
+                      className={`${registryTableRowClickable} ${selected ? "bg-[#0f7eff]/[.06]" : ""}`}
                     >
                       <td className={registryTableCellFirst}>
                         <span className={`block w-3.5 h-3.5 rounded-full border-2 ${
-                          selected ? "border-[#5b5bf6] bg-[#5b5bf6]" : "border-gray-500"
+                          selected ? "border-[#0f7eff] bg-[#0f7eff]" : "border-gray-500"
                         }`} />
                       </td>
                       <td className={`${registryTableCell} font-mono text-sm text-white`}>
@@ -468,11 +468,11 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
                     <tr
                       key={test.id}
                       onClick={() => setSelectedTestId(test.id)}
-                      className={`${registryTableRowClickable} ${selected ? "bg-[#5b5bf6]/[.06]" : ""}`}
+                      className={`${registryTableRowClickable} ${selected ? "bg-[#0f7eff]/[.06]" : ""}`}
                     >
                       <td className={registryTableCellFirst}>
                         <span className={`block w-3.5 h-3.5 rounded-full border-2 ${
-                          selected ? "border-[#5b5bf6] bg-[#5b5bf6]" : "border-gray-500"
+                          selected ? "border-[#0f7eff] bg-[#0f7eff]" : "border-gray-500"
                         }`} />
                       </td>
                       <td className={`${registryTableCell} text-gray-200`}>{test.label}</td>
@@ -506,7 +506,7 @@ export function PhoneTestPanel({ agentId, agentName, voiceProvider = "google", o
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <Radio className="w-4 h-4 text-[#5b5bf6]" />
+                <Radio className="w-4 h-4 text-[#0f7eff]" />
                 <p className="text-sm font-medium text-white">Listo para probar</p>
               </div>
               <p className={`text-xs ${textSecondary}`}>

@@ -155,7 +155,7 @@ export function TestPhoneNumbersPanel() {
                       disabled={togglingId === row.id}
                       onClick={() => toggleActive(row)}
                       className={`relative w-10 h-5 rounded-full transition-colors ${
-                        row.active !== false ? "bg-[#5b5bf6]" : "bg-white/20"
+                        row.active !== false ? "bg-[#0f7eff]" : "bg-white/20"
                       }`}
                       aria-label={row.active !== false ? "Activo" : "Inactivo"}
                     >

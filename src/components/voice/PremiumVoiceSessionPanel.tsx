@@ -508,7 +508,7 @@ export function PremiumVoiceSessionPanel({
                   <button
                     onClick={() => void startSession()}
                     disabled={!ready || !agentId}
-                    className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#5b5bf6] to-[#7c6cf6] hover:from-[#6b6bf7] hover:to-[#8b7cf7] shadow-[0_8px_32px_rgba(91,91,246,0.35)] transition-all disabled:opacity-45 disabled:shadow-none"
+                    className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#0f7eff] to-[#7c6cf6] hover:from-[#6b6bf7] hover:to-[#8b7cf7] shadow-[0_8px_32px_rgba(15,126,255,0.35)] transition-all disabled:opacity-45 disabled:shadow-none"
                   >
                     {state === "error" ? (
                       <><RefreshCw className="w-4 h-4" /> Reintentar</>
@@ -575,7 +575,7 @@ export function PremiumVoiceSessionPanel({
         <section className="flex-1 min-w-0 flex flex-col rounded-2xl border border-white/[.08] bg-[#0c0c10]/80 backdrop-blur-sm overflow-hidden">
           <div className="px-5 py-3.5 border-b border-white/[.06] flex items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-2 min-w-0">
-              <MessageSquare className="w-4 h-4 text-[#a5a5ff] shrink-0" />
+              <MessageSquare className="w-4 h-4 text-[#99c9ff] shrink-0" />
               <span className="text-sm font-medium text-gray-200">Transcripción en vivo</span>
             </div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[.03] border border-white/[.08] shrink-0">
@@ -591,7 +591,7 @@ export function PremiumVoiceSessionPanel({
                   {[0, 1, 2, 3, 4, 5, 6].map(i => (
                     <span
                       key={i}
-                      className="w-1 rounded-full bg-gradient-to-t from-[#5b5bf6] to-[#a5a5ff] premium-voice-wave-bar"
+                      className="w-1 rounded-full bg-gradient-to-t from-[#0f7eff] to-[#99c9ff] premium-voice-wave-bar"
                       style={{
                         height: `${14 + (i % 3) * 10}px`,
                         animationDelay: `${i * 0.12}s`,
@@ -612,7 +612,7 @@ export function PremiumVoiceSessionPanel({
                 >
                   <div className={`max-w-[82%] px-4 py-3 rounded-2xl text-[13px] leading-relaxed ${
                     line.role === "user"
-                      ? "bg-[#5b5bf6]/15 border border-[#5b5bf6]/25 text-gray-100"
+                      ? "bg-[#0f7eff]/15 border border-[#0f7eff]/25 text-gray-100"
                       : "bg-white/[.04] border border-white/[.08] text-gray-200"
                   }`}>
                     <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 text-gray-500">

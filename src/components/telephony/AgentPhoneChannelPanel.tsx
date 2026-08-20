@@ -121,7 +121,7 @@ export function AgentPhoneChannelPanel({ agentId, isPremium = false }: AgentPhon
       <div className="flex-1 overflow-y-auto p-6 max-w-xl space-y-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Phone className="w-5 h-5 text-[#5b5bf6]" />
+            <Phone className="w-5 h-5 text-[#0f7eff]" />
             <h2 className="text-lg font-semibold text-white">Canal telefónico</h2>
           </div>
           <p className={`text-sm ${textMuted}`}>

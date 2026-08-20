@@ -146,12 +146,12 @@ export function TextAgentTestPanel({
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-noova-main relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute top-[15%] left-1/2 -translate-x-1/2 w-[500px] h-[320px] bg-[#5b5bf6]/[.05] rounded-full blur-[90px]" />
+        <div className="absolute top-[15%] left-1/2 -translate-x-1/2 w-[500px] h-[320px] bg-[#0f7eff]/[.05] rounded-full blur-[90px]" />
       </div>
 
       <div className="relative z-10 shrink-0 flex items-center justify-between px-8 py-4 border-b border-white/[.06]">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#5b5bf6] to-[#7070f8] flex items-center justify-center shadow-lg shadow-[#5b5bf6]/25">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shadow-lg shadow-[#0f7eff]/25">
             <MessageSquare className="w-4 h-4 text-white" strokeWidth={2} />
           </div>
           <div>
@@ -162,7 +162,7 @@ export function TextAgentTestPanel({
         {hasChat && (
           <button
             onClick={resetChat}
-            className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-[#a5a5ff] transition-colors"
+            className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-[#99c9ff] transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             Nueva conversación
@@ -198,7 +198,7 @@ export function TextAgentTestPanel({
                   {[0, 100, 200].map(d => (
                     <div
                       key={d}
-                      className="w-1.5 h-1.5 rounded-full bg-[#5b5bf6]/50 animate-pulse"
+                      className="w-1.5 h-1.5 rounded-full bg-[#0f7eff]/50 animate-pulse"
                       style={{ animationDelay: `${d}ms` }}
                     />
                   ))}
@@ -223,7 +223,7 @@ export function TextAgentTestPanel({
               <p className="mb-4 text-center text-xs font-medium text-red-400">{error}</p>
             )}
 
-            <div className="rounded-[1.25rem] border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] focus-within:border-[#5b5bf6]/30 focus-within:shadow-[0_0_0_1px_rgba(91,91,246,0.15)] transition-all">
+            <div className="rounded-[1.25rem] border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] focus-within:border-[#0f7eff]/30 focus-within:shadow-[0_0_0_1px_rgba(15,126,255,0.15)] transition-all">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -239,7 +239,7 @@ export function TextAgentTestPanel({
                 <button
                   onClick={() => sendMessage(input)}
                   disabled={!input.trim() || loading}
-                  className="p-2.5 rounded-xl bg-[#5b5bf6] hover:bg-[#7070f8] text-white shadow-lg shadow-[#5b5bf6]/25 disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+                  className="p-2.5 rounded-xl bg-[#0f7eff] hover:bg-[#3392ff] text-white shadow-lg shadow-[#0f7eff]/25 disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed transition-all"
                 >
                   {loading ? (
                     <Loader2 className="w-[18px] h-[18px] animate-spin" />
@@ -258,7 +258,7 @@ export function TextAgentTestPanel({
                     type="button"
                     onClick={() => sendMessage(prompt)}
                     disabled={loading}
-                    className="px-4 py-2 rounded-xl border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] hover:border-[#5b5bf6]/25 hover:bg-[var(--nv-accent-muted)] text-[13px] font-medium text-[var(--nv-text-muted)] hover:text-[var(--nv-text)] transition-all disabled:opacity-40"
+                    className="px-4 py-2 rounded-xl border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] hover:border-[#0f7eff]/25 hover:bg-[var(--nv-accent-muted)] text-[13px] font-medium text-[var(--nv-text-muted)] hover:text-[var(--nv-text)] transition-all disabled:opacity-40"
                   >
                     {prompt}
                   </button>

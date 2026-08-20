@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Sparkles, History, FileText, Users, RefreshCw,
-  Mail, Phone, Loader2, Plus, Mic, ChevronDown, ArrowUp
+  Mail, Phone, Loader2, Plus, Mic, ArrowUp
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
@@ -11,6 +11,7 @@ import type { CompanyContext } from "@/types/company-context";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import { Badge } from "@/components/ui/Badge";
 import { TEXT_LLM_MODELS, DEFAULT_TEXT_MODEL, resolveTextLlm } from "@/lib/text-agent-options";
+import { llmModelIcon } from "@/lib/llm/provider-icon";
 
 const ORI_MODEL_STORAGE_KEY = "noova_ori_model";
 
@@ -157,13 +158,13 @@ export default function OriCopilotoPage() {
   return (
     <div className="flex-1 flex flex-col min-h-0 h-full bg-noova-main text-white relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-[#5b5bf6]/[.06] rounded-full blur-[100px]" />
+        <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-[#0f7eff]/[.06] rounded-full blur-[100px]" />
       </div>
 
       {/* Header Ori */}
       <div className="relative z-10 shrink-0 flex items-center justify-between px-8 py-4">
         <div className="flex items-center gap-3">
-          <div className="nv-ori-icon w-9 h-9 rounded-xl bg-gradient-to-br from-[#5b5bf6] to-[#7070f8] flex items-center justify-center shadow-lg shadow-[#5b5bf6]/30">
+          <div className="nv-ori-icon w-9 h-9 rounded-xl bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shadow-lg shadow-[#0f7eff]/30">
             <Sparkles className="w-4 h-4 text-white nv-ori-icon-glyph" strokeWidth={2} />
           </div>
           <div className="flex items-center gap-2">
@@ -172,13 +173,6 @@ export default function OriCopilotoPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <NoovaSelect
-            value={model}
-            onChange={handleModelChange}
-            allowEmpty={false}
-            className="w-auto min-w-[140px]"
-            options={TEXT_LLM_MODELS.map(m => ({ value: m.id, label: m.label }))}
-          />
           {contexts.length > 0 && (
             <NoovaSelect
               value={contextId}
@@ -191,7 +185,7 @@ export default function OriCopilotoPage() {
           {hasChat && (
             <button
               onClick={startNewChat}
-              className="text-xs font-medium text-gray-500 hover:text-[#a5a5ff] transition-colors"
+              className="text-xs font-medium text-gray-500 hover:text-[#99c9ff] transition-colors"
             >
               Nueva conversación
             </button>
@@ -232,7 +226,7 @@ export default function OriCopilotoPage() {
                   {[0, 100, 200].map(d => (
                     <div
                       key={d}
-                      className="w-1.5 h-1.5 rounded-full bg-[#5b5bf6]/50 animate-pulse"
+                      className="w-1.5 h-1.5 rounded-full bg-[#0f7eff]/50 animate-pulse"
                       style={{ animationDelay: `${d}ms` }}
                     />
                   ))}
@@ -245,7 +239,7 @@ export default function OriCopilotoPage() {
 
             {!hasChat && (
               <div className="flex items-center justify-center gap-3 mb-12">
-                <Sparkles className="w-5 h-5 text-[#5b5bf6]" strokeWidth={1.75} />
+                <Sparkles className="w-5 h-5 text-[#0f7eff]" strokeWidth={1.75} />
                 <h1 className="text-[1.75rem] sm:text-[2rem] font-semibold text-gray-200 tracking-tight">
                   ¿Cómo puedo ayudarte hoy,{" "}
                   <span className="text-white">{userName}</span>?
@@ -258,7 +252,7 @@ export default function OriCopilotoPage() {
             )}
 
             {/* Input amplio */}
-            <div className="nv-ori-composer rounded-[1.35rem] border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] focus-within:border-[#5b5bf6]/30 focus-within:shadow-[0_0_0_1px_rgba(91,91,246,0.15)] transition-all">
+            <div className="nv-ori-composer rounded-[1.35rem] border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] focus-within:border-[#0f7eff]/30 focus-within:shadow-[0_0_0_1px_rgba(15,126,255,0.15)] transition-all">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -280,13 +274,13 @@ export default function OriCopilotoPage() {
                 </button>
 
                 <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-[#a5a5ff]/80 hover:text-[#c4c4ff] hover:bg-[#5b5bf6]/[.08] transition-colors"
-                  >
-                    Gemini 2.5 Flash
-                    <ChevronDown className="w-3.5 h-3.5 opacity-70" />
-                  </button>
+                  <NoovaSelect
+                    value={model}
+                    onChange={handleModelChange}
+                    allowEmpty={false}
+                    className="w-auto min-w-[130px]"
+                    options={TEXT_LLM_MODELS.map(m => ({ value: m.id, label: m.label, icon: llmModelIcon(m.id) }))}
+                  />
                   <button
                     type="button"
                     disabled
@@ -298,7 +292,7 @@ export default function OriCopilotoPage() {
                   <button
                     onClick={() => sendMessage(input)}
                     disabled={!input.trim() || loading}
-                    className="p-2.5 rounded-xl bg-[#5b5bf6] hover:bg-[#7070f8] text-white shadow-lg shadow-[#5b5bf6]/25 disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+                    className="p-2.5 rounded-xl bg-[#0f7eff] hover:bg-[#3392ff] text-white shadow-lg shadow-[#0f7eff]/25 disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed transition-all"
                   >
                     {loading ? (
                       <Loader2 className="w-[18px] h-[18px] animate-spin" />
@@ -320,9 +314,9 @@ export default function OriCopilotoPage() {
                       type="button"
                       onClick={() => sendMessage(action.prompt)}
                       disabled={loading}
-                      className="group flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] hover:border-[#5b5bf6]/25 hover:bg-[var(--nv-accent-muted)] text-[13px] font-medium text-[var(--nv-text-muted)] hover:text-[var(--nv-text)] transition-all disabled:opacity-40 sm:w-auto w-full justify-center sm:justify-start"
+                      className="group flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] hover:border-[#0f7eff]/25 hover:bg-[var(--nv-accent-muted)] text-[13px] font-medium text-[var(--nv-text-muted)] hover:text-[var(--nv-text)] transition-all disabled:opacity-40 sm:w-auto w-full justify-center sm:justify-start"
                     >
-                      <Icon className="w-3.5 h-3.5 text-gray-500 group-hover:text-[#5b5bf6] transition-colors" strokeWidth={1.75} />
+                      <Icon className="w-3.5 h-3.5 text-gray-500 group-hover:text-[#0f7eff] transition-colors" strokeWidth={1.75} />
                       {action.label}
                     </button>
                   );

@@ -34,8 +34,8 @@ export function WhatsAppPhonePreview({
 
             {/* Header WA */}
             <div className="flex items-center gap-3 px-3 py-2.5 bg-[#1f2c34] border-b border-black/20">
-              <div className="w-8 h-8 rounded-full bg-[#5b5bf6]/30 flex items-center justify-center">
-                <MessageCircle className="w-4 h-4 text-[#a5a5ff]" />
+              <div className="w-8 h-8 rounded-full bg-[#0f7eff]/30 flex items-center justify-center">
+                <MessageCircle className="w-4 h-4 text-[#99c9ff]" />
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-medium text-white truncate">{contactName}</p>
@@ -48,7 +48,7 @@ export function WhatsAppPhonePreview({
               className="px-3 py-4 min-h-[320px] max-h-[320px] overflow-y-auto"
               style={{
                 backgroundImage:
-                  "radial-gradient(circle at 20% 30%, rgba(91,91,246,0.04) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(16,185,129,0.03) 0%, transparent 50%)"
+                  "radial-gradient(circle at 20% 30%, rgba(15,126,255,0.04) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(16,185,129,0.03) 0%, transparent 50%)"
               }}
             >
               <div className="mx-auto max-w-[92%] mb-3">

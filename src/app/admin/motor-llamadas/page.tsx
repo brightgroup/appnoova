@@ -52,7 +52,7 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 const inputCls =
-  "w-32 rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white text-right tabular-nums focus:outline-none focus:border-[#5b5bf6]/50";
+  "w-32 rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white text-right tabular-nums focus:outline-none focus:border-[#0f7eff]/50";
 const cardCls = "rounded-xl border border-white/[.08] bg-white/[.02] p-4";
 const labelCls = "text-sm font-medium text-white";
 const hintCls = "text-xs text-gray-500";
@@ -202,7 +202,7 @@ export default function MotorLlamadasPage() {
                 onClick={() => setTab(t.id)}
                 className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                   active
-                    ? "border-[#5b5bf6] text-white"
+                    ? "border-[#0f7eff] text-white"
                     : "border-transparent text-gray-400 hover:text-white"
                 }`}
               >
@@ -236,7 +236,7 @@ export default function MotorLlamadasPage() {
                 type="button"
                 onClick={() => patchRule({ enabled: !rules?.enabled })}
                 className={`relative w-11 h-6 rounded-full transition-colors ${
-                  rules?.enabled ? "bg-[#5b5bf6]" : "bg-white/[.15]"
+                  rules?.enabled ? "bg-[#0f7eff]" : "bg-white/[.15]"
                 }`}
               >
                 <span
@@ -323,7 +323,7 @@ export default function MotorLlamadasPage() {
               {/* Estado actual en vivo */}
               <div className={cardCls}>
                 <div className="flex items-center gap-2 mb-3">
-                  <Clock className="w-4 h-4 text-[#5b5bf6]" />
+                  <Clock className="w-4 h-4 text-[#0f7eff]" />
                   <h3 className="text-sm font-semibold text-white">Hora y fecha actuales (lo que ve la IA)</h3>
                 </div>
                 <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
@@ -364,7 +364,7 @@ export default function MotorLlamadasPage() {
                     setSavedTime(false);
                   }}
                   rows={3}
-                  className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
+                  className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50"
                   placeholder="Ej. Hoy atención reducida por capacitación interna"
                 />
               </div>
@@ -412,7 +412,7 @@ export default function MotorLlamadasPage() {
                           setTime(prev => (prev ? { ...prev, rules: { ...prev.rules, extra_events } } : prev));
                           setSavedTime(false);
                         }}
-                        className="rounded-lg border border-white/[.12] bg-white/[.04] px-2 py-1.5 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
+                        className="rounded-lg border border-white/[.12] bg-white/[.04] px-2 py-1.5 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50"
                       />
                       <input
                         value={ev.label}
@@ -423,7 +423,7 @@ export default function MotorLlamadasPage() {
                           setSavedTime(false);
                         }}
                         placeholder="Descripción"
-                        className="flex-1 rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-1.5 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
+                        className="flex-1 rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-1.5 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50"
                       />
                       <button
                         type="button"
@@ -461,7 +461,7 @@ export default function MotorLlamadasPage() {
               {/* Festivos en código (solo lectura) */}
               <div className={cardCls}>
                 <div className="flex items-center gap-2 mb-3">
-                  <CalendarDays className="w-4 h-4 text-[#5b5bf6]" />
+                  <CalendarDays className="w-4 h-4 text-[#0f7eff]" />
                   <h3 className="text-sm font-semibold text-white">Festivos por año (definidos en código)</h3>
                 </div>
                 <p className={`${hintCls} mb-3`}>

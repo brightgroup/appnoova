@@ -278,7 +278,7 @@ export function AgentCreationWizard({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl p-4">
       <div className="relative bg-noova-surface border border-white/[.10] rounded-3xl w-full max-w-2xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
-        <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#5b5bf6]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#0f7eff]/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Header */}
         <div className="relative px-6 pt-6 pb-3 shrink-0 border-b border-white/[.06]">
@@ -291,8 +291,8 @@ export function AgentCreationWizard({
           </button>
 
           <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-9 h-9 rounded-xl bg-[#5b5bf6]/15 border border-[#5b5bf6]/25 flex items-center justify-center">
-              <ChannelIcon className="w-4 h-4 text-[#a5a5ff]" />
+            <div className="w-9 h-9 rounded-xl bg-[#0f7eff]/15 border border-[#0f7eff]/25 flex items-center justify-center">
+              <ChannelIcon className="w-4 h-4 text-[#99c9ff]" />
             </div>
             <div>
               <h2 className="text-base font-bold text-white">
@@ -308,9 +308,9 @@ export function AgentCreationWizard({
                 <div
                   className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                     i < stepIndex
-                      ? "bg-[#5b5bf6] text-white"
+                      ? "bg-[#0f7eff] text-white"
                       : i === stepIndex
-                        ? "bg-[#5b5bf6]/20 text-[#a5a5ff] ring-2 ring-[#5b5bf6]"
+                        ? "bg-[#0f7eff]/20 text-[#99c9ff] ring-2 ring-[#0f7eff]"
                         : "bg-white/[.06] text-gray-500"
                   }`}
                 >
@@ -318,13 +318,13 @@ export function AgentCreationWizard({
                 </div>
                 <span
                   className={`text-[11px] truncate hidden sm:block ${
-                    i === stepIndex ? "text-[#a5a5ff] font-medium" : "text-gray-500"
+                    i === stepIndex ? "text-[#99c9ff] font-medium" : "text-gray-500"
                   }`}
                 >
                   {s.label}
                 </span>
                 {i < STEPS.length - 1 && (
-                  <div className={`flex-1 h-px ${i < stepIndex ? "bg-[#5b5bf6]/40" : "bg-white/[.08]"}`} />
+                  <div className={`flex-1 h-px ${i < stepIndex ? "bg-[#0f7eff]/40" : "bg-white/[.08]"}`} />
                 )}
               </div>
             ))}
@@ -353,14 +353,14 @@ export function AgentCreationWizard({
                         }}
                         className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${
                           selected
-                            ? "border-[#5b5bf6]/50 bg-[#5b5bf6]/10 ring-1 ring-[#5b5bf6]/30"
+                            ? "border-[#0f7eff]/50 bg-[#0f7eff]/10 ring-1 ring-[#0f7eff]/30"
                             : "border-white/[.08] bg-white/[.02] hover:border-white/[.16]"
                         }`}
                       >
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          selected ? "bg-[#5b5bf6]/20" : "bg-white/[.04]"
+                          selected ? "bg-[#0f7eff]/20" : "bg-white/[.04]"
                         }`}>
-                          <Icon className={`w-4 h-4 ${selected ? "text-[#a5a5ff]" : "text-gray-400"}`} />
+                          <Icon className={`w-4 h-4 ${selected ? "text-[#99c9ff]" : "text-gray-400"}`} />
                         </div>
                         <span className="text-xs font-semibold text-white leading-tight">{p.label}</span>
                       </button>
@@ -378,7 +378,7 @@ export function AgentCreationWizard({
                       onClick={() => setVoiceProvider("google")}
                       className={`p-3 rounded-xl border text-left transition-all ${
                         voiceProvider === "google"
-                          ? "border-[#5b5bf6]/50 bg-[#5b5bf6]/10 ring-1 ring-[#5b5bf6]/30"
+                          ? "border-[#0f7eff]/50 bg-[#0f7eff]/10 ring-1 ring-[#0f7eff]/30"
                           : "border-white/[.08] bg-white/[.02] hover:border-white/[.16]"
                       }`}
                     >
@@ -409,7 +409,7 @@ export function AgentCreationWizard({
                     value={agentName}
                     onChange={e => setAgentName(e.target.value)}
                     placeholder={isVoice ? "Ej. Manuela, Juan" : "Ej. Valentina, Asistente"}
-                    className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#5b5bf6]/50"
+                    className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#0f7eff]/50"
                   />
                 </div>
                 {isVoice ? (
@@ -437,7 +437,7 @@ export function AgentCreationWizard({
                           setVoiceManual(true);
                           setVoiceName(e.target.value);
                         }}
-                        className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
+                        className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50"
                       >
                         {GEMINI_VOICES.map(v => (
                           <option key={v.id} value={v.id} className="bg-[#232329]">{v.label}</option>
@@ -464,7 +464,7 @@ export function AgentCreationWizard({
                   onChange={e => setExtraInstructions(e.target.value)}
                   rows={2}
                   placeholder="Ej. Captura email y motivo de contacto."
-                  className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#5b5bf6]/50 resize-none"
+                  className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#0f7eff]/50 resize-none"
                 />
               )}
             </div>
@@ -483,7 +483,7 @@ export function AgentCreationWizard({
                   onClick={() => setContextMode("existing")}
                   className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
                     contextMode === "existing"
-                      ? "border-[#5b5bf6]/40 bg-[#5b5bf6]/10 text-[#a5a5ff]"
+                      ? "border-[#0f7eff]/40 bg-[#0f7eff]/10 text-[#99c9ff]"
                       : "border-white/[.08] text-gray-400 hover:text-white disabled:opacity-40"
                   }`}
                 >
@@ -494,7 +494,7 @@ export function AgentCreationWizard({
                   onClick={() => setContextMode("new")}
                   className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
                     contextMode === "new"
-                      ? "border-[#5b5bf6]/40 bg-[#5b5bf6]/10 text-[#a5a5ff]"
+                      ? "border-[#0f7eff]/40 bg-[#0f7eff]/10 text-[#99c9ff]"
                       : "border-white/[.08] text-gray-400 hover:text-white"
                   }`}
                 >
@@ -512,7 +512,7 @@ export function AgentCreationWizard({
                   <select
                     value={selectedContextId}
                     onChange={e => setSelectedContextId(e.target.value)}
-                    className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5b5bf6]/50"
+                    className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50"
                   >
                     {contexts.map(c => (
                       <option key={c.id} value={c.id} className="bg-[#232329]">
@@ -530,7 +530,7 @@ export function AgentCreationWizard({
                       value={companyName}
                       onChange={e => setCompanyName(e.target.value)}
                       placeholder="Ej. Noova 360"
-                      className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#5b5bf6]/50"
+                      className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#0f7eff]/50"
                     />
                   </div>
                   <div>
@@ -540,7 +540,7 @@ export function AgentCreationWizard({
                       onChange={e => setCompanyDescription(e.target.value)}
                       rows={4}
                       placeholder="Productos, servicios y propuesta de valor."
-                      className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#5b5bf6]/50 resize-none"
+                      className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#0f7eff]/50 resize-none"
                     />
                     <p className="text-[10px] text-gray-600 mt-1">Mínimo 20 caracteres.</p>
                   </div>

@@ -178,7 +178,7 @@ export default function TablaDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32 text-gray-400">
-        <Loader2 className="w-5 h-5 animate-spin mr-2 text-[#5b5bf6]" /> Cargando…
+        <Loader2 className="w-5 h-5 animate-spin mr-2 text-[#0f7eff]" /> Cargando…
       </div>
     );
   }
@@ -187,7 +187,7 @@ export default function TablaDetailPage() {
     return (
       <div className="p-8 text-center text-gray-400">
         Tabla no encontrada.{" "}
-        <Link href="/dashboard/tablas" className="text-[#a5a5ff] hover:underline">Volver</Link>
+        <Link href="/dashboard/tablas" className="text-[#99c9ff] hover:underline">Volver</Link>
       </div>
     );
   }
@@ -201,7 +201,7 @@ export default function TablaDetailPage() {
           </Link>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <Database className="w-4 h-4 text-[#5b5bf6] shrink-0" />
+              <Database className="w-4 h-4 text-[#0f7eff] shrink-0" />
               <h1 className="text-xl font-bold tracking-tight truncate">{table.name}</h1>
             </div>
             {linkedAgents.length > 0 && (
@@ -340,12 +340,12 @@ export default function TablaDetailPage() {
                                 }
                               }}
                               onClick={e => e.stopPropagation()}
-                              className="w-full min-w-0 max-w-full box-border bg-[#1a1b24] border border-[#5b5bf6]/50 px-2 py-1 text-xs text-white outline-none focus:border-[#5b5bf6]"
+                              className="w-full min-w-0 max-w-full box-border bg-[#1a1b24] border border-[#0f7eff]/50 px-2 py-1 text-xs text-white outline-none focus:border-[#0f7eff]"
                             />
                           ) : (
                             <span className="block px-2 py-1 truncate cursor-text hover:bg-white/[.04]">
                               {isSaving ? (
-                                <Loader2 className="w-3 h-3 animate-spin text-[#5b5bf6] inline" />
+                                <Loader2 className="w-3 h-3 animate-spin text-[#0f7eff] inline" />
                               ) : (
                                 display
                               )}

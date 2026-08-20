@@ -223,7 +223,7 @@ export default function CrmLeadsPage() {
                     <td className={`${registryTableCell} text-xs text-gray-400`}>{lead.contact?.name ?? "—"}</td>
                     <td className={registryTableCell}>
                       <span className="inline-flex items-center gap-1.5 text-xs text-gray-300">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: lead.stage?.color ?? "#5b5bf6" }} />
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: lead.stage?.color ?? "#0f7eff" }} />
                         {lead.stage?.name ?? "—"}
                       </span>
                     </td>
@@ -235,7 +235,7 @@ export default function CrmLeadsPage() {
                     <td className={`${registryTableCell} text-xs text-gray-400 max-w-[200px]`}>
                       <span className="line-clamp-2">{lead.categoria_interes ?? "—"}</span>
                     </td>
-                    <td className={`${registryTableCell} text-sm text-[#a5a5ff] tabular-nums`}>
+                    <td className={`${registryTableCell} text-sm text-[#99c9ff] tabular-nums`}>
                       {formatLeadValue(lead.value_amount, lead.currency)}
                     </td>
                     <td className={`${registryTableCell} text-center`} onClick={e => e.stopPropagation()}>

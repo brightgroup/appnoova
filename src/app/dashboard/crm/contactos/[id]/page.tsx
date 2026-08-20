@@ -188,7 +188,7 @@ function ContactEditContent({ contactId }: { contactId: string }) {
             <>
               {nextStep && <CrmContactNextStep message={nextStep.message} href={nextStep.href} />}
               {callMessage && (
-                <p className="mb-4 text-xs text-[#a5a5ff]">{callMessage}</p>
+                <p className="mb-4 text-xs text-[#99c9ff]">{callMessage}</p>
               )}
               <CrmContactTimeline
                 contactId={contactId}

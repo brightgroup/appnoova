@@ -1,6 +1,6 @@
 /** Metadatos de proveedor para las vistas de consumo en /admin — solo admin, nunca al cliente. */
 export const PROVIDER_LABELS: Record<string, { label: string; color: string }> = {
-  google: { label: "Gemini", color: "#5b5bf6" },
+  google: { label: "Gemini", color: "#0f7eff" },
   anthropic: { label: "Claude", color: "#c084fc" },
   openai: { label: "OpenAI", color: "#10a37f" },
   twilio: { label: "Twilio", color: "#22c55e" },

@@ -93,7 +93,7 @@ function TableCheckbox({
       }}
       className={`w-4 h-4 shrink-0 rounded-md border flex items-center justify-center transition-colors ${
         checked || indeterminate
-          ? "bg-[#a5a5ff] border-[#a5a5ff]"
+          ? "bg-[#99c9ff] border-[#99c9ff]"
           : "border-white/20 bg-white/[.04] hover:border-white/30"
       }`}
     >
@@ -300,8 +300,8 @@ export default function CrmContactsPage() {
             </div>
           )}
           {selected.size > 0 ? (
-            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#a5a5ff]/25 bg-[#a5a5ff]/8 px-4 py-3">
-              <span className="text-sm text-[#c4c4ff]">
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#99c9ff]/25 bg-[#99c9ff]/8 px-4 py-3">
+              <span className="text-sm text-[#b3d6ff]">
                 <span className="font-semibold text-white">{selected.size}</span> seleccionado(s)
               </span>
               <ExportMenu
@@ -378,7 +378,7 @@ export default function CrmContactsPage() {
                 </td>
                 <td className={registryTableCellFirst}>
                   <div className="flex items-center gap-3">
-                    <User className="w-4 h-4 text-[#a5a5ff] shrink-0" />
+                    <User className="w-4 h-4 text-[#99c9ff] shrink-0" />
                     <div className="min-w-0">
                       <div className="text-sm font-medium text-white truncate">{c.name}</div>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
