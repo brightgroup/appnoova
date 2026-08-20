@@ -33,7 +33,8 @@ import {
   Trash2,
   Radio,
   Undo2,
-  Redo2
+  Redo2,
+  Bot
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { supabase } from "@/lib/supabase";
@@ -73,9 +74,19 @@ const TABS: { id: Tab; label: string }[] = [
 const NODE_PICKER_ICON: Record<WorkflowNodeType, React.ReactNode> = {
   "trigger.whatsapp_message": <WhatsAppLogo className="w-4 h-4 text-white" />,
   "trigger.webhook": <Webhook className="w-4 h-4 text-white" strokeWidth={1.8} />,
+  "action.ai_extract": <Bot className="w-4 h-4 text-white" strokeWidth={1.6} />,
   "action.webhook": <Globe className="w-4 h-4 text-white" strokeWidth={1.6} />,
   "action.send_whatsapp_message": <WhatsAppLogo className="w-4 h-4 text-white" />
 };
+
+/** Modelo con el que corre este nodo — nombre explícito del proveedor a propósito: acá el usuario elige a mano, a diferencia del selector "Estándar" neutro de agentes de texto (que oculta el proveedor porque puede haber failover automático por detrás). Sin descripción al lado del nombre a propósito — las limitaciones puntuales (ej. GPT-4o mini y PDF) se avisan como nota aparte, según el disparador conectado, no como texto fijo en la opción. */
+const AI_EXTRACT_MODEL_OPTIONS: { value: string; label: string }[] = [
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  { value: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
+  { value: "claude-sonnet-5", label: "Claude Sonnet 5" },
+  { value: "gpt-4o-mini", label: "GPT-4o mini" }
+];
+const DEFAULT_AI_EXTRACT_MODEL = "gemini-2.5-flash";
 
 const TRIGGER_TYPES: WorkflowNodeType[] = ["trigger.whatsapp_message", "trigger.webhook"];
 
@@ -271,7 +282,12 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
     pushHistory();
     const id = crypto.randomUUID();
     // El nodo Webhook entrante genera su URL propia de inmediato — sin fricción, sin esperar a Guardar.
-    const data: WorkflowNodeData = type === "trigger.webhook" ? { webhookToken: crypto.randomUUID().replace(/-/g, "") } : {};
+    const data: WorkflowNodeData =
+      type === "trigger.webhook"
+        ? { webhookToken: crypto.randomUUID().replace(/-/g, "") }
+        : type === "action.ai_extract"
+          ? { aiModel: DEFAULT_AI_EXTRACT_MODEL }
+          : {};
     setNodes(nds => [
       ...nds,
       { id, type, position: { x: 60 + nds.length * 230, y: 160 }, data }
@@ -597,6 +613,8 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
               <NodeConfigPanel
                 key={configNode.id}
                 node={configNode}
+                nodes={nodes}
+                edges={edges}
                 connections={connections}
                 channels={channels}
                 templates={templates}
@@ -617,9 +635,19 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
   );
 }
 
-function whatsappEventMatches(e: AutomationEventRow, mediaFilter: "image" | "text" | "any"): boolean {
-  if (e.event_type !== "whatsapp.image_received" && e.event_type !== "whatsapp.text_received") return false;
+function normalizeMediaFilter(value: unknown): "image" | "document" | "text" | "any" {
+  return value === "image" || value === "document" || value === "text" ? value : "any";
+}
+
+function whatsappEventMatches(e: AutomationEventRow, mediaFilter: "image" | "document" | "text" | "any"): boolean {
+  if (
+    e.event_type !== "whatsapp.image_received" &&
+    e.event_type !== "whatsapp.document_received" &&
+    e.event_type !== "whatsapp.text_received"
+  )
+    return false;
   if (mediaFilter === "image") return e.event_type === "whatsapp.image_received";
+  if (mediaFilter === "document") return e.event_type === "whatsapp.document_received";
   if (mediaFilter === "text") return e.event_type === "whatsapp.text_received";
   return true;
 }
@@ -762,6 +790,17 @@ const EXAMPLE_JSON_IMAGE_EVENT = JSON.stringify(
     conversation_id: "5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02",
     contact: { phone: "+573001234567", label: "Juan Pérez" },
     image: { url: "https://.../foto.jpg", analysis: "Producto con empaque dañado" }
+  },
+  null,
+  2
+);
+
+const EXAMPLE_JSON_DOCUMENT_EVENT = JSON.stringify(
+  {
+    event: "whatsapp.document_received",
+    conversation_id: "5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02",
+    contact: { phone: "+573001234567", label: "Juan Pérez" },
+    document: { url: "https://.../comprobante.pdf", analysis: "Comprobante de transferencia" }
   },
   null,
   2
@@ -1173,6 +1212,8 @@ function ExtractFieldsEditor({
 
 function NodeConfigPanel({
   node,
+  nodes,
+  edges,
   connections,
   channels,
   templates,
@@ -1182,6 +1223,8 @@ function NodeConfigPanel({
   onSetData
 }: {
   node: Node<WorkflowNodeData>;
+  nodes: Node<WorkflowNodeData>[];
+  edges: Edge[];
   connections: AutomationConnectionRecord[];
   channels: WhatsAppChannelRecord[];
   templates: WhatsAppTemplateOption[];
@@ -1200,7 +1243,7 @@ function NodeConfigPanel({
   const [labelDraft, setLabelDraft] = useState("");
   const [capturedExample, setCapturedExample] = useState<AutomationEventRow | null>(() => {
     if (type === "trigger.whatsapp_message") {
-      const mediaFilter = node.data.mediaFilter === "image" || node.data.mediaFilter === "text" ? node.data.mediaFilter : "any";
+      const mediaFilter = normalizeMediaFilter(node.data.mediaFilter);
       return events.find(e => whatsappEventMatches(e, mediaFilter)) ?? null;
     }
     if (type === "trigger.webhook") {
@@ -1256,9 +1299,21 @@ function NodeConfigPanel({
 
       <div className="flex-1 overflow-y-auto p-4">
         {type === "trigger.whatsapp_message" && (() => {
-          const mediaFilter = node.data.mediaFilter === "image" || node.data.mediaFilter === "text" ? node.data.mediaFilter : "any";
-          const staticExample = mediaFilter === "text" ? EXAMPLE_JSON_TEXT_EVENT : EXAMPLE_JSON_IMAGE_EVENT;
-          const kindLabel = mediaFilter === "image" ? "imágenes" : mediaFilter === "text" ? "mensajes de texto" : "imágenes o mensajes de texto";
+          const mediaFilter = normalizeMediaFilter(node.data.mediaFilter);
+          const staticExample =
+            mediaFilter === "text"
+              ? EXAMPLE_JSON_TEXT_EVENT
+              : mediaFilter === "document"
+                ? EXAMPLE_JSON_DOCUMENT_EVENT
+                : EXAMPLE_JSON_IMAGE_EVENT;
+          const kindLabel =
+            mediaFilter === "image"
+              ? "imágenes"
+              : mediaFilter === "document"
+                ? "documentos (PDF)"
+                : mediaFilter === "text"
+                  ? "mensajes de texto"
+                  : "imágenes, documentos o mensajes de texto";
           const example = capturedExample ? prettyPrint(capturedExample.request_body) ?? staticExample : staticExample;
           const exampleLabel = capturedExample
             ? `Ver JSON real · capturado ${new Date(capturedExample.created_at).toLocaleString("es-CO")}`
@@ -1278,10 +1333,11 @@ function NodeConfigPanel({
                 <SelectField
                   label="Se activa con"
                   value={mediaFilter}
-                  onChange={v => onSetData({ mediaFilter: v as "image" | "text" | "any" })}
+                  onChange={v => onSetData({ mediaFilter: v as "image" | "document" | "text" | "any" })}
                   options={[
-                    { value: "any", label: "Cualquiera — imagen o texto" },
+                    { value: "any", label: "Cualquiera — imagen, documento o texto" },
                     { value: "image", label: "Solo imágenes" },
+                    { value: "document", label: "Solo documentos (PDF)" },
                     { value: "text", label: "Solo texto" }
                   ]}
                 />
@@ -1292,22 +1348,61 @@ function NodeConfigPanel({
                   kindLabel={kindLabel}
                 />
               </div>
+            </div>
+          );
+        })()}
 
-              <div className="mt-5 pt-4 border-t border-white/[.08]">
-                <ToggleField
-                  label="Extraer datos estructurados con IA"
-                  description="Además de la descripción libre, la IA llena estos campos exactos y los manda al webhook — nunca se muestran en la respuesta al cliente."
-                  checked={Boolean(node.data.extractFields)}
-                  onChange={extractFields => onSetData({ extractFields })}
+        {type === "action.ai_extract" && (() => {
+          // GPT-4o mini no soporta PDF en este nodo (Chat Completions no tiene input de
+          // documento nativo, a diferencia de Gemini/Claude — ver ai-extract-engine.ts). Si el
+          // disparador conectado solo recibe PDF, sacarlo de la lista evita elegir algo que
+          // siempre va a fallar; si puede recibir de todo ("cualquiera"), se deja pero se avisa.
+          const triggerId = edges.find(e => e.target === node.id)?.source;
+          const triggerNode = triggerId ? nodes.find(n => n.id === triggerId) : undefined;
+          const triggerMediaFilter =
+            triggerNode?.type === "trigger.whatsapp_message" ? normalizeMediaFilter(triggerNode.data.mediaFilter) : null;
+          const blocksGpt = triggerMediaFilter === "document";
+          const modelOptions = blocksGpt ? AI_EXTRACT_MODEL_OPTIONS.filter(o => o.value !== "gpt-4o-mini") : AI_EXTRACT_MODEL_OPTIONS;
+          const currentModel = node.data.aiModel ?? DEFAULT_AI_EXTRACT_MODEL;
+
+          return (
+            <div>
+              <InfoNote example={EXAMPLE_JSON_IMAGE_EVENT} exampleLabel="Ver ejemplo de JSON de salida (con el campo extracted)">
+                Analiza el archivo o mensaje que llegó por WhatsApp con el modelo que elijas y arma el JSON de{" "}
+                <code>extracted</code> — separado por completo de la respuesta conversacional al cliente, nunca se le muestra.
+                Conéctalo entre el disparador y el <strong className="text-gray-300">HTTP Request</strong>.
+              </InfoNote>
+
+              {!triggerNode && (
+                <p className="text-[11px] text-gray-500 mb-3">
+                  Conectá este nodo a un disparador de WhatsApp para que el selector sepa qué archivos va a recibir.
+                </p>
+              )}
+              {blocksGpt && (
+                <p className={`text-[11px] mb-3 ${currentModel === "gpt-4o-mini" ? "text-red-400 font-medium" : "text-amber-400/90"}`}>
+                  {currentModel === "gpt-4o-mini"
+                    ? "Este nodo tiene GPT-4o mini elegido, pero el disparador conectado solo recibe documentos (PDF) — GPT no los soporta acá. Elegí Gemini o Claude."
+                    : "El disparador conectado solo recibe documentos (PDF) — GPT-4o mini no aparece como opción porque no los soporta en este nodo."}
+                </p>
+              )}
+              {!blocksGpt && triggerMediaFilter === "any" && currentModel === "gpt-4o-mini" && (
+                <p className="text-[11px] text-amber-400/90 mb-3">
+                  Este disparador puede recibir PDF además de imágenes o texto — si llega un PDF, GPT-4o mini va a fallar (sin
+                  cobrarte esa extracción) en vez de procesarlo. Elegí Gemini o Claude si esperás documentos por acá.
+                </p>
+              )}
+
+              <SelectField
+                label="Modelo de IA"
+                value={currentModel}
+                onChange={aiModel => onSetData({ aiModel })}
+                options={modelOptions}
+              />
+              <div className="mt-4">
+                <ExtractFieldsEditor
+                  fields={readExtractSchema(node.data.extractSchema)}
+                  onChange={extractSchema => onSetData({ extractSchema })}
                 />
-                {node.data.extractFields && (
-                  <div className="mt-4">
-                    <ExtractFieldsEditor
-                      fields={readExtractSchema(node.data.extractSchema)}
-                      onChange={extractSchema => onSetData({ extractSchema })}
-                    />
-                  </div>
-                )}
               </div>
             </div>
           );

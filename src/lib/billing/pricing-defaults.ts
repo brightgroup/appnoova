@@ -60,6 +60,10 @@ export const DEFAULT_PROVIDER_RATES: Record<string, number> = {
   anthropic_haiku_output_per_m: 5,
   anthropic_sonnet_input_per_m: 3,
   anthropic_sonnet_output_per_m: 15,
+  // Precios oficiales OpenAI (developers.openai.com/api/docs/pricing) — motor
+  // primario de los agentes nuevos, más barato que Gemini Flash en ambos lados.
+  openai_4o_mini_input_per_m: 0.15,
+  openai_4o_mini_output_per_m: 0.6,
 };
 
 export interface UnitPriceMeta {
@@ -118,4 +122,6 @@ export const DEFAULT_PROVIDER_RATE_META: ProviderRateMeta[] = [
   { rate_key: "anthropic_haiku_output_per_m", provider: "anthropic", label: "Claude Haiku 4.5 salida", description: null, unit_label: "por millón tokens", cost_usd: 5, sort_order: 41 },
   { rate_key: "anthropic_sonnet_input_per_m", provider: "anthropic", label: "Claude Sonnet 5 entrada", description: null, unit_label: "por millón tokens", cost_usd: 3, sort_order: 42 },
   { rate_key: "anthropic_sonnet_output_per_m", provider: "anthropic", label: "Claude Sonnet 5 salida", description: null, unit_label: "por millón tokens", cost_usd: 15, sort_order: 43 },
+  { rate_key: "openai_4o_mini_input_per_m", provider: "openai", label: "GPT-4o mini entrada", description: null, unit_label: "por millón tokens", cost_usd: 0.15, sort_order: 50 },
+  { rate_key: "openai_4o_mini_output_per_m", provider: "openai", label: "GPT-4o mini salida", description: null, unit_label: "por millón tokens", cost_usd: 0.6, sort_order: 51 },
 ];

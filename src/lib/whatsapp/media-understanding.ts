@@ -3,8 +3,8 @@ import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 import { uploadWhatsAppMedia } from "@/lib/whatsapp/media-storage";
 import { readGeminiUsage, type GeminiUsage } from "@/lib/billing/meter";
-import { withGeminiTimeout } from "@/lib/gemini-timeout";
-import { getAnthropicApiKey, readClaudeUsage } from "@/lib/text-agent-generate-claude";
+import { withGeminiTimeout, withLlmTimeout } from "@/lib/gemini-timeout";
+import { getAnthropicApiKey, readClaudeUsage, buildAnthropicMediaBlock, createClaudeMessage } from "@/lib/text-agent-generate-claude";
 import {
   downloadTwilioWhatsAppMedia,
   mediaKindFromContentType,
@@ -109,23 +109,23 @@ async function claudeUnderstandMedia(
   kind: "image" | "document"
 ): Promise<{ text: string; usage: GeminiUsage }> {
   const client = new Anthropic({ apiKey: getAnthropicApiKey() });
-  const mediaBlock: Anthropic.ContentBlockParam =
-    kind === "image"
-      ? {
-          type: "image",
-          source: { type: "base64", media_type: mimeType as "image/jpeg", data: buffer.toString("base64") }
-        }
-      : {
-          type: "document",
-          source: { type: "base64", media_type: "application/pdf", data: buffer.toString("base64") }
-        };
+  const mediaBlock = buildAnthropicMediaBlock(buffer.toString("base64"), mimeType, kind);
 
-  const response = await client.messages.create({
-    model,
-    max_tokens: 1024,
-    temperature: 0.2,
-    messages: [{ role: "user", content: [mediaBlock, { type: "text", text: instruction }] }]
-  });
+  const response = await withLlmTimeout(
+    abortSignal =>
+      createClaudeMessage(
+        client,
+        {
+          model,
+          max_tokens: 1024,
+          temperature: 0.2,
+          messages: [{ role: "user", content: [mediaBlock, { type: "text", text: instruction }] }]
+        },
+        { signal: abortSignal }
+      ),
+    undefined,
+    "Claude"
+  );
 
   const text = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")

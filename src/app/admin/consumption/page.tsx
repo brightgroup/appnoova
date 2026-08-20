@@ -73,6 +73,7 @@ interface ConsumptionData {
     elevenlabs_cost_usd: number;
     meta_cost_usd: number;
     anthropic_cost_usd: number;
+    openai_cost_usd: number;
   };
   by_service: { key: string; label: string; color: string; credits: number; cost_usd: number; events: number }[];
   by_provider: { key: string; label: string; color: string; cost_usd: number; events: number }[];
@@ -402,6 +403,7 @@ export default function AdminConsumptionPage() {
                         <div className="flex justify-between text-gray-400"><span>Meta</span><span className="text-amber-300">{fmtUsdShort(totals.meta_cost_usd)}</span></div>
                         <div className="flex justify-between text-gray-400"><span>Google</span><span className="text-amber-300">{fmtUsdShort(totals.google_cost_usd)}</span></div>
                         <div className="flex justify-between text-gray-400"><span>Anthropic</span><span className="text-amber-300">{fmtUsdShort(totals.anthropic_cost_usd)}</span></div>
+                        <div className="flex justify-between text-gray-400"><span>OpenAI</span><span className="text-amber-300">{fmtUsdShort(totals.openai_cost_usd)}</span></div>
                         <div className="flex justify-between text-gray-400"><span>Telnyx</span><span className="text-amber-300">{fmtUsdShort(totals.telnyx_cost_usd)}</span></div>
                       </div>
                     </div>

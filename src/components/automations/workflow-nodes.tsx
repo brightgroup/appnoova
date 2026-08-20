@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Zap, Webhook, Globe, Copy, Check } from "lucide-react";
+import { Zap, Webhook, Globe, Copy, Check, Bot } from "lucide-react";
 import { WhatsAppLogo } from "@/components/icons/brands/WhatsAppLogo";
 import type { AutomationConnectionRecord } from "@/lib/automations/connections-db";
 import type { WorkflowNodeData, WorkflowNodeType } from "@/lib/automations/node-types";
@@ -17,6 +17,7 @@ export const ChannelsContext = createContext<WhatsAppChannelRecord[]>([]);
 export const NODE_BRAND_COLOR: Record<string, string> = {
   "trigger.whatsapp_message": "#25D366",
   "trigger.webhook": "#F5A623",
+  "action.ai_extract": "#8B5CF6",
   "action.webhook": "#0EA5E9",
   "action.send_whatsapp_message": "#25D366"
 };
@@ -25,12 +26,14 @@ export const NODE_BRAND_COLOR: Record<string, string> = {
 export const NODE_TITLE: Record<WorkflowNodeType, string> = {
   "trigger.whatsapp_message": "Mensaje de WhatsApp recibido",
   "trigger.webhook": "Webhook entrante",
+  "action.ai_extract": "IA",
   "action.webhook": "HTTP Request",
   "action.send_whatsapp_message": "Enviar mensaje de WhatsApp"
 };
 
 const MEDIA_FILTER_LABEL: Record<string, string> = {
   image: "Imagen de WhatsApp",
+  document: "Documento (PDF) de WhatsApp",
   text: "Texto de WhatsApp"
 };
 
@@ -133,6 +136,22 @@ export function WebhookActionNode({ selected, data }: NodeProps) {
   );
 }
 
+/**
+ * Va en el medio de la cadena (trigger → ai_extract → webhook) — igual que WebhookActionNode,
+ * tiene handle target Y source. Hoy solo hace extracción de campos, pero el nodo (y su ícono
+ * genérico de robot, no de "extracción") está pensado para ganar más acciones de IA después.
+ */
+export function AiExtractNode({ selected, data }: NodeProps) {
+  const label = resolveNodeLabel("action.ai_extract", (data as WorkflowNodeData) ?? {}, [], []);
+  return (
+    <NodeShell selected={selected} label={label} color={NODE_BRAND_COLOR["action.ai_extract"]}>
+      <Handle type="target" position={Position.Left} className="!bg-white !w-2.5 !h-2.5 !border-2 !border-[#111218]" />
+      <Bot className="w-10 h-10 text-white" strokeWidth={1.6} />
+      <Handle type="source" position={Position.Right} className="!bg-white !w-2.5 !h-2.5 !border-2 !border-[#111218]" />
+    </NodeShell>
+  );
+}
+
 export function SendWhatsAppMessageNode({ selected, data }: NodeProps) {
   const label = resolveNodeLabel("action.send_whatsapp_message", (data as WorkflowNodeData) ?? {}, [], []);
   return (
@@ -147,6 +166,7 @@ export function SendWhatsAppMessageNode({ selected, data }: NodeProps) {
 export const WORKFLOW_NODE_TYPES = {
   "trigger.whatsapp_message": WhatsAppTriggerNode,
   "trigger.webhook": WebhookTriggerNode,
+  "action.ai_extract": AiExtractNode,
   "action.webhook": WebhookActionNode,
   "action.send_whatsapp_message": SendWhatsAppMessageNode
 };

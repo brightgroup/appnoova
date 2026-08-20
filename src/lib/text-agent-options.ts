@@ -1,12 +1,27 @@
-import { ORI_DEFAULT_MODEL } from "@/lib/google-ai";
+import { DEFAULT_ENGINE_ID } from "@/lib/llm/engines";
 
+/**
+ * "Estándar" no nombra el proveedor a propósito: por detrás hay failover
+ * automático a otro motor si el principal falla o se cuelga (ver
+ * resolveEngineChain en lib/llm/engines.ts), así que la etiqueta no puede
+ * prometer un proveedor puntual. Gemini 2.5 Flash sigue siendo el motor
+ * primario de los agentes creados antes de este cambio — no se les mueve el
+ * default, solo ganan el mismo respaldo automático.
+ *
+ * Sin Claude Sonnet 5 a propósito (2026-08-20): se deja reservado para el
+ * nodo `action.ai_extract` de workflows (ver AI_EXTRACT_MODEL_OPTIONS en
+ * WorkflowEditor.tsx), donde el usuario ya probó que ordena mejor datos
+ * estructurados. En la conversación con el cliente no aporta lo mismo y sale
+ * más caro que Haiku — no hay ningún agente en producción usándolo hoy
+ * (verificado contra la base), así que sacarlo no rompe nada existente.
+ */
 export const TEXT_LLM_MODELS = [
-  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash — recomendado (rápido y económico)" },
-  { id: "claude-haiku-4-5", label: "Claude Haiku 4.5 (Anthropic)" },
-  { id: "claude-sonnet-5", label: "Claude Sonnet 5 (Anthropic) — más inteligente, mayor costo" }
+  { id: "gpt-4o-mini", label: "Estándar — recomendado (rápido y económico)" },
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  { id: "claude-haiku-4-5", label: "Claude Haiku 4.5 (Anthropic)" }
 ] as const;
 
-export const DEFAULT_TEXT_MODEL = ORI_DEFAULT_MODEL;
+export const DEFAULT_TEXT_MODEL = DEFAULT_ENGINE_ID;
 
 const VALID_TEXT_MODEL_IDS = new Set<string>(TEXT_LLM_MODELS.map(m => m.id));
 

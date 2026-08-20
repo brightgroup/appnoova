@@ -200,14 +200,17 @@ export async function POST(req: NextRequest) {
     }
 
     if (billing.organizationId) {
+      // Motor real, no el elegido por el agente — pueden diferir tras un
+      // failover (generateTextAgentReply). El precio al cliente no cambia.
+      const actualEngine = generated.engine ?? model;
       await recordUsageSafe({
         db,
         organizationId: billing.organizationId,
         userId,
         eventType: "text_test",
         channel: "web_test",
-        provider: providerForLlmModel(model),
-        model,
+        provider: providerForLlmModel(actualEngine),
+        model: actualEngine,
         gemini: generated.usage,
         referenceType: "text_agent_conversation",
         referenceId: savedConversationId ?? undefined

@@ -81,7 +81,7 @@ interface LlmModelPrice {
   outputPerM: number;
 }
 
-/** Precios por modelo de LLM (Gemini + Claude), en USD por millón de tokens. */
+/** Precios por modelo de LLM (Gemini + Claude + OpenAI), en USD por millón de tokens. */
 function llmPricesFromConfig(): Record<string, LlmModelPrice> {
   const r = getPricingConfig().providerRates;
   return {
@@ -101,6 +101,10 @@ function llmPricesFromConfig(): Record<string, LlmModelPrice> {
       inputPerM: r.anthropic_sonnet_input_per_m ?? DEFAULT_PROVIDER_RATES.anthropic_sonnet_input_per_m,
       outputPerM: r.anthropic_sonnet_output_per_m ?? DEFAULT_PROVIDER_RATES.anthropic_sonnet_output_per_m,
     },
+    "gpt-4o-mini": {
+      inputPerM: r.openai_4o_mini_input_per_m ?? DEFAULT_PROVIDER_RATES.openai_4o_mini_input_per_m,
+      outputPerM: r.openai_4o_mini_output_per_m ?? DEFAULT_PROVIDER_RATES.openai_4o_mini_output_per_m,
+    },
   };
 }
 
@@ -112,9 +116,11 @@ function llmPriceFor(model?: string | null): LlmModelPrice {
   return key ? prices[key] : fallback;
 }
 
-/** Devuelve "google" o "anthropic" según el modelo — para etiquetar `usage_events.provider`. */
-export function providerForLlmModel(model?: string | null): "google" | "anthropic" {
-  return model?.startsWith("claude-") ? "anthropic" : "google";
+/** Devuelve el proveedor real según el modelo — para etiquetar `usage_events.provider`. */
+export function providerForLlmModel(model?: string | null): "google" | "anthropic" | "openai" {
+  if (model?.startsWith("claude-")) return "anthropic";
+  if (model?.startsWith("gpt-")) return "openai";
+  return "google";
 }
 
 export function llmCostUsd(

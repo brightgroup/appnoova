@@ -44,7 +44,7 @@ const whatsappAiPrice = DEFAULT_UNIT_PRICE_META.find(u => u.event_type === "what
 // la línea de entrega Twilio/Meta (creditsOverride: 0). Costo TOTAL = suma de ambas.
 const deliveryCostUsd = 2 * DEFAULT_PROVIDER_RATES.twilio_wa_per_msg;
 
-for (const model of ["gemini-2.5-flash", "claude-haiku-4-5", "claude-sonnet-5"] as const) {
+for (const model of ["gpt-4o-mini", "gemini-2.5-flash", "claude-haiku-4-5", "claude-sonnet-5"] as const) {
   const modelCostUsd = llmCostUsd(model, 900, 650);
   const totalCostUsd = modelCostUsd + deliveryCostUsd;
   const dynamicCredits = creditsFromUsdPrice(modelCostUsd * MARGIN_MULTIPLIER);
@@ -62,7 +62,7 @@ console.log("\n=== 3. whatsapp_media_ai — línea propia de imagen/PDF por What
 const mediaPrice = DEFAULT_UNIT_PRICE_META.find(u => u.event_type === "whatsapp_media_ai")!.price_usd;
 const mediaProfile = { promptTokens: 1600, completionTokens: 250 }; // 1 imagen típica
 
-for (const model of ["gemini-2.5-flash", "claude-haiku-4-5", "claude-sonnet-5"] as const) {
+for (const model of ["gpt-4o-mini", "gemini-2.5-flash", "claude-haiku-4-5", "claude-sonnet-5"] as const) {
   const costUsd = llmCostUsd(model, mediaProfile.promptTokens, mediaProfile.completionTokens);
   const dynamicCredits = creditsFromUsdPrice(costUsd * MARGIN_MULTIPLIER);
   const dynamicUsd = dynamicCredits * 0.0003;

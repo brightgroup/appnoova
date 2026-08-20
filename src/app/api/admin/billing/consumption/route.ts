@@ -276,6 +276,7 @@ export async function GET(req: NextRequest) {
       elevenlabs_cost_usd: Number(t.elevenlabs_cost_usd ?? 0),
       meta_cost_usd: Number(t.meta_cost_usd ?? 0),
       anthropic_cost_usd: Number(t.anthropic_cost_usd ?? 0),
+      openai_cost_usd: Number(t.openai_cost_usd ?? 0),
     },
     by_service: byService,
     by_provider: byProvider,

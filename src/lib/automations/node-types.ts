@@ -12,14 +12,15 @@ export type { ExtractFieldDef, ExtractFieldType } from "@/lib/automations/extrac
 export const NODE_TYPES = [
   "trigger.whatsapp_message",
   "trigger.webhook",
+  "action.ai_extract",
   "action.webhook",
   "action.send_whatsapp_message"
 ] as const;
 
 export type WorkflowNodeType = (typeof NODE_TYPES)[number];
 
-/** Qué disparó realmente el evento — no es un tipo de nodo, es el hecho real (llegó una imagen o un texto). */
-export type WhatsAppEventMediaType = "image" | "text";
+/** Qué disparó realmente el evento — no es un tipo de nodo, es el hecho real (llegó una imagen, un documento/PDF, o un texto). */
+export type WhatsAppEventMediaType = "image" | "document" | "text";
 
 export interface WorkflowNodeData {
   /** Nombre propio puesto por el usuario — si está, siempre gana sobre cualquier etiqueta calculada (canal/conexión/default). */
@@ -36,12 +37,22 @@ export interface WorkflowNodeData {
   requestBodyTemplate?: string;
   /** Solo aplica al disparador de WhatsApp: id del whatsapp_channels a escuchar. Vacío/ausente = cualquier canal de la org. */
   channelId?: string;
-  /** Solo aplica a trigger.whatsapp_message: qué lo activa. Default "any" (imagen o texto). */
-  mediaFilter?: "image" | "text" | "any";
-  /** Solo aplica a trigger.whatsapp_message: si está activo, se corre una extracción de datos estructurados con IA antes de emitir el evento — separada por completo de la respuesta conversacional del agente al cliente. */
+  /** Solo aplica a trigger.whatsapp_message: qué lo activa. Default "any" (imagen, documento/PDF o texto). */
+  mediaFilter?: "image" | "document" | "text" | "any";
+  /**
+   * @deprecated Vive en el nodo `action.ai_extract` conectado, no en el trigger. Solo se lee acá
+   * para migrar workflows guardados antes de separar la extracción en su propio nodo — ver
+   * `ensureAiExtractNodes`. No usar en código nuevo.
+   */
   extractFields?: boolean;
-  /** Solo aplica a trigger.whatsapp_message con extractFields activo: forma del JSON a extraer, definida por el tenant (nombre + tipo + instrucción por campo, con anidamiento). */
+  /**
+   * Forma del JSON a extraer con IA, definida por el tenant (nombre + tipo + instrucción por
+   * campo, con anidamiento). Vive en `action.ai_extract`; en `trigger.whatsapp_message` solo
+   * aparece en workflows guardados antes de la migración (ver `extractFields` arriba).
+   */
   extractSchema?: ExtractFieldDef[];
+  /** Solo aplica a action.ai_extract: modelo que analiza el archivo/texto y arma el JSON — mismo espacio de ids que resolveEngineChain/billing (ej. "gemini-2.5-flash", "claude-sonnet-5"), pero con catálogo propio (AI_EXTRACT_MODEL_OPTIONS en WorkflowEditor.tsx) que sí incluye Sonnet — a diferencia de TEXT_LLM_MODELS, que ya no lo ofrece en la conversación con el cliente. Default "gemini-2.5-flash". */
+  aiModel?: string;
   /** Solo aplica a trigger.webhook: token único de este nodo — la URL pública es /api/automations/inbound/{webhookToken}. Se genera al crear el nodo. */
   webhookToken?: string;
   /** Solo aplica a action.send_whatsapp_message: qué tipo de contenido envía. Default "text". */
@@ -105,6 +116,12 @@ export const NODE_CATALOG: NodeCatalogEntry[] = [
     description: "Genera una URL propia — cualquier sistema externo puede llamarla"
   },
   {
+    type: "action.ai_extract",
+    category: "action",
+    label: "IA",
+    description: "Analiza el archivo o mensaje con el modelo que elijas — hoy extrae datos estructurados, más adelante otras acciones"
+  },
+  {
     type: "action.webhook",
     category: "action",
     label: "HTTP Request",
@@ -127,6 +144,56 @@ const LEGACY_NODE_TYPE_MIGRATIONS: Record<string, { type: WorkflowNodeType; data
   "trigger.whatsapp_image": { type: "trigger.whatsapp_message", data: { mediaFilter: "image" } },
   "trigger.whatsapp_text": { type: "trigger.whatsapp_message", data: { mediaFilter: "text" } }
 };
+
+/** Modelo con el que SIEMPRE corrió la extracción antes de que tuviera nodo propio (Gemini fijo, sin excepción) — es el que toma un workflow migrado, para no cambiarle en silencio el JSON de salida a nadie que ya esté en producción. */
+const DEFAULT_AI_EXTRACT_MODEL = "gemini-2.5-flash";
+
+/**
+ * Antes de que la extracción con IA tuviera su propio nodo, vivía como config
+ * pegada al trigger (`extractFields`/`extractSchema`). Esta función migra esos
+ * workflows en memoria, insertando un nodo `action.ai_extract` conectado entre
+ * el trigger y los nodos a los que ya apuntaba — mismo patrón que
+ * `ensureWebhookTokens` (idempotente, vía el flag `changed`), pero mutando
+ * nodos Y aristas en vez de solo `data`.
+ */
+function ensureAiExtractNodes(graph: WorkflowGraph): WorkflowGraph {
+  let changed = false;
+  const nodes = [...graph.nodes];
+  let edges = [...graph.edges];
+
+  for (const trigger of graph.nodes) {
+    if (trigger.type !== "trigger.whatsapp_message" || trigger.data.extractFields !== true) continue;
+
+    const alreadyConnected = edges.some(
+      (e) => e.source === trigger.id && nodes.find((n) => n.id === e.target)?.type === "action.ai_extract"
+    );
+    if (alreadyConnected) continue;
+
+    changed = true;
+    const newNodeId = `ai_extract_${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
+
+    nodes.push({
+      id: newNodeId,
+      type: "action.ai_extract",
+      position: { x: trigger.position.x + 260, y: trigger.position.y },
+      data: { aiModel: DEFAULT_AI_EXTRACT_MODEL, extractSchema: trigger.data.extractSchema }
+    });
+
+    // Las aristas que salían directo del trigger ahora salen del nodo nuevo —
+    // el trigger pasa a apuntar solo a la extracción, que sigue hacia donde
+    // sea que apuntaba antes (típicamente un action.webhook).
+    edges = edges.map((e) => (e.source === trigger.id ? { ...e, source: newNodeId } : e));
+    edges.push({ id: `e_${trigger.id}_${newNodeId}`, source: trigger.id, target: newNodeId });
+
+    const triggerIdx = nodes.findIndex((n) => n.id === trigger.id);
+    nodes[triggerIdx] = {
+      ...nodes[triggerIdx],
+      data: { ...nodes[triggerIdx].data, extractFields: undefined, extractSchema: undefined }
+    };
+  }
+
+  return changed ? { nodes, edges } : graph;
+}
 
 /** Valida/normaliza un grafo recibido del cliente antes de guardarlo. */
 export function normalizeWorkflowGraph(input: unknown): WorkflowGraph {
@@ -171,7 +238,7 @@ export function normalizeWorkflowGraph(input: unknown): WorkflowGraph {
     )
     .map((e) => ({ id: e.id as string, source: e.source as string, target: e.target as string }));
 
-  return { nodes, edges };
+  return ensureAiExtractNodes({ nodes, edges });
 }
 
 export interface WebhookActionConfig {
@@ -207,27 +274,39 @@ export function findMatchingWhatsAppTriggerNodeIds(
 }
 
 /**
- * Configuración de extracción con IA del primer disparador de WhatsApp que
- * aplique a este evento — nombre, tipo e instrucción de cada campo que el
- * tenant definió, con su anidamiento. `null` si el disparador no tiene la
- * extracción activada o no definió ningún campo.
+ * Configuración del nodo `action.ai_extract` conectado directo a este
+ * disparador (si lo hay) — campos a extraer + modelo elegido para esa
+ * extracción. `null` si el disparador no tiene ningún nodo de extracción
+ * conectado, o si no definió ningún campo.
  */
-export function getTriggerExtractConfig(
+export function getConnectedAiExtractConfig(
   graph: WorkflowGraph,
   triggerNodeId: string
-): { fields: ExtractFieldDef[] } | null {
-  const node = graph.nodes.find((n) => n.id === triggerNodeId);
-  if (!node || node.data.extractFields !== true) return null;
+): { fields: ExtractFieldDef[]; model: string } | null {
+  const extractNodeId = graph.edges.find(
+    (e) => e.source === triggerNodeId && graph.nodes.find((n) => n.id === e.target)?.type === "action.ai_extract"
+  )?.target;
+  if (!extractNodeId) return null;
+
+  const node = graph.nodes.find((n) => n.id === extractNodeId);
+  if (!node) return null;
   const fields = readExtractSchema(node.data.extractSchema);
   if (fields.length === 0) return null;
-  return { fields };
+  const model = typeof node.data.aiModel === "string" && node.data.aiModel ? node.data.aiModel : DEFAULT_AI_EXTRACT_MODEL;
+  return { fields, model };
 }
 
 /**
  * Recorre el grafo buscando nodos disparadores de WhatsApp que apliquen a
- * este evento, conectados por una arista directa a un nodo `action.webhook`,
- * y devuelve la configuración de cada uno (conexión + si tiene solicitud
+ * este evento, conectados a un nodo `action.webhook` — directo, o a través de
+ * un nodo `action.ai_extract` intermedio (trigger → ai_extract → webhook,
+ * la forma que arma el editor cuando el workflow extrae campos con IA) — y
+ * devuelve la configuración de cada uno (conexión + si tiene solicitud
  * personalizada).
+ *
+ * El motor sigue siendo de 1 salto por diseño (ver comentario de archivo):
+ * esto no es un recorrido BFS genérico, solo "ve a través" del único tipo de
+ * nodo intermedio que existe hoy.
  */
 export function findWebhookActionConfigs(
   graph: WorkflowGraph,
@@ -237,6 +316,13 @@ export function findWebhookActionConfigs(
   const triggerIds = new Set(findMatchingWhatsAppTriggerNodeIds(graph, eventMediaType, channelId));
   if (triggerIds.size === 0) return [];
 
+  const effectiveSourceIds = new Set(triggerIds);
+  for (const edge of graph.edges) {
+    if (!triggerIds.has(edge.source)) continue;
+    const target = graph.nodes.find((n) => n.id === edge.target);
+    if (target?.type === "action.ai_extract") effectiveSourceIds.add(target.id);
+  }
+
   const actionNodesById = new Map(
     graph.nodes.filter((n) => n.type === "action.webhook").map((n) => [n.id, n])
   );
@@ -244,7 +330,7 @@ export function findWebhookActionConfigs(
   const seenActionIds = new Set<string>();
   const configs: WebhookActionConfig[] = [];
   for (const edge of graph.edges) {
-    if (!triggerIds.has(edge.source)) continue;
+    if (!effectiveSourceIds.has(edge.source)) continue;
     const action = actionNodesById.get(edge.target);
     const connectionId = action?.data.connectionId;
     if (!action || typeof connectionId !== "string" || !connectionId) continue;

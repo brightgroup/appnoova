@@ -44,10 +44,11 @@ export async function runOriTextPrompt(
 
 export async function runOriJsonPrompt<T>(
   systemInstruction: string,
-  userPrompt: string
+  userPrompt: string,
+  modelOverride?: string
 ): Promise<OriPromptResult<T>> {
   const ai = new GoogleGenAI({ apiKey: requireOriApiKey() });
-  const model = getOriModel();
+  const model = modelOverride || getOriModel();
   const response = await withGeminiTimeout(abortSignal =>
     ai.models.generateContent({
       model,
@@ -69,10 +70,11 @@ export async function runOriDocumentExtract<T>(
   systemInstruction: string,
   userPrompt: string,
   fileBase64: string,
-  mimeType: string
+  mimeType: string,
+  modelOverride?: string
 ): Promise<OriPromptResult<T>> {
   const ai = new GoogleGenAI({ apiKey: requireOriApiKey() });
-  const model = getOriModel();
+  const model = modelOverride || getOriModel();
   const response = await withGeminiTimeout(abortSignal =>
     ai.models.generateContent({
       model,

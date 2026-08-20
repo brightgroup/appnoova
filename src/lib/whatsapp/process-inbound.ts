@@ -327,7 +327,14 @@ async function processTwilioWhatsAppInboundLocked(
   // matchee el filtro configurado en el nodo disparador, sin importar si en ese momento
   // la conversación la maneja la IA o un humano (modo handoff) — el trigger describe lo
   // que el cliente final envió, no quién está respondiendo internamente.
-  const automationMediaType = userMediaType === "image" ? "image" : userMediaType === "text" ? "text" : null;
+  const automationMediaType =
+    userMediaType === "image"
+      ? "image"
+      : userMediaType === "document"
+        ? "document"
+        : userMediaType === "text"
+          ? "text"
+          : null;
   function triggerAutomationEvent(conversationId: string): void {
     if (!orgId || !automationMediaType) return;
     void emitAutomationEvent(db, {
@@ -336,6 +343,7 @@ async function processTwilioWhatsAppInboundLocked(
       contactPhone: inbound.fromE164,
       contactLabel,
       mediaStoragePath: inboundContent.mediaStoragePath ?? null,
+      mediaMime: inboundContent.mediaMime ?? null,
       analysisText: inboundContent.userText,
       messageSid: inbound.messageSid,
       channelId: channel.id,
@@ -689,6 +697,11 @@ async function processTwilioWhatsAppInboundLocked(
 
   let reply: string;
   let geminiUsage: ReturnType<typeof readGeminiUsage> | null = null;
+  // Motor que realmente respondió el turno (puede diferir de `model` tras un
+  // failover — ver generateTextAgentReply). Se usa solo para facturar correcto;
+  // lo que se persiste como `llm_model` del agente/conversación sigue siendo
+  // `model`, el elegido por el cliente, sin importar qué motor corrió por detrás.
+  let actualEngine = model;
   // El guardián del catálogo tuvo que eliminar un dato que el agente afirmó
   // sin respaldo: el cliente se queda sin respuesta y necesita un asesor.
   let catalogNeedsHuman = false;
@@ -789,6 +802,7 @@ async function processTwilioWhatsAppInboundLocked(
     }
     catalogNeedsHuman = guarded.needsHuman;
     reply = guarded.text;
+    actualEngine = generated.engine ?? model;
     // El audio (transcripción, siempre Gemini) se suma al turno de texto — antes se
     // descartaba y el turno quedaba subfacturado. La imagen/PDF NO se suma aquí: se
     // factura aparte como whatsapp_media_ai (línea propia, editable en /admin/pricing)
@@ -808,8 +822,9 @@ async function processTwilioWhatsAppInboundLocked(
     const msg = err instanceof Error ? err.message : "Error IA";
     console.error("[whatsapp/inbound] generación de respuesta falló tras reintento, escalando a humano:", msg);
 
-    // Gemini falló dos veces seguidas (ver withOneRetryOnOverload): antes esto
-    // dejaba al cliente sin ninguna respuesta y sin rastro visible del error.
+    // Toda la cadena de motores falló (primario + failover — ver
+    // generateTextAgentReply/resolveEngineChain): antes esto dejaba al cliente
+    // sin ninguna respuesta y sin rastro visible del error.
     const fallbackReply = "En un momento un asesor te contactará.";
     await persistAssistantReplyOnly({
       db,
@@ -917,8 +932,12 @@ async function processTwilioWhatsAppInboundLocked(
       userId: channel.user_id,
       eventType: "whatsapp_ai",
       channel: WHATSAPP_CONVERSATION_CHANNEL,
-      provider: providerForLlmModel(model),
-      model,
+      // Motor real, no el elegido por el cliente — pueden diferir tras un
+      // failover (ver `actualEngine` arriba). El precio al cliente no cambia
+      // (es plano por evento); esto es solo para que el costo real quede bien
+      // atribuido en usage_events/admin.
+      provider: providerForLlmModel(actualEngine),
+      model: actualEngine,
       gemini: geminiUsage,
       referenceType: "text_agent_conversation",
       referenceId: userPersist.conversationId,

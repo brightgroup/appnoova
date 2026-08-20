@@ -6,12 +6,14 @@ import { listActiveWorkflowsForOrg } from "@/lib/automations/workflows-db";
 import {
   findWebhookActionConfigs,
   findMatchingWhatsAppTriggerNodeIds,
-  getTriggerExtractConfig,
+  getConnectedAiExtractConfig,
   type WebhookActionConfig,
   type WhatsAppEventMediaType
 } from "@/lib/automations/node-types";
 import { runFieldExtraction } from "@/lib/automations/extract";
+import type { ExtractFileInput } from "@/lib/automations/ai-extract-engine";
 import { recordUsageSafe } from "@/lib/billing/meter";
+import { providerForLlmModel } from "@/lib/billing/pricing";
 
 const WEBHOOK_TIMEOUT_MS = 8000;
 /** Cuánto del payload/respuesta se guarda para inspección en la UI — evita que un conector que devuelva HTML gigante llene la tabla. */
@@ -22,8 +24,10 @@ export interface EmitWhatsAppEventParams {
   conversationId: string;
   contactPhone: string;
   contactLabel: string | null;
-  /** Solo aplica cuando mediaType es "image". */
+  /** Solo aplica cuando mediaType es "image" o "document". */
   mediaStoragePath: string | null;
+  /** Mime real del archivo (solo aplica cuando mediaType es "image" o "document") — para poder descargarlo y mandarlo tal cual al nodo de extracción con IA, sin depender del header de la URL firmada. */
+  mediaMime: string | null;
   /** Análisis de la imagen (IA) o el texto del mensaje, según mediaType. */
   analysisText: string;
   messageSid: string;
@@ -51,40 +55,66 @@ export async function emitAutomationEvent(
   const workflows = await listActiveWorkflowsForOrg(db, params.organizationId);
   if (workflows.length === 0) return;
 
-  const imageUrl =
-    params.mediaType === "image" && params.mediaStoragePath
-      ? await signedUrlForPath(db, params.mediaStoragePath)
-      : null;
-  const eventType = params.mediaType === "image" ? "whatsapp.image_received" : "whatsapp.text_received";
+  const hasFile = params.mediaType === "image" || params.mediaType === "document";
+  const mediaUrl = hasFile && params.mediaStoragePath ? await signedUrlForPath(db, params.mediaStoragePath) : null;
+  const eventType =
+    params.mediaType === "image"
+      ? "whatsapp.image_received"
+      : params.mediaType === "document"
+        ? "whatsapp.document_received"
+        : "whatsapp.text_received";
+
+  // Archivo real (no la descripción en texto) para el nodo de extracción con IA — se baja una
+  // sola vez por evento, no por workflow, reusando la misma URL firmada que ya se calculó para
+  // el payload del webhook. Si falla, `file` queda undefined y la extracción cae a analysisText
+  // (ver runFieldExtraction) en vez de tumbar el evento completo.
+  let file: ExtractFileInput | undefined;
+  if (hasFile && mediaUrl && params.mediaMime) {
+    try {
+      const res = await fetch(mediaUrl);
+      file = { base64: Buffer.from(await res.arrayBuffer()).toString("base64"), mimeType: params.mediaMime };
+    } catch (err) {
+      console.warn(
+        "[automations] no se pudo descargar el archivo para extracción con IA, se usa el texto ya interpretado:",
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
 
   for (const workflow of workflows) {
     const matchingTriggerIds = findMatchingWhatsAppTriggerNodeIds(workflow.graph, params.mediaType, params.channelId);
     if (matchingTriggerIds.length === 0) continue;
 
-    // Extracción estructurada con IA (opcional, configurada por el tenant en
-    // el disparador): corre una sola vez por workflow, antes de armar el
+    // Extracción estructurada con IA (opcional, nodo action.ai_extract conectado
+    // al disparador): corre una sola vez por workflow, antes de armar el
     // payload — nunca bloquea ni se mezcla con la respuesta al cliente final,
     // que ya salió por otro camino antes de llegar acá.
-    const extractConfig = getTriggerExtractConfig(workflow.graph, matchingTriggerIds[0]);
+    const extractConfig = getConnectedAiExtractConfig(workflow.graph, matchingTriggerIds[0]);
     let extracted: Record<string, unknown> | null = null;
     let extractError: string | undefined;
     if (extractConfig) {
-      const extraction = await runFieldExtraction(extractConfig.fields, params.analysisText, params.mediaType);
+      const extraction = await runFieldExtraction(
+        extractConfig.fields,
+        params.analysisText,
+        params.mediaType,
+        extractConfig.model,
+        file
+      );
       extracted = extraction.extracted;
       extractError = extraction.error;
       if (extractError) {
         console.warn("[automations] extracción de campos falló:", JSON.stringify({ workflowId: workflow.id, extractError }));
       }
-      // Consumo real de Gemini — se cobra siempre que la llamada realmente se hizo
-      // (haya devuelto JSON o no), sin importar si el evento termina en un webhook
-      // conectado o solo queda "capturado" para pruebas en el editor.
+      // Consumo real del modelo elegido en el nodo — se cobra siempre que la llamada
+      // realmente se hizo (haya devuelto JSON o no), sin importar si el evento termina
+      // en un webhook conectado o solo queda "capturado" para pruebas en el editor.
       if (extraction.model) {
         await recordUsageSafe({
           db,
           organizationId: params.organizationId,
           eventType: "automation_extract",
           channel: "automations",
-          provider: "google",
+          provider: providerForLlmModel(extraction.model),
           model: extraction.model,
           gemini: extraction.usage,
           referenceType: "text_agent_conversation",
@@ -96,14 +126,14 @@ export async function emitAutomationEvent(
 
     const actionConfigs = findWebhookActionConfigs(workflow.graph, params.mediaType, params.channelId);
     if (actionConfigs.length === 0) {
-      await logCapturedTriggerEvent(db, { workflowId: workflow.id, imageUrl, eventType, extracted, extractError, ...params });
+      await logCapturedTriggerEvent(db, { workflowId: workflow.id, mediaUrl, eventType, extracted, extractError, ...params });
       continue;
     }
 
     for (const config of actionConfigs) {
       await sendWebhookEvent(db, {
         workflowId: workflow.id,
-        imageUrl,
+        mediaUrl,
         eventType,
         extracted,
         extractError,
@@ -116,7 +146,7 @@ export async function emitAutomationEvent(
 
 interface CapturedTriggerEventParams extends EmitWhatsAppEventParams {
   workflowId: string;
-  imageUrl: string | null;
+  mediaUrl: string | null;
   eventType: string;
   extracted: Record<string, unknown> | null;
   extractError?: string;
@@ -129,8 +159,10 @@ async function logCapturedTriggerEvent(db: SupabaseClient, params: CapturedTrigg
     conversation_id: params.conversationId,
     contact: { phone: params.contactPhone, label: params.contactLabel },
     ...(params.eventType === "whatsapp.image_received"
-      ? { image: { url: params.imageUrl, analysis: params.analysisText } }
-      : { message: { text: params.analysisText } }),
+      ? { image: { url: params.mediaUrl, analysis: params.analysisText } }
+      : params.eventType === "whatsapp.document_received"
+        ? { document: { url: params.mediaUrl, analysis: params.analysisText } }
+        : { message: { text: params.analysisText } }),
     ...(params.extracted ? { extracted: params.extracted } : {}),
     ...(params.extractError ? { extract_error: params.extractError } : {})
   });
@@ -147,7 +179,7 @@ async function logCapturedTriggerEvent(db: SupabaseClient, params: CapturedTrigg
 
 interface SendWebhookEventParams extends EmitWhatsAppEventParams, WebhookActionConfig {
   workflowId: string;
-  imageUrl: string | null;
+  mediaUrl: string | null;
   eventType: string;
   extracted: Record<string, unknown> | null;
   extractError?: string;
@@ -166,6 +198,7 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
   if (!connection || connection.status !== "active") return;
 
   const isImage = params.mediaType === "image";
+  const isDocument = params.mediaType === "document";
   const eventType = params.eventType;
 
   let method = "POST";
@@ -182,7 +215,8 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
       contact_phone: params.contactPhone,
       contact_label: params.contactLabel ?? "",
       message_text: params.analysisText,
-      image_url: params.imageUrl ?? ""
+      image_url: isImage ? params.mediaUrl ?? "" : "",
+      document_url: isDocument ? params.mediaUrl ?? "" : ""
     };
 
     const substitutedBody = substituteTokens(params.requestBodyTemplate, tokens);
@@ -225,7 +259,9 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
       contact: { phone: params.contactPhone, label: params.contactLabel }
     };
     if (isImage) {
-      payload.image = { url: params.imageUrl, analysis: params.analysisText };
+      payload.image = { url: params.mediaUrl, analysis: params.analysisText };
+    } else if (isDocument) {
+      payload.document = { url: params.mediaUrl, analysis: params.analysisText };
     } else {
       payload.message = { text: params.analysisText };
     }

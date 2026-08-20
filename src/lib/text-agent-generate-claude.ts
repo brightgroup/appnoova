@@ -23,6 +23,7 @@ import type {
   GenerateTextAgentReplyResult
 } from "@/lib/text-agent-generate";
 import type { GeminiUsage } from "@/lib/billing/meter";
+import { withLlmTimeout } from "@/lib/gemini-timeout";
 
 export function getAnthropicApiKey(): string {
   const key = process.env.ANTHROPIC_API_KEY?.trim();
@@ -30,13 +31,59 @@ export function getAnthropicApiKey(): string {
   return key;
 }
 
+function isTemperatureUnsupportedError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /temperature.*deprecated for this model/i.test(msg);
+}
+
+/**
+ * Wrapper de `client.messages.create` que reintenta sin `temperature` si el
+ * modelo la rechaza. Encontrado en vivo el 2026-08-20 probando el nodo de
+ * extracción con IA: `claude-sonnet-5` devuelve 400 ("temperature is
+ * deprecated for this model") ante CUALQUIER valor de `temperature` — no es
+ * intermitente, es el 100% de las llamadas. Sin este resguardo, cualquier
+ * agente configurado en Sonnet 5 queda mudo. `claude-haiku-4-5` no tiene el
+ * problema, así que el reintento solo dispara cuando realmente hace falta.
+ */
+export async function createClaudeMessage(
+  client: Anthropic,
+  params: Anthropic.MessageCreateParamsNonStreaming,
+  options: { signal?: AbortSignal }
+): Promise<Anthropic.Message> {
+  try {
+    return await client.messages.create(params, options);
+  } catch (err) {
+    if (!isTemperatureUnsupportedError(err) || params.temperature === undefined) throw err;
+    const { temperature: _drop, ...rest } = params;
+    return client.messages.create(rest, options);
+  }
+}
+
+/**
+ * Bloque de imagen/documento en base64 para el Messages API de Claude —
+ * compartido entre `media-understanding.ts` (entendimiento conversacional) y
+ * `automations/ai-extract-engine.ts` (extracción estructurada), para no
+ * duplicar esta construcción en los dos lugares.
+ */
+export function buildAnthropicMediaBlock(
+  base64: string,
+  mimeType: string,
+  kind: "image" | "document"
+): Anthropic.ContentBlockParam {
+  return kind === "image"
+    ? { type: "image", source: { type: "base64", media_type: mimeType as "image/jpeg", data: base64 } }
+    : { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } };
+}
+
 /**
  * Los agentes de texto ya definen sus tools en formato Gemini (`FunctionDeclaration`,
- * con `Type.OBJECT`/`Type.STRING` en mayúsculas). Anthropic usa JSON Schema estándar
- * (`type: "object"` en minúscula) — este conversor recorre el schema de Gemini y
- * produce el `input_schema` que espera el Messages API de Claude.
+ * con `Type.OBJECT`/`Type.STRING` en mayúsculas). Anthropic y OpenAI usan JSON Schema
+ * estándar (`type: "object"` en minúscula) — este conversor recorre el schema de
+ * Gemini y produce el JSON Schema que esperan tanto el Messages API de Claude
+ * (`input_schema`) como el Chat Completions API de OpenAI (`parameters`). Se exporta
+ * para que `text-agent-generate-openai.ts` no duplique esta lógica.
  */
-function convertGeminiSchema(schema: Schema | undefined): Record<string, unknown> {
+export function convertGeminiSchema(schema: Schema | undefined): Record<string, unknown> {
   if (!schema) return { type: "object", properties: {} };
   const out: Record<string, unknown> = {};
   if (schema.type) out.type = String(schema.type).toLowerCase();
@@ -114,14 +161,16 @@ export async function generateClaudeAgentReply(
   const toolResults: AgentToolResult[] = [];
   let usage: GeminiUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
-  let response = await client.messages.create({
-    model: input.model,
-    system,
-    messages,
-    max_tokens: input.maxOutputTokens,
-    temperature: input.temperature,
-    tools
-  });
+  let response = await withLlmTimeout(
+    abortSignal =>
+      createClaudeMessage(
+        client,
+        { model: input.model, system, messages, max_tokens: input.maxOutputTokens, temperature: input.temperature, tools },
+        { signal: abortSignal }
+      ),
+    undefined,
+    "Claude"
+  );
   usage = addUsage(usage, readClaudeUsage(response));
 
   let rounds = 0;
@@ -150,14 +199,15 @@ export async function generateClaudeAgentReply(
 
     messages.push({ role: "user", content: toolResultBlocks });
 
-    response = await client.messages.create({
-      model: input.model,
-      system,
-      messages,
-      max_tokens: input.maxOutputTokens,
-      temperature: input.temperature,
-      tools
-    });
+    response = await withLlmTimeout(
+      abortSignal =>
+        client.messages.create(
+          { model: input.model, system, messages, max_tokens: input.maxOutputTokens, temperature: input.temperature, tools },
+          { signal: abortSignal }
+        ),
+      undefined,
+      "Claude"
+    );
     usage = addUsage(usage, readClaudeUsage(response));
   }
 

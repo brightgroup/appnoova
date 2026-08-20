@@ -14,6 +14,8 @@ import {
   type AgentToolResult
 } from "@/lib/agent-tools/registry";
 import type { CalendarConnectionRecord } from "@/lib/google-calendar/connections-db";
+import { resolveEngineChain, type LlmEngine } from "@/lib/llm/engines";
+import { isEngineOpen, recordEngineFailure, recordEngineSuccess } from "@/lib/llm/breaker";
 
 export interface TextAgentChatMessage {
   role: "user" | "assistant";
@@ -37,6 +39,13 @@ export interface GenerateTextAgentReplyResult {
   text: string;
   usage: GeminiUsage;
   toolResults: AgentToolResult[];
+  /**
+   * Id de modelo del motor que realmente respondió (ej. "gpt-4o-mini" tras un
+   * failover, aunque el agente esté configurado con "gemini-2.5-flash"). Lo llena
+   * `generateTextAgentReply` — usarlo para facturar (`usage_events`), nunca el
+   * `model` que el cliente eligió, que es el que se le sigue mostrando siempre.
+   */
+  engine?: string;
 }
 
 function isTransientGeminiError(err: unknown): boolean {
@@ -66,21 +75,53 @@ function toGeminiContents(messages: TextAgentChatMessage[]): Content[] {
   }));
 }
 
+async function callEngine(
+  engine: LlmEngine,
+  input: GenerateTextAgentReplyInput
+): Promise<GenerateTextAgentReplyResult> {
+  if (engine.provider === "anthropic") {
+    const { generateClaudeAgentReply } = await import("@/lib/text-agent-generate-claude");
+    return generateClaudeAgentReply(input);
+  }
+  if (engine.provider === "openai") {
+    const { generateOpenAiAgentReply } = await import("@/lib/text-agent-generate-openai");
+    return generateOpenAiAgentReply(input);
+  }
+  return generateGeminiAgentReply(input);
+}
+
 /**
- * Genera respuesta del agente de texto. Despacha por proveedor según el prefijo
- * del modelo guardado en la BD: `claude-*` va a Anthropic (ver
- * text-agent-generate-claude.ts), cualquier otro valor (por ahora solo
- * `gemini-*`) sigue el camino de Gemini de siempre. Quien llama no necesita
- * saber qué proveedor hay detrás.
+ * Genera respuesta del agente de texto, con failover automático entre motores.
+ * `resolveEngineChain` traduce el modelo elegido por el cliente (`input.model`) a
+ * una cadena ordenada — ej. un agente en Gemini Flash intenta Gemini primero y,
+ * si falla o se cuelga, GPT-4o mini; uno en Claude respalda con GPT-4o mini. El
+ * cliente nunca ve el swap: `input.model` no cambia, solo el motor que responde
+ * por detrás (devuelto en `result.engine` para que quien llama facture correcto).
+ *
+ * Quien llama no necesita saber qué proveedor terminó respondiendo.
  */
 export async function generateTextAgentReply(
   input: GenerateTextAgentReplyInput
 ): Promise<GenerateTextAgentReplyResult> {
-  if (input.model.startsWith("claude-")) {
-    const { generateClaudeAgentReply } = await import("@/lib/text-agent-generate-claude");
-    return generateClaudeAgentReply(input);
+  const chain = resolveEngineChain(input.model);
+  const healthy = chain.filter(engine => !isEngineOpen(engine.id));
+  // Si el breaker dejó la cadena entera abierta (los dos motores fallaron hace
+  // poco), igual conviene intentar algo real en vez de rendirse sin probar.
+  const engines = healthy.length > 0 ? healthy : chain;
+
+  let lastError: unknown;
+  for (const engine of engines) {
+    try {
+      const result = await callEngine(engine, { ...input, model: engine.id });
+      recordEngineSuccess(engine.id);
+      return { ...result, engine: engine.id };
+    } catch (err) {
+      recordEngineFailure(engine.id);
+      lastError = err;
+    }
   }
-  return generateGeminiAgentReply(input);
+
+  throw lastError instanceof Error ? lastError : new Error("Todos los motores de IA fallaron");
 }
 
 /**

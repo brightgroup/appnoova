@@ -1,7 +1,7 @@
-import { runOriJsonPrompt } from "@/lib/crm-gemini";
 import type { GeminiUsage } from "@/lib/billing/meter";
 import { renderExtractSchemaAsPromptSpec, type ExtractFieldDef } from "@/lib/automations/extract-schema";
 import type { WhatsAppEventMediaType } from "@/lib/automations/node-types";
+import { extractStructuredJson, type ExtractFileInput } from "@/lib/automations/ai-extract-engine";
 
 export interface FieldExtractionResult {
   extracted: Record<string, unknown> | null;
@@ -15,10 +15,16 @@ const EMPTY_USAGE: GeminiUsage = { promptTokens: 0, completionTokens: 0, totalTo
 
 /**
  * Llamada de IA dedicada y separada de la respuesta conversacional al
- * cliente: toma el contenido ya interpretado del mensaje entrante (la
- * descripción de una imagen, o el texto tal cual) y devuelve un JSON con
- * exactamente los campos que el tenant definió en el disparador del
- * workflow — para mandarlo al webhook, nunca al cliente final.
+ * cliente: devuelve un JSON con exactamente los campos que el tenant definió
+ * en el nodo `action.ai_extract` del workflow — para mandarlo al webhook,
+ * nunca al cliente final.
+ *
+ * Si `file` viene informado (imagen del evento), se analiza el ARCHIVO
+ * ORIGINAL directamente con el modelo elegido — no la descripción en texto
+ * que ya generó el entendimiento conversacional, que es un resumen de un
+ * resumen y pierde precisión. `rawContent`/`mediaType` siguen usándose como
+ * respaldo cuando no hay archivo (mensajes de texto, o si la descarga del
+ * archivo falló — ver `emitAutomationEvent`).
  *
  * Antes de esto, el único lugar donde un cliente (Qbit/Customext) podía pedir
  * esta forma de salida era metiendo el JSON directamente en el prompt
@@ -29,15 +35,20 @@ const EMPTY_USAGE: GeminiUsage = { promptTokens: 0, completionTokens: 0, totalTo
 export async function runFieldExtraction(
   fields: ExtractFieldDef[],
   rawContent: string,
-  mediaType: WhatsAppEventMediaType
+  mediaType: WhatsAppEventMediaType,
+  model: string,
+  file?: ExtractFileInput
 ): Promise<FieldExtractionResult> {
   const spec = renderExtractSchemaAsPromptSpec(fields);
-  if (!spec || !rawContent.trim()) {
+  if (!spec || (!file && !rawContent.trim())) {
     return { extracted: null, usage: EMPTY_USAGE, model: "" };
   }
 
-  const sourceLabel =
-    mediaType === "image" ? "la descripción de una imagen recibida por WhatsApp" : "un mensaje de texto recibido por WhatsApp";
+  const sourceLabel = file
+    ? "una imagen adjunta, recibida por WhatsApp"
+    : mediaType === "image"
+      ? "la descripción de una imagen recibida por WhatsApp"
+      : "un mensaje de texto recibido por WhatsApp";
 
   const system = `Eres un extractor de datos estructurados. Se te entrega ${sourceLabel} y debes devolver ÚNICAMENTE un JSON con esta forma exacta (los comentarios "//" explican qué va en cada campo — no los incluyas en tu respuesta, son solo instrucciones para ti):
 
@@ -47,12 +58,15 @@ Reglas:
 - No inventes datos: si algo no está presente o no se puede determinar con certeza, usa null (o el valor vacío que corresponda al tipo — nunca un dato inventado).
 - Responde solo el JSON, sin texto adicional, sin markdown, sin explicaciones.`;
 
-  const userPrompt =
-    mediaType === "image" ? `Descripción de la imagen recibida:\n\n${rawContent}` : `Mensaje recibido:\n\n${rawContent}`;
+  const userPrompt = file
+    ? "Analiza el archivo adjunto y devuelve el JSON pedido."
+    : mediaType === "image"
+      ? `Descripción de la imagen recibida:\n\n${rawContent}`
+      : `Mensaje recibido:\n\n${rawContent}`;
 
   try {
-    const { result, usage, model } = await runOriJsonPrompt<Record<string, unknown>>(system, userPrompt);
-    return { extracted: result, usage, model };
+    const { result, usage } = await extractStructuredJson({ model, systemInstruction: system, userPrompt, file });
+    return { extracted: result as Record<string, unknown>, usage, model };
   } catch (err) {
     return {
       extracted: null,
