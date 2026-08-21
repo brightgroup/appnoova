@@ -107,11 +107,15 @@ type ChartTabId = (typeof CHART_TABS)[number]["id"];
 type PageTabId = (typeof PAGE_TABS)[number]["id"];
 
 const fmtN = (n: number) => new Intl.NumberFormat("es-CO").format(Math.round(n));
+// Siempre 3 decimales: antes se mezclaban 2-4 (Intl) para montos ≥ $1 con 4 fijos
+// (toFixed) para montos menores, lo que hacía parecer que había unidades distintas
+// cuando en realidad todo era USD con formato inconsistente.
 const fmtUsd = (n: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(n);
-const fmtUsdShort = (n: number) =>
-  n >= 1 ? fmtUsd(n) : `$${n.toFixed(4)}`;
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(n);
 const cop = (n: number) => "$" + new Intl.NumberFormat("es-CO").format(Math.round(n));
+// Etiqueta muda junto a cada cifra en USD/COP — créditos ya se distinguen con "cr" (ver fmtN).
+const UsdLabel = () => <span className="text-gray-500 font-normal">USD</span>;
+const CopLabel = () => <span className="text-gray-500 font-normal">COP</span>;
 
 function ServiceCellDisplay({ cell }: { cell: ServiceCell | undefined }) {
   if (!cell || (cell.credits === 0 && cell.cost_usd === 0)) {
@@ -120,7 +124,7 @@ function ServiceCellDisplay({ cell }: { cell: ServiceCell | undefined }) {
   return (
     <div className="tabular-nums">
       <p className="text-sm text-white font-medium">{fmtN(cell.credits)} <span className="text-gray-500 font-normal text-xs">cr</span></p>
-      <p className="text-xs text-amber-300/90">{fmtUsdShort(cell.cost_usd)}</p>
+      <p className="text-xs text-amber-300/90">{fmtUsd(cell.cost_usd)} <span className="text-[10px]"><UsdLabel /></span></p>
     </div>
   );
 }
@@ -131,7 +135,7 @@ function ProviderCellDisplay({ cell }: { cell: ProviderCell | undefined }) {
   }
   return (
     <div className="tabular-nums">
-      <p className="text-sm text-amber-300 font-medium">{fmtUsdShort(cell.cost_usd)}</p>
+      <p className="text-sm text-amber-300 font-medium">{fmtUsd(cell.cost_usd)} <span className="text-xs"><UsdLabel /></span></p>
       <p className="text-[10px] text-gray-500">{fmtN(cell.events)} eventos</p>
     </div>
   );
@@ -384,14 +388,14 @@ export default function AdminConsumptionPage() {
                       <p className="text-[10px] text-gray-400 flex items-center gap-1.5 mb-1.5 font-medium uppercase tracking-wide">
                         <DollarSign className="w-3 h-3" /> Costo real (USD)
                       </p>
-                      <p className="text-xl font-bold text-amber-300">{fmtUsd(totals.cost_usd)}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{cop(totals.cost_cop)} COP</p>
+                      <p className="text-xl font-bold text-amber-300">{fmtUsd(totals.cost_usd)} <span className="text-xs font-normal"><UsdLabel /></span></p>
+                      <p className="text-xs text-gray-500 mt-0.5">{cop(totals.cost_cop)} <CopLabel /></p>
                     </div>
                     <div className="rounded-xl border border-white/[.08] bg-white/[.02] p-4">
                       <p className="text-[10px] text-gray-400 flex items-center gap-1.5 mb-1.5 font-medium uppercase tracking-wide">
                         <Wallet className="w-3 h-3" /> Créditos consumidos
                       </p>
-                      <p className="text-xl font-bold">{fmtN(totals.credits)}</p>
+                      <p className="text-xl font-bold">{fmtN(totals.credits)} <span className="text-xs text-gray-500 font-normal">cr</span></p>
                       <p className="text-xs text-gray-500 mt-0.5">{fmtN(totals.events)} eventos</p>
                     </div>
                     <div className="rounded-xl border border-white/[.08] bg-white/[.02] p-4">
@@ -399,12 +403,12 @@ export default function AdminConsumptionPage() {
                         <TrendingUp className="w-3 h-3" /> Por proveedor (USD)
                       </p>
                       <div className="space-y-0.5 text-xs">
-                        <div className="flex justify-between text-gray-400"><span>Twilio</span><span className="text-amber-300">{fmtUsdShort(totals.twilio_cost_usd)}</span></div>
-                        <div className="flex justify-between text-gray-400"><span>Meta</span><span className="text-amber-300">{fmtUsdShort(totals.meta_cost_usd)}</span></div>
-                        <div className="flex justify-between text-gray-400"><span>Google</span><span className="text-amber-300">{fmtUsdShort(totals.google_cost_usd)}</span></div>
-                        <div className="flex justify-between text-gray-400"><span>Anthropic</span><span className="text-amber-300">{fmtUsdShort(totals.anthropic_cost_usd)}</span></div>
-                        <div className="flex justify-between text-gray-400"><span>OpenAI</span><span className="text-amber-300">{fmtUsdShort(totals.openai_cost_usd)}</span></div>
-                        <div className="flex justify-between text-gray-400"><span>Telnyx</span><span className="text-amber-300">{fmtUsdShort(totals.telnyx_cost_usd)}</span></div>
+                        <div className="flex justify-between text-gray-400"><span>Twilio</span><span className="text-amber-300">{fmtUsd(totals.twilio_cost_usd)} <UsdLabel /></span></div>
+                        <div className="flex justify-between text-gray-400"><span>Meta</span><span className="text-amber-300">{fmtUsd(totals.meta_cost_usd)} <UsdLabel /></span></div>
+                        <div className="flex justify-between text-gray-400"><span>Google</span><span className="text-amber-300">{fmtUsd(totals.google_cost_usd)} <UsdLabel /></span></div>
+                        <div className="flex justify-between text-gray-400"><span>Anthropic</span><span className="text-amber-300">{fmtUsd(totals.anthropic_cost_usd)} <UsdLabel /></span></div>
+                        <div className="flex justify-between text-gray-400"><span>OpenAI</span><span className="text-amber-300">{fmtUsd(totals.openai_cost_usd)} <UsdLabel /></span></div>
+                        <div className="flex justify-between text-gray-400"><span>Telnyx</span><span className="text-amber-300">{fmtUsd(totals.telnyx_cost_usd)} <UsdLabel /></span></div>
                       </div>
                     </div>
                     <div className="rounded-xl border border-white/[.08] bg-white/[.02] p-4">
@@ -437,7 +441,7 @@ export default function AdminConsumptionPage() {
                             <span className="text-xs font-medium text-gray-300">{s.label}</span>
                           </div>
                           <p className="text-sm font-bold text-white">{fmtN(s.credits)} <span className="text-gray-500 font-normal text-xs">cr</span></p>
-                          <p className="text-xs text-amber-300 mt-0.5">{fmtUsdShort(s.cost_usd)}</p>
+                          <p className="text-xs text-amber-300 mt-0.5">{fmtUsd(s.cost_usd)} <UsdLabel /></p>
                         </button>
                       ))}
                     </div>
@@ -484,7 +488,7 @@ export default function AdminConsumptionPage() {
                         scaleMax={costChartScaleMax}
                         ticks={costChartTicks}
                         valueLabel={data?.range.label ?? ""}
-                        formatValue={(n) => fmtUsdShort(n)}
+                        formatValue={(n) => `${fmtUsd(n)} USD`}
                         hoverDay={hoverCostDay}
                         onHoverDay={setHoverCostDay}
                       />
@@ -618,11 +622,11 @@ export default function AdminConsumptionPage() {
                             </td>
                           ))}
                       <td className={`${registryTableCell} text-right font-bold text-white tabular-nums`}>
-                        {fmtN(row.total_credits)}
+                        {fmtN(row.total_credits)} <span className="text-gray-500 font-normal text-xs">cr</span>
                       </td>
                       <td className={`${registryTableCell} text-right font-bold text-amber-300 tabular-nums`}>
-                        {fmtUsdShort(row.total_cost_usd)}
-                        <p className="text-[10px] text-gray-500 font-normal">{cop(row.total_cost_cop)}</p>
+                        {fmtUsd(row.total_cost_usd)} <span className="text-xs font-normal"><UsdLabel /></span>
+                        <p className="text-[10px] text-gray-500 font-normal">{cop(row.total_cost_cop)} <CopLabel /></p>
                       </td>
                       <td className={registryTableCell}>
                         <ChevronRight className="w-4 h-4 text-gray-600" />
