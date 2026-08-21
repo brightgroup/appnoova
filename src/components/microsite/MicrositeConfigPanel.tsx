@@ -72,14 +72,16 @@ function ConfigContent({
 }: MicrositeConfigPanelProps) {
   const router = useRouter();
   const params = useSearchParams();
+  const idParam = params.get("id");
 
   const [activeTab, setActiveTab] = useState<TabId>(() => parseTab(params.get("tab")));
   const [previewKey, setPreviewKey] = useState(0);
 
   const setTab = useCallback((tab: TabId) => {
     setActiveTab(tab);
-    router.replace(`${basePath}?tab=${tab}`, { scroll: false });
-  }, [router, basePath]);
+    const query = idParam ? `tab=${tab}&id=${idParam}` : `tab=${tab}`;
+    router.replace(`${basePath}?${query}`, { scroll: false });
+  }, [router, basePath, idParam]);
 
   useEffect(() => {
     setActiveTab(parseTab(params.get("tab")));
@@ -119,7 +121,7 @@ function ConfigContent({
     setError("");
     try {
       const headers = await getAuthHeaders();
-      const id = params.get("id");
+      const id = idParam;
       const [siteRes, agentsRes] = await Promise.all([
         fetch(id ? `/api/microsite?id=${id}` : "/api/microsite", { headers }),
         fetch("/api/text/agents", { headers })
@@ -171,7 +173,7 @@ function ConfigContent({
     } finally {
       setLoading(false);
     }
-  }, [router, setupPath, backHref, params]);
+  }, [router, setupPath, backHref, idParam]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
