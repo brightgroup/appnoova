@@ -37,7 +37,8 @@ export async function runFieldExtraction(
   rawContent: string,
   mediaType: WhatsAppEventMediaType,
   model: string,
-  file?: ExtractFileInput
+  file?: ExtractFileInput,
+  generalInstruction?: string
 ): Promise<FieldExtractionResult> {
   const spec = renderExtractSchemaAsPromptSpec(fields);
   if (!spec || (!file && !rawContent.trim())) {
@@ -50,10 +51,14 @@ export async function runFieldExtraction(
       ? "la descripción de una imagen recibida por WhatsApp"
       : "un mensaje de texto recibido por WhatsApp";
 
+  const generalInstructionBlock = generalInstruction?.trim()
+    ? `\nInstrucciones adicionales del usuario (aplican a toda la extracción):\n${generalInstruction.trim()}\n`
+    : "";
+
   const system = `Eres un extractor de datos estructurados. Se te entrega ${sourceLabel} y debes devolver ÚNICAMENTE un JSON con esta forma exacta (los comentarios "//" explican qué va en cada campo — no los incluyas en tu respuesta, son solo instrucciones para ti):
 
 ${spec}
-
+${generalInstructionBlock}
 Reglas:
 - No inventes datos: si algo no está presente o no se puede determinar con certeza, usa null (o el valor vacío que corresponda al tipo — nunca un dato inventado).
 - Responde solo el JSON, sin texto adicional, sin markdown, sin explicaciones.`;

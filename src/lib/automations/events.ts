@@ -98,7 +98,8 @@ export async function emitAutomationEvent(
         params.analysisText,
         params.mediaType,
         extractConfig.model,
-        file
+        file,
+        extractConfig.generalInstruction
       );
       extracted = extraction.extracted;
       extractError = extraction.error;

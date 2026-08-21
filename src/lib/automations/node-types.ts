@@ -53,6 +53,8 @@ export interface WorkflowNodeData {
   extractSchema?: ExtractFieldDef[];
   /** Solo aplica a action.ai_extract: modelo que analiza el archivo/texto y arma el JSON — mismo espacio de ids que resolveEngineChain/billing (ej. "gemini-2.5-flash", "claude-sonnet-5"), pero con catálogo propio (AI_EXTRACT_MODEL_OPTIONS en WorkflowEditor.tsx) que sí incluye Sonnet — a diferencia de TEXT_LLM_MODELS, que ya no lo ofrece en la conversación con el cliente. Default "gemini-2.5-flash". */
   aiModel?: string;
+  /** Solo aplica a action.ai_extract: instrucciones generales del tenant que aplican a toda la extracción (tono, prioridades, cómo resolver ambigüedades) — distinto de `instruction` por campo en `extractSchema`, que es puntual a un dato. Se inyecta en el prompt del sistema, ver runFieldExtraction en extract.ts. */
+  generalInstruction?: string;
   /** Solo aplica a trigger.webhook: token único de este nodo — la URL pública es /api/automations/inbound/{webhookToken}. Se genera al crear el nodo. */
   webhookToken?: string;
   /** Solo aplica a action.send_whatsapp_message: qué tipo de contenido envía. Default "text". */
@@ -282,7 +284,7 @@ export function findMatchingWhatsAppTriggerNodeIds(
 export function getConnectedAiExtractConfig(
   graph: WorkflowGraph,
   triggerNodeId: string
-): { fields: ExtractFieldDef[]; model: string } | null {
+): { fields: ExtractFieldDef[]; model: string; generalInstruction?: string } | null {
   const extractNodeId = graph.edges.find(
     (e) => e.source === triggerNodeId && graph.nodes.find((n) => n.id === e.target)?.type === "action.ai_extract"
   )?.target;
@@ -293,7 +295,8 @@ export function getConnectedAiExtractConfig(
   const fields = readExtractSchema(node.data.extractSchema);
   if (fields.length === 0) return null;
   const model = typeof node.data.aiModel === "string" && node.data.aiModel ? node.data.aiModel : DEFAULT_AI_EXTRACT_MODEL;
-  return { fields, model };
+  const generalInstruction = typeof node.data.generalInstruction === "string" ? node.data.generalInstruction.trim() : "";
+  return { fields, model, generalInstruction: generalInstruction || undefined };
 }
 
 /**

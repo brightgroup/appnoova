@@ -15,7 +15,8 @@ import {
   type Node,
   type Edge,
   type Connection,
-  type NodeMouseHandler
+  type NodeMouseHandler,
+  type ReactFlowInstance
 } from "@xyflow/react";
 import {
   ChevronLeft,
@@ -123,6 +124,11 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
 
   const [nodes, setNodes, onNodesChangeBase] = useNodesState<Node<WorkflowNodeData>>([]);
   const [edges, setEdges, onEdgesChangeBase] = useEdgesState<Edge>([]);
+
+  // Para ubicar un nodo nuevo en el centro de lo que el usuario está viendo ahora mismo
+  // (no en un offset fijo desde el origen del grafo) — ver addNode.
+  const paneRef = useRef<HTMLDivElement>(null);
+  const rfInstanceRef = useRef<ReactFlowInstance | null>(null);
 
   // Deshacer/rehacer (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z) — historial en memoria, no persiste tras recargar la página.
   const nodesRef = useRef(nodes);
@@ -289,10 +295,21 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
         : type === "action.ai_extract"
           ? { aiModel: DEFAULT_AI_EXTRACT_MODEL }
           : {};
-    setNodes(nds => [
-      ...nds,
-      { id, type, position: { x: 60 + nds.length * 230, y: 160 }, data }
-    ]);
+
+    // Centro de lo que el usuario está viendo ahora mismo en el canvas — no un offset fijo
+    // desde el origen del grafo, que quedaba fuera de vista en cuanto alguien paneaba o
+    // hacía zoom y obligaba a "Ajustar vista" para encontrar el nodo recién creado.
+    const rect = paneRef.current?.getBoundingClientRect();
+    const center =
+      rect && rfInstanceRef.current
+        ? rfInstanceRef.current.screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+        : { x: 250, y: 160 };
+
+    setNodes(nds => {
+      // Pequeño desplazamiento en cascada para que agregar varios nodos seguidos no los apile exactos.
+      const jitter = (nds.length % 5) * 36;
+      return [...nds, { id, type, position: { x: center.x - 90 + jitter, y: center.y - 40 + jitter }, data }];
+    });
     setSaved(false);
     setPaletteOpen(false);
     setPaletteSearch("");
@@ -497,12 +514,13 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
       </div>
 
       {activeTab === "editor" ? (
-        <div className="flex-1 min-h-0 relative overflow-hidden">
+        <div ref={paneRef} className="flex-1 min-h-0 relative overflow-hidden">
           <ConnectionsContext.Provider value={connections}>
           <ChannelsContext.Provider value={channels}>
             <ReactFlow
               nodes={nodes}
               edges={edges}
+              onInit={instance => { rfInstanceRef.current = instance; }}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
@@ -1211,6 +1229,84 @@ function ExtractFieldsEditor({
   );
 }
 
+/**
+ * Panel para editar las instrucciones generales del nodo de IA — un textarea
+ * de una línea en los 360px del sidebar se queda corto para prompts largos.
+ * Se abre pegado al borde izquierdo del sidebar (no como overlay a pantalla
+ * completa) para que el resto de la configuración del nodo — modelo, campos
+ * a extraer — siga visible y usable mientras se escribe. Guarda en vivo,
+ * igual que el resto de los campos del panel — no hay Guardar/Cancelar.
+ */
+/** Mismo parser línea-a-línea de agentes-texto/agentes-voz (sin librería, solo #, ##, - y párrafos) — no vale la pena una dependencia de markdown para una vista previa liviana. */
+function InstructionPreview({ text }: { text: string }) {
+  return (
+    <>
+      {text.split("\n").map((line, i) => {
+        if (line.startsWith("# ")) return <h1 key={i} className="text-xl font-bold text-white mt-4 mb-2">{line.slice(2)}</h1>;
+        if (line.startsWith("## ")) return <h2 key={i} className="text-lg font-semibold text-white mt-3 mb-1">{line.slice(3)}</h2>;
+        if (line.startsWith("- ")) return <li key={i} className="text-gray-300 ml-4">{line.slice(2)}</li>;
+        if (line.trim() === "") return <br key={i} />;
+        return <p key={i} className="text-gray-300 mb-2">{line}</p>;
+      })}
+    </>
+  );
+}
+
+function AiInstructionPanel({
+  value,
+  onChange,
+  onClose
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onClose: () => void;
+}) {
+  const [mode, setMode] = useState<"markdown" | "preview">("markdown");
+  return (
+    <div className="absolute top-0 right-full bottom-0 w-[420px] max-w-[80vw] bg-[#16171e] border-l border-white/[.12] shadow-2xl flex flex-col z-10">
+      <div className="flex items-center justify-between px-4 py-4 border-b border-white/[.08] shrink-0">
+        <h3 className="text-sm font-bold text-white">Instrucciones</h3>
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1">
+            {(["markdown", "preview"] as const).map(m => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-medium ${
+                  mode === m ? "bg-white/[.10] text-white" : "text-gray-500 hover:text-white"
+                }`}
+              >
+                {m === "markdown" ? "Markdown" : "Vista previa"}
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/[.08]">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+      {mode === "markdown" ? (
+        <textarea
+          autoFocus
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === "Escape") onClose();
+          }}
+          placeholder="Instrucciones específicas o complementarias para la IA en este nodo…"
+          spellCheck={false}
+          className="flex-1 w-full px-4 py-3 text-sm text-gray-200 font-mono placeholder:text-gray-600 bg-transparent outline-none resize-none leading-relaxed"
+        />
+      ) : (
+        <div className="flex-1 overflow-y-auto px-4 py-3 prose prose-invert prose-sm max-w-none">
+          {value.trim() ? <InstructionPreview text={value} /> : <p className="text-gray-600 text-sm">Sin instrucciones todavía.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NodeConfigPanel({
   node,
   nodes,
@@ -1242,6 +1338,7 @@ function NodeConfigPanel({
   const displayLabel = resolveNodeLabel(type, node.data, channels, connections);
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelDraft, setLabelDraft] = useState("");
+  const [instructionPanelOpen, setInstructionPanelOpen] = useState(false);
   const [capturedExample, setCapturedExample] = useState<AutomationEventRow | null>(() => {
     if (type === "trigger.whatsapp_message") {
       const mediaFilter = normalizeMediaFilter(node.data.mediaFilter);
@@ -1399,6 +1496,19 @@ function NodeConfigPanel({
                 onChange={aiModel => onSetData({ aiModel })}
                 options={modelOptions.map(o => ({ ...o, icon: llmModelIcon(o.value) }))}
               />
+
+              <div className="mt-4 flex items-center justify-between">
+                <label className="block text-xs font-semibold text-gray-400">Instrucciones</label>
+                <button
+                  type="button"
+                  onClick={() => setInstructionPanelOpen(o => !o)}
+                  className="text-[11px] text-[#0f7eff] hover:underline flex items-center gap-1 shrink-0"
+                >
+                  <Pencil className="w-3 h-3" />
+                  {instructionPanelOpen ? "Cerrar" : node.data.generalInstruction?.trim() ? "Editar" : "Agregar"}
+                </button>
+              </div>
+
               <div className="mt-4">
                 <ExtractFieldsEditor
                   fields={readExtractSchema(node.data.extractSchema)}
@@ -1616,6 +1726,14 @@ function NodeConfigPanel({
           );
         })()}
       </div>
+
+      {instructionPanelOpen && type === "action.ai_extract" && (
+        <AiInstructionPanel
+          value={node.data.generalInstruction ?? ""}
+          onChange={generalInstruction => onSetData({ generalInstruction })}
+          onClose={() => setInstructionPanelOpen(false)}
+        />
+      )}
     </>
   );
 }
