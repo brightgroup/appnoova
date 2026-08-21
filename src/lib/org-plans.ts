@@ -8,6 +8,7 @@ export interface OrgPlanOption {
   price_usd: number;
   monthly_credits: number;
   max_users: number | null;
+  max_links: number | null;
   is_public: boolean;
 }
 
@@ -17,14 +18,15 @@ export function formatPlanCredits(n: number): string {
 
 export function formatOrgPlanLabel(plan: OrgPlanOption): string {
   const users = plan.max_users != null ? `${plan.max_users} usuario${plan.max_users !== 1 ? "s" : ""}` : "usuarios ilimitados";
+  const links = plan.max_links != null ? `${plan.max_links} link${plan.max_links !== 1 ? "s" : ""}` : "links ilimitados";
   const visibility = plan.is_public ? "" : " · solo admin";
-  return `${plan.name} · $${plan.price_usd}/mes · ${formatPlanCredits(plan.monthly_credits)} cr · ${users}${visibility}`;
+  return `${plan.name} · $${plan.price_usd}/mes · ${formatPlanCredits(plan.monthly_credits)} cr · ${users} · ${links}${visibility}`;
 }
 
 export async function listActiveOrgPlans(db: Db): Promise<OrgPlanOption[]> {
   const { data, error } = await db
     .from("plans")
-    .select("id, name, price_usd, monthly_credits, max_users, is_public, sort_order")
+    .select("id, name, price_usd, monthly_credits, max_users, max_links, is_public, sort_order")
     .eq("is_active", true)
     .order("sort_order");
 

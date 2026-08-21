@@ -20,10 +20,11 @@ export default function MiLinkNuevoPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const [linkLimit, setLinkLimit] = useState<{ used: number; max: number | null } | null>(null);
 
   const publicBaseDisplay = getMicrositePublicBaseUrl().replace(/^https?:\/\//, "");
 
-  const checkExisting = useCallback(async () => {
+  const loadContext = useCallback(async () => {
     setLoading(true);
     try {
       const headers = await getAuthHeaders();
@@ -34,9 +35,13 @@ export default function MiLinkNuevoPage() {
       const siteData = await siteRes.json();
       const ctxData = await ctxRes.json();
 
-      if (siteRes.ok && siteData.microsite) {
-        router.replace("/dashboard/canales/mi-link");
-        return;
+      if (siteRes.ok && siteData.links) {
+        const links = siteData.links as { used: number; max: number | null };
+        setLinkLimit(links);
+        if (links.max != null && links.used >= links.max) {
+          router.replace("/dashboard/canales/mi-link");
+          return;
+        }
       }
 
       if (ctxRes.ok) {
@@ -50,7 +55,7 @@ export default function MiLinkNuevoPage() {
     setLoading(false);
   }, [router]);
 
-  useEffect(() => { checkExisting(); }, [checkExisting]);
+  useEffect(() => { loadContext(); }, [loadContext]);
 
   const handleCreate = async () => {
     const normalized = slugifyBrandName(slug);
@@ -84,7 +89,7 @@ export default function MiLinkNuevoPage() {
         setError(data.error || "No se pudo crear el link");
         return;
       }
-      router.push("/dashboard/canales/mi-link/configuracion?tab=link");
+      router.push(`/dashboard/canales/mi-link/configuracion?id=${data.microsite.id}&tab=link`);
     } catch {
       setError("Error de red al crear el link");
     } finally {
@@ -123,7 +128,9 @@ export default function MiLinkNuevoPage() {
             <div className="flex items-center gap-2 mb-6">
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#0f7eff]/10 border border-[#0f7eff]/20">
                 <Sparkles className="w-3 h-3 text-[#0f7eff]" />
-                <span className="text-xs font-medium text-[#0f7eff]">Un link por cuenta</span>
+                <span className="text-xs font-medium text-[#0f7eff]">
+                  {linkLimit ? `${linkLimit.used}/${linkLimit.max ?? "∞"} links usados` : "Cargando cupo..."}
+                </span>
               </div>
             </div>
             <div className="flex items-center gap-3 mb-2">

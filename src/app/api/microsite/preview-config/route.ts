@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMicrositePreviewForUser } from "@/lib/microsite-server";
-import { getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
+import { getMicrositePreviewForOrg } from "@/lib/microsite-server";
+import { requireOrgModule } from "@/lib/module-auth";
 
 export async function GET(req: NextRequest) {
-  const userId = await getTextAgentUserIdFromRequest(req);
-  if (!userId) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const orgCtx = await requireOrgModule(req, "channels", "view");
+  if (orgCtx instanceof NextResponse) return orgCtx;
 
-  const resolved = await getMicrositePreviewForUser(userId);
+  const id = req.nextUrl.searchParams.get("id") ?? undefined;
+  const resolved = await getMicrositePreviewForOrg(orgCtx.organizationId, id);
   if (!resolved) {
     return NextResponse.json(
       { error: "Asigna un agente de texto para generar la vista previa." },

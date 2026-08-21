@@ -54,6 +54,7 @@ export function toMicrositeRecord(raw: Record<string, unknown>): BrokerMicrosite
   return {
     id: String(raw.id),
     user_id: String(raw.user_id),
+    organization_id: String(raw.organization_id ?? ""),
     created_at: String(raw.created_at ?? ""),
     updated_at: String(raw.updated_at ?? ""),
     ...normalizeMicrositeForm({

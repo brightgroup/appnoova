@@ -5,7 +5,7 @@ import type { BrokerMicrositeRecord, PublicMicrositeConfig } from "@/types/micro
 
 async function resolveBrandName(
   db: SupabaseClient,
-  userId: string,
+  organizationId: string,
   companyContextId: string | null
 ): Promise<string> {
   if (!companyContextId) return "";
@@ -13,7 +13,7 @@ async function resolveBrandName(
     .from("company_contexts")
     .select("name")
     .eq("id", companyContextId)
-    .eq("user_id", userId)
+    .eq("organization_id", organizationId)
     .maybeSingle();
   return String(ctx?.name ?? "");
 }
@@ -26,28 +26,44 @@ async function buildPublicConfig(
 
   const { data: agent } = await db
     .from("text_agents")
-    .select("id, name, user_id, company_context_id")
+    .select("id, name, organization_id, company_context_id")
     .eq("id", microsite.text_agent_id)
     .maybeSingle();
 
-  if (!agent || String(agent.user_id) !== microsite.user_id) return null;
+  if (!agent || String(agent.organization_id) !== microsite.organization_id) return null;
 
   const contextId = agent.company_context_id
     ? String(agent.company_context_id)
     : microsite.company_context_id;
-  const brandName = await resolveBrandName(db, microsite.user_id, contextId);
+  const brandName = await resolveBrandName(db, microsite.organization_id, contextId);
 
   return toPublicMicrositeConfig(microsite, brandName, String(agent.name));
 }
 
-export async function getMicrositeByUserId(
+export async function listMicrositesForOrg(
   db: SupabaseClient,
-  userId: string
+  organizationId: string
+): Promise<BrokerMicrositeRecord[]> {
+  const { data, error } = await db
+    .from("broker_microsites")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .order("updated_at", { ascending: false });
+
+  if (error || !data) return [];
+  return data.map(toMicrositeRecord);
+}
+
+export async function getMicrositeById(
+  db: SupabaseClient,
+  organizationId: string,
+  id: string
 ): Promise<BrokerMicrositeRecord | null> {
   const { data, error } = await db
     .from("broker_microsites")
     .select("*")
-    .eq("user_id", userId)
+    .eq("id", id)
+    .eq("organization_id", organizationId)
     .maybeSingle();
 
   if (error || !data) return null;
@@ -74,11 +90,14 @@ export async function getPublishedMicrositeBySlug(
   return { microsite, config };
 }
 
-export async function getMicrositePreviewForUser(
-  userId: string
+export async function getMicrositePreviewForOrg(
+  organizationId: string,
+  id?: string
 ): Promise<{ microsite: BrokerMicrositeRecord; config: PublicMicrositeConfig } | null> {
   const db = textAgentsAdminClient();
-  const microsite = await getMicrositeByUserId(db, userId);
+  const microsite = id
+    ? await getMicrositeById(db, organizationId, id)
+    : (await listMicrositesForOrg(db, organizationId))[0] ?? null;
   if (!microsite) return null;
 
   const config = await buildPublicConfig(db, microsite);
@@ -105,7 +124,7 @@ export async function resolveMicrositeAgentForChat(slug: string) {
     .from("text_agents")
     .select("*")
     .eq("id", microsite.text_agent_id)
-    .eq("user_id", microsite.user_id)
+    .eq("organization_id", microsite.organization_id)
     .maybeSingle();
 
   if (agentErr || !agent) return null;
@@ -117,10 +136,13 @@ export async function resolveMicrositeAgentForChat(slug: string) {
       .from("company_contexts")
       .select("content")
       .eq("id", contextId)
-      .eq("user_id", microsite.user_id)
+      .eq("organization_id", microsite.organization_id)
       .maybeSingle();
     companyContextText = String(ctx?.content ?? "");
   }
 
-  return { microsite, agent, companyContextText, userId: microsite.user_id };
+  // Las conversaciones de este agente (WhatsApp, inbox, "probar") se particionan por
+  // el dueño del agente, no por quién creó el Mi Link — deben coincidir aunque el Mi
+  // Link haya sido creado por otro miembro del mismo equipo.
+  return { microsite, agent, companyContextText, userId: String(agent.user_id) };
 }

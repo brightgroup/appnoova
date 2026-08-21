@@ -107,17 +107,21 @@ function ConfigContent({
   });
 
   const [agents, setAgents] = useState<TextAgentListItem[]>([]);
+  const [recordId, setRecordId] = useState<string | null>(null);
   const selectedAgent = agents.find(a => a.id === form.text_agent_id);
   const displayTitle = form.agent_display_name?.trim() || selectedAgent?.name || form.slug || "Mi link";
-  const previewUrl = `/preview/micrositio?v=${previewKey}`;
+  const previewUrl = recordId
+    ? `/preview/micrositio?v=${previewKey}&id=${recordId}`
+    : `/preview/micrositio?v=${previewKey}`;
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const headers = await getAuthHeaders();
+      const id = params.get("id");
       const [siteRes, agentsRes] = await Promise.all([
-        fetch("/api/microsite", { headers }),
+        fetch(id ? `/api/microsite?id=${id}` : "/api/microsite", { headers }),
         fetch("/api/text/agents", { headers })
       ]);
 
@@ -131,12 +135,34 @@ function ConfigContent({
         return;
       }
 
-      if (!siteData.microsite) {
-        router.replace(setupPath);
+      if (id) {
+        const record = siteData.microsite as BrokerMicrositeRecord | undefined;
+        if (!record) {
+          router.replace(setupPath);
+          return;
+        }
+        setRecordId(record.id);
+        setForm(normalizeRecord(record));
+        setPublicUrl(siteData.public_url ?? buildMicrositePublicUrl(record.slug));
+        setSaved(true);
         return;
       }
 
-      const record = siteData.microsite as BrokerMicrositeRecord;
+      // Bookmark viejo sin ?id= (era singleton): usar el único registro si hay
+      // exactamente uno, si no mandar a la lista para que elija cuál editar.
+      const list = (siteData.microsites as BrokerMicrositeRecord[] | undefined) ?? [];
+      if (list.length === 0) {
+        router.replace(setupPath);
+        return;
+      }
+      if (list.length > 1) {
+        router.replace(backHref);
+        return;
+      }
+
+      const record = list[0];
+
+      setRecordId(record.id);
       setForm(normalizeRecord(record));
       setPublicUrl(siteData.public_url ?? buildMicrositePublicUrl(record.slug));
       setSaved(true);
@@ -145,7 +171,7 @@ function ConfigContent({
     } finally {
       setLoading(false);
     }
-  }, [router, setupPath]);
+  }, [router, setupPath, backHref, params]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
@@ -162,7 +188,7 @@ function ConfigContent({
       const res = await fetch("/api/microsite", {
         method: "POST",
         headers,
-        body: JSON.stringify(form)
+        body: JSON.stringify({ ...form, id: recordId })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -170,6 +196,7 @@ function ConfigContent({
         return;
       }
       if (data.microsite) {
+        setRecordId(data.microsite.id);
         setForm(normalizeRecord(data.microsite as BrokerMicrositeRecord));
         setPublicUrl(data.public_url ?? buildMicrositePublicUrl(data.microsite.slug));
       }
