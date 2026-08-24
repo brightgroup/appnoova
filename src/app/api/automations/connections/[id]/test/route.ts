@@ -48,10 +48,28 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     const latencyMs = Date.now() - startedAt;
     const ok = res.ok;
     await markConnectionTested(db, id, ok, ok ? undefined : `HTTP ${res.status}`);
+    await db.from("automation_event_log").insert({
+      organization_id: orgCtx.organizationId,
+      connection_id: id,
+      event_type: "connector.ping",
+      status: ok ? "sent" : "error",
+      http_status: res.status,
+      latency_ms: latencyMs,
+      error_message: ok ? null : `HTTP ${res.status}`,
+      request_body: body
+    });
     return NextResponse.json({ ok, httpStatus: res.status, latencyMs });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error de red desconocido";
     await markConnectionTested(db, id, false, message);
+    await db.from("automation_event_log").insert({
+      organization_id: orgCtx.organizationId,
+      connection_id: id,
+      event_type: "connector.ping",
+      status: "error",
+      error_message: message,
+      request_body: body
+    });
     return NextResponse.json({ ok: false, error: message }, { status: 200 });
   }
 }

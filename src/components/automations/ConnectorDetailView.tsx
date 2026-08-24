@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { authFetch } from "@/lib/telephony-api";
+import { supabase } from "@/lib/supabase";
 import { tabActive, tabIdle, btnPrimarySm, modalInput } from "@/lib/brand-ui";
 import { Badge } from "@/components/ui/Badge";
 import { AutomationEventsTable, type AutomationEventRow } from "@/components/automations/AutomationEventsTable";
@@ -90,6 +91,24 @@ export function ConnectorDetailView({
   }, [connectionId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Se suscribe a Supabase Realtime para que un evento real (o una "Probar conexión") aparezca
+  // solo, sin tener que recargar la página — igual que la pestaña "Ejecuciones" del editor de workflows.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`connector-events-${connectionId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "automation_event_log", filter: `connection_id=eq.${connectionId}` },
+        payload => {
+          const row = payload.new as AutomationEventRow;
+          setEvents(prev => (prev.some(e => e.id === row.id) ? prev : [row, ...prev]));
+        }
+      )
+      .subscribe();
+
+    return () => { void supabase.removeChannel(channel); };
+  }, [connectionId]);
 
   async function copyText(field: string, value: string) {
     await navigator.clipboard.writeText(value);
@@ -312,9 +331,22 @@ function VistaGeneralTab({
   const ok = recent.filter(e => e.status === "sent" || e.status === "responded");
   const successRate = sent.length > 0 ? Math.round((ok.length / sent.length) * 100) : null;
   const recentErrors = events.filter(e => e.status === "error").slice(0, 5);
+  const isN8nTestUrl = /\/webhook-test\//.test(connection.webhookUrl);
 
   return (
     <div className="max-w-3xl space-y-5">
+      {isN8nTestUrl && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-xs text-amber-300 leading-relaxed">
+          <p className="font-semibold text-amber-200 mb-1">Esta URL es de prueba de n8n (/webhook-test/)</p>
+          <p>
+            n8n solo escucha una llamada por cada clic en &ldquo;Listen for test event&rdquo; en el editor del
+            workflow; después de esa llamada, cualquier prueba o evento real fallará hasta que lo vuelvas a activar
+            allá. Por eso parece que el conector &ldquo;se desconecta&rdquo; solo. Cuando actives el workflow en n8n,
+            reemplaza esta URL por la de producción (<code className="bg-black/30 px-1 py-0.5 rounded">/webhook/…</code>,
+            sin &ldquo;-test&rdquo;) para que escuche de forma continua.
+          </p>
+        </div>
+      )}
       <div>
         <h4 className="text-sm font-semibold text-white mb-1">URL del webhook</h4>
         <p className="text-xs text-gray-500 mb-3">Noova envía cada evento aquí — este conector solo maneja la salida.</p>
