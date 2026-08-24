@@ -6,7 +6,10 @@ import { getConnectionById, getConnectionSecretsById, markConnectionTested } fro
 
 type Ctx = { params: Promise<{ id: string }> };
 
-const TEST_TIMEOUT_MS = 8000;
+// Mismo criterio que el envío real (ver WEBHOOK_TIMEOUT_MS en events.ts): varios workflows de n8n
+// solo responden cuando termina todo el workflow, así que 8s marcaba como error integraciones sanas
+// pero lentas. Se deja un poco más corto que el envío real porque aquí el usuario espera con un spinner.
+const TEST_TIMEOUT_MS = 15_000;
 
 /** Envía un ping firmado al webhook configurado, para que el cliente confirme que Noova lo alcanza. */
 export async function POST(req: NextRequest, ctx: Ctx) {

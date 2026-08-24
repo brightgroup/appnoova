@@ -15,7 +15,10 @@ import type { ExtractFileInput } from "@/lib/automations/ai-extract-engine";
 import { recordUsageSafe } from "@/lib/billing/meter";
 import { providerForLlmModel } from "@/lib/billing/pricing";
 
-const WEBHOOK_TIMEOUT_MS = 8000;
+// 20s en vez de un timeout más corto porque este envío es "fire and forget" (nunca se espera
+// desde la respuesta al usuario de WhatsApp) y varios workflows de n8n responden solo cuando
+// termina todo el workflow — un timeout corto genera falsos "error" en integraciones lentas pero sanas.
+const WEBHOOK_TIMEOUT_MS = 20_000;
 /** Cuánto del payload/respuesta se guarda para inspección en la UI — evita que un conector que devuelva HTML gigante llene la tabla. */
 const LOGGED_BODY_MAX_CHARS = 8000;
 
