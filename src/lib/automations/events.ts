@@ -19,6 +19,9 @@ import { providerForLlmModel } from "@/lib/billing/pricing";
 // desde la respuesta al usuario de WhatsApp) y varios workflows de n8n responden solo cuando
 // termina todo el workflow — un timeout corto genera falsos "error" en integraciones lentas pero sanas.
 const WEBHOOK_TIMEOUT_MS = 20_000;
+/** Reintentos ante fallas transitorias (sin respuesta / error 5xx del otro lado) — un 4xx no se reintenta porque repetir el mismo request no lo arregla. */
+const MAX_SEND_ATTEMPTS = 3;
+const RETRY_DELAYS_MS = [2000, 6000];
 /** Cuánto del payload/respuesta se guarda para inspección en la UI — evita que un conector que devuelva HTML gigante llene la tabla. */
 const LOGGED_BODY_MAX_CHARS = 8000;
 
@@ -281,39 +284,58 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
   let httpStatus: number | null = null;
   let errorMessage: string | null = null;
   let responseBodyText: string | null = null;
+  let attempt = 0;
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
+  while (attempt < MAX_SEND_ATTEMPTS) {
+    attempt++;
+    status = "sent";
+    httpStatus = null;
+    errorMessage = null;
+    responseBodyText = null;
+
     try {
-      const res = await fetch(connection.webhookUrl, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          "X-Noova-Signature": signature,
-          // Header plano equivalente a un API key — para usar la credencial "Header Auth" de n8n sin código.
-          "X-Noova-Api-Key": connection.secret,
-          ...extraHeaders
-        },
-        body,
-        signal: controller.signal
-      });
-      httpStatus = res.status;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
       try {
-        responseBodyText = (await res.text()).slice(0, LOGGED_BODY_MAX_CHARS);
-      } catch {
-        // Cuerpo de respuesta no legible (stream vacío, etc.) — no es crítico.
+        const res = await fetch(connection.webhookUrl, {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+            "X-Noova-Signature": signature,
+            // Header plano equivalente a un API key — para usar la credencial "Header Auth" de n8n sin código.
+            "X-Noova-Api-Key": connection.secret,
+            ...extraHeaders
+          },
+          body,
+          signal: controller.signal
+        });
+        httpStatus = res.status;
+        try {
+          responseBodyText = (await res.text()).slice(0, LOGGED_BODY_MAX_CHARS);
+        } catch {
+          // Cuerpo de respuesta no legible (stream vacío, etc.) — no es crítico.
+        }
+        if (!res.ok) {
+          status = "error";
+          errorMessage = `HTTP ${res.status}`;
+        }
+      } finally {
+        clearTimeout(timeout);
       }
-      if (!res.ok) {
-        status = "error";
-        errorMessage = `HTTP ${res.status}`;
-      }
-    } finally {
-      clearTimeout(timeout);
+    } catch (err) {
+      status = "error";
+      errorMessage = err instanceof Error ? err.message : "Error de red desconocido";
     }
-  } catch (err) {
-    status = "error";
-    errorMessage = err instanceof Error ? err.message : "Error de red desconocido";
+
+    // Solo vale la pena reintentar una falla transitoria (sin respuesta, o un 5xx del otro lado).
+    // Un 4xx significa que la config está mal (URL, auth) — repetir el mismo request no lo arregla.
+    const retryable = status === "error" && (httpStatus === null || httpStatus >= 500);
+    if (!retryable || attempt >= MAX_SEND_ATTEMPTS) break;
+    await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS_MS[attempt - 1]));
+  }
+
+  if (status === "error" && attempt > 1) {
+    errorMessage = `${errorMessage} (tras ${attempt} intentos)`;
   }
 
   const latencyMs = Date.now() - startedAt;
