@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI, type Content, type Part } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { getOriApiKey, getOriModel } from "@/lib/google-ai";
 import { getAnthropicApiKey, readClaudeUsage, createClaudeMessage, toAnthropicTools } from "@/lib/text-agent-generate-claude";
+import { getOpenAiApiKey, readOpenAiUsage, toOpenAiTools } from "@/lib/text-agent-generate-openai";
 import { resolveTextLlm } from "@/lib/text-agent-options";
 import { buildOriSystemInstruction } from "@/lib/merge-ori-context";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
@@ -34,22 +36,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const apiKey = getOriApiKey();
-  if (!apiKey) {
-    return NextResponse.json(
-      {
-        error:
-          "Falta ORI_GOOGLE_AI_KEY en .env.local. Crea una API key aparte en Google AI Studio para Ori y reinicia el servidor."
-      },
-      { status: 500 }
-    );
-  }
-
   const body = await req.json();
   const messages = (body.messages ?? []) as ChatMessage[];
   const companyContextId = body.company_context_id as string | undefined;
-  // Si el usuario no elige modelo, sigue el default de siempre (Gemini vía ORI_GEMINI_MODEL).
+  // Si el usuario no elige modelo, sigue el default de siempre (hoy GPT-4o mini, ver DEFAULT_ENGINE_ID).
   const model = body.model ? resolveTextLlm(String(body.model)) : getOriModel();
+  const provider: "claude" | "openai" | "gemini" = model.startsWith("claude-")
+    ? "claude"
+    : model.startsWith("gpt-")
+      ? "openai"
+      : "gemini";
   const lastUser = [...messages].reverse().find(m => m.role === "user");
 
   if (!lastUser?.content?.trim()) {
@@ -127,7 +123,7 @@ export async function POST(req: NextRequest) {
     let reply: string;
     let usage: ReturnType<typeof readGeminiUsage>;
 
-    if (model.startsWith("claude-")) {
+    if (provider === "claude") {
       const client = new Anthropic({ apiKey: getAnthropicApiKey() });
       const anthropicMessages: Anthropic.MessageParam[] = messages.map(m => ({ role: m.role, content: m.content }));
       const tools = toolsEnabled ? toAnthropicTools(oriTools.map(t => t.declaration)) : undefined;
@@ -165,7 +161,63 @@ export async function POST(req: NextRequest) {
         .map(b => b.text)
         .join("\n")
         .trim();
+    } else if (provider === "openai") {
+      const client = new OpenAI({ apiKey: getOpenAiApiKey() });
+      const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        { role: "system", content: systemInstruction },
+        ...messages.map((m): OpenAI.Chat.ChatCompletionMessageParam => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: m.content
+        }))
+      ];
+      const tools = toolsEnabled ? toOpenAiTools(oriTools.map(t => t.declaration)) : undefined;
+
+      let response = await client.chat.completions.create({
+        model,
+        messages: openaiMessages,
+        max_completion_tokens: 2048,
+        temperature: 0.7,
+        tools
+      });
+      usage = readOpenAiUsage(response);
+      let choice = response.choices[0];
+
+      let rounds = 0;
+      while (toolsEnabled && choice?.finish_reason === "tool_calls" && choice.message.tool_calls?.length && rounds < 3) {
+        rounds += 1;
+        openaiMessages.push(choice.message);
+
+        for (const call of choice.message.tool_calls) {
+          if (call.type !== "function") continue;
+          let args: Record<string, unknown> = {};
+          try { args = JSON.parse(call.function.arguments); } catch { /* args inválidos del modelo — se ejecuta con {} */ }
+          const result = await executeOriTool(oriTools, call.function.name, args, toolCtx);
+          openaiMessages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
+        }
+
+        response = await client.chat.completions.create({
+          model,
+          messages: openaiMessages,
+          max_completion_tokens: 2048,
+          temperature: 0.7,
+          tools
+        });
+        usage = readOpenAiUsage(response);
+        choice = response.choices[0];
+      }
+
+      reply = choice?.message.content?.trim() ?? "";
     } else {
+      const apiKey = getOriApiKey();
+      if (!apiKey) {
+        return NextResponse.json(
+          {
+            error:
+              "Falta ORI_GOOGLE_AI_KEY en .env.local. Crea una API key aparte en Google AI Studio para Ori y reinicia el servidor."
+          },
+          { status: 500 }
+        );
+      }
       const ai = new GoogleGenAI({ apiKey });
       const contents: Content[] = messages.map(m => ({
         role: m.role === "assistant" ? "model" as const : "user" as const,

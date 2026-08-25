@@ -33,7 +33,7 @@ export function getOpenAiApiKey(): string {
 }
 
 /** Mismo conversor de schema que usa Claude (registry.ts define las tools en formato Gemini). */
-function toOpenAiTools(declarations: FunctionDeclaration[]): OpenAI.Chat.ChatCompletionTool[] {
+export function toOpenAiTools(declarations: FunctionDeclaration[]): OpenAI.Chat.ChatCompletionTool[] {
   return declarations.map(decl => ({
     type: "function",
     function: {
