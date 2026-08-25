@@ -12,6 +12,8 @@ import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import { Badge } from "@/components/ui/Badge";
 import { TEXT_LLM_MODELS, DEFAULT_TEXT_MODEL, resolveTextLlm } from "@/lib/text-agent-options";
 import { llmModelIcon } from "@/lib/llm/provider-icon";
+import { OriToolResultView } from "@/components/ori/OriToolResultView";
+import type { OriToolCall } from "@/types/ori";
 
 const ORI_MODEL_STORAGE_KEY = "noova_ori_model";
 
@@ -19,6 +21,7 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  toolCalls?: OriToolCall[];
 }
 
 const QUICK_ACTIONS = [
@@ -132,7 +135,7 @@ export default function OriCopilotoPage() {
       }
       setMessages(prev => [
         ...prev,
-        { id: crypto.randomUUID(), role: "assistant", content: data.reply }
+        { id: crypto.randomUUID(), role: "assistant", content: data.reply, toolCalls: data.tool_calls ?? [] }
       ]);
     } catch {
       setError("Error de red. Intenta de nuevo.");
@@ -210,15 +213,18 @@ export default function OriCopilotoPage() {
                   key={msg.id}
                   className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  <p
-                    className={`max-w-[78%] text-[15px] leading-relaxed whitespace-pre-wrap ${
-                      msg.role === "user"
-                        ? "text-right text-gray-100 font-medium"
-                        : "text-left text-gray-400"
-                    }`}
-                  >
-                    {msg.content}
-                  </p>
+                  <div className={msg.role === "user" ? "max-w-[78%]" : "max-w-[92%] w-full"}>
+                    <p
+                      className={`text-[15px] leading-relaxed whitespace-pre-wrap ${
+                        msg.role === "user"
+                          ? "text-right text-gray-100 font-medium"
+                          : "text-left text-gray-400"
+                      }`}
+                    >
+                      {msg.content}
+                    </p>
+                    {msg.toolCalls && msg.toolCalls.length > 0 && <OriToolResultView toolCalls={msg.toolCalls} />}
+                  </div>
                 </div>
               ))}
               {loading && (

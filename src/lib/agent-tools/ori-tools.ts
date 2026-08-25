@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FunctionDeclaration } from "@google/genai";
+import { inventoryLookupTool } from "@/lib/agent-tools/inventory-lookup-tool";
+import { inventoryMovementsTool } from "@/lib/agent-tools/inventory-movements-tool";
 
 /**
  * Registro de tools SOLO para ORI (copiloto interno) — deliberadamente separado
@@ -30,6 +32,19 @@ export interface OriToolDefinition {
   execute(args: Record<string, unknown>, ctx: OriToolContext): Promise<OriToolResult>;
 }
 
+/**
+ * Instrucción compartida, más estricta que la de cada tool individual —
+ * cubre el patrón de alucinación más común: no inventar datos cuando una
+ * herramienta está disponible pero el modelo "cree recordar" la respuesta.
+ * Aprendido de los ajustes que hubo que hacerle al agente de WhatsApp para
+ * catálogos de más de mil productos (ver src/lib/data-tables/catalog-guard.ts):
+ * ahí existe una verificación posterior que corrige la respuesta contra la
+ * base real; acá no hay ese resguardo — la precisión depende de que el
+ * modelo SIEMPRE llame a la herramienta y relate sus datos tal cual.
+ */
+export const ORI_GROUNDING_PROMPT =
+  "Reglas para inventario: NUNCA respondas preguntas de existencias, stock mínimo o movimientos usando lo que recuerdes de un mensaje anterior — vuelve a llamar a la herramienta correspondiente en cada pregunta nueva, aunque parezca repetida, porque el inventario puede haber cambiado. Si una herramienta no encuentra el producto o no tiene datos, dilo tal cual — nunca completes con un valor supuesto o aproximado.";
+
 export async function executeOriTool(
   tools: OriToolDefinition[],
   name: string,
@@ -45,3 +60,6 @@ export async function executeOriTool(
     return { ok: false, reason: err instanceof Error ? err.message : "Error ejecutando la tool" };
   }
 }
+
+/** Registro de todas las tools de Ori — agregar una nueva es sumarla acá. */
+export const ORI_TOOLS: OriToolDefinition[] = [inventoryLookupTool, inventoryMovementsTool];

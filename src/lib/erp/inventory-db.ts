@@ -112,6 +112,22 @@ export async function findInventoryItemByCodigo(
   return data ? toItemRecord(data as InventoryItemRow) : null;
 }
 
+/** Trae solo los productos cuyo id está en `ids` — para resolver código/nombre de un lote pequeño de movimientos sin traer todo el catálogo. */
+export async function getInventoryItemsByIds(
+  db: SupabaseClient,
+  organizationId: string,
+  ids: string[]
+): Promise<InventoryItemRecord[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await db
+    .from("erp_inventory_items")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .in("id", ids);
+  if (error) throw new Error(error.message);
+  return ((data as InventoryItemRow[] | null) ?? []).map(toItemRecord);
+}
+
 export interface InventoryItemInput {
   codigo: string;
   nombre: string;

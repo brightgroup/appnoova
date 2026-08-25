@@ -5,11 +5,63 @@ import { supabase } from "@/lib/supabase";
 import { authFetch } from "@/lib/telephony-api";
 import { DEFAULT_TEXT_MODEL } from "@/lib/text-agent-options";
 import { SendIcon, SparkleIcon } from "../../../icons";
+import { toolProductRows, toolMovementRows, toolTruncationCaption, type OriToolCall } from "@/types/ori";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  toolCalls?: OriToolCall[];
+}
+
+function OriToolResultCards({ toolCalls }: { toolCalls: OriToolCall[] }) {
+  return (
+    <>
+      {toolCalls.map((call, i) => {
+        const productos = toolProductRows(call);
+        const movimientos = toolMovementRows(call);
+        const caption = toolTruncationCaption(call);
+
+        if (productos.length > 0) {
+          return (
+            <div key={i} className="ori-result-card">
+              {productos.map(p => (
+                <div key={p.codigo} className="ori-result-row">
+                  <div className="ori-result-main">
+                    <span className="ori-result-title">{p.nombre}</span>
+                    <span className="ori-result-sub">{p.codigo}</span>
+                  </div>
+                  <span className={`ori-result-value${p.bajo_minimo ? " warn" : ""}`}>{p.existencia}</span>
+                </div>
+              ))}
+              {caption && <p className="ori-result-caption">{caption}</p>}
+            </div>
+          );
+        }
+
+        if (movimientos.length > 0) {
+          return (
+            <div key={i} className="ori-result-card">
+              {movimientos.map((m, idx) => (
+                <div key={idx} className="ori-result-row">
+                  <div className="ori-result-main">
+                    <span className="ori-result-title">{m.producto}</span>
+                    <span className="ori-result-sub">{m.fecha} · {m.tipo}</span>
+                  </div>
+                  <span className={`ori-result-value${m.cantidad > 0 ? "" : " warn"}`}>
+                    {m.cantidad > 0 ? `+${m.cantidad}` : m.cantidad}
+                  </span>
+                </div>
+              ))}
+              {caption && <p className="ori-result-caption">{caption}</p>}
+            </div>
+          );
+        }
+
+        return null;
+      })}
+    </>
+  );
 }
 
 const QUICK_ACTIONS = [
@@ -67,7 +119,10 @@ export default function MobileOriPage() {
           setError(data.error || "No se pudo obtener respuesta.");
           return;
         }
-        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "assistant", content: data.reply }]);
+        setMessages(prev => [
+          ...prev,
+          { id: crypto.randomUUID(), role: "assistant", content: data.reply, toolCalls: data.tool_calls ?? [] }
+        ]);
       } catch {
         setError("Error de red. Intenta de nuevo.");
       } finally {
@@ -114,7 +169,10 @@ export default function MobileOriPage() {
               {msg.role === "user" ? (
                 <div className="vbubble">{msg.content}</div>
               ) : (
-                <div className="agent-text">{msg.content}</div>
+                <>
+                  <div className="agent-text">{msg.content}</div>
+                  {msg.toolCalls && msg.toolCalls.length > 0 && <OriToolResultCards toolCalls={msg.toolCalls} />}
+                </>
               )}
             </div>
           ))}

@@ -22,12 +22,23 @@ import {
 } from "@/lib/billing/meter";
 import { providerForLlmModel } from "@/lib/billing/pricing";
 import { getOriInventoryAccess } from "@/lib/erp/ori-access-db";
-import { executeOriTool } from "@/lib/agent-tools/ori-tools";
-import { ORI_TOOLS } from "@/lib/agent-tools/inventory-lookup-tool";
+import { executeOriTool, ORI_TOOLS, ORI_GROUNDING_PROMPT } from "@/lib/agent-tools/ori-tools";
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+/**
+ * Resultado crudo de una tool, expuesto al frontend además del texto que
+ * redactó el modelo — así la UI puede renderizar los números directo desde
+ * la respuesta real de la base de datos (tabla), en vez de depender de que el
+ * modelo los haya transcrito bien en la prosa. El texto sigue siendo el
+ * comentario/interpretación; la tabla es la fuente de verdad visual.
+ */
+interface OriToolCallRecord {
+  name: string;
+  result: Record<string, unknown>;
 }
 
 export async function POST(req: NextRequest) {
@@ -108,7 +119,9 @@ export async function POST(req: NextRequest) {
     ? ORI_TOOLS
     : [];
   const toolsEnabled = oriTools.length > 0;
-  const toolsPromptBlock = oriTools.map(t => t.promptBlock).join("\n\n");
+  const toolsPromptBlock = [toolsEnabled ? ORI_GROUNDING_PROMPT : "", ...oriTools.map(t => t.promptBlock)]
+    .filter(Boolean)
+    .join("\n\n");
 
   const systemInstruction = [
     buildOriSystemInstruction(companyContextText, platformHelp, temporal.promptBlock),
@@ -118,6 +131,8 @@ export async function POST(req: NextRequest) {
     .join("\n\n");
 
   const toolCtx = { db: billingDb, organizationId: billing.organizationId ?? "" };
+
+  const toolCalls: OriToolCallRecord[] = [];
 
   try {
     let reply: string;
@@ -144,6 +159,7 @@ export async function POST(req: NextRequest) {
         const toolResultBlocks: Anthropic.ToolResultBlockParam[] = [];
         for (const call of toolUseBlocks) {
           const result = await executeOriTool(oriTools, call.name, (call.input ?? {}) as Record<string, unknown>, toolCtx);
+          toolCalls.push({ name: call.name, result });
           toolResultBlocks.push({ type: "tool_result", tool_use_id: call.id, content: JSON.stringify(result) });
         }
         anthropicMessages.push({ role: "user", content: toolResultBlocks });
@@ -192,6 +208,7 @@ export async function POST(req: NextRequest) {
           let args: Record<string, unknown> = {};
           try { args = JSON.parse(call.function.arguments); } catch { /* args inválidos del modelo — se ejecuta con {} */ }
           const result = await executeOriTool(oriTools, call.function.name, args, toolCtx);
+          toolCalls.push({ name: call.function.name, result });
           openaiMessages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
         }
 
@@ -250,6 +267,7 @@ export async function POST(req: NextRequest) {
         for (const call of response.functionCalls) {
           const name = call.name ?? "";
           const result = await executeOriTool(oriTools, name, (call.args ?? {}) as Record<string, unknown>, toolCtx);
+          toolCalls.push({ name, result });
           functionResponseParts.push({ functionResponse: { name, id: call.id, response: result } });
         }
         contents.push({ role: "user", parts: functionResponseParts });
@@ -278,7 +296,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ reply, model });
+    return NextResponse.json({ reply, model, tool_calls: toolCalls });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Error al consultar Gemini";
     return NextResponse.json({ error: msg }, { status: 500 });

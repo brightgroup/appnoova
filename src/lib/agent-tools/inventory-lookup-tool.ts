@@ -27,18 +27,18 @@ export const inventoryLookupTool: OriToolDefinition = {
         },
         limite: {
           type: Type.INTEGER,
-          description: "Máximo de productos a devolver. Por defecto 20, máximo 50."
+          description: "Máximo de productos a devolver. Por defecto 15, máximo 30 — para listados más grandes, dirige al usuario a la tabla de Inventario."
         }
       }
     }
   },
   promptBlock:
-    "Tienes una herramienta (consultar_inventario) para ver en tiempo real el inventario de esta empresa: existencias, stock mínimo, marca y responsable por producto. Úsala cada vez que te pregunten por inventario, existencias, qué se está agotando, o listados por producto/marca — nunca respondas esas preguntas de memoria ni inventes cifras.",
+    "Tienes una herramienta (consultar_inventario) para ver en tiempo real el inventario de esta empresa: existencias, stock mínimo, marca y responsable por producto. Úsala cada vez que te pregunten por inventario, existencias, qué se está agotando, o listados por producto/marca — nunca respondas esas preguntas de memoria ni inventes cifras. Cuando reportes números, cópialos exactamente como vienen en la respuesta de la herramienta — no los redondees ni los recuerdes de un mensaje anterior. Si `mostrados` es menor que `total_encontrados`, dilo explícitamente (ej. \"te muestro los primeros 20 de 43\") y sugiere que para ver el listado completo revisen la tabla en ERP → Inventario, que sí lo trae completo, ordenable y exportable a Excel.",
   async execute(args: Record<string, unknown>, ctx: OriToolContext): Promise<OriToolResult> {
     const busqueda = typeof args.busqueda === "string" ? args.busqueda.trim() : "";
     const marca = typeof args.marca === "string" ? args.marca.trim().toLowerCase() : "";
     const soloBajoMinimo = args.solo_bajo_minimo === true;
-    const limite = Math.min(Math.max(Number(args.limite) || 20, 1), 50);
+    const limite = Math.min(Math.max(Number(args.limite) || 15, 1), 30);
 
     const items = await listInventoryItems(ctx.db, ctx.organizationId, { search: busqueda || undefined });
 
@@ -64,5 +64,3 @@ export const inventoryLookupTool: OriToolDefinition = {
     };
   }
 };
-
-export const ORI_TOOLS: OriToolDefinition[] = [inventoryLookupTool];
