@@ -119,8 +119,16 @@ Mismo endpoint, fuentes de config distintas.
 ├── agentes-voz/      → CRUD agentes Gemini Live
 ├── inbox/            → conversaciones texto + handoff humano
 ├── micrositio/       → redirects legacy → canales
+├── erp/
+│   └── inventarios/  → maestro de productos, movimientos, reglas de alerta
 └── admin/            → telefonía admin, usuarios
 ```
+
+### ERP > Inventarios
+
+Módulo **habilitado por organización** (no por rol): `organizations.settings.modules.erp`, editable desde `/admin/organizations` (superadmin) — ver `src/lib/org-modules.ts`. Aparte, el permiso RBAC `erp` decide qué puede hacer cada usuario *dentro* de una organización que ya lo tiene encendido (`view` consulta, `edit` registra entradas/salidas, `manage` ajusta existencias, crea productos e importa Excel). Toda ruta de `/api/erp/**` valida ambas cosas server-side (`requireErpAccess` en `src/lib/erp/api-guard.ts`) — el gating de sidebar es solo cosmético.
+
+Tablas: `erp_inventory_items` (maestro, existencia mantenida solo vía el RPC `erp_register_movement`), `erp_inventory_movements` (kardex, saldo auditable por fila) y `erp_inventory_alert_rules` (regla configurable de alerta de stock mínimo, no cableada). Migraciones: `102_erp_module.sql` (permiso RBAC) y `103_erp_inventory.sql` (tablas + RPC).
 
 Navegación lateral: `src/lib/canales-nav.ts`, `agentes-texto-nav.ts`, `agentes-voz-nav.ts`.
 
@@ -193,6 +201,7 @@ Migraciones incrementales en `supabase/migrations/`:
 | 016 | Inbox handoff |
 | 017 | Landing leads |
 | 018–020 | Widget web standalone |
+| 102–103 | ERP e inventarios |
 
 Instalación nueva: aplicar migraciones en orden o ejecutar `supabase/APPLY_IN_SUPABASE.sql` (esquema consolidado).
 

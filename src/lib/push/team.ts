@@ -55,3 +55,12 @@ export async function getOrgInboxTeamUserIds(organizationId: string): Promise<st
 export async function getOrgConectoresTeamUserIds(organizationId: string): Promise<string[]> {
   return getOrgTeamUserIdsForModule(organizationId, "conectores", "edit");
 }
+
+/**
+ * user_id de miembros activos con permiso para administrar ERP > Inventarios
+ * (módulo "erp" ≥ manage) — a quienes se avisa cuando un producto toca su
+ * stock mínimo y la regla de alerta no tiene destinatarios explícitos.
+ */
+export async function getOrgErpTeamUserIds(organizationId: string): Promise<string[]> {
+  return getOrgTeamUserIdsForModule(organizationId, "erp", "manage");
+}

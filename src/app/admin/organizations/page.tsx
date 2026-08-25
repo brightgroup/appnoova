@@ -22,6 +22,7 @@ import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import type { AccountStatus } from "@/types/rbac";
 import { parseOrgBranding } from "@/lib/org-branding";
+import { parseOrgModules } from "@/lib/org-modules";
 
 interface OrgRow {
   id: string;
@@ -99,6 +100,7 @@ export default function AdminOrganizationsPage() {
           owner_full_name: values.owner_full_name || undefined,
           owner_password: values.owner_password || undefined,
           hide_noova_logo: values.hide_noova_logo,
+          erp: values.erp,
         }),
       });
       const json = await res.json();
@@ -119,6 +121,7 @@ export default function AdminOrganizationsPage() {
           slug: values.slug || undefined,
           status: values.status,
           hide_noova_logo: values.hide_noova_logo,
+          erp: values.erp,
           ...(values.plan !== modal.org.plan ? { plan: values.plan } : {}),
         }),
       });
@@ -194,6 +197,7 @@ export default function AdminOrganizationsPage() {
                 {pageRows.map((o) => {
                   const protected_ = o.is_protected;
                   const whiteLabel = parseOrgBranding(o.settings).hide_noova_logo;
+                  const erpEnabled = parseOrgModules(o.settings).erp;
                   return (
                     <tr key={o.id} className={registryTableRow}>
                       <td className={registryTableCellFirst}>
@@ -203,6 +207,11 @@ export default function AdminOrganizationsPage() {
                           {whiteLabel && (
                             <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-white/[.08] text-gray-400">
                               Sin logo
+                            </span>
+                          )}
+                          {erpEnabled && (
+                            <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#0f7eff]/15 text-[#99c9ff]">
+                              ERP
                             </span>
                           )}
                         </p>
@@ -280,6 +289,7 @@ export default function AdminOrganizationsPage() {
           status: modal.org.status,
           is_protected: modal.org.is_protected,
           hide_noova_logo: parseOrgBranding(modal.org.settings).hide_noova_logo,
+          erp: parseOrgModules(modal.org.settings).erp,
         } : undefined}
         saving={saving}
         onClose={() => setModal(null)}

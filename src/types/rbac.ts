@@ -36,6 +36,7 @@ export const ORG_PERMISSION_MODULE_KEYS = [
   "billing",
   "company_context",
   "org_users",
+  "erp",
 ] as const;
 
 export type OrgPermissionModuleKey = (typeof ORG_PERMISSION_MODULE_KEYS)[number];
@@ -77,6 +78,7 @@ export const ORG_MODULE_LABELS: Record<OrgPermissionModuleKey, string> = {
   billing: "Facturación",
   company_context: "Contextos de marca",
   org_users: "Usuarios org",
+  erp: "ERP (inventarios)",
 };
 
 /** Roles de sistema por organización */

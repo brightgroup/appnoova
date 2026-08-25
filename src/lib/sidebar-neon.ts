@@ -13,6 +13,7 @@ export const sidebarNeonIcon = {
   team: "",
   billing: "",
   settings: "",
+  erp: "",
 } as const;
 
 export const sidebarIconBase = "nv-sidebar-icon shrink-0";

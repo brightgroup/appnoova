@@ -4,6 +4,7 @@ import { deleteOrganizationCompletely } from "@/lib/admin-provisioning";
 import { adminClient } from "@/lib/voice-agents-server";
 import { uniqueOrgSlug } from "@/lib/admin-utils";
 import { mergeOrgBrandingSettings } from "@/lib/org-branding";
+import { mergeOrgModulesSettings } from "@/lib/org-modules";
 import { isActivePlanId } from "@/lib/org-plans";
 import type { AccountStatus } from "@/types/rbac";
 
@@ -69,6 +70,14 @@ export async function PATCH(
   if (typeof body.hide_noova_logo === "boolean") {
     updates.settings = mergeOrgBrandingSettings(org.settings, {
       hide_noova_logo: body.hide_noova_logo,
+    });
+  }
+
+  if (typeof body.erp === "boolean") {
+    // Encadenar sobre updates.settings si el branding ya lo tocó arriba, para no
+    // pisar ese merge con uno hecho sobre org.settings desactualizado.
+    updates.settings = mergeOrgModulesSettings(updates.settings ?? org.settings, {
+      erp: body.erp,
     });
   }
 

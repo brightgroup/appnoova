@@ -126,6 +126,7 @@ export async function POST(req: NextRequest) {
       ownerUserId: ownerId,
       plan,
       hideNoovaLogo: body.hide_noova_logo === true,
+      erp: body.erp === true,
     });
 
     return NextResponse.json(

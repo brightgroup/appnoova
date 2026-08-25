@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LogOut, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, Building2, Loader2, Share2, Contact, Database, Plug, Workflow } from "lucide-react";
+import { LogOut, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, Building2, Loader2, Share2, Contact, Database, Plug, Workflow, Boxes } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -16,6 +16,7 @@ import { AGENTES_VOZ_NAV } from "@/lib/agentes-voz-nav";
 import { AGENTES_TEXTO_NAV } from "@/lib/agentes-texto-nav";
 import { CRM_NAV } from "@/lib/crm-nav";
 import { CAMPAIGNS_NAV } from "@/lib/campaigns-nav";
+import { ERP_NAV } from "@/lib/erp-nav";
 import { sidebarIconBase, sidebarNeonIcon } from "@/lib/sidebar-neon";
 import { DesktopOnlyGate } from "@/components/layout/DesktopOnlyGate";
 import { SidebarAccountMenu } from "@/components/layout/SidebarAccountMenu";
@@ -100,7 +101,7 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
   } | null>(null);
   const router = useRouter();
   const pathname = usePathname();
-  const { flags: permFlags, branding } = useOrgPermissions();
+  const { flags: permFlags, branding, modules } = useOrgPermissions();
 
   const textoNavItems = AGENTES_TEXTO_NAV.filter((item) =>
     item.href.includes("/inbox") ? permFlags.can_view_inbox : permFlags.can_view_text_agents
@@ -114,6 +115,7 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
   const showCampaignsSection = permFlags.can_view_campaigns;
   const showContextsSection = permFlags.can_view_contexts;
   const showTablesSection = permFlags.can_view_campaigns;
+  const showErpSection = modules.erp && permFlags.can_view_erp;
 
   useEffect(() => {
     if (!checked) return;
@@ -160,6 +162,8 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
       setExpandedMenu("canales");
     } else if (pathname.startsWith("/dashboard/crm")) {
       setExpandedMenu("crm");
+    } else if (pathname.startsWith("/dashboard/erp")) {
+      setExpandedMenu("erp");
     }
   }, [pathname]);
 
@@ -414,6 +418,34 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
             </button>
             {sidebarOpen && expandedMenu === "crm" && (
               <SidebarSubMenu pathname={pathname} items={CRM_NAV} />
+            )}
+          </div>
+          )}
+
+          {/* ERP */}
+          {showErpSection && (
+          <div>
+            <button
+              onClick={() => toggleMenu("erp")}
+              className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-gray-300 ${
+                sidebarOpen ? "hover:text-white hover:bg-white/[.08]" : "hover:text-white"
+              } ${
+                expandedMenu === "erp" && sidebarOpen ? "text-white bg-white/[.08]" : ""
+              }`}
+              title="ERP"
+            >
+              {sidebarOpen ? (
+                <>
+                  <Boxes className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.erp}`} />
+                  <span className="flex-1 text-left">ERP</span>
+                  <ChevronRight className={`w-4 h-4 transition-transform ml-2 ${expandedMenu === "erp" ? "rotate-90" : ""}`} />
+                </>
+              ) : (
+                <Boxes className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.erp}`} />
+              )}
+            </button>
+            {sidebarOpen && expandedMenu === "erp" && (
+              <SidebarSubMenu pathname={pathname} items={ERP_NAV} />
             )}
           </div>
           )}

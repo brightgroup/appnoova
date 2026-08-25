@@ -1,6 +1,7 @@
 import { adminClient, userDisplayName } from "@/lib/voice-agents-server";
 import { uniqueOrgSlug } from "@/lib/admin-utils";
 import { mergeOrgBrandingSettings } from "@/lib/org-branding";
+import { mergeOrgModulesSettings } from "@/lib/org-modules";
 import { isSuperAdminEmail } from "@/lib/rbac-constants";
 
 export type OrgMemberRoleSlug = "owner" | "org_admin" | "manager" | "advisor" | "viewer";
@@ -115,6 +116,7 @@ export async function bootstrapOrganization(
     plan?: string;
     slug?: string;
     hideNoovaLogo?: boolean;
+    erp?: boolean;
   }
 ): Promise<{ id: string; slug: string }> {
   const name = input.name.trim();
@@ -129,10 +131,13 @@ export async function bootstrapOrganization(
     ? await uniqueOrgSlug(db, input.slug)
     : await uniqueOrgSlug(db, name);
 
-  const settings =
+  let settings: Record<string, unknown> =
     input.hideNoovaLogo === true
       ? mergeOrgBrandingSettings({}, { hide_noova_logo: true })
       : {};
+  if (input.erp === true) {
+    settings = mergeOrgModulesSettings(settings, { erp: true });
+  }
 
   const { data: org, error } = await db
     .from("organizations")

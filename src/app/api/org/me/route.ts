@@ -6,6 +6,7 @@ import {
 } from "@/lib/org-server";
 import { buildPermissionFlags } from "@/lib/org-permissions";
 import { parseOrgBranding } from "@/lib/org-branding";
+import { parseOrgModules } from "@/lib/org-modules";
 import { adminClient } from "@/lib/voice-agents-server";
 
 /** GET — organización activa, membresía y permisos del usuario */
@@ -24,6 +25,7 @@ export async function GET(req: NextRequest) {
     .single();
 
   const branding = parseOrgBranding(org?.settings);
+  const modules = parseOrgModules(org?.settings);
 
   return NextResponse.json({
     organization: org,
@@ -31,6 +33,7 @@ export async function GET(req: NextRequest) {
     permissions,
     flags: buildPermissionFlags(permissions),
     branding,
+    modules,
     permissions_legacy: {
       org_users: orgUsersLevel,
       can_view_team: hasOrgPermission(orgUsersLevel, "view"),

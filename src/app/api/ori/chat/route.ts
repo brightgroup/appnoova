@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, type Content, type Part } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 import { getOriApiKey, getOriModel } from "@/lib/google-ai";
-import { getAnthropicApiKey, readClaudeUsage } from "@/lib/text-agent-generate-claude";
+import { getAnthropicApiKey, readClaudeUsage, createClaudeMessage, toAnthropicTools } from "@/lib/text-agent-generate-claude";
 import { resolveTextLlm } from "@/lib/text-agent-options";
 import { buildOriSystemInstruction } from "@/lib/merge-ori-context";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
@@ -19,6 +19,9 @@ import {
   recordUsageSafe
 } from "@/lib/billing/meter";
 import { providerForLlmModel } from "@/lib/billing/pricing";
+import { getOriInventoryAccess } from "@/lib/erp/ori-access-db";
+import { executeOriTool } from "@/lib/agent-tools/ori-tools";
+import { ORI_TOOLS } from "@/lib/agent-tools/inventory-lookup-tool";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -100,11 +103,25 @@ export async function POST(req: NextRequest) {
     extraEvents: timeRules.extra_events,
     extraNotes: timeRules.extra_notes,
   });
-  const systemInstruction = buildOriSystemInstruction(
-    companyContextText,
-    platformHelp,
-    temporal.promptBlock
-  );
+
+  // Tools internas de Ori (hoy solo consultar_inventario) — nunca las de
+  // ALL_TEXT_AGENT_TOOLS, que alimentan al agente que habla con clientes
+  // externos. Se filtran por organización: erp encendido + toggle propio de Ori
+  // (ver src/lib/erp/ori-access-db.ts) — ninguna de las dos sola alcanza.
+  const oriTools = billing.organizationId && (await getOriInventoryAccess(billingDb, billing.organizationId))
+    ? ORI_TOOLS
+    : [];
+  const toolsEnabled = oriTools.length > 0;
+  const toolsPromptBlock = oriTools.map(t => t.promptBlock).join("\n\n");
+
+  const systemInstruction = [
+    buildOriSystemInstruction(companyContextText, platformHelp, temporal.promptBlock),
+    toolsPromptBlock
+  ]
+    .filter(block => block.trim().length > 0)
+    .join("\n\n");
+
+  const toolCtx = { db: billingDb, organizationId: billing.organizationId ?? "" };
 
   try {
     let reply: string;
@@ -112,36 +129,84 @@ export async function POST(req: NextRequest) {
 
     if (model.startsWith("claude-")) {
       const client = new Anthropic({ apiKey: getAnthropicApiKey() });
-      const response = await client.messages.create({
-        model,
-        system: systemInstruction,
-        max_tokens: 2048,
-        temperature: 0.7,
-        messages: messages.map(m => ({ role: m.role, content: m.content }))
-      });
+      const anthropicMessages: Anthropic.MessageParam[] = messages.map(m => ({ role: m.role, content: m.content }));
+      const tools = toolsEnabled ? toAnthropicTools(oriTools.map(t => t.declaration)) : undefined;
+
+      let response = await createClaudeMessage(
+        client,
+        { model, system: systemInstruction, max_tokens: 2048, temperature: 0.7, messages: anthropicMessages, tools },
+        {}
+      );
+      usage = readClaudeUsage(response);
+
+      let rounds = 0;
+      while (toolsEnabled && response.stop_reason === "tool_use" && rounds < 3) {
+        rounds += 1;
+        const toolUseBlocks = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+        anthropicMessages.push({ role: "assistant", content: response.content });
+
+        const toolResultBlocks: Anthropic.ToolResultBlockParam[] = [];
+        for (const call of toolUseBlocks) {
+          const result = await executeOriTool(oriTools, call.name, (call.input ?? {}) as Record<string, unknown>, toolCtx);
+          toolResultBlocks.push({ type: "tool_result", tool_use_id: call.id, content: JSON.stringify(result) });
+        }
+        anthropicMessages.push({ role: "user", content: toolResultBlocks });
+
+        response = await createClaudeMessage(
+          client,
+          { model, system: systemInstruction, max_tokens: 2048, temperature: 0.7, messages: anthropicMessages, tools },
+          {}
+        );
+        usage = readClaudeUsage(response);
+      }
+
       reply = response.content
         .filter((b): b is Anthropic.TextBlock => b.type === "text")
         .map(b => b.text)
         .join("\n")
         .trim();
-      usage = readClaudeUsage(response);
     } else {
       const ai = new GoogleGenAI({ apiKey });
-      const contents = messages.map(m => ({
+      const contents: Content[] = messages.map(m => ({
         role: m.role === "assistant" ? "model" as const : "user" as const,
         parts: [{ text: m.content }]
       }));
-      const response = await ai.models.generateContent({
-        model,
-        contents,
-        config: {
-          systemInstruction,
-          temperature: 0.7,
-          maxOutputTokens: 2048
-        }
-      });
-      reply = response.text?.trim() ?? "";
+      const config = {
+        systemInstruction,
+        temperature: 0.7,
+        maxOutputTokens: 2048,
+        ...(toolsEnabled ? { tools: [{ functionDeclarations: oriTools.map(t => t.declaration) }] } : {})
+      };
+
+      let response = await ai.models.generateContent({ model, contents, config });
       usage = readGeminiUsage(response);
+
+      let rounds = 0;
+      while (toolsEnabled && response.functionCalls?.length && rounds < 3) {
+        rounds += 1;
+        const modelContent = response.candidates?.[0]?.content;
+        if (modelContent) {
+          contents.push(modelContent);
+        } else {
+          contents.push({
+            role: "model",
+            parts: response.functionCalls.map(fc => ({ functionCall: { name: fc.name, args: fc.args, id: fc.id } }))
+          });
+        }
+
+        const functionResponseParts: Part[] = [];
+        for (const call of response.functionCalls) {
+          const name = call.name ?? "";
+          const result = await executeOriTool(oriTools, name, (call.args ?? {}) as Record<string, unknown>, toolCtx);
+          functionResponseParts.push({ functionResponse: { name, id: call.id, response: result } });
+        }
+        contents.push({ role: "user", parts: functionResponseParts });
+
+        response = await ai.models.generateContent({ model, contents, config });
+        usage = readGeminiUsage(response);
+      }
+
+      reply = response.text?.trim() ?? "";
     }
 
     if (!reply) {

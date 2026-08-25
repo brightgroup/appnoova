@@ -99,7 +99,7 @@ export function convertGeminiSchema(schema: Schema | undefined): Record<string, 
   return out;
 }
 
-function toAnthropicTools(declarations: FunctionDeclaration[]): Anthropic.Tool[] {
+export function toAnthropicTools(declarations: FunctionDeclaration[]): Anthropic.Tool[] {
   return declarations.map(decl => ({
     name: decl.name ?? "",
     description: decl.description ?? "",

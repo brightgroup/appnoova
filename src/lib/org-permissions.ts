@@ -38,6 +38,7 @@ export const DASHBOARD_ROUTE_RULES: { prefix: string; rule: DashboardRouteRule }
   { prefix: "/dashboard/micrositio", rule: { module: "channels", min: "view" } },
   { prefix: "/dashboard/contextos", rule: { module: "company_context", min: "view" } },
   { prefix: "/dashboard/tablas", rule: { module: "campaigns", min: "view" } },
+  { prefix: "/dashboard/erp", rule: { module: "erp", min: "view" } },
 ];
 
 export function routeRuleForPath(pathname: string): DashboardRouteRule | null {
@@ -84,5 +85,8 @@ export function buildPermissionFlags(permissions: OrgPermissionsMap) {
     can_edit_workflows: canAccessModule(permissions, "workflows", "edit"),
     can_view_contexts: canAccessModule(permissions, "company_context", "view"),
     can_edit_contexts: canAccessModule(permissions, "company_context", "edit"),
+    can_view_erp: canAccessModule(permissions, "erp", "view"),
+    can_edit_erp: canAccessModule(permissions, "erp", "edit"),
+    can_manage_erp: canAccessModule(permissions, "erp", "manage"),
   };
 }

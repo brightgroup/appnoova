@@ -20,12 +20,15 @@ import {
 import type { OrgPermissionModuleKey, PermissionLevel } from "@/types/rbac";
 import type { OrgBranding } from "@/lib/org-branding";
 import { DEFAULT_ORG_BRANDING } from "@/lib/org-branding";
+import type { OrgModules } from "@/lib/org-modules";
+import { DEFAULT_ORG_MODULES } from "@/lib/org-modules";
 
 interface OrgMeResponse {
   organization?: { id: string; name: string; slug: string; plan: string; status: string };
   membership?: { role_slug: string; role_name: string };
   permissions?: OrgPermissionsMap;
   branding?: OrgBranding;
+  modules?: OrgModules;
 }
 
 interface OrgPermissionsContextValue {
@@ -38,6 +41,7 @@ interface OrgPermissionsContextValue {
   canAccessPath: (pathname: string) => boolean;
   flags: ReturnType<typeof buildPermissionFlags>;
   branding: OrgBranding;
+  modules: OrgModules;
   refresh: () => Promise<void>;
 }
 
@@ -56,6 +60,7 @@ export function OrgPermissionsProvider({
   const [roleName, setRoleName] = useState("");
   const [orgName, setOrgName] = useState("");
   const [branding, setBranding] = useState<OrgBranding>(DEFAULT_ORG_BRANDING);
+  const [modules, setModules] = useState<OrgModules>(DEFAULT_ORG_MODULES);
 
   const load = useCallback(async () => {
     if (!enabled) {
@@ -68,6 +73,7 @@ export function OrgPermissionsProvider({
       const json = (await res.json()) as OrgMeResponse;
       if (!res.ok) {
         setPermissions(emptyOrgPermissions());
+        setModules(DEFAULT_ORG_MODULES);
         return;
       }
       setPermissions({ ...emptyOrgPermissions(), ...(json.permissions ?? {}) });
@@ -75,8 +81,10 @@ export function OrgPermissionsProvider({
       setRoleName(json.membership?.role_name ?? "");
       setOrgName(json.organization?.name ?? "");
       setBranding(json.branding ?? DEFAULT_ORG_BRANDING);
+      setModules(json.modules ?? DEFAULT_ORG_MODULES);
     } catch {
       setPermissions(emptyOrgPermissions());
+      setModules(DEFAULT_ORG_MODULES);
     } finally {
       setLoading(false);
     }
@@ -98,9 +106,10 @@ export function OrgPermissionsProvider({
       canAccessPath: (pathname) => canAccessDashboardPath(permissions, pathname),
       flags,
       branding,
+      modules,
       refresh: load,
     };
-  }, [loading, permissions, roleSlug, roleName, orgName, branding, load]);
+  }, [loading, permissions, roleSlug, roleName, orgName, branding, modules, load]);
 
   return (
     <OrgPermissionsContext.Provider value={value}>
@@ -123,6 +132,7 @@ export function useOrgPermissions(): OrgPermissionsContextValue {
       canAccessPath: () => true,
       flags: buildPermissionFlags(permissions),
       branding: DEFAULT_ORG_BRANDING,
+      modules: DEFAULT_ORG_MODULES,
       refresh: async () => {},
     };
   }
