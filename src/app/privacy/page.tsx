@@ -355,11 +355,11 @@ export default function PrivacyPolicyPage() {
 
       <footer className="border-t border-white/[.06] py-8 px-6 text-center text-sm text-gray-500 leading-relaxed">
         <p className="mb-3 space-x-3">
-          <Link href="/privacy" className="text-[#99c9ff] hover:underline">Política de Privacidad</Link>
+          <Link href="/terminos" className="text-[#99c9ff] hover:underline">Terms and Conditions</Link>
           <span>·</span>
-          <Link href="/terminos" className="text-[#99c9ff] hover:underline">Términos de Servicio</Link>
+          <Link href="/reembolsos" className="text-[#99c9ff] hover:underline">Refund Policy</Link>
           <span>·</span>
-          <Link href="/reembolsos" className="text-[#99c9ff] hover:underline">Política de Reembolsos</Link>
+          <Link href="/privacy" className="text-[#99c9ff] hover:underline">Privacy Policy</Link>
         </p>
         <p>© 2026 Noova 360 · BG Soluciones · Bogotá, Colombia</p>
         <p className="mt-2 text-xs text-gray-600 max-w-xl mx-auto">

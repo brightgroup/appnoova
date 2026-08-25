@@ -4,14 +4,14 @@ import Image from "next/image";
 import { getMarketingSiteUrl } from "@/lib/marketing-site-url";
 
 export const metadata: Metadata = {
-  title: "Política de Reembolsos – Noova 360",
+  title: "Refund Policy – Política de Reembolsos – Noova 360",
   description:
-    "Política de reembolsos de Noova 360 (DOMAL SAS). Cómo funcionan los cobros, la prueba gratuita, las cancelaciones y las solicitudes de reembolso.",
+    "Refund Policy / Política de reembolsos de Noova 360 (DOMAL SAS). Cómo funcionan los cobros, la prueba gratuita, las cancelaciones y las solicitudes de reembolso.",
   alternates: {
     canonical: "https://app.noova360.com/reembolsos"
   },
   openGraph: {
-    title: "Política de Reembolsos – Noova 360",
+    title: "Refund Policy – Política de Reembolsos – Noova 360",
     url: "https://app.noova360.com/reembolsos",
     siteName: "Noova 360",
     locale: "es_CO",
@@ -209,7 +209,7 @@ export default function RefundPolicyPage() {
 
       <main className="flex-1 mx-auto w-full max-w-3xl px-6 py-12 sm:py-16">
         <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mb-2">
-          Política de Reembolsos
+          Refund Policy / Política de Reembolsos
         </h1>
         <p className="text-sm text-gray-500 mb-8 pb-8 border-b border-white/[.08]">
           Última actualización: 31 de julio de 2026 · Vigente desde: 31 de julio de 2026
@@ -240,11 +240,11 @@ export default function RefundPolicyPage() {
 
       <footer className="border-t border-white/[.06] py-8 px-6 text-center text-sm text-gray-500 leading-relaxed">
         <p className="mb-3 space-x-3">
-          <Link href="/privacy" className="text-[#99c9ff] hover:underline">Política de Privacidad</Link>
+          <Link href="/terminos" className="text-[#99c9ff] hover:underline">Terms and Conditions</Link>
           <span>·</span>
-          <Link href="/terminos" className="text-[#99c9ff] hover:underline">Términos de Servicio</Link>
+          <Link href="/reembolsos" className="text-[#99c9ff] hover:underline">Refund Policy</Link>
           <span>·</span>
-          <Link href="/reembolsos" className="text-[#99c9ff] hover:underline">Política de Reembolsos</Link>
+          <Link href="/privacy" className="text-[#99c9ff] hover:underline">Privacy Policy</Link>
         </p>
         <p>© 2026 Noova 360 · DOMAL SAS · Bogotá, Colombia</p>
         <p className="mt-2 text-xs text-gray-600 max-w-xl mx-auto">

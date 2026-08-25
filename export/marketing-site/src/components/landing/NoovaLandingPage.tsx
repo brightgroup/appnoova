@@ -681,8 +681,18 @@ function LandingPageContent() {
                   </LeadCaptureButton>
                 </li>
                 <li>
+                  <Link href={appPath("/terminos")} className="hover:text-white transition-colors">
+                    Terms and Conditions
+                  </Link>
+                </li>
+                <li>
+                  <Link href={appPath("/reembolsos")} className="hover:text-white transition-colors">
+                    Refund Policy
+                  </Link>
+                </li>
+                <li>
                   <Link href={appPath("/privacy")} className="hover:text-white transition-colors">
-                    Política de privacidad
+                    Privacy Policy
                   </Link>
                 </li>
               </ul>

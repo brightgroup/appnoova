@@ -5,6 +5,7 @@ import { Monitor } from "lucide-react";
 import { NoovaLogo } from "@/components/brand/NoovaLogo";
 import { DESKTOP_MEDIA_QUERY, DESKTOP_MIN_WIDTH_PX } from "@/lib/desktop-viewport";
 import { getMarketingSiteUrl } from "@/lib/marketing-site-url";
+import { PublicLegalLinks } from "@/components/legal/PublicLegalLinks";
 
 function DesktopOnlyMessage({ neutralBranding }: { neutralBranding?: boolean }) {
   const marketingUrl = getMarketingSiteUrl();
@@ -39,6 +40,9 @@ function DesktopOnlyMessage({ neutralBranding }: { neutralBranding?: boolean }) 
             Volver al sitio
           </a>
         )}
+      </div>
+      <div className="relative z-10 mt-8 text-xs text-[var(--nv-text-faint)]">
+        <PublicLegalLinks className="text-center" />
       </div>
     </div>
   );

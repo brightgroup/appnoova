@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { NoovaLogo } from "@/components/brand/NoovaLogo";
 import { DesktopOnlyGate } from "@/components/layout/DesktopOnlyGate";
 import { getMarketingSiteUrl } from "@/lib/marketing-site-url";
+import { PublicLegalLinks } from "@/components/legal/PublicLegalLinks";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -159,9 +160,10 @@ export default function LoginPage() {
         </p>
       </div>
 
-      <p className="relative z-10 mt-8 text-xs text-[var(--nv-text-faint)]">
-        © 2026 BG Soluciones · Noova 360
-      </p>
+      <div className="relative z-10 mt-8 flex flex-col items-center gap-3 text-xs text-[var(--nv-text-faint)]">
+        <PublicLegalLinks className="text-center" />
+        <p>© 2026 BG Soluciones · Noova 360</p>
+      </div>
     </div>
     </DesktopOnlyGate>
   );

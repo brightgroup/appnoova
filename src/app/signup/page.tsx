@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Lock } from "lucide-react";
 import { getMarketingSiteUrl, marketingPath } from "@/lib/marketing-site-url";
+import { PublicLegalLinks } from "@/components/legal/PublicLegalLinks";
 
 export default function SignupPage() {
   const marketingUrl = getMarketingSiteUrl();
@@ -48,6 +49,10 @@ export default function SignupPage() {
         >
           ¿Ya tiene cuenta? Iniciar sesión
         </Link>
+      </div>
+
+      <div className="mt-8 text-xs text-gray-500">
+        <PublicLegalLinks className="text-center" />
       </div>
     </div>
   );
