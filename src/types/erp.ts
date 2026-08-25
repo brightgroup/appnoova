@@ -44,3 +44,13 @@ export interface InventoryAlertRule {
 export function isLowStock(item: Pick<InventoryItem, "existencia" | "stockMinimo">): boolean {
   return item.stockMinimo !== null && item.existencia <= item.stockMinimo;
 }
+
+/**
+ * "Fecha" (`fecha`, solo día — puede quedar retroactiva si alguien la edita al
+ * registrar) + la hora real en que se registró (`createdAt`, con precisión de
+ * segundos) — para que el kardex quede completo sin perder la fecha elegida.
+ */
+export function formatMovementDateTime(m: Pick<InventoryMovement, "fecha" | "createdAt">): string {
+  const time = new Date(m.createdAt).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+  return `${m.fecha} · ${time}`;
+}

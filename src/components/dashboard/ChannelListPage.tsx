@@ -8,6 +8,8 @@ import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 interface ChannelListPageProps {
   title: string;
   description: string;
+  /** A dónde vuelve la flecha atrás — por defecto /dashboard, como siempre. */
+  backHref?: string;
   loading?: boolean;
   search?: string;
   onSearchChange?: (value: string) => void;
@@ -25,6 +27,7 @@ interface ChannelListPageProps {
 export function ChannelListPage({
   title,
   description,
+  backHref = "/dashboard",
   loading,
   search,
   onSearchChange,
@@ -43,7 +46,7 @@ export function ChannelListPage({
       <div className={registryToolbar}>
         <div className="flex items-center gap-3 min-w-0">
           <Link
-            href="/dashboard"
+            href={backHref}
             className="p-1.5 hover:bg-white/[.06] rounded-lg transition-colors text-gray-400 hover:text-white shrink-0"
           >
             <ChevronLeft className="w-5 h-5" />

@@ -21,7 +21,7 @@ import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { useModuleWriteAccess } from "@/components/layout/DashboardRouteGuard";
 import { InventoryItemModal, type InventoryItemFormValues } from "@/components/erp/InventoryItemModal";
 import { MovementModal, movementTypeLabel, type MovementFormValues } from "@/components/erp/MovementModal";
-import { isLowStock, type InventoryItem, type InventoryMovement } from "@/types/erp";
+import { isLowStock, formatMovementDateTime, type InventoryItem, type InventoryMovement } from "@/types/erp";
 
 function movementIcon(tipo: InventoryMovement["tipo"]) {
   if (tipo === "entrada" || tipo === "saldo_inicial") return <ArrowDownCircle className="w-4 h-4 text-emerald-400" />;
@@ -140,6 +140,7 @@ export default function ErpInventoryItemPage() {
       <ChannelListPage
         title={item.nombre}
         description={`${item.codigo}${item.marca ? ` · ${item.marca}` : ""}`}
+        backHref="/dashboard/erp/inventario"
         loading={false}
         onRefresh={() => load()}
         action={
@@ -193,7 +194,7 @@ export default function ErpInventoryItemPage() {
         {movements.length === 0 ? (
           <div className={registryTableEmpty}>Sin movimientos todavía.</div>
         ) : (
-          <table className={`${registryTable} min-w-[860px]`}>
+          <table className={`${registryTable} min-w-[900px]`}>
             <thead className={registryTableHead}>
               <tr className={registryTableHeadRow}>
                 <th className={registryTableHeadCell}>Fecha</th>
@@ -209,7 +210,7 @@ export default function ErpInventoryItemPage() {
             <tbody>
               {pageRows.map(m => (
                 <tr key={m.id}>
-                  <td className={registryTableCellFirst}>{m.fecha}</td>
+                  <td className={registryTableCellFirst}>{formatMovementDateTime(m)}</td>
                   <td className={registryTableCell}>
                     <span className="inline-flex items-center gap-1.5 text-sm text-gray-300">
                       {movementIcon(m.tipo)} {movementTypeLabel(m.tipo)}

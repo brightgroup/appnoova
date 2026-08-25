@@ -26,7 +26,7 @@ import { ExportMenu } from "@/components/ui/ExportMenu";
 import { useModuleWriteAccess } from "@/components/layout/DashboardRouteGuard";
 import { MovementModal, movementTypeLabel, type MovementFormValues } from "@/components/erp/MovementModal";
 import { ProductPickerModal } from "@/components/erp/ProductPickerModal";
-import type { InventoryItem, InventoryMovement, InventoryMovementType } from "@/types/erp";
+import { formatMovementDateTime, type InventoryItem, type InventoryMovement, type InventoryMovementType } from "@/types/erp";
 
 type Filter = "all" | InventoryMovementType;
 type SortKey = "fecha" | "producto" | "tipo" | "cantidad" | "saldo" | "responsable" | "registrado_por";
@@ -135,7 +135,7 @@ export default function ErpMovimientosPage() {
     (m: InventoryMovement, key: SortKey): string | number | null => {
       const item = itemsById.get(m.itemId);
       switch (key) {
-        case "fecha": return m.fecha;
+        case "fecha": return m.createdAt;
         case "producto": return item?.nombre ?? "";
         case "tipo": return movementTypeLabel(m.tipo);
         case "cantidad": return m.delta;
@@ -156,6 +156,7 @@ export default function ErpMovimientosPage() {
       <ChannelListPage
         title="Movimientos"
         description="Entradas, salidas y ajustes de todo el inventario, más recientes primero."
+        backHref="/dashboard/erp/inventario"
         loading={loading}
         search={search}
         onSearchChange={setSearch}
@@ -177,7 +178,7 @@ export default function ErpMovimientosPage() {
               filename="movimientos-inventario"
               sheetName="Movimientos"
               columns={[
-                { header: "Fecha", value: (m: InventoryMovement) => m.fecha },
+                { header: "Fecha", value: (m: InventoryMovement) => formatMovementDateTime(m) },
                 { header: "Código", value: (m: InventoryMovement) => itemsById.get(m.itemId)?.codigo ?? "" },
                 { header: "Producto", value: (m: InventoryMovement) => itemsById.get(m.itemId)?.nombre ?? "" },
                 { header: "Tipo", value: (m: InventoryMovement) => movementTypeLabel(m.tipo) },
@@ -214,7 +215,7 @@ export default function ErpMovimientosPage() {
         {filtered.length === 0 ? (
           <div className={registryTableEmpty}>No hay movimientos con estos filtros.</div>
         ) : (
-          <table className={`${registryTable} min-w-[1060px]`}>
+          <table className={`${registryTable} min-w-[1100px]`}>
             <thead className={registryTableHead}>
               <tr className={registryTableHeadRow}>
                 <SortableTh label="Fecha" sortKey="fecha" activeKey={sort.key} direction={sort.direction} onSort={toggleSort} />
@@ -236,7 +237,7 @@ export default function ErpMovimientosPage() {
                     className={registryTableRowClickable}
                     onClick={() => item && router.push(`/dashboard/erp/inventario/${item.id}`)}
                   >
-                    <td className={registryTableCellFirst}>{m.fecha}</td>
+                    <td className={registryTableCellFirst}>{formatMovementDateTime(m)}</td>
                     <td className={registryTableCell}>
                       <div className="text-sm text-white">{item?.nombre ?? "—"}</div>
                       <div className="text-xs text-gray-500 font-mono">{item?.codigo ?? m.itemId}</div>
