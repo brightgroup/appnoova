@@ -5,6 +5,7 @@ import { getActiveHubspotConnectionSecrets } from "@/lib/hubspot/connections-db"
 import { getMessage, getThread, listThreadMessages, sendThreadMessage, type HubspotThreadMessage } from "@/lib/hubspot/conversations";
 import { createContact, getContactOwnerId, searchContactByPhone, updateContactOwner } from "@/lib/hubspot/contacts";
 import { resolveOwnerIdFromAssignedActor } from "@/lib/hubspot/owners";
+import { HubspotApiError } from "@/lib/hubspot/client";
 import { runFieldExtraction } from "@/lib/automations/extract";
 import { recordUsageSafe } from "@/lib/billing/meter";
 import { providerForLlmModel } from "@/lib/billing/pricing";
@@ -205,8 +206,22 @@ export async function runHubspotMessageEvent(db: SupabaseClient, params: RunPara
             });
             return;
           }
-          const created = await createContact(db, conn, { phone: contact.phone, fullName: contact.label, placeholderEmailDomain: step.placeholderEmailDomain });
-          contactId = created.id;
+          try {
+            const created = await createContact(db, conn, { phone: contact.phone, fullName: contact.label, placeholderEmailDomain: step.placeholderEmailDomain });
+            contactId = created.id;
+          } catch (createErr) {
+            // La búsqueda de HubSpot puede tardar unos segundos en indexar un contacto recién
+            // creado (consistencia eventual) — si dos mensajes del mismo remitente llegan casi
+            // juntos, el segundo no lo encuentra por búsqueda y el create choca por email
+            // duplicado. HubSpot devuelve el id real del contacto en el mensaje del 409 — se usa
+            // ese en vez de fallar la cadena.
+            const existingId =
+              createErr instanceof HubspotApiError && createErr.status === 409
+                ? createErr.message.match(/Existing ID: (\d+)/)?.[1]
+                : undefined;
+            if (!existingId) throw createErr;
+            contactId = existingId;
+          }
         }
       } catch (err) {
         await logEvent(db, params, {
