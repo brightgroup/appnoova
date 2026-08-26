@@ -115,6 +115,40 @@ function InboxPageInner() {
     return el.scrollHeight - el.scrollTop - el.clientHeight < 96;
   }, []);
 
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressFiredRef = useRef(false);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartRef.current = null;
+  }, []);
+
+  const handleItemTouchStart = useCallback(
+    (e: React.TouchEvent, item: InboxListItem) => {
+      const touch = e.touches[0];
+      longPressStartRef.current = { x: touch.clientX, y: touch.clientY };
+      longPressTimerRef.current = window.setTimeout(() => {
+        longPressFiredRef.current = true;
+        longPressTimerRef.current = null;
+        setContextMenu({ x: touch.clientX, y: touch.clientY, item });
+      }, 500);
+    },
+    []
+  );
+
+  const handleItemTouchMove = useCallback((e: React.TouchEvent) => {
+    const start = longPressStartRef.current;
+    if (!start) return;
+    const touch = e.touches[0];
+    if (Math.abs(touch.clientX - start.x) > 10 || Math.abs(touch.clientY - start.y) > 10) {
+      cancelLongPress();
+    }
+  }, [cancelLongPress]);
+
   const handleMessagesScroll = useCallback(() => {
     stickToBottomRef.current = isNearBottom();
   }, [isNearBottom]);
@@ -612,12 +646,22 @@ function InboxPageInner() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => selectItem(item)}
+                  onClick={() => {
+                    if (longPressFiredRef.current) {
+                      longPressFiredRef.current = false;
+                      return;
+                    }
+                    selectItem(item);
+                  }}
                   onContextMenu={e => {
                     e.preventDefault();
                     setContextMenu({ x: e.clientX, y: e.clientY, item });
                   }}
-                  className={`w-full border-b border-white/[.04] px-5 py-3.5 text-left transition-colors ${
+                  onTouchStart={e => handleItemTouchStart(e, item)}
+                  onTouchMove={handleItemTouchMove}
+                  onTouchEnd={cancelLongPress}
+                  onTouchCancel={cancelLongPress}
+                  className={`w-full select-none border-b border-white/[.04] px-5 py-3.5 text-left transition-colors ${
                     active
                       ? "bg-white/[.08]"
                       : hasUnread
@@ -944,56 +988,72 @@ function InboxPageInner() {
       </section>
 
       {contextMenu &&
-        createPortal(
-          <div
-            className="fixed z-50"
-            style={{
-              top: Math.min(contextMenu.y, window.innerHeight - 300),
-              left: Math.min(contextMenu.x, window.innerWidth - 220)
-            }}
-          >
-            <NoovaListMenu className="min-w-[210px]">
-              <NoovaListMenuItem
-                onClick={() => {
-                  archiveConversation(!contextMenu.item.archived_at, contextMenu.item.id);
-                  setContextMenu(null);
-                }}
-              >
-                <span className="flex items-center gap-2.5">
-                  {contextMenu.item.archived_at ? (
-                    <ArchiveRestore className="h-4 w-4" />
-                  ) : (
-                    <Archive className="h-4 w-4" />
-                  )}
-                  {contextMenu.item.archived_at ? "Desarchivar" : "Archivar"}
-                </span>
-              </NoovaListMenuItem>
-              <div className="my-1 h-px bg-white/[.06]" />
-              <NoovaListMenuItem
-                onClick={() => {
-                  assignConversation("ai", contextMenu.item.id);
-                  setContextMenu(null);
-                }}
-              >
-                <span className="flex items-center gap-2.5">
-                  <Bot className="h-4 w-4 text-[#0f7eff]" />
-                  Asignar a Agente (IA)
-                </span>
-              </NoovaListMenuItem>
-              <NoovaListMenuItem
-                onClick={() => {
-                  assignConversation("me", contextMenu.item.id);
-                  setContextMenu(null);
-                }}
-              >
-                <span className="flex items-center gap-2.5">
-                  <User className="h-4 w-4 text-[#67e8f9]" />
-                  Asignar a mí ({currentUserName})
-                </span>
-              </NoovaListMenuItem>
-              {assignees
-                .filter(a => a.name !== currentUserName)
-                .map(a => (
+        (() => {
+          const otherAssignees = assignees.filter(a => a.name !== currentUserName);
+          const width = 176;
+          const rowHeight = 38;
+          const estimatedHeight =
+            8 /* padding vertical del contenedor */ +
+            rowHeight /* archivar */ +
+            9 /* separador */ +
+            18 /* etiqueta "Asignar a" */ +
+            rowHeight * (2 + otherAssignees.length);
+          const left = Math.max(8, Math.min(contextMenu.x, window.innerWidth - width - 8));
+          const top = Math.max(
+            8,
+            Math.min(contextMenu.y, window.innerHeight - estimatedHeight - 8)
+          );
+
+          return createPortal(
+            <div
+              className="fixed z-50"
+              style={{ top, left, width, maxHeight: window.innerHeight - 16 }}
+            >
+              <NoovaListMenu className="max-h-full overflow-y-auto">
+                <NoovaListMenuItem
+                  onClick={() => {
+                    archiveConversation(!contextMenu.item.archived_at, contextMenu.item.id);
+                    setContextMenu(null);
+                  }}
+                >
+                  <span className="flex items-center gap-2.5">
+                    {contextMenu.item.archived_at ? (
+                      <ArchiveRestore className="h-4 w-4 shrink-0" />
+                    ) : (
+                      <Archive className="h-4 w-4 shrink-0" />
+                    )}
+                    <span className="truncate">
+                      {contextMenu.item.archived_at ? "Desarchivar" : "Archivar"}
+                    </span>
+                  </span>
+                </NoovaListMenuItem>
+                <div className="my-1 h-px bg-white/[.06]" />
+                <div className="px-4 pb-1 text-[10px] font-semibold uppercase tracking-wide text-white/30">
+                  Asignar a
+                </div>
+                <NoovaListMenuItem
+                  onClick={() => {
+                    assignConversation("ai", contextMenu.item.id);
+                    setContextMenu(null);
+                  }}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Bot className="h-4 w-4 shrink-0 text-[#0f7eff]" />
+                    <span className="truncate">Agente (IA)</span>
+                  </span>
+                </NoovaListMenuItem>
+                <NoovaListMenuItem
+                  onClick={() => {
+                    assignConversation("me", contextMenu.item.id);
+                    setContextMenu(null);
+                  }}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <User className="h-4 w-4 shrink-0 text-[#67e8f9]" />
+                    <span className="truncate">Mí ({currentUserName})</span>
+                  </span>
+                </NoovaListMenuItem>
+                {otherAssignees.map(a => (
                   <NoovaListMenuItem
                     key={a.user_id}
                     onClick={() => {
@@ -1002,15 +1062,16 @@ function InboxPageInner() {
                     }}
                   >
                     <span className="flex items-center gap-2.5">
-                      <User className="h-4 w-4 text-white/50" />
-                      Asignar a {a.name}
+                      <User className="h-4 w-4 shrink-0 text-white/50" />
+                      <span className="truncate">{a.name}</span>
                     </span>
                   </NoovaListMenuItem>
                 ))}
-            </NoovaListMenu>
-          </div>,
-          document.body
-        )}
+              </NoovaListMenu>
+            </div>,
+            document.body
+          );
+        })()}
     </div>
   );
 }
