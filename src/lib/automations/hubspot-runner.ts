@@ -38,7 +38,11 @@ async function logEvent(
     errorMessage?: string;
   }
 ): Promise<void> {
-  await db.from("automation_event_log").insert({
+  // supabase-js no lanza excepción ante un error de inserción (constraint, tipo de columna, etc.) —
+  // devuelve `{ error }` en la respuesta. Si no se revisa, un fallo acá queda invisible: el runner
+  // sigue corriendo normal, pero nunca deja rastro en Ejecuciones. Pasó exactamente eso con
+  // conversation_id (ver migración 109) — de ahí este console.error explícito.
+  const { error } = await db.from("automation_event_log").insert({
     organization_id: params.organizationId,
     workflow_id: params.workflowId,
     conversation_id: patch.conversationId ?? null,
@@ -47,6 +51,9 @@ async function logEvent(
     error_message: patch.errorMessage?.slice(0, 500) ?? null,
     request_body: JSON.stringify(patch.requestBody).slice(0, LOGGED_BODY_MAX_CHARS)
   });
+  if (error) {
+    console.error("[hubspot-runner] no se pudo escribir en automation_event_log:", error.message);
+  }
 }
 
 /**
