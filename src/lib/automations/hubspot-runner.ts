@@ -1,10 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getWorkflowById } from "@/lib/automations/workflows-db";
-import { findHubspotGreetingConfig, findMatchingHubspotTriggerNodeIds } from "@/lib/automations/node-types";
+import { walkHubspotChain, findMatchingHubspotTriggerNodeIds, resolveJsonPath } from "@/lib/automations/node-types";
 import { getActiveHubspotConnectionSecrets } from "@/lib/hubspot/connections-db";
-import { getMessage, getThread, listThreadMessages, sendThreadMessage } from "@/lib/hubspot/conversations";
+import { getMessage, getThread, listThreadMessages, sendThreadMessage, type HubspotThreadMessage } from "@/lib/hubspot/conversations";
 import { createContact, searchContactByPhone } from "@/lib/hubspot/contacts";
+import { runFieldExtraction } from "@/lib/automations/extract";
 import { recordUsageSafe } from "@/lib/billing/meter";
+import { providerForLlmModel } from "@/lib/billing/pricing";
 
 const LOGGED_BODY_MAX_CHARS = 8000;
 
@@ -48,13 +50,15 @@ async function logEvent(
 }
 
 /**
- * Corre la cadena completa del saludo automático de HubSpot para un evento
- * `conversation.newMessage` — equivalente en Noova al flujo de n8n que se
- * migra (dedup → traer mensaje → filtrar entrante+bandeja → contacto →
- * ¿primer mensaje? → saludar). Motor paralelo al de WhatsApp
- * (`emitAutomationEvent` en events.ts): mismo estilo (recorrido explícito,
- * no genérico), pero HubSpot no pasa por ahí porque no es un canal de
- * WhatsApp de Noova. Nunca lanza — el llamador (la ruta pública del
+ * Corre la cadena de nodos de HubSpot conectados a un `trigger.hubspot_message`
+ * para un evento `conversation.newMessage` real — equivalente en Noova al
+ * flujo de n8n que se migra, pero como pasos independientes y reutilizables
+ * (`action.ai_extract` → `action.hubspot_upsert_contact` →
+ * `action.hubspot_send_message`, en cualquier orden y cantidad — ver
+ * `walkHubspotChain`) en vez de un único nodo todo-en-uno. Motor paralelo al
+ * de WhatsApp (`emitAutomationEvent` en events.ts): mismo estilo (recorrido
+ * explícito, no genérico), pero HubSpot no pasa por ahí porque no es un
+ * canal de WhatsApp de Noova. Nunca lanza — el llamador (la ruta pública del
  * webhook) debe invocarla con `void ... .catch(...)`, nunca `await` en el
  * camino crítico de la respuesta a HubSpot.
  */
@@ -62,7 +66,7 @@ export async function runHubspotMessageEvent(db: SupabaseClient, params: RunPara
   const threadId = String(params.event.objectId);
 
   // 1. Dedup — HubSpot reintenta webhooks que no respondieron a tiempo; sin esto, un reintento
-  // volvería a saludar. Silencioso a propósito: es ruido esperado, no un evento de negocio.
+  // volvería a reprocesar todo. Silencioso a propósito: es ruido esperado, no un evento de negocio.
   const { error: insertError } = await db
     .from("hubspot_processed_messages")
     .insert({ message_id: params.event.messageId, organization_id: params.organizationId, thread_id: threadId });
@@ -80,7 +84,7 @@ export async function runHubspotMessageEvent(db: SupabaseClient, params: RunPara
   const workflow = await getWorkflowById(db, params.organizationId, params.workflowId);
   if (!workflow) return; // el workflow se borró entre que se registró el token y llegó el evento
 
-  let message;
+  let message: HubspotThreadMessage;
   try {
     message = await getMessage(db, conn, threadId, params.event.messageId);
   } catch (err) {
@@ -93,7 +97,7 @@ export async function runHubspotMessageEvent(db: SupabaseClient, params: RunPara
     return;
   }
 
-  // Solo mensajes del contacto final — un OUTGOING es una respuesta manual del equipo, no dispara saludo.
+  // Solo mensajes del contacto final — un OUTGOING es una respuesta manual del equipo, no dispara nada.
   if (message.direction !== "INCOMING") return;
 
   let thread;
@@ -117,109 +121,162 @@ export async function runHubspotMessageEvent(db: SupabaseClient, params: RunPara
   const contact = { label: message.senders[0]?.name ?? null, phone: message.senders[0]?.deliveryIdentifier?.value ?? "" };
   const baseRequestBody = { event: params.event, contact, conversation_id: threadId, message: { text: message.text } };
 
-  const config = findHubspotGreetingConfig(workflow.graph, params.triggerNodeId);
-  if (!config) {
+  const steps = walkHubspotChain(workflow.graph, params.triggerNodeId);
+  if (steps.length === 0) {
     // Igual se deja el JSON real recibido — así "Escuchar evento de prueba" funciona aunque el
-    // nodo trigger todavía no esté conectado a ningún "Saludo automático HubSpot".
+    // trigger todavía no esté conectado a ningún nodo de acción.
     await logEvent(db, params, { status: "captured", conversationId: threadId, requestBody: baseRequestBody });
     return;
   }
 
-  if (!contact.phone) {
-    await logEvent(db, params, {
-      status: "no_response",
-      conversationId: threadId,
-      requestBody: baseRequestBody,
-      errorMessage: "El mensaje no trae un teléfono de remitente identificable"
-    });
-    return;
+  // Contexto interno que cada paso puede leer/enriquecer — `extracted` lo llena un
+  // `action.ai_extract` conectado en la cadena; `action.hubspot_send_message` con
+  // origen "upstream" lee de acá por dot-path (ver resolveJsonPath).
+  const context: Record<string, unknown> = { event: params.event, message: { text: message.text }, contact, extracted: null };
+
+  // Se calcula perezosamente (memoizado) porque solo hace falta si algún paso pide "solo primer
+  // mensaje" — y no cambia entre pasos dentro de esta misma ejecución (nuestro propio envío,
+  // si lo hay, es OUTGOING, no afecta el conteo de mensajes INCOMING del hilo).
+  let incomingCountCache: number | null = null;
+  async function isFirstIncomingMessage(): Promise<{ isFirst: boolean; count: number }> {
+    if (incomingCountCache === null) {
+      const messages = await listThreadMessages(db, conn!, threadId);
+      incomingCountCache = messages.filter((m) => m.direction === "INCOMING" && m.type === "MESSAGE").length;
+    }
+    return { isFirst: incomingCountCache === 1, count: incomingCountCache };
   }
 
-  let existingContact;
-  try {
-    existingContact = await searchContactByPhone(db, conn, contact.phone);
-    if (!existingContact) {
-      if (!config.createContactIfMissing) {
+  for (const step of steps) {
+    if (step.kind === "ai_extract") {
+      const extraction = await runFieldExtraction(step.fields, message.text ?? "", "text", step.model, undefined, step.generalInstruction);
+      context.extracted = extraction.extracted;
+      if (extraction.error) {
+        console.warn("[hubspot-runner] extracción con IA falló:", JSON.stringify({ workflowId: params.workflowId, error: extraction.error }));
+      }
+      if (extraction.model) {
+        await recordUsageSafe({
+          db,
+          organizationId: params.organizationId,
+          eventType: "automation_extract",
+          channel: "automations",
+          provider: providerForLlmModel(extraction.model),
+          model: extraction.model,
+          gemini: extraction.usage,
+          referenceType: "hubspot_thread",
+          referenceId: threadId,
+          idempotencyKey: `automation_extract_${params.workflowId}_${params.event.messageId}`
+        });
+      }
+      continue;
+    }
+
+    if (step.kind === "upsert_contact") {
+      if (!contact.phone) {
         await logEvent(db, params, {
           status: "no_response",
           conversationId: threadId,
           requestBody: baseRequestBody,
-          errorMessage: "No existe contacto con ese teléfono y la creación automática está desactivada"
+          errorMessage: "El mensaje no trae un teléfono de remitente identificable"
         });
         return;
       }
-      await createContact(db, conn, {
-        phone: contact.phone,
-        fullName: contact.label,
-        placeholderEmailDomain: config.placeholderEmailDomain
-      });
+      try {
+        const existingContact = await searchContactByPhone(db, conn, contact.phone);
+        if (!existingContact) {
+          if (!step.createIfMissing) {
+            await logEvent(db, params, {
+              status: "no_response",
+              conversationId: threadId,
+              requestBody: baseRequestBody,
+              errorMessage: "No existe contacto con ese teléfono y la creación automática está desactivada"
+            });
+            return;
+          }
+          await createContact(db, conn, { phone: contact.phone, fullName: contact.label, placeholderEmailDomain: step.placeholderEmailDomain });
+        }
+      } catch (err) {
+        await logEvent(db, params, {
+          status: "error",
+          conversationId: threadId,
+          requestBody: baseRequestBody,
+          errorMessage: err instanceof Error ? err.message : "Error validando/creando el contacto en HubSpot"
+        });
+        return;
+      }
+      continue;
     }
-  } catch (err) {
-    await logEvent(db, params, {
-      status: "error",
-      conversationId: threadId,
-      requestBody: baseRequestBody,
-      errorMessage: err instanceof Error ? err.message : "Error validando/creando el contacto en HubSpot"
-    });
-    return;
-  }
 
-  if (config.onlyFirstMessage) {
-    let messages;
+    // step.kind === "send_message"
+    if (step.onlyFirstMessage) {
+      let firstCheck: { isFirst: boolean; count: number };
+      try {
+        firstCheck = await isFirstIncomingMessage();
+      } catch (err) {
+        await logEvent(db, params, {
+          status: "error",
+          conversationId: threadId,
+          requestBody: baseRequestBody,
+          errorMessage: err instanceof Error ? err.message : "Error contando los mensajes del hilo"
+        });
+        return;
+      }
+      if (!firstCheck.isFirst) {
+        await logEvent(db, params, {
+          status: "no_response",
+          conversationId: threadId,
+          requestBody: baseRequestBody,
+          errorMessage: `Ya hay conversación previa con este contacto (${firstCheck.count} mensajes entrantes) — se omite el envío`
+        });
+        return;
+      }
+    }
+
+    const text = (step.source === "upstream" ? resolveJsonPath(context, step.textPath) : step.text)?.trim();
+    if (!text) {
+      await logEvent(db, params, {
+        status: "error",
+        conversationId: threadId,
+        requestBody: baseRequestBody,
+        errorMessage:
+          step.source === "upstream"
+            ? `No se encontró texto en '${step.textPath}' del contexto interno`
+            : "El nodo 'Enviar mensaje' no tiene texto configurado"
+      });
+      return;
+    }
+
     try {
-      messages = await listThreadMessages(db, conn, threadId);
+      await sendThreadMessage(db, conn, {
+        threadId,
+        text,
+        senderActorId: step.senderActorId,
+        channelId: message.channelId ?? "",
+        channelAccountId: message.channelAccountId ?? ""
+      });
     } catch (err) {
       await logEvent(db, params, {
         status: "error",
         conversationId: threadId,
         requestBody: baseRequestBody,
-        errorMessage: err instanceof Error ? err.message : "Error contando los mensajes del hilo"
+        errorMessage: err instanceof Error ? err.message : "Error enviando el mensaje en HubSpot"
       });
       return;
     }
-    const incomingCount = messages.filter((m) => m.direction === "INCOMING" && m.type === "MESSAGE").length;
-    if (incomingCount !== 1) {
-      await logEvent(db, params, {
-        status: "no_response",
-        conversationId: threadId,
-        requestBody: baseRequestBody,
-        errorMessage: `Ya hay conversación previa con este contacto (${incomingCount} mensajes entrantes) — se omite el saludo`
-      });
-      return;
-    }
-  }
 
-  try {
-    await sendThreadMessage(db, conn, {
-      threadId,
-      text: config.greetingText,
-      senderActorId: config.senderActorId,
-      channelId: message.channelId ?? "",
-      channelAccountId: message.channelAccountId ?? ""
+    await logEvent(db, params, { status: "sent", conversationId: threadId, requestBody: baseRequestBody });
+
+    // La API de HubSpot no cobra por llamada — se registra el consumo en créditos de Noova con costo
+    // de proveedor en 0, mismo patrón que "automation_extract" en events.ts pero sin componente LLM.
+    await recordUsageSafe({
+      db,
+      organizationId: params.organizationId,
+      eventType: "hubspot_send_message",
+      channel: "automations",
+      provider: "hubspot",
+      providerCostUsdOverride: 0,
+      referenceType: "hubspot_thread",
+      referenceId: threadId,
+      idempotencyKey: `hubspot_send_message_${params.workflowId}_${params.event.messageId}`
     });
-  } catch (err) {
-    await logEvent(db, params, {
-      status: "error",
-      conversationId: threadId,
-      requestBody: baseRequestBody,
-      errorMessage: err instanceof Error ? err.message : "Error enviando el saludo en HubSpot"
-    });
-    return;
   }
-
-  await logEvent(db, params, { status: "sent", conversationId: threadId, requestBody: baseRequestBody });
-
-  // La API de HubSpot no cobra por llamada — se registra el consumo en créditos de Noova con costo
-  // de proveedor en 0, mismo patrón que "automation_extract" en events.ts pero sin componente LLM.
-  await recordUsageSafe({
-    db,
-    organizationId: params.organizationId,
-    eventType: "hubspot_greeting",
-    channel: "automations",
-    provider: "hubspot",
-    providerCostUsdOverride: 0,
-    referenceType: "hubspot_thread",
-    referenceId: threadId,
-    idempotencyKey: `hubspot_greeting_${params.workflowId}_${params.event.messageId}`
-  });
 }

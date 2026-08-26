@@ -16,7 +16,8 @@ export const NODE_TYPES = [
   "action.ai_extract",
   "action.webhook",
   "action.send_whatsapp_message",
-  "action.hubspot_greeting"
+  "action.hubspot_upsert_contact",
+  "action.hubspot_send_message"
 ] as const;
 
 export type WorkflowNodeType = (typeof NODE_TYPES)[number];
@@ -78,16 +79,27 @@ export interface WorkflowNodeData {
   hubspotWebhookToken?: string;
   /** Solo aplica a trigger.hubspot_message: ids de bandejas (inboxId) de HubSpot a escuchar. Vacío/ausente = cualquier bandeja del portal. */
   hubspotInboxIds?: string[];
-  /** Solo aplica a action.hubspot_greeting: texto del saludo a publicar en el hilo. */
-  hubspotGreetingText?: string;
-  /** Solo aplica a action.hubspot_greeting: actor que HubSpot usa para firmar el mensaje en Conversaciones (formato "A-XXXXXX" de una app, o el actor con el que respondes manualmente en ese hilo). */
-  hubspotSenderActorId?: string;
-  /** Solo aplica a action.hubspot_greeting: si es false, saluda en cualquier mensaje entrante que aplique, no solo el primero del hilo. Default true. */
-  hubspotOnlyFirstMessage?: boolean;
-  /** Solo aplica a action.hubspot_greeting: si no existe un contacto con ese teléfono, lo crea antes de saludar. Default true. */
-  hubspotCreateContactIfMissing?: boolean;
-  /** Solo aplica a action.hubspot_greeting con hubspotCreateContactIfMissing activo: dominio para el email placeholder que exige HubSpot cuando no hay email real (ej. "telefono@dominio"). Default "whatsapp.sin-correo.com". */
+  /** Solo aplica a action.hubspot_upsert_contact: si no existe un contacto con ese teléfono, lo crea. Default true — si es false, el nodo solo busca (útil si otra cosa ya debe haber creado el contacto antes). */
+  hubspotCreateIfMissing?: boolean;
+  /** Solo aplica a action.hubspot_upsert_contact con hubspotCreateIfMissing activo: dominio para el email placeholder que exige HubSpot cuando no hay email real (ej. "telefono@dominio"). Default "whatsapp.sin-correo.com". */
   hubspotPlaceholderEmailDomain?: string;
+  /**
+   * Solo aplica a action.hubspot_send_message: de dónde sale el texto a enviar.
+   * "fixed" = el texto escrito en `hubspotMessageText` tal cual. "upstream" = se lee por
+   * dot-path (`hubspotMessageTextPath`) del contexto interno de la ejecución — que incluye
+   * `extracted` si hay un nodo `action.ai_extract` conectado antes en la cadena (ej. una
+   * respuesta redactada por IA), además de `message.text` (el mensaje original del contacto).
+   * Default "fixed".
+   */
+  hubspotMessageSource?: "fixed" | "upstream";
+  /** Solo aplica a action.hubspot_send_message con hubspotMessageSource "fixed": el texto tal cual se publica en el hilo. */
+  hubspotMessageText?: string;
+  /** Solo aplica a action.hubspot_send_message con hubspotMessageSource "upstream": dot-path dentro del contexto interno de la ejecución (ej. "extracted.respuesta"). */
+  hubspotMessageTextPath?: string;
+  /** Solo aplica a action.hubspot_send_message: actor que HubSpot usa para firmar el mensaje en Conversaciones (formato "A-XXXXXX" de una app, o el actor con el que respondes manualmente en ese hilo). */
+  hubspotSenderActorId?: string;
+  /** Solo aplica a action.hubspot_send_message: si es false, envía en cualquier mensaje entrante que aplique, no solo el primero del hilo. Default true. */
+  hubspotOnlyFirstMessage?: boolean;
   [key: string]: unknown;
 }
 
@@ -158,10 +170,16 @@ export const NODE_CATALOG: NodeCatalogEntry[] = [
     description: "Responde en el mismo chat del cliente final"
   },
   {
-    type: "action.hubspot_greeting",
+    type: "action.hubspot_upsert_contact",
     category: "action",
-    label: "Saludo automático HubSpot",
-    description: "Valida/crea el contacto y responde en el hilo — solo en el primer mensaje, si así lo eliges"
+    label: "Crear o actualizar contacto (HubSpot)",
+    description: "Busca el contacto por teléfono y lo crea si no existe — reutilizable en cualquier flujo de HubSpot"
+  },
+  {
+    type: "action.hubspot_send_message",
+    category: "action",
+    label: "Enviar mensaje (HubSpot)",
+    description: "Responde en el mismo hilo — texto fijo o el resultado de un nodo de IA conectado antes"
   }
 ];
 
@@ -455,37 +473,69 @@ export function findSendMessageTargets(graph: WorkflowGraph, triggerNodeId: stri
   return targets;
 }
 
-export interface HubspotGreetingConfig {
-  greetingText: string;
-  senderActorId: string;
-  onlyFirstMessage: boolean;
-  createContactIfMissing: boolean;
-  placeholderEmailDomain: string;
-}
+export type HubspotChainStep =
+  | { kind: "ai_extract"; fields: ExtractFieldDef[]; model: string; generalInstruction?: string }
+  | { kind: "upsert_contact"; createIfMissing: boolean; placeholderEmailDomain: string }
+  | { kind: "send_message"; source: "fixed" | "upstream"; text: string; textPath: string; senderActorId: string; onlyFirstMessage: boolean };
 
 /**
- * Configuración del nodo `action.hubspot_greeting` conectado directo a un
- * `trigger.hubspot_message` — análogo a `findSendMessageTargets`, pero solo
- * espera un destino (una sola acción por disparador tiene sentido para este
- * flujo). `null` si no hay ninguno conectado o le falta el texto del saludo.
+ * Camino lineal desde un `trigger.hubspot_message`, siguiendo una arista de
+ * salida a la vez a través de los tipos de nodo que el motor de HubSpot sabe
+ * ejecutar (`action.ai_extract`, `action.hubspot_upsert_contact`,
+ * `action.hubspot_send_message`, en cualquier orden y cantidad) — el mismo
+ * criterio de "recorrido explícito, no BFS genérico" que el resto del
+ * archivo, pero generalizado a una cadena de largo arbitrario en vez de un
+ * único salto. Se detiene en el primer nodo de otro tipo, sin salida más
+ * adelante, o si un nodo tiene más de una arista saliente (evita ambigüedad
+ * — este motor no ramifica).
  */
-export function findHubspotGreetingConfig(graph: WorkflowGraph, triggerNodeId: string): HubspotGreetingConfig | null {
-  const actionId = graph.edges.find(
-    (e) => e.source === triggerNodeId && graph.nodes.find((n) => n.id === e.target)?.type === "action.hubspot_greeting"
-  )?.target;
-  if (!actionId) return null;
+export function walkHubspotChain(graph: WorkflowGraph, triggerNodeId: string): HubspotChainStep[] {
+  const nodesById = new Map(graph.nodes.map((n) => [n.id, n]));
+  const steps: HubspotChainStep[] = [];
+  const visited = new Set<string>([triggerNodeId]);
+  let currentId = triggerNodeId;
 
-  const action = graph.nodes.find((n) => n.id === actionId);
-  const greetingText = typeof action?.data.hubspotGreetingText === "string" ? action.data.hubspotGreetingText.trim() : "";
-  if (!action || !greetingText) return null;
+  while (true) {
+    const outgoing = graph.edges.filter((e) => e.source === currentId);
+    if (outgoing.length !== 1) break;
+    const next = nodesById.get(outgoing[0].target);
+    if (!next || visited.has(next.id)) break;
+    visited.add(next.id);
 
-  return {
-    greetingText,
-    senderActorId: strOr(action.data.hubspotSenderActorId, "").trim(),
-    onlyFirstMessage: action.data.hubspotOnlyFirstMessage !== false,
-    createContactIfMissing: action.data.hubspotCreateContactIfMissing !== false,
-    placeholderEmailDomain: strOr(action.data.hubspotPlaceholderEmailDomain, "whatsapp.sin-correo.com")
-  };
+    if (next.type === "action.ai_extract") {
+      const fields = readExtractSchema(next.data.extractSchema);
+      if (fields.length > 0) {
+        const generalInstruction = typeof next.data.generalInstruction === "string" ? next.data.generalInstruction.trim() : "";
+        steps.push({
+          kind: "ai_extract",
+          fields,
+          model: strOr(next.data.aiModel, DEFAULT_AI_EXTRACT_MODEL),
+          generalInstruction: generalInstruction || undefined
+        });
+      }
+    } else if (next.type === "action.hubspot_upsert_contact") {
+      steps.push({
+        kind: "upsert_contact",
+        createIfMissing: next.data.hubspotCreateIfMissing !== false,
+        placeholderEmailDomain: strOr(next.data.hubspotPlaceholderEmailDomain, "whatsapp.sin-correo.com")
+      });
+    } else if (next.type === "action.hubspot_send_message") {
+      steps.push({
+        kind: "send_message",
+        source: next.data.hubspotMessageSource === "upstream" ? "upstream" : "fixed",
+        text: typeof next.data.hubspotMessageText === "string" ? next.data.hubspotMessageText.trim() : "",
+        textPath: strOr(next.data.hubspotMessageTextPath, ""),
+        senderActorId: strOr(next.data.hubspotSenderActorId, "").trim(),
+        onlyFirstMessage: next.data.hubspotOnlyFirstMessage !== false
+      });
+    } else {
+      break; // tipo de nodo que este motor no sabe ejecutar — corta la cadena acá
+    }
+
+    currentId = next.id;
+  }
+
+  return steps;
 }
 
 /**

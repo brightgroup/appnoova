@@ -35,8 +35,7 @@ import {
   Radio,
   Undo2,
   Redo2,
-  Bot,
-  MessageCircleHeart
+  Bot
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { supabase } from "@/lib/supabase";
@@ -84,7 +83,8 @@ const NODE_PICKER_ICON: Record<WorkflowNodeType, React.ReactNode> = {
   "action.ai_extract": <Bot className="w-4 h-4 text-white" strokeWidth={1.6} />,
   "action.webhook": <Globe className="w-4 h-4 text-white" strokeWidth={1.6} />,
   "action.send_whatsapp_message": <WhatsAppLogo className="w-4 h-4 text-white" />,
-  "action.hubspot_greeting": <MessageCircleHeart className="w-4 h-4 text-white" strokeWidth={1.6} />
+  "action.hubspot_upsert_contact": <HubSpotLogo className="w-4 h-4 text-white" />,
+  "action.hubspot_send_message": <HubSpotLogo className="w-4 h-4 text-white" />
 };
 
 /** Modelo con el que corre este nodo — nombre explícito del proveedor a propósito: acá el usuario elige a mano, a diferencia del selector "Estándar" neutro de agentes de texto (que oculta el proveedor porque puede haber failover automático por detrás). Sin descripción al lado del nombre a propósito — las limitaciones puntuales (ej. GPT-4o mini y PDF) se avisan como nota aparte, según el disparador conectado, no como texto fijo en la opción. */
@@ -308,9 +308,11 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
           ? { hubspotWebhookToken: crypto.randomUUID().replace(/-/g, "") }
           : type === "action.ai_extract"
             ? { aiModel: DEFAULT_AI_EXTRACT_MODEL }
-            : type === "action.hubspot_greeting"
-              ? { hubspotOnlyFirstMessage: true, hubspotCreateContactIfMissing: true }
-              : {};
+            : type === "action.hubspot_upsert_contact"
+              ? { hubspotCreateIfMissing: true }
+              : type === "action.hubspot_send_message"
+                ? { hubspotMessageSource: "fixed", hubspotOnlyFirstMessage: true }
+                : {};
 
     // Centro de lo que el usuario está viendo ahora mismo en el canvas — no un offset fijo
     // desde el origen del grafo, que quedaba fuera de vista en cuanto alguien paneaba o
@@ -1797,11 +1799,12 @@ function NodeConfigPanel({
           </div>
         )}
 
-        {type === "action.hubspot_greeting" && (
+        {type === "action.hubspot_upsert_contact" && (
           <div>
             <InfoNote example={EXAMPLE_JSON_HUBSPOT_EVENT} exampleLabel="Ver ejemplo de JSON de entrada">
-              Valida o crea el contacto por teléfono y responde en el mismo hilo de HubSpot — pensado para ir después de{" "}
-              <strong className="text-gray-300">Mensaje recibido en HubSpot</strong>.
+              Busca el contacto por teléfono en HubSpot y lo crea si no existe — reutilizable en cualquier flujo,
+              va conectado después de <strong className="text-gray-300">Mensaje recibido en HubSpot</strong> (directo, o
+              después de un nodo de <strong className="text-gray-300">IA</strong>).
             </InfoNote>
             {!hubspotConnected && (
               <p className="text-[11px] text-amber-400/90 mb-3 leading-relaxed">
@@ -1810,52 +1813,96 @@ function NodeConfigPanel({
               </p>
             )}
             <div className="space-y-4">
-              <TextareaField
-                label="Texto del saludo"
-                value={node.data.hubspotGreetingText}
-                onChange={hubspotGreetingText => onSetData({ hubspotGreetingText })}
-                placeholder={"Hola, gracias por escribirnos 👋\n¿En qué te podemos ayudar hoy?"}
-                rows={5}
+              <ToggleField
+                label="Crear contacto si no existe"
+                description="Si no hay un contacto con ese teléfono en HubSpot, lo crea. Si lo apagas, el nodo solo busca — útil si el contacto ya debería existir de antes."
+                checked={node.data.hubspotCreateIfMissing !== false}
+                onChange={hubspotCreateIfMissing => onSetData({ hubspotCreateIfMissing })}
               />
-              <div>
+              {node.data.hubspotCreateIfMissing !== false && (
                 <TextField
-                  label="Actor que envía (senderActorId)"
-                  value={node.data.hubspotSenderActorId}
-                  onChange={hubspotSenderActorId => onSetData({ hubspotSenderActorId })}
-                  placeholder="A-XXXXXX"
+                  label="Dominio del email placeholder"
+                  value={node.data.hubspotPlaceholderEmailDomain}
+                  onChange={hubspotPlaceholderEmailDomain => onSetData({ hubspotPlaceholderEmailDomain })}
+                  placeholder="whatsapp.sin-correo.com"
                 />
-                <p className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
-                  El actor con el que HubSpot firma el mensaje en Conversaciones — normalmente empieza con{" "}
-                  <code>A-</code> (una app). Lo ves en el campo <code>senderActorId</code> de cualquier mensaje que
-                  ya hayas enviado manualmente desde ese hilo.
-                </p>
-              </div>
-
-              <div className="pt-4 border-t border-white/[.08] space-y-4">
-                <ToggleField
-                  label="Solo en el primer mensaje"
-                  description="Si ya hay conversación previa con este contacto en el hilo, no se manda el saludo de nuevo."
-                  checked={node.data.hubspotOnlyFirstMessage !== false}
-                  onChange={hubspotOnlyFirstMessage => onSetData({ hubspotOnlyFirstMessage })}
-                />
-                <ToggleField
-                  label="Crear contacto si no existe"
-                  description="Si no hay un contacto con ese teléfono en HubSpot, lo crea antes de saludar. Si lo apagas, sin contacto existente no se saluda."
-                  checked={node.data.hubspotCreateContactIfMissing !== false}
-                  onChange={hubspotCreateContactIfMissing => onSetData({ hubspotCreateContactIfMissing })}
-                />
-                {node.data.hubspotCreateContactIfMissing !== false && (
-                  <TextField
-                    label="Dominio del email placeholder"
-                    value={node.data.hubspotPlaceholderEmailDomain}
-                    onChange={hubspotPlaceholderEmailDomain => onSetData({ hubspotPlaceholderEmailDomain })}
-                    placeholder="whatsapp.sin-correo.com"
-                  />
-                )}
-              </div>
+              )}
             </div>
           </div>
         )}
+
+        {type === "action.hubspot_send_message" && (() => {
+          const messageSource = node.data.hubspotMessageSource === "upstream" ? "upstream" : "fixed";
+          return (
+            <div>
+              <InfoNote example={EXAMPLE_JSON_HUBSPOT_EVENT} exampleLabel="Ver ejemplo de JSON de entrada">
+                Publica una respuesta en el mismo hilo de HubSpot — texto fijo, o el resultado de un nodo{" "}
+                <strong className="text-gray-300">IA</strong> conectado antes en la cadena.
+              </InfoNote>
+              {!hubspotConnected && (
+                <p className="text-[11px] text-amber-400/90 mb-3 leading-relaxed">
+                  HubSpot no está conectado todavía.{" "}
+                  <Link href="/dashboard/conectores/hubspot" className="underline">Conéctalo aquí</Link>.
+                </p>
+              )}
+              <div className="space-y-4">
+                <SelectField
+                  label="Origen del mensaje"
+                  value={messageSource}
+                  onChange={v => onSetData({ hubspotMessageSource: v as "fixed" | "upstream" })}
+                  options={[
+                    { value: "fixed", label: "Texto fijo" },
+                    { value: "upstream", label: "Resultado de un nodo anterior (IA)" }
+                  ]}
+                />
+                {messageSource === "fixed" ? (
+                  <TextareaField
+                    label="Texto del mensaje"
+                    value={node.data.hubspotMessageText}
+                    onChange={hubspotMessageText => onSetData({ hubspotMessageText })}
+                    placeholder={"Hola, gracias por escribirnos 👋\n¿En qué te podemos ayudar hoy?"}
+                    rows={5}
+                  />
+                ) : (
+                  <div>
+                    <TextField
+                      label="Campo con el texto a enviar"
+                      value={node.data.hubspotMessageTextPath}
+                      onChange={hubspotMessageTextPath => onSetData({ hubspotMessageTextPath })}
+                      placeholder="extracted.respuesta"
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
+                      Dot-path dentro del resultado del nodo <strong className="text-gray-300">IA</strong> conectado
+                      antes — ej. <code>extracted.respuesta</code> si tu esquema de extracción tiene un campo
+                      &quot;respuesta&quot;. También puedes leer <code>message.text</code> (el mensaje original del contacto).
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <TextField
+                    label="Actor que envía (senderActorId)"
+                    value={node.data.hubspotSenderActorId}
+                    onChange={hubspotSenderActorId => onSetData({ hubspotSenderActorId })}
+                    placeholder="A-XXXXXX"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
+                    El actor con el que HubSpot firma el mensaje en Conversaciones — normalmente empieza con{" "}
+                    <code>A-</code> (una app). Lo ves en el campo <code>senderActorId</code> de cualquier mensaje que
+                    ya hayas enviado manualmente desde ese hilo.
+                  </p>
+                </div>
+                <div className="pt-4 border-t border-white/[.08]">
+                  <ToggleField
+                    label="Solo en el primer mensaje"
+                    description="Si ya hay conversación previa con este contacto en el hilo, no se envía de nuevo."
+                    checked={node.data.hubspotOnlyFirstMessage !== false}
+                    onChange={hubspotOnlyFirstMessage => onSetData({ hubspotOnlyFirstMessage })}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {type === "action.send_whatsapp_message" && (() => {
           const messageType = node.data.messageType === "template" || node.data.messageType === "media" ? node.data.messageType : "text";

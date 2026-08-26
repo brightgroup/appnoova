@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Zap, Webhook, Globe, Copy, Check, Bot, MessageCircleHeart } from "lucide-react";
+import { Zap, Webhook, Globe, Copy, Check, Bot } from "lucide-react";
 import { WhatsAppLogo } from "@/components/icons/brands/WhatsAppLogo";
 import { HubSpotLogo } from "@/components/icons/brands/HubSpotLogo";
 import type { AutomationConnectionRecord } from "@/lib/automations/connections-db";
@@ -28,7 +28,8 @@ export const NODE_BRAND_COLOR: Record<string, string> = {
   "action.ai_extract": "#8B5CF6",
   "action.webhook": "#0EA5E9",
   "action.send_whatsapp_message": "#25D366",
-  "action.hubspot_greeting": "#FF7A59"
+  "action.hubspot_upsert_contact": "#FF7A59",
+  "action.hubspot_send_message": "#FF7A59"
 };
 
 /** Nombre "de fábrica" de cada tipo de nodo — lo que se ve cuando no hay canal/conexión elegido ni nombre propio. */
@@ -39,7 +40,8 @@ export const NODE_TITLE: Record<WorkflowNodeType, string> = {
   "action.ai_extract": "IA",
   "action.webhook": "HTTP Request",
   "action.send_whatsapp_message": "Enviar mensaje de WhatsApp",
-  "action.hubspot_greeting": "Saludo automático HubSpot"
+  "action.hubspot_upsert_contact": "Crear o actualizar contacto (HubSpot)",
+  "action.hubspot_send_message": "Enviar mensaje (HubSpot)"
 };
 
 const MEDIA_FILTER_LABEL: Record<string, string> = {
@@ -195,12 +197,24 @@ export function SendWhatsAppMessageNode({ selected, data }: NodeProps) {
   );
 }
 
-export function HubspotGreetingNode({ selected, data }: NodeProps) {
-  const label = resolveNodeLabel("action.hubspot_greeting", (data as WorkflowNodeData) ?? {}, [], []);
+/** Nodos HubSpot intermedios: mantienen el logo de marca (igual que el trigger), no un ícono genérico — así se identifican de un vistazo como parte de la misma familia. */
+export function HubspotUpsertContactNode({ selected, data }: NodeProps) {
+  const label = resolveNodeLabel("action.hubspot_upsert_contact", (data as WorkflowNodeData) ?? {}, [], []);
   return (
-    <NodeShell selected={selected} label={label} color={NODE_BRAND_COLOR["action.hubspot_greeting"]}>
+    <NodeShell selected={selected} label={label} color={NODE_BRAND_COLOR["action.hubspot_upsert_contact"]}>
       <Handle type="target" position={Position.Left} className="!bg-white !w-2.5 !h-2.5 !border-2 !border-[#111218]" />
-      <MessageCircleHeart className="w-10 h-10 text-white" strokeWidth={1.6} />
+      <HubSpotLogo className="w-10 h-10 text-white" />
+      <Handle type="source" position={Position.Right} className="!bg-white !w-2.5 !h-2.5 !border-2 !border-[#111218]" />
+    </NodeShell>
+  );
+}
+
+export function HubspotSendMessageNode({ selected, data }: NodeProps) {
+  const label = resolveNodeLabel("action.hubspot_send_message", (data as WorkflowNodeData) ?? {}, [], []);
+  return (
+    <NodeShell selected={selected} label={label} color={NODE_BRAND_COLOR["action.hubspot_send_message"]}>
+      <Handle type="target" position={Position.Left} className="!bg-white !w-2.5 !h-2.5 !border-2 !border-[#111218]" />
+      <HubSpotLogo className="w-10 h-10 text-white" />
       <Handle type="source" position={Position.Right} className="!bg-white !w-2.5 !h-2.5 !border-2 !border-[#111218]" />
     </NodeShell>
   );
@@ -210,7 +224,8 @@ export const WORKFLOW_NODE_TYPES = {
   "trigger.whatsapp_message": WhatsAppTriggerNode,
   "trigger.webhook": WebhookTriggerNode,
   "trigger.hubspot_message": HubspotTriggerNode,
-  "action.hubspot_greeting": HubspotGreetingNode,
+  "action.hubspot_upsert_contact": HubspotUpsertContactNode,
+  "action.hubspot_send_message": HubspotSendMessageNode,
   "action.ai_extract": AiExtractNode,
   "action.webhook": WebhookActionNode,
   "action.send_whatsapp_message": SendWhatsAppMessageNode
