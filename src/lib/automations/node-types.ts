@@ -17,6 +17,7 @@ export const NODE_TYPES = [
   "action.webhook",
   "action.send_whatsapp_message",
   "action.hubspot_upsert_contact",
+  "action.hubspot_assign_owner",
   "action.hubspot_send_message"
 ] as const;
 
@@ -83,6 +84,14 @@ export interface WorkflowNodeData {
   hubspotCreateIfMissing?: boolean;
   /** Solo aplica a action.hubspot_upsert_contact con hubspotCreateIfMissing activo: dominio para el email placeholder que exige HubSpot cuando no hay email real (ej. "telefono@dominio"). Default "whatsapp.sin-correo.com". */
   hubspotPlaceholderEmailDomain?: string;
+  /**
+   * Solo aplica a action.hubspot_assign_owner: "always" copia siempre el propietario de la
+   * conversación (el agente de HubSpot asignado al hilo) al contacto, sobreescribiendo lo que
+   * tuviera. "only_if_empty" solo lo asigna si el contacto todavía no tiene propietario — no
+   * reasigna una relación comercial ya existente solo porque otro agente contestó este hilo.
+   * Default "always" (mismo comportamiento que el flujo de n8n que se migra).
+   */
+  hubspotOwnerAssignMode?: "always" | "only_if_empty";
   /**
    * Solo aplica a action.hubspot_send_message: de dónde sale el texto a enviar.
    * "fixed" = el texto escrito en `hubspotMessageText` tal cual. "upstream" = se lee por
@@ -174,6 +183,12 @@ export const NODE_CATALOG: NodeCatalogEntry[] = [
     category: "action",
     label: "Crear o actualizar contacto (HubSpot)",
     description: "Busca el contacto por teléfono y lo crea si no existe — reutilizable en cualquier flujo de HubSpot"
+  },
+  {
+    type: "action.hubspot_assign_owner",
+    category: "action",
+    label: "Asignar propietario (HubSpot)",
+    description: "Copia el agente asignado a la conversación como propietario del contacto"
   },
   {
     type: "action.hubspot_send_message",
@@ -476,6 +491,7 @@ export function findSendMessageTargets(graph: WorkflowGraph, triggerNodeId: stri
 export type HubspotChainStep =
   | { kind: "ai_extract"; fields: ExtractFieldDef[]; model: string; generalInstruction?: string }
   | { kind: "upsert_contact"; createIfMissing: boolean; placeholderEmailDomain: string }
+  | { kind: "assign_owner"; onlyIfEmpty: boolean }
   | { kind: "send_message"; source: "fixed" | "upstream"; text: string; textPath: string; senderActorId: string; onlyFirstMessage: boolean };
 
 /**
@@ -518,6 +534,11 @@ export function walkHubspotChain(graph: WorkflowGraph, triggerNodeId: string): H
         kind: "upsert_contact",
         createIfMissing: next.data.hubspotCreateIfMissing !== false,
         placeholderEmailDomain: strOr(next.data.hubspotPlaceholderEmailDomain, "whatsapp.sin-correo.com")
+      });
+    } else if (next.type === "action.hubspot_assign_owner") {
+      steps.push({
+        kind: "assign_owner",
+        onlyIfEmpty: next.data.hubspotOwnerAssignMode === "only_if_empty"
       });
     } else if (next.type === "action.hubspot_send_message") {
       steps.push({

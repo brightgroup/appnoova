@@ -29,6 +29,7 @@ export const NODE_BRAND_COLOR: Record<string, string> = {
   "action.webhook": "#0EA5E9",
   "action.send_whatsapp_message": "#25D366",
   "action.hubspot_upsert_contact": "#FF7A59",
+  "action.hubspot_assign_owner": "#FF7A59",
   "action.hubspot_send_message": "#FF7A59"
 };
 
@@ -41,6 +42,7 @@ export const NODE_TITLE: Record<WorkflowNodeType, string> = {
   "action.webhook": "HTTP Request",
   "action.send_whatsapp_message": "Enviar mensaje de WhatsApp",
   "action.hubspot_upsert_contact": "Crear o actualizar contacto (HubSpot)",
+  "action.hubspot_assign_owner": "Asignar propietario (HubSpot)",
   "action.hubspot_send_message": "Enviar mensaje (HubSpot)"
 };
 
@@ -209,6 +211,17 @@ export function HubspotUpsertContactNode({ selected, data }: NodeProps) {
   );
 }
 
+export function HubspotAssignOwnerNode({ selected, data }: NodeProps) {
+  const label = resolveNodeLabel("action.hubspot_assign_owner", (data as WorkflowNodeData) ?? {}, [], []);
+  return (
+    <NodeShell selected={selected} label={label} color={NODE_BRAND_COLOR["action.hubspot_assign_owner"]}>
+      <Handle type="target" position={Position.Left} className="!bg-white !w-2.5 !h-2.5 !border-2 !border-[#111218]" />
+      <HubSpotLogo className="w-10 h-10 text-white" />
+      <Handle type="source" position={Position.Right} className="!bg-white !w-2.5 !h-2.5 !border-2 !border-[#111218]" />
+    </NodeShell>
+  );
+}
+
 export function HubspotSendMessageNode({ selected, data }: NodeProps) {
   const label = resolveNodeLabel("action.hubspot_send_message", (data as WorkflowNodeData) ?? {}, [], []);
   return (
@@ -225,6 +238,7 @@ export const WORKFLOW_NODE_TYPES = {
   "trigger.webhook": WebhookTriggerNode,
   "trigger.hubspot_message": HubspotTriggerNode,
   "action.hubspot_upsert_contact": HubspotUpsertContactNode,
+  "action.hubspot_assign_owner": HubspotAssignOwnerNode,
   "action.hubspot_send_message": HubspotSendMessageNode,
   "action.ai_extract": AiExtractNode,
   "action.webhook": WebhookActionNode,

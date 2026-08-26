@@ -84,6 +84,7 @@ const NODE_PICKER_ICON: Record<WorkflowNodeType, React.ReactNode> = {
   "action.webhook": <Globe className="w-4 h-4 text-white" strokeWidth={1.6} />,
   "action.send_whatsapp_message": <WhatsAppLogo className="w-4 h-4 text-white" />,
   "action.hubspot_upsert_contact": <HubSpotLogo className="w-4 h-4 text-white" />,
+  "action.hubspot_assign_owner": <HubSpotLogo className="w-4 h-4 text-white" />,
   "action.hubspot_send_message": <HubSpotLogo className="w-4 h-4 text-white" />
 };
 
@@ -1828,6 +1829,32 @@ function NodeConfigPanel({
                 />
               )}
             </div>
+          </div>
+        )}
+
+        {type === "action.hubspot_assign_owner" && (
+          <div>
+            <InfoNote example={EXAMPLE_JSON_HUBSPOT_EVENT} exampleLabel="Ver ejemplo de JSON de entrada">
+              Copia el agente de HubSpot asignado a la conversación como propietario del contacto — va conectado
+              después de <strong className="text-gray-300">Crear o actualizar contacto</strong> (necesita el id del
+              contacto que ese nodo resuelve).
+            </InfoNote>
+            {!hubspotConnected && (
+              <p className="text-[11px] text-amber-400/90 mb-3 leading-relaxed">
+                HubSpot no está conectado todavía.{" "}
+                <Link href="/dashboard/conectores/hubspot" className="underline">Conéctalo aquí</Link>.
+              </p>
+            )}
+            <ToggleField
+              label="Solo si el contacto no tiene propietario"
+              description="Si lo activas, no reasigna un contacto que ya tiene propietario — solo lo asigna la primera vez. Si lo dejas apagado, siempre lo actualiza al agente de esta conversación."
+              checked={node.data.hubspotOwnerAssignMode === "only_if_empty"}
+              onChange={checked => onSetData({ hubspotOwnerAssignMode: checked ? "only_if_empty" : "always" })}
+            />
+            <p className="text-[11px] text-gray-500 mt-3 leading-relaxed">
+              Si la conversación no tiene ningún agente asignado en HubSpot, este nodo no hace nada — no borra ni
+              cambia el propietario existente.
+            </p>
           </div>
         )}
 

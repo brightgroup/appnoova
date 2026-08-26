@@ -59,3 +59,17 @@ export async function createContact(
     })
   });
 }
+
+/** Trae el `hubspot_owner_id` actual del contacto — usado por action.hubspot_assign_owner cuando el modo es "solo si no tiene propietario". */
+export async function getContactOwnerId(db: SupabaseClient, conn: HubspotConnectionSecrets, contactId: string): Promise<string | null> {
+  const contact = await hubspotFetchJson<HubspotContact>(db, conn, `/crm/v3/objects/contacts/${contactId}?properties=hubspot_owner_id`);
+  return contact.properties.hubspot_owner_id || null;
+}
+
+/** Asigna el propietario del contacto — equivale a "actualiza propietario de contacto" en n8n. */
+export async function updateContactOwner(db: SupabaseClient, conn: HubspotConnectionSecrets, contactId: string, ownerId: string): Promise<void> {
+  await hubspotFetchJson(db, conn, `/crm/v3/objects/contacts/${contactId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ properties: { hubspot_owner_id: ownerId } })
+  });
+}

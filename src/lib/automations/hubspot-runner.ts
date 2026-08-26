@@ -3,7 +3,8 @@ import { getWorkflowById } from "@/lib/automations/workflows-db";
 import { walkHubspotChain, findMatchingHubspotTriggerNodeIds, resolveJsonPath } from "@/lib/automations/node-types";
 import { getActiveHubspotConnectionSecrets } from "@/lib/hubspot/connections-db";
 import { getMessage, getThread, listThreadMessages, sendThreadMessage, type HubspotThreadMessage } from "@/lib/hubspot/conversations";
-import { createContact, searchContactByPhone } from "@/lib/hubspot/contacts";
+import { createContact, getContactOwnerId, searchContactByPhone, updateContactOwner } from "@/lib/hubspot/contacts";
+import { resolveOwnerIdFromAssignedActor } from "@/lib/hubspot/owners";
 import { runFieldExtraction } from "@/lib/automations/extract";
 import { recordUsageSafe } from "@/lib/billing/meter";
 import { providerForLlmModel } from "@/lib/billing/pricing";
@@ -144,6 +145,9 @@ export async function runHubspotMessageEvent(db: SupabaseClient, params: RunPara
   // Se calcula perezosamente (memoizado) porque solo hace falta si algún paso pide "solo primer
   // mensaje" — y no cambia entre pasos dentro de esta misma ejecución (nuestro propio envío,
   // si lo hay, es OUTGOING, no afecta el conteo de mensajes INCOMING del hilo).
+  // Id del contacto resuelto por un action.hubspot_upsert_contact anterior en la cadena —
+  // action.hubspot_assign_owner lo necesita para saber a qué contacto asignarle el propietario.
+  let contactId: string | null = null;
   let incomingCountCache: number | null = null;
   async function isFirstIncomingMessage(): Promise<{ isFirst: boolean; count: number }> {
     if (incomingCountCache === null) {
@@ -189,7 +193,9 @@ export async function runHubspotMessageEvent(db: SupabaseClient, params: RunPara
       }
       try {
         const existingContact = await searchContactByPhone(db, conn, contact.phone);
-        if (!existingContact) {
+        if (existingContact) {
+          contactId = existingContact.id;
+        } else {
           if (!step.createIfMissing) {
             await logEvent(db, params, {
               status: "no_response",
@@ -199,7 +205,8 @@ export async function runHubspotMessageEvent(db: SupabaseClient, params: RunPara
             });
             return;
           }
-          await createContact(db, conn, { phone: contact.phone, fullName: contact.label, placeholderEmailDomain: step.placeholderEmailDomain });
+          const created = await createContact(db, conn, { phone: contact.phone, fullName: contact.label, placeholderEmailDomain: step.placeholderEmailDomain });
+          contactId = created.id;
         }
       } catch (err) {
         await logEvent(db, params, {
@@ -207,6 +214,41 @@ export async function runHubspotMessageEvent(db: SupabaseClient, params: RunPara
           conversationId: threadId,
           requestBody: baseRequestBody,
           errorMessage: err instanceof Error ? err.message : "Error validando/creando el contacto en HubSpot"
+        });
+        return;
+      }
+      continue;
+    }
+
+    if (step.kind === "assign_owner") {
+      if (!contactId) {
+        await logEvent(db, params, {
+          status: "error",
+          conversationId: threadId,
+          requestBody: baseRequestBody,
+          errorMessage: "'Asignar propietario' necesita ir conectado después de 'Crear o actualizar contacto'"
+        });
+        return;
+      }
+      // Sin agente asignado a la conversación: no es un error, simplemente no hay nada que copiar.
+      if (!thread.assignedTo) continue;
+
+      try {
+        const ownerId = await resolveOwnerIdFromAssignedActor(db, conn, thread.assignedTo);
+        if (!ownerId) continue; // el actor asignado no corresponde a un owner de CRM (ej. un bot)
+
+        if (step.onlyIfEmpty) {
+          const currentOwnerId = await getContactOwnerId(db, conn, contactId);
+          if (currentOwnerId) continue;
+        }
+
+        await updateContactOwner(db, conn, contactId, ownerId);
+      } catch (err) {
+        await logEvent(db, params, {
+          status: "error",
+          conversationId: threadId,
+          requestBody: baseRequestBody,
+          errorMessage: err instanceof Error ? err.message : "Error asignando el propietario del contacto"
         });
         return;
       }
