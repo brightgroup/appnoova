@@ -35,7 +35,8 @@ import {
   Radio,
   Undo2,
   Redo2,
-  Bot
+  Bot,
+  MessageCircleHeart
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { supabase } from "@/lib/supabase";
@@ -45,15 +46,18 @@ import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import {
   ConnectionsContext,
   ChannelsContext,
+  HubspotInboxesContext,
   NODE_BRAND_COLOR,
   NODE_TITLE,
   WORKFLOW_NODE_TYPES,
   resolveNodeLabel,
-  CopyButton
+  CopyButton,
+  type HubspotInboxOption
 } from "@/components/automations/workflow-nodes";
 import { DeleteWorkflowModal } from "@/components/automations/DeleteWorkflowModal";
 import { ExecutionsTable, groupEventsByExecution, prettyPrint, type AutomationEventRow } from "@/components/automations/AutomationEventsTable";
 import { WhatsAppLogo } from "@/components/icons/brands/WhatsAppLogo";
+import { HubSpotLogo } from "@/components/icons/brands/HubSpotLogo";
 import { llmModelIcon } from "@/lib/llm/provider-icon";
 import { NODE_CATALOG, type WorkflowNodeType, type WorkflowNodeData } from "@/lib/automations/node-types";
 import {
@@ -76,9 +80,11 @@ const TABS: { id: Tab; label: string }[] = [
 const NODE_PICKER_ICON: Record<WorkflowNodeType, React.ReactNode> = {
   "trigger.whatsapp_message": <WhatsAppLogo className="w-4 h-4 text-white" />,
   "trigger.webhook": <Webhook className="w-4 h-4 text-white" strokeWidth={1.8} />,
+  "trigger.hubspot_message": <HubSpotLogo className="w-4 h-4 text-white" />,
   "action.ai_extract": <Bot className="w-4 h-4 text-white" strokeWidth={1.6} />,
   "action.webhook": <Globe className="w-4 h-4 text-white" strokeWidth={1.6} />,
-  "action.send_whatsapp_message": <WhatsAppLogo className="w-4 h-4 text-white" />
+  "action.send_whatsapp_message": <WhatsAppLogo className="w-4 h-4 text-white" />,
+  "action.hubspot_greeting": <MessageCircleHeart className="w-4 h-4 text-white" strokeWidth={1.6} />
 };
 
 /** Modelo con el que corre este nodo — nombre explícito del proveedor a propósito: acá el usuario elige a mano, a diferencia del selector "Estándar" neutro de agentes de texto (que oculta el proveedor porque puede haber failover automático por detrás). Sin descripción al lado del nombre a propósito — las limitaciones puntuales (ej. GPT-4o mini y PDF) se avisan como nota aparte, según el disparador conectado, no como texto fijo en la opción. */
@@ -90,7 +96,7 @@ const AI_EXTRACT_MODEL_OPTIONS: { value: string; label: string }[] = [
 ];
 const DEFAULT_AI_EXTRACT_MODEL = "gemini-2.5-flash";
 
-const TRIGGER_TYPES: WorkflowNodeType[] = ["trigger.whatsapp_message", "trigger.webhook"];
+const TRIGGER_TYPES: WorkflowNodeType[] = ["trigger.whatsapp_message", "trigger.webhook", "trigger.hubspot_message"];
 
 interface WhatsAppTemplateOption {
   id: string;
@@ -107,6 +113,8 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
   const [connections, setConnections] = useState<AutomationConnectionRecord[]>([]);
   const [channels, setChannels] = useState<WhatsAppChannelRecord[]>([]);
   const [templates, setTemplates] = useState<WhatsAppTemplateOption[]>([]);
+  const [hubspotInboxes, setHubspotInboxes] = useState<HubspotInboxOption[]>([]);
+  const [hubspotConnected, setHubspotConnected] = useState(false);
   const [events, setEvents] = useState<AutomationEventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -198,12 +206,14 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const [wfRes, connRes, evRes, chRes, tplRes] = await Promise.all([
+    const [wfRes, connRes, evRes, chRes, tplRes, hsStatusRes, hsInboxRes] = await Promise.all([
       authFetch(`/api/automations/workflows/${workflowId}`),
       authFetch("/api/automations/connections"),
       authFetch(`/api/automations/workflows/${workflowId}/events`),
       authFetch("/api/whatsapp/channels"),
-      authFetch("/api/automations/templates")
+      authFetch("/api/automations/templates"),
+      authFetch("/api/conectores/hubspot/status"),
+      authFetch("/api/conectores/hubspot/inboxes")
     ]);
     const wfJson = await wfRes.json();
     if (!wfRes.ok) {
@@ -222,6 +232,8 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
     if (evRes.ok) setEvents((await evRes.json()).events ?? []);
     if (chRes.ok) setChannels((await chRes.json()).channels ?? []);
     if (tplRes.ok) setTemplates((await tplRes.json()).templates ?? []);
+    if (hsStatusRes.ok) setHubspotConnected((await hsStatusRes.json()).connection?.status === "active");
+    if (hsInboxRes.ok) setHubspotInboxes((await hsInboxRes.json()).inboxes ?? []);
     setLoading(false);
   }, [workflowId, setNodes, setEdges]);
 
@@ -292,9 +304,13 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
     const data: WorkflowNodeData =
       type === "trigger.webhook"
         ? { webhookToken: crypto.randomUUID().replace(/-/g, "") }
-        : type === "action.ai_extract"
-          ? { aiModel: DEFAULT_AI_EXTRACT_MODEL }
-          : {};
+        : type === "trigger.hubspot_message"
+          ? { hubspotWebhookToken: crypto.randomUUID().replace(/-/g, "") }
+          : type === "action.ai_extract"
+            ? { aiModel: DEFAULT_AI_EXTRACT_MODEL }
+            : type === "action.hubspot_greeting"
+              ? { hubspotOnlyFirstMessage: true, hubspotCreateContactIfMissing: true }
+              : {};
 
     // Centro de lo que el usuario está viendo ahora mismo en el canvas — no un offset fijo
     // desde el origen del grafo, que quedaba fuera de vista en cuanto alguien paneaba o
@@ -517,6 +533,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
         <div ref={paneRef} className="flex-1 min-h-0 relative overflow-hidden">
           <ConnectionsContext.Provider value={connections}>
           <ChannelsContext.Provider value={channels}>
+          <HubspotInboxesContext.Provider value={hubspotInboxes}>
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -537,6 +554,7 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
               <Background variant={BackgroundVariant.Dots} gap={20} size={1.3} color="rgba(255,255,255,.09)" />
               <Controls showInteractive={false} className="!shadow-none [&>button]:!bg-[#16171e] [&>button]:!border-white/[.12] [&>button]:!text-gray-300" />
             </ReactFlow>
+          </HubspotInboxesContext.Provider>
           </ChannelsContext.Provider>
           </ConnectionsContext.Provider>
 
@@ -637,6 +655,8 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
                 connections={connections}
                 channels={channels}
                 templates={templates}
+                hubspotInboxes={hubspotInboxes}
+                hubspotConnected={hubspotConnected}
                 workflowId={workflowId}
                 events={events}
                 onSetData={patch => setNodeData(configNode.id, patch)}
@@ -673,6 +693,10 @@ function whatsappEventMatches(e: AutomationEventRow, mediaFilter: "image" | "doc
 
 function webhookEventMatches(e: AutomationEventRow): boolean {
   return e.event_type === "webhook.received" || e.event_type === "automation.callback";
+}
+
+function hubspotEventMatches(e: AutomationEventRow): boolean {
+  return e.event_type === "hubspot.conversation_new_message";
 }
 
 /**
@@ -831,6 +855,17 @@ const EXAMPLE_JSON_TEXT_EVENT = JSON.stringify(
     conversation_id: "5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02",
     contact: { phone: "+573001234567", label: "Juan Pérez" },
     message: { text: "¿Tienen disponible la talla M?" }
+  },
+  null,
+  2
+);
+
+const EXAMPLE_JSON_HUBSPOT_EVENT = JSON.stringify(
+  {
+    event: { subscriptionType: "conversation.newMessage", objectId: 10896772776, messageId: "139dbe7b71d62d26ce67c1d9fc3a6d1c" },
+    contact: { phone: "+573001234567", label: "Juan Pérez" },
+    conversation_id: "10896772776",
+    message: { text: "Hola, quiero información" }
   },
   null,
   2
@@ -1016,6 +1051,95 @@ function JsonPathField({
         placeholder={placeholder}
         className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white placeholder:text-gray-600"
       />
+    </div>
+  );
+}
+
+/** Campo de texto simple de una línea — mismo look que JsonPathField, sin implicar que el valor sea un dot-path. */
+function TextField({
+  label,
+  value,
+  onChange,
+  placeholder
+}: {
+  label: string;
+  value: string | undefined;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-400 mb-1.5">{label}</label>
+      <input
+        type="text"
+        value={value ?? ""}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-sm text-white placeholder:text-gray-600"
+      />
+    </div>
+  );
+}
+
+/** Textarea de texto plano (no JSON/monoespaciado) — para mensajes que el nodo envía tal cual, como el saludo de HubSpot. */
+function TextareaField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  rows = 5
+}: {
+  label: string;
+  value: string | undefined;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  rows?: number;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-400 mb-1.5">{label}</label>
+      <textarea
+        value={value ?? ""}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className="w-full rounded-lg border border-white/[.12] bg-white/[.04] px-3 py-2 text-xs text-white placeholder:text-gray-600 resize-y leading-relaxed"
+      />
+    </div>
+  );
+}
+
+/** Selector múltiple por checkboxes — usado por el disparador de HubSpot para elegir a qué bandejas (inboxId) escuchar. Vacío = cualquier bandeja. */
+function InboxMultiSelectField({
+  options,
+  value,
+  onChange
+}: {
+  options: HubspotInboxOption[];
+  value: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  function toggle(id: string) {
+    onChange(value.includes(id) ? value.filter(v => v !== id) : [...value, id]);
+  }
+
+  if (options.length === 0) {
+    return <p className="text-[11px] text-gray-500">No se encontraron bandejas — verifica la conexión de HubSpot.</p>;
+  }
+
+  return (
+    <div className="rounded-lg border border-white/[.12] bg-white/[.04] max-h-48 overflow-y-auto divide-y divide-white/[.06]">
+      {options.map(inbox => (
+        <label key={inbox.id} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-white/[.04]">
+          <input
+            type="checkbox"
+            checked={value.includes(inbox.id)}
+            onChange={() => toggle(inbox.id)}
+            className="accent-[#0f7eff] w-3.5 h-3.5 shrink-0"
+          />
+          <span className="text-xs text-gray-200 truncate">{inbox.name}</span>
+        </label>
+      ))}
     </div>
   );
 }
@@ -1314,6 +1438,8 @@ function NodeConfigPanel({
   connections,
   channels,
   templates,
+  hubspotInboxes,
+  hubspotConnected,
   workflowId,
   events,
   onClose,
@@ -1325,6 +1451,8 @@ function NodeConfigPanel({
   connections: AutomationConnectionRecord[];
   channels: WhatsAppChannelRecord[];
   templates: WhatsAppTemplateOption[];
+  hubspotInboxes: HubspotInboxOption[];
+  hubspotConnected: boolean;
   workflowId: string;
   events: AutomationEventRow[];
   onClose: () => void;
@@ -1334,8 +1462,9 @@ function NodeConfigPanel({
   const color = NODE_BRAND_COLOR[type];
   const isTrigger = TRIGGER_TYPES.includes(type);
   const webhookBaseUrl = typeof window !== "undefined" ? `${window.location.origin}/api/automations/inbound` : "";
+  const hubspotWebhookBaseUrl = typeof window !== "undefined" ? `${window.location.origin}/api/automations/hubspot` : "";
 
-  const displayLabel = resolveNodeLabel(type, node.data, channels, connections);
+  const displayLabel = resolveNodeLabel(type, node.data, channels, connections, hubspotInboxes);
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelDraft, setLabelDraft] = useState("");
   const [instructionPanelOpen, setInstructionPanelOpen] = useState(false);
@@ -1346,6 +1475,9 @@ function NodeConfigPanel({
     }
     if (type === "trigger.webhook") {
       return events.find(webhookEventMatches) ?? null;
+    }
+    if (type === "trigger.hubspot_message") {
+      return events.find(hubspotEventMatches) ?? null;
     }
     return null;
   });
@@ -1549,6 +1681,50 @@ function NodeConfigPanel({
           );
         })()}
 
+        {type === "trigger.hubspot_message" && (() => {
+          const example = capturedExample ? prettyPrint(capturedExample.request_body) ?? EXAMPLE_JSON_HUBSPOT_EVENT : EXAMPLE_JSON_HUBSPOT_EVENT;
+          const exampleLabel = capturedExample
+            ? `Ver JSON real · capturado ${new Date(capturedExample.created_at).toLocaleString("es-CO")}`
+            : "Ver ejemplo ilustrativo (sin datos reales aún)";
+          const inboxIds = Array.isArray(node.data.hubspotInboxIds) ? node.data.hubspotInboxIds : [];
+
+          return (
+            <div>
+              <InfoNote example={example} exampleLabel={exampleLabel} exampleIsReal={Boolean(capturedExample)}>
+                Se activa cuando llega un mensaje nuevo a Conversaciones de HubSpot. Elige a qué bandejas escuchar y
+                conecta <strong className="text-gray-300">Saludo automático HubSpot</strong> para responder.
+              </InfoNote>
+              {!hubspotConnected && (
+                <p className="text-[11px] text-amber-400/90 mb-3 leading-relaxed">
+                  HubSpot no está conectado todavía.{" "}
+                  <Link href="/dashboard/conectores/hubspot" className="underline">Conéctalo aquí</Link> para poder elegir
+                  bandejas y activar este disparador.
+                </p>
+              )}
+              <TestListenButton workflowId={workflowId} matches={hubspotEventMatches} onCaptured={setCapturedExample} />
+              <label className="block text-xs font-semibold text-gray-400 mb-1.5">URL del webhook</label>
+              <WebhookSlugField
+                baseUrl={hubspotWebhookBaseUrl}
+                value={node.data.hubspotWebhookToken ?? ""}
+                onChange={token => onSetData({ hubspotWebhookToken: token })}
+              />
+              <p className="text-[11px] text-gray-500 mt-2 mb-4 leading-relaxed">
+                Pega esta URL en tu Private App de HubSpot, como destino de la suscripción de webhook{" "}
+                <code>conversation.newMessage</code>.
+              </p>
+              <label className="block text-xs font-semibold text-gray-400 mb-1.5">Bandejas a escuchar</label>
+              <InboxMultiSelectField
+                options={hubspotInboxes}
+                value={inboxIds}
+                onChange={ids => onSetData({ hubspotInboxIds: ids })}
+              />
+              <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+                Sin elegir ninguna = escucha cualquier bandeja del portal.
+              </p>
+            </div>
+          );
+        })()}
+
         {type === "action.webhook" && (
           <div>
             <InfoNote example={EXAMPLE_JSON_IMAGE_EVENT} exampleLabel="Ver ejemplo de JSON de salida (varía según el disparador conectado)">
@@ -1617,6 +1793,66 @@ function NodeConfigPanel({
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {type === "action.hubspot_greeting" && (
+          <div>
+            <InfoNote example={EXAMPLE_JSON_HUBSPOT_EVENT} exampleLabel="Ver ejemplo de JSON de entrada">
+              Valida o crea el contacto por teléfono y responde en el mismo hilo de HubSpot — pensado para ir después de{" "}
+              <strong className="text-gray-300">Mensaje recibido en HubSpot</strong>.
+            </InfoNote>
+            {!hubspotConnected && (
+              <p className="text-[11px] text-amber-400/90 mb-3 leading-relaxed">
+                HubSpot no está conectado todavía.{" "}
+                <Link href="/dashboard/conectores/hubspot" className="underline">Conéctalo aquí</Link>.
+              </p>
+            )}
+            <div className="space-y-4">
+              <TextareaField
+                label="Texto del saludo"
+                value={node.data.hubspotGreetingText}
+                onChange={hubspotGreetingText => onSetData({ hubspotGreetingText })}
+                placeholder={"Hola, gracias por escribirnos 👋\n¿En qué te podemos ayudar hoy?"}
+                rows={5}
+              />
+              <div>
+                <TextField
+                  label="Actor que envía (senderActorId)"
+                  value={node.data.hubspotSenderActorId}
+                  onChange={hubspotSenderActorId => onSetData({ hubspotSenderActorId })}
+                  placeholder="A-XXXXXX"
+                />
+                <p className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
+                  El actor con el que HubSpot firma el mensaje en Conversaciones — normalmente empieza con{" "}
+                  <code>A-</code> (una app). Lo ves en el campo <code>senderActorId</code> de cualquier mensaje que
+                  ya hayas enviado manualmente desde ese hilo.
+                </p>
+              </div>
+
+              <div className="pt-4 border-t border-white/[.08] space-y-4">
+                <ToggleField
+                  label="Solo en el primer mensaje"
+                  description="Si ya hay conversación previa con este contacto en el hilo, no se manda el saludo de nuevo."
+                  checked={node.data.hubspotOnlyFirstMessage !== false}
+                  onChange={hubspotOnlyFirstMessage => onSetData({ hubspotOnlyFirstMessage })}
+                />
+                <ToggleField
+                  label="Crear contacto si no existe"
+                  description="Si no hay un contacto con ese teléfono en HubSpot, lo crea antes de saludar. Si lo apagas, sin contacto existente no se saluda."
+                  checked={node.data.hubspotCreateContactIfMissing !== false}
+                  onChange={hubspotCreateContactIfMissing => onSetData({ hubspotCreateContactIfMissing })}
+                />
+                {node.data.hubspotCreateContactIfMissing !== false && (
+                  <TextField
+                    label="Dominio del email placeholder"
+                    value={node.data.hubspotPlaceholderEmailDomain}
+                    onChange={hubspotPlaceholderEmailDomain => onSetData({ hubspotPlaceholderEmailDomain })}
+                    placeholder="whatsapp.sin-correo.com"
+                  />
+                )}
+              </div>
             </div>
           </div>
         )}

@@ -7,6 +7,7 @@ import { authFetch } from "@/lib/telephony-api";
 import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
 import { Badge } from "@/components/ui/Badge";
 import { GoogleCalendarLogo } from "@/components/icons/brands/GoogleCalendarLogo";
+import { HubSpotLogo } from "@/components/icons/brands/HubSpotLogo";
 import { ExploreConnectorsModal } from "@/components/automations/ExploreConnectorsModal";
 import {
   btnPrimary,
@@ -32,9 +33,17 @@ interface CalendarConnectionStatus {
   } | null;
 }
 
+interface HubspotConnectionStatus {
+  connection: {
+    id: string;
+    portalId: string | null;
+    status: "active" | "disconnected" | "error";
+  } | null;
+}
+
 interface ConnectorRow {
   id: string;
-  kind: "webhook" | "google_calendar";
+  kind: "webhook" | "google_calendar" | "hubspot";
   name: string;
   detail: string;
   status: "active" | "disconnected" | "error" | "none";
@@ -45,6 +54,7 @@ export default function ConectoresPage() {
   const router = useRouter();
   const [connections, setConnections] = useState<AutomationConnectionRecord[]>([]);
   const [calendarStatus, setCalendarStatus] = useState<CalendarConnectionStatus | null>(null);
+  const [hubspotStatus, setHubspotStatus] = useState<HubspotConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exploreOpen, setExploreOpen] = useState(false);
@@ -52,15 +62,17 @@ export default function ConectoresPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const [connRes, calRes] = await Promise.all([
+    const [connRes, calRes, hubspotRes] = await Promise.all([
       authFetch("/api/automations/connections"),
-      authFetch("/api/conectores/google-calendar/status")
+      authFetch("/api/conectores/google-calendar/status"),
+      authFetch("/api/conectores/hubspot/status")
     ]);
     const connJson = await connRes.json();
     if (!connRes.ok) setError(connJson.error ?? "Error al cargar conectores");
     else setConnections(connJson.connections ?? []);
 
     if (calRes.ok) setCalendarStatus(await calRes.json());
+    if (hubspotRes.ok) setHubspotStatus(await hubspotRes.json());
     setLoading(false);
   }, []);
 
@@ -87,7 +99,17 @@ export default function ConectoresPage() {
             href: "/dashboard/conectores/google-calendar"
           }
         ]
-      : [])
+      : []),
+    // A diferencia de Calendar, HubSpot no depende de credenciales OAuth del servidor
+    // (modo Private App) — siempre aparece disponible para conectar, no solo cuando ya está activo.
+    {
+      id: "hubspot",
+      kind: "hubspot" as const,
+      name: "HubSpot",
+      detail: hubspotStatus?.connection?.portalId ? `Portal ${hubspotStatus.connection.portalId}` : "—",
+      status: (hubspotStatus?.connection?.status ?? "none") as ConnectorRow["status"],
+      href: "/dashboard/conectores/hubspot"
+    }
   ];
 
   return (
@@ -130,11 +152,17 @@ export default function ConectoresPage() {
                     <div className="flex items-center gap-3">
                       <div
                         className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                          row.kind === "google_calendar" ? "bg-[#4285f4]/15" : "bg-white/[.08]"
+                          row.kind === "google_calendar"
+                            ? "bg-[#4285f4]/15"
+                            : row.kind === "hubspot"
+                              ? "bg-[#ff7a59]/15"
+                              : "bg-white/[.08]"
                         }`}
                       >
                         {row.kind === "google_calendar" ? (
                           <GoogleCalendarLogo className="w-[18px] h-[18px] text-[#4285f4]" />
+                        ) : row.kind === "hubspot" ? (
+                          <HubSpotLogo className="w-[18px] h-[18px] text-[#ff7a59]" />
                         ) : (
                           <Webhook className="w-[18px] h-[18px] text-gray-300" />
                         )}

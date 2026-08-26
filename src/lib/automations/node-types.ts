@@ -12,9 +12,11 @@ export type { ExtractFieldDef, ExtractFieldType } from "@/lib/automations/extrac
 export const NODE_TYPES = [
   "trigger.whatsapp_message",
   "trigger.webhook",
+  "trigger.hubspot_message",
   "action.ai_extract",
   "action.webhook",
-  "action.send_whatsapp_message"
+  "action.send_whatsapp_message",
+  "action.hubspot_greeting"
 ] as const;
 
 export type WorkflowNodeType = (typeof NODE_TYPES)[number];
@@ -72,6 +74,20 @@ export interface WorkflowNodeData {
   mediaUrlPath?: string;
   /** Solo aplica a messageType "media": dot-path al texto/caption opcional dentro del JSON entrante. Default "media.caption". */
   captionPath?: string;
+  /** Solo aplica a trigger.hubspot_message: token único de este nodo — la URL pública es /api/automations/hubspot/{webhookToken}. Se genera al crear el nodo. */
+  hubspotWebhookToken?: string;
+  /** Solo aplica a trigger.hubspot_message: ids de bandejas (inboxId) de HubSpot a escuchar. Vacío/ausente = cualquier bandeja del portal. */
+  hubspotInboxIds?: string[];
+  /** Solo aplica a action.hubspot_greeting: texto del saludo a publicar en el hilo. */
+  hubspotGreetingText?: string;
+  /** Solo aplica a action.hubspot_greeting: actor que HubSpot usa para firmar el mensaje en Conversaciones (formato "A-XXXXXX" de una app, o el actor con el que respondes manualmente en ese hilo). */
+  hubspotSenderActorId?: string;
+  /** Solo aplica a action.hubspot_greeting: si es false, saluda en cualquier mensaje entrante que aplique, no solo el primero del hilo. Default true. */
+  hubspotOnlyFirstMessage?: boolean;
+  /** Solo aplica a action.hubspot_greeting: si no existe un contacto con ese teléfono, lo crea antes de saludar. Default true. */
+  hubspotCreateContactIfMissing?: boolean;
+  /** Solo aplica a action.hubspot_greeting con hubspotCreateContactIfMissing activo: dominio para el email placeholder que exige HubSpot cuando no hay email real (ej. "telefono@dominio"). Default "whatsapp.sin-correo.com". */
+  hubspotPlaceholderEmailDomain?: string;
   [key: string]: unknown;
 }
 
@@ -118,6 +134,12 @@ export const NODE_CATALOG: NodeCatalogEntry[] = [
     description: "Genera una URL propia — cualquier sistema externo puede llamarla"
   },
   {
+    type: "trigger.hubspot_message",
+    category: "trigger",
+    label: "Mensaje recibido en HubSpot",
+    description: "Elige las bandejas de Conversaciones a escuchar — requiere HubSpot conectado"
+  },
+  {
     type: "action.ai_extract",
     category: "action",
     label: "IA",
@@ -134,6 +156,12 @@ export const NODE_CATALOG: NodeCatalogEntry[] = [
     category: "action",
     label: "Enviar mensaje de WhatsApp",
     description: "Responde en el mismo chat del cliente final"
+  },
+  {
+    type: "action.hubspot_greeting",
+    category: "action",
+    label: "Saludo automático HubSpot",
+    description: "Valida/crea el contacto y responde en el hilo — solo en el primer mensaje, si así lo eliges"
   }
 ];
 
@@ -352,21 +380,30 @@ export function findWebhookActionConfigs(
 }
 
 /**
- * Asigna un `webhookToken` a cualquier nodo `trigger.webhook` que aún no
- * tenga uno (el editor ya lo genera al crear el nodo — esto es solo un
- * resguardo del lado del servidor antes de persistir el grafo).
+ * Asigna el token de URL pública a cualquier nodo `trigger.webhook` o
+ * `trigger.hubspot_message` que aún no tenga uno (el editor ya lo genera al
+ * crear el nodo — esto es solo un resguardo del lado del servidor antes de
+ * persistir el grafo). Cada tipo guarda su token en su propio campo
+ * (`webhookToken` / `hubspotWebhookToken`) porque son URLs de callback
+ * distintas (`/api/automations/inbound/...` vs `/api/automations/hubspot/...`).
  */
 /** Mismo formato que valida el campo del editor — letras, números, punto, guion y guion bajo. */
 const VALID_WEBHOOK_SLUG = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
 
+const TOKEN_FIELD_BY_TRIGGER_TYPE: Partial<Record<WorkflowNodeType, keyof WorkflowNodeData>> = {
+  "trigger.webhook": "webhookToken",
+  "trigger.hubspot_message": "hubspotWebhookToken"
+};
+
 export function ensureWebhookTokens(graph: WorkflowGraph): WorkflowGraph {
   let changed = false;
   const nodes = graph.nodes.map((n) => {
-    if (n.type !== "trigger.webhook") return n;
-    const token = n.data.webhookToken;
+    const field = TOKEN_FIELD_BY_TRIGGER_TYPE[n.type];
+    if (!field) return n;
+    const token = n.data[field];
     if (typeof token === "string" && VALID_WEBHOOK_SLUG.test(token)) return n;
     changed = true;
-    return { ...n, data: { ...n.data, webhookToken: crypto.randomUUID().replace(/-/g, "") } };
+    return { ...n, data: { ...n.data, [field]: crypto.randomUUID().replace(/-/g, "") } };
   });
   return changed ? { ...graph, nodes } : graph;
 }
@@ -416,6 +453,54 @@ export function findSendMessageTargets(graph: WorkflowGraph, triggerNodeId: stri
     });
   }
   return targets;
+}
+
+export interface HubspotGreetingConfig {
+  greetingText: string;
+  senderActorId: string;
+  onlyFirstMessage: boolean;
+  createContactIfMissing: boolean;
+  placeholderEmailDomain: string;
+}
+
+/**
+ * Configuración del nodo `action.hubspot_greeting` conectado directo a un
+ * `trigger.hubspot_message` — análogo a `findSendMessageTargets`, pero solo
+ * espera un destino (una sola acción por disparador tiene sentido para este
+ * flujo). `null` si no hay ninguno conectado o le falta el texto del saludo.
+ */
+export function findHubspotGreetingConfig(graph: WorkflowGraph, triggerNodeId: string): HubspotGreetingConfig | null {
+  const actionId = graph.edges.find(
+    (e) => e.source === triggerNodeId && graph.nodes.find((n) => n.id === e.target)?.type === "action.hubspot_greeting"
+  )?.target;
+  if (!actionId) return null;
+
+  const action = graph.nodes.find((n) => n.id === actionId);
+  const greetingText = typeof action?.data.hubspotGreetingText === "string" ? action.data.hubspotGreetingText.trim() : "";
+  if (!action || !greetingText) return null;
+
+  return {
+    greetingText,
+    senderActorId: strOr(action.data.hubspotSenderActorId, "").trim(),
+    onlyFirstMessage: action.data.hubspotOnlyFirstMessage !== false,
+    createContactIfMissing: action.data.hubspotCreateContactIfMissing !== false,
+    placeholderEmailDomain: strOr(action.data.hubspotPlaceholderEmailDomain, "whatsapp.sin-correo.com")
+  };
+}
+
+/**
+ * Ids de los nodos `trigger.hubspot_message` que aplican a una bandeja
+ * (inboxId) concreta — mismo criterio que `findMatchingWhatsAppTriggerNodeIds`:
+ * lista vacía/ausente en el nodo = dispara para cualquier bandeja del portal.
+ */
+export function findMatchingHubspotTriggerNodeIds(graph: WorkflowGraph, inboxId: string): string[] {
+  return graph.nodes
+    .filter((n) => n.type === "trigger.hubspot_message")
+    .filter((n) => {
+      const inboxIds = n.data.hubspotInboxIds;
+      return !Array.isArray(inboxIds) || inboxIds.length === 0 || inboxIds.includes(inboxId);
+    })
+    .map((n) => n.id);
 }
 
 /** Lee un valor por dot-path (`"reply.text"`) de un JSON arbitrario recibido en un webhook entrante. */

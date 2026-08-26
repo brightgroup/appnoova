@@ -7,6 +7,7 @@ export type UsageEventType =
   | "whatsapp_manual"
   | "whatsapp_media_ai"
   | "automation_extract"
+  | "hubspot_greeting"
   | "voice"
   | "voice_premium"
   | "voice_voicemail"

@@ -30,10 +30,17 @@ export async function syncWebhookTriggers(
 ): Promise<void> {
   await db.from("workflow_webhook_triggers").delete().eq("workflow_id", workflowId);
 
+  // Dos tipos de disparador tienen URL pública propia, cada uno con su campo de token
+  // (ver TOKEN_FIELD_BY_TRIGGER_TYPE en node-types.ts) — ambos comparten este mismo índice
+  // porque el token en sí ya es único (UUID aleatorio), sin importar de qué tipo sea el nodo.
   const rows = graph.nodes
-    .filter((n) => n.type === "trigger.webhook" && typeof n.data.webhookToken === "string" && n.data.webhookToken)
+    .filter(
+      (n) =>
+        (n.type === "trigger.webhook" && typeof n.data.webhookToken === "string" && n.data.webhookToken) ||
+        (n.type === "trigger.hubspot_message" && typeof n.data.hubspotWebhookToken === "string" && n.data.hubspotWebhookToken)
+    )
     .map((n) => ({
-      token: n.data.webhookToken as string,
+      token: (n.type === "trigger.webhook" ? n.data.webhookToken : n.data.hubspotWebhookToken) as string,
       organization_id: organizationId,
       workflow_id: workflowId,
       node_id: n.id

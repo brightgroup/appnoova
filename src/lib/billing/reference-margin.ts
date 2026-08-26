@@ -23,6 +23,9 @@ const REFERENCE_USAGE: Record<UsageEventType, ReferenceUsageProfile> = {
   // Esquema con anidamiento moderado (ej. varios comprobantes con monto/fecha/banco) —
   // la salida es JSON compacto, más liviana que una respuesta conversacional.
   automation_extract: { geminiModel: "flash", promptTokens: 1000, completionTokens: 400 },
+  // Sin componente de costo real — la API de HubSpot no cobra por llamada (a diferencia de
+  // Twilio/Meta o los modelos LLM), así que no hay desglose de costo de proveedor que mostrar.
+  hubspot_greeting: {},
   voice: { voiceMinutes: 1 },
   voice_premium: { voiceMinutes: 1, voicePremium: true },
   voice_voicemail: { voiceMinutes: 0.05, voicePremium: true },

@@ -130,18 +130,18 @@ export function ExploreConnectorsModal({ open, onClose, onConnected }: ExploreCo
                 iconBg="bg-[#ff7a59]/15"
                 name="HubSpot"
                 publisher="Por Noova · CRM"
-                description="Sincroniza contactos, negocios y notas automáticamente con tu CRM."
+                description="Conecta tu portal y automatiza acciones sobre tus conversaciones — empezando por el saludo automático."
                 action={
-                  <div className="flex items-center gap-2">
-                    <Badge variant="neutral">Próximamente</Badge>
-                    <button
-                      type="button"
-                      onClick={() => setNotice("Te avisamos cuando esté listo.")}
-                      className={`${btnGhost}`}
-                    >
-                      Avísame
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      close();
+                      router.push("/dashboard/conectores/hubspot");
+                    }}
+                    className={`${btnPrimary} !px-3 !py-1.5 !text-xs gap-1.5`}
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Conectar
+                  </button>
                 }
               />
               <ConnectorCard

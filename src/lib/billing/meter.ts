@@ -117,7 +117,7 @@ export interface RecordUsageInput {
   quantity?: number;
   /** Sobrescribe los créditos calculados. */
   creditsOverride?: number;
-  provider?: "google" | "twilio" | "meta" | "telnyx" | "elevenlabs" | "anthropic" | "openai" | null;
+  provider?: "google" | "twilio" | "meta" | "telnyx" | "elevenlabs" | "anthropic" | "openai" | "hubspot" | null;
   model?: string | null;
   gemini?: GeminiUsage | null;
   /** Mensajes Twilio involucrados (entrante + saliente) para el costo real. */
