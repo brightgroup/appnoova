@@ -2,7 +2,7 @@ import type { TextChatMessage } from "@/types/text-agent-conversation";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
 
 export type InboxKind = "text" | "voice";
-export type InboxFilter = "all" | "mine" | "unassigned";
+export type InboxFilter = "all" | "mine" | "unassigned" | "archived";
 
 export interface InboxListItem {
   id: string;
@@ -21,6 +21,7 @@ export interface InboxListItem {
   messages_count: number;
   created_at: string;
   updated_at: string;
+  archived_at: string | null;
 }
 
 export interface InboxTextDetail {
@@ -41,6 +42,7 @@ export interface InboxTextDetail {
   messages: TextChatMessage[];
   created_at: string;
   updated_at: string;
+  archived_at: string | null;
   /** WhatsApp: ventana Meta 24 h abierta */
   whatsapp_session_open?: boolean;
   whatsapp_session_expires_at?: string | null;

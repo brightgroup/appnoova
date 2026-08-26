@@ -4,6 +4,8 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState, memo } fro
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
+  Archive,
+  ArchiveRestore,
   Bot,
   ChevronDown,
   FileText,
@@ -357,6 +359,29 @@ function InboxPageInner() {
     }
   };
 
+  const archiveConversation = async (archived: boolean) => {
+    if (!selectedId) return;
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/inbox", {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ conversation_id: selectedId, archived })
+      });
+      const data = await res.json().catch(() => ({} as { error?: string }));
+      if (!res.ok) {
+        setError(data.error || "No se pudo archivar la conversación");
+        return;
+      }
+      setSelectedId(null);
+      setDetail(null);
+      setConversationInUrl(null);
+      await loadList();
+    } catch {
+      setError("Error de red al archivar");
+    }
+  };
+
   const sendReply = async () => {
     const text = reply.trim();
     if (!text || !selectedId || sending) return;
@@ -440,6 +465,7 @@ function InboxPageInner() {
     detail?.handoff_mode === "human" &&
     Boolean(detail?.assigned_to) &&
     !offline &&
+    !detail?.archived_at &&
     (detail.kind !== "text" ||
       detail.channel !== "whatsapp" ||
       (detail.whatsapp_session_open !== false && !detail.whatsapp_opted_out));
@@ -460,7 +486,8 @@ function InboxPageInner() {
   const tabs: { id: InboxFilter; label: string }[] = [
     { id: "all", label: "Todos" },
     { id: "mine", label: "Mías" },
-    { id: "unassigned", label: "Sin asignar" }
+    { id: "unassigned", label: "Sin asignar" },
+    { id: "archived", label: "Archivadas" }
   ];
 
   return (
@@ -548,7 +575,9 @@ function InboxPageInner() {
             </div>
           ) : filteredItems.length === 0 && !error ? (
             <p className="px-5 py-10 text-center text-sm text-white/40">
-              No hay conversaciones todavía. Aparecerán aquí los chats del micrositio y las pruebas de agentes de texto.
+              {filter === "archived"
+                ? "No hay conversaciones archivadas."
+                : "No hay conversaciones todavía. Aparecerán aquí los chats del micrositio y las pruebas de agentes de texto."}
             </p>
           ) : filteredItems.length === 0 ? null : (
             filteredItems.map(item => {
@@ -708,6 +737,21 @@ function InboxPageInner() {
                     </div>
                   )}
                   <ChannelBadge channel={detail?.channel ?? "web_test"} />
+                  {detail?.kind === "text" && (
+                    <button
+                      type="button"
+                      onClick={() => archiveConversation(!detail.archived_at)}
+                      className="shrink-0 rounded-xl border border-white/[.08] bg-white/[.08] p-2.5 text-white/50 transition-colors hover:text-white"
+                      aria-label={detail.archived_at ? "Desarchivar" : "Archivar"}
+                      title={detail.archived_at ? "Desarchivar conversación" : "Archivar conversación"}
+                    >
+                      {detail.archived_at ? (
+                        <ArchiveRestore className="h-4 w-4" />
+                      ) : (
+                        <Archive className="h-4 w-4" />
+                      )}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -845,7 +889,9 @@ function InboxPageInner() {
                   )
                 ) : (
                   <p className="text-center text-sm text-white/35">
-                    {offline
+                    {detail.kind === "text" && detail.archived_at
+                      ? "Conversación archivada. Desarchívala para responder."
+                      : offline
                       ? "Activa Online para responder conversaciones."
                       : detail.kind === "text" &&
                           detail.channel === "whatsapp" &&

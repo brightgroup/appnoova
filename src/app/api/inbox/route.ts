@@ -96,7 +96,7 @@ async function buildTemplateContext(input: {
 }
 
 function parseFilter(raw: string | null): InboxFilter {
-  if (raw === "mine" || raw === "unassigned") return raw;
+  if (raw === "mine" || raw === "unassigned" || raw === "archived") return raw;
   return "all";
 }
 
@@ -179,6 +179,7 @@ export async function GET(req: NextRequest) {
       messages: messagesWithMedia,
       created_at: record.created_at,
       updated_at: record.updated_at,
+      archived_at: record.archived_at,
       ...(isWhatsApp
         ? {
             whatsapp_session_open: isWhatsAppSessionOpen(waMeta.lastInboundAt),
@@ -211,17 +212,29 @@ export async function GET(req: NextRequest) {
 
   const textNames = await loadOrgTextAgentNames(db, orgCtx.organizationId);
 
+  const listSelectWithArchive =
+    "id, text_agent_id, channel, contact_label, messages_count, status, assigned_to, handoff_mode, unread_count, messages, summary, created_at, updated_at, archived_at";
   const listSelectWithHandoff =
     "id, text_agent_id, channel, contact_label, messages_count, status, assigned_to, handoff_mode, unread_count, messages, summary, created_at, updated_at";
   const listSelectLegacy =
     "id, text_agent_id, channel, contact_label, messages_count, status, messages, summary, created_at, updated_at";
 
-  const textResPrimary = await db
+  const textResArchive = await db
     .from("text_agent_conversations")
-    .select(listSelectWithHandoff)
+    .select(listSelectWithArchive)
     .in("text_agent_id", agentIds)
     .order("updated_at", { ascending: false })
     .limit(200);
+
+  const textResPrimary =
+    textResArchive.error && isMissingColumnError(textResArchive.error)
+      ? await db
+          .from("text_agent_conversations")
+          .select(listSelectWithHandoff)
+          .in("text_agent_id", agentIds)
+          .order("updated_at", { ascending: false })
+          .limit(200)
+      : textResArchive;
 
   const textRes =
     textResPrimary.error && isMissingColumnError(textResPrimary.error)
@@ -270,6 +283,36 @@ export async function PATCH(req: NextRequest) {
   const belongs = await conversationBelongsToOrg(db, conversationId, orgCtx.organizationId);
   if (!belongs) {
     return NextResponse.json({ error: "Conversación no encontrada" }, { status: 404 });
+  }
+
+  if (typeof body.archived === "boolean") {
+    const agentIds = await getOrgTextAgentIds(db, orgCtx.organizationId);
+    const { data, error } = await db
+      .from("text_agent_conversations")
+      .update({
+        archived_at: body.archived ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", conversationId)
+      .in("text_agent_id", agentIds)
+      .select("*")
+      .maybeSingle();
+
+    if (error) {
+      if (isMissingTableError(error) || isMissingColumnError(error)) {
+        return NextResponse.json({ error: "Ejecuta la migración 097_inbox_archive en Supabase" }, { status: 503 });
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    if (!data) {
+      return NextResponse.json({ error: "Conversación no encontrada" }, { status: 404 });
+    }
+
+    const record = toTextConversationRecord(data);
+    return NextResponse.json({
+      conversation: record,
+      can_reply: record.handoff_mode === "human" && Boolean(record.assigned_to)
+    });
   }
 
   const assignTo = body.assign_to as string | null | undefined;

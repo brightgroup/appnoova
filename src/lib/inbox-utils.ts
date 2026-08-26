@@ -144,7 +144,8 @@ export function textRowToInboxItem(
     unread_count: Number(row.unread_count) || 0,
     messages_count: Number(row.messages_count) || 0,
     created_at: String(row.created_at ?? ""),
-    updated_at: updatedAt
+    updated_at: updatedAt,
+    archived_at: row.archived_at ? String(row.archived_at) : null
   };
 }
 
@@ -173,7 +174,8 @@ export function voiceRowToInboxItem(
     unread_count: 0,
     messages_count: Array.isArray(row.transcript) ? row.transcript.length : 0,
     created_at: createdAt,
-    updated_at: createdAt
+    updated_at: createdAt,
+    archived_at: null
   };
 }
 
@@ -188,20 +190,26 @@ export function sortInboxItems(items: InboxListItem[]): InboxListItem[] {
 
 export function filterInboxItems(
   items: InboxListItem[],
-  filter: "all" | "mine" | "unassigned",
+  filter: "all" | "mine" | "unassigned" | "archived",
   currentUserName: string
 ): InboxListItem[] {
+  if (filter === "archived") {
+    return items.filter(i => Boolean(i.archived_at));
+  }
+
+  const notArchived = items.filter(i => !i.archived_at);
+
   if (filter === "mine") {
-    return items.filter(
+    return notArchived.filter(
       i => i.kind === "text" && i.handoff_mode === "human" && i.assigned_to === currentUserName
     );
   }
   if (filter === "unassigned") {
-    return items.filter(
+    return notArchived.filter(
       i => i.kind === "text" && i.handoff_mode === "human" && !i.assigned_to
     );
   }
-  return items;
+  return notArchived;
 }
 
 export function inboxMessageLabel(role: string): string {

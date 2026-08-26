@@ -40,7 +40,8 @@ export function toTextConversationRecord(raw: Record<string, unknown>): TextAgen
     ended_at: raw.ended_at ? String(raw.ended_at) : null,
     assigned_to: raw.assigned_to ? String(raw.assigned_to) : null,
     handoff_mode: raw.handoff_mode === "human" ? "human" : "ai",
-    unread_count: num(raw.unread_count)
+    unread_count: num(raw.unread_count),
+    archived_at: raw.archived_at ? String(raw.archived_at) : null
   };
 }
 
@@ -66,7 +67,8 @@ export function toTextConversationListItem(raw: Record<string, unknown>): TextAg
     ended_at: record.ended_at,
     assigned_to: record.assigned_to,
     handoff_mode: record.handoff_mode,
-    unread_count: record.unread_count
+    unread_count: record.unread_count,
+    archived_at: record.archived_at
   };
 }
 

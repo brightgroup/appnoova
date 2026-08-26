@@ -37,6 +37,7 @@ export interface TextAgentConversationRecord {
   assigned_to: string | null;
   handoff_mode: "ai" | "human";
   unread_count: number;
+  archived_at: string | null;
 }
 
 export interface TextAgentConversationListItem {
@@ -60,4 +61,5 @@ export interface TextAgentConversationListItem {
   assigned_to: string | null;
   handoff_mode: "ai" | "human";
   unread_count: number;
+  archived_at: string | null;
 }
