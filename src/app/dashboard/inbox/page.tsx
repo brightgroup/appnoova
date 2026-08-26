@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -88,6 +89,7 @@ function InboxPageInner() {
   const [waTemplates, setWaTemplates] = useState<WhatsAppTemplateRecord[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [templateVars, setTemplateVars] = useState<string[]>([]);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: InboxListItem } | null>(null);
   const assignRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -303,6 +305,22 @@ function InboxPageInner() {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    window.addEventListener("click", close);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [contextMenu]);
+
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return items;
@@ -334,8 +352,9 @@ function InboxPageInner() {
     }
   };
 
-  const assignConversation = async (value: AssignValue) => {
-    if (!selectedId) return;
+  const assignConversation = async (value: AssignValue, targetId?: string) => {
+    const id = targetId ?? selectedId;
+    if (!id) return;
     setAssignOpen(false);
     try {
       const headers = await getAuthHeaders();
@@ -343,7 +362,7 @@ function InboxPageInner() {
         method: "PATCH",
         headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify({
-          conversation_id: selectedId,
+          conversation_id: id,
           assign_to: value
         })
       });
@@ -352,31 +371,37 @@ function InboxPageInner() {
         setError(data.error || "No se pudo asignar");
         return;
       }
-      await loadDetail(selectedId);
-      await loadList();
+      if (id === selectedId) await loadDetail(id);
+      await loadList(true);
     } catch {
       setError("Error de red al asignar");
     }
   };
 
-  const archiveConversation = async (archived: boolean) => {
-    if (!selectedId) return;
+  const archiveConversation = async (archived: boolean, targetId?: string) => {
+    const id = targetId ?? selectedId;
+    if (!id) return;
     try {
       const headers = await getAuthHeaders();
       const res = await fetch("/api/inbox", {
         method: "PATCH",
         headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ conversation_id: selectedId, archived })
+        body: JSON.stringify({ conversation_id: id, archived })
       });
       const data = await res.json().catch(() => ({} as { error?: string }));
       if (!res.ok) {
         setError(data.error || "No se pudo archivar la conversación");
         return;
       }
-      setSelectedId(null);
-      setDetail(null);
-      setConversationInUrl(null);
-      await loadList();
+      setError("");
+      if (id === selectedId) {
+        setDetail(prev =>
+          prev && prev.kind === "text"
+            ? { ...prev, archived_at: archived ? new Date().toISOString() : null }
+            : prev
+        );
+      }
+      await loadList(true);
     } catch {
       setError("Error de red al archivar");
     }
@@ -588,6 +613,10 @@ function InboxPageInner() {
                   key={item.id}
                   type="button"
                   onClick={() => selectItem(item)}
+                  onContextMenu={e => {
+                    e.preventDefault();
+                    setContextMenu({ x: e.clientX, y: e.clientY, item });
+                  }}
                   className={`w-full border-b border-white/[.04] px-5 py-3.5 text-left transition-colors ${
                     active
                       ? "bg-white/[.08]"
@@ -913,6 +942,75 @@ function InboxPageInner() {
           </>
         )}
       </section>
+
+      {contextMenu &&
+        createPortal(
+          <div
+            className="fixed z-50"
+            style={{
+              top: Math.min(contextMenu.y, window.innerHeight - 300),
+              left: Math.min(contextMenu.x, window.innerWidth - 220)
+            }}
+          >
+            <NoovaListMenu className="min-w-[210px]">
+              <NoovaListMenuItem
+                onClick={() => {
+                  archiveConversation(!contextMenu.item.archived_at, contextMenu.item.id);
+                  setContextMenu(null);
+                }}
+              >
+                <span className="flex items-center gap-2.5">
+                  {contextMenu.item.archived_at ? (
+                    <ArchiveRestore className="h-4 w-4" />
+                  ) : (
+                    <Archive className="h-4 w-4" />
+                  )}
+                  {contextMenu.item.archived_at ? "Desarchivar" : "Archivar"}
+                </span>
+              </NoovaListMenuItem>
+              <div className="my-1 h-px bg-white/[.06]" />
+              <NoovaListMenuItem
+                onClick={() => {
+                  assignConversation("ai", contextMenu.item.id);
+                  setContextMenu(null);
+                }}
+              >
+                <span className="flex items-center gap-2.5">
+                  <Bot className="h-4 w-4 text-[#0f7eff]" />
+                  Asignar a Agente (IA)
+                </span>
+              </NoovaListMenuItem>
+              <NoovaListMenuItem
+                onClick={() => {
+                  assignConversation("me", contextMenu.item.id);
+                  setContextMenu(null);
+                }}
+              >
+                <span className="flex items-center gap-2.5">
+                  <User className="h-4 w-4 text-[#67e8f9]" />
+                  Asignar a mí ({currentUserName})
+                </span>
+              </NoovaListMenuItem>
+              {assignees
+                .filter(a => a.name !== currentUserName)
+                .map(a => (
+                  <NoovaListMenuItem
+                    key={a.user_id}
+                    onClick={() => {
+                      assignConversation(a.name, contextMenu.item.id);
+                      setContextMenu(null);
+                    }}
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <User className="h-4 w-4 text-white/50" />
+                      Asignar a {a.name}
+                    </span>
+                  </NoovaListMenuItem>
+                ))}
+            </NoovaListMenu>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
