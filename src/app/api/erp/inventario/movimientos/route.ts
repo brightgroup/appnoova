@@ -9,18 +9,21 @@ import {
   listInventoryMovements,
   registerInventoryMovement
 } from "@/lib/erp/inventory-db";
-import { getInventoryAlertRule } from "@/lib/erp/alert-rules-db";
-import { notifyLowStock } from "@/lib/email/notify-low-stock";
+import { maybeSendLowStockAlert } from "@/lib/erp/low-stock-alert";
 
 export async function GET(req: NextRequest) {
   const ctx = await requireErpAccess(req, "view");
   if (ctx instanceof NextResponse) return ctx;
 
   const itemId = req.nextUrl.searchParams.get("item_id") ?? undefined;
+  const numeroPedido = req.nextUrl.searchParams.get("numero_pedido") ?? undefined;
   const db = adminClient();
 
   try {
-    const movements = await attachCreatedByLabels(db, await listInventoryMovements(db, ctx.organizationId, { itemId }));
+    const movements = await attachCreatedByLabels(
+      db,
+      await listInventoryMovements(db, ctx.organizationId, { itemId, numeroPedido })
+    );
     return NextResponse.json({ movements });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Error al listar" }, { status: 500 });
@@ -67,6 +70,7 @@ export async function POST(req: NextRequest) {
   const fecha = typeof body.fecha === "string" && body.fecha.trim() ? body.fecha.trim() : undefined;
   const responsable = typeof body.responsable === "string" ? body.responsable.trim() || null : null;
   const nota = typeof body.nota === "string" ? body.nota.trim() || null : null;
+  const numeroPedido = typeof body.numero_pedido === "string" ? body.numero_pedido.trim() || null : null;
 
   try {
     const result = await registerInventoryMovement(db, ctx.organizationId, {
@@ -76,6 +80,7 @@ export async function POST(req: NextRequest) {
       fecha,
       responsable,
       nota,
+      numeroPedido,
       createdBy: ctx.userId
     });
 
@@ -93,15 +98,4 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Error al registrar" }, { status: 500 });
   }
-}
-
-async function maybeSendLowStockAlert(
-  db: ReturnType<typeof adminClient>,
-  organizationId: string,
-  item: { id: string; codigo: string; nombre: string; existencia: number; stockMinimo: number }
-): Promise<void> {
-  const rule = await getInventoryAlertRule(db, organizationId);
-  if (!rule.enabled || !rule.canalEmail) return;
-  if (rule.modo !== "al_cruzar" && rule.modo !== "ambos") return;
-  await notifyLowStock({ organizationId, items: [item] });
 }

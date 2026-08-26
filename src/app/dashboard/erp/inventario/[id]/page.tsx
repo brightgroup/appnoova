@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, SlidersHorizontal, Pencil, Loader2, Trash2 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import {
@@ -31,6 +31,7 @@ function movementIcon(tipo: InventoryMovement["tipo"]) {
 
 export default function ErpInventoryItemPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const itemId = params.id;
   const { canWrite: canRegisterMovements } = useModuleWriteAccess("erp", "edit");
   const { canWrite: canManage } = useModuleWriteAccess("erp", "manage");
@@ -96,7 +97,8 @@ export default function ErpInventoryItemPage() {
       tipo: values.tipo,
       fecha: values.fecha,
       responsable: values.responsable || null,
-      nota: values.nota || null
+      nota: values.nota || null,
+      numero_pedido: values.numeroPedido || null
     };
     if (values.tipo === "ajuste") body.delta = Number(values.delta);
     else body.cantidad = Number(values.cantidad);
@@ -116,6 +118,17 @@ export default function ErpInventoryItemPage() {
     if (!confirm("¿Eliminar este movimiento? La existencia se ajusta automáticamente para revertirlo.")) return;
     const res = await authFetch(`/api/erp/inventario/movimientos/${movementId}`, { method: "DELETE" });
     if (res.ok) void load(true);
+    else alert((await res.json()).error ?? "Error al eliminar");
+  }
+
+  async function deleteThisItem() {
+    if (!item) return;
+    const warning = item.existencia !== 0
+      ? `«${item.nombre}» todavía tiene ${item.existencia} en existencia. ¿Eliminarlo igual? Se oculta del inventario pero conserva su kardex.`
+      : `¿Eliminar «${item.nombre}»? Se oculta del inventario pero conserva su kardex.`;
+    if (!confirm(warning)) return;
+    const res = await authFetch(`/api/erp/inventario/items/${item.id}`, { method: "DELETE" });
+    if (res.ok) router.push("/dashboard/erp/inventario");
     else alert((await res.json()).error ?? "Error al eliminar");
   }
 
@@ -148,6 +161,11 @@ export default function ErpInventoryItemPage() {
             {canManage && (
               <button type="button" onClick={() => setEditOpen(true)} className={btnGhost}>
                 <Pencil className="w-4 h-4" /> Editar
+              </button>
+            )}
+            {canManage && (
+              <button type="button" onClick={deleteThisItem} className={`${btnGhost} text-red-300 hover:text-red-200`}>
+                <Trash2 className="w-4 h-4" /> Eliminar
               </button>
             )}
             {canRegisterMovements && (
@@ -194,13 +212,14 @@ export default function ErpInventoryItemPage() {
         {movements.length === 0 ? (
           <div className={registryTableEmpty}>Sin movimientos todavía.</div>
         ) : (
-          <table className={`${registryTable} min-w-[900px]`}>
+          <table className={`${registryTable} min-w-[1050px]`}>
             <thead className={registryTableHead}>
               <tr className={registryTableHeadRow}>
                 <th className={registryTableHeadCell}>Fecha</th>
                 <th className={registryTableHeadCell}>Tipo</th>
                 <th className={registryTableHeadCell}>Cantidad</th>
                 <th className={registryTableHeadCell}>Saldo</th>
+                <th className={registryTableHeadCell}>Pedido</th>
                 <th className={registryTableHeadCell}>Responsable</th>
                 <th className={registryTableHeadCell}>Registrado por</th>
                 <th className={registryTableHeadCell}>Nota</th>
@@ -220,6 +239,7 @@ export default function ErpInventoryItemPage() {
                     {m.delta > 0 ? `+${m.delta}` : m.delta}
                   </td>
                   <td className={`${registryTableCell} font-mono text-white`}>{m.existenciaResultante}</td>
+                  <td className={`${registryTableCell} text-sm text-gray-400 font-mono`}>{m.numeroPedido || "—"}</td>
                   <td className={`${registryTableCell} text-sm text-gray-400`}>{m.responsable || "—"}</td>
                   <td className={`${registryTableCell} text-sm text-gray-400`}>{m.createdByLabel || "—"}</td>
                   <td className={`${registryTableCell} text-sm text-gray-500`}>{m.nota || "—"}</td>

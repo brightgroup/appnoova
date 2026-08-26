@@ -208,6 +208,7 @@ export interface InventoryMovementRecord {
   fecha: string;
   responsable: string | null;
   nota: string | null;
+  numeroPedido: string | null;
   createdByUserId: string | null;
   /** Nombre/email de quien lo registró en el sistema — se completa aparte con attachCreatedByLabels(). */
   createdByLabel?: string | null;
@@ -224,6 +225,7 @@ interface InventoryMovementRow {
   fecha: string;
   responsable: string | null;
   nota: string | null;
+  numero_pedido: string | null;
   created_by_user_id: string | null;
   created_at: string;
 }
@@ -239,6 +241,7 @@ function toMovementRecord(row: InventoryMovementRow): InventoryMovementRecord {
     fecha: row.fecha,
     responsable: row.responsable,
     nota: row.nota,
+    numeroPedido: row.numero_pedido,
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at
   };
@@ -247,7 +250,7 @@ function toMovementRecord(row: InventoryMovementRow): InventoryMovementRecord {
 export async function listInventoryMovements(
   db: SupabaseClient,
   organizationId: string,
-  opts: { itemId?: string; limit?: number } = {}
+  opts: { itemId?: string; limit?: number; numeroPedido?: string } = {}
 ): Promise<InventoryMovementRecord[]> {
   let query = db
     .from("erp_inventory_movements")
@@ -257,6 +260,7 @@ export async function listInventoryMovements(
     .limit(opts.limit ?? 500);
 
   if (opts.itemId) query = query.eq("item_id", opts.itemId);
+  if (opts.numeroPedido) query = query.ilike("numero_pedido", opts.numeroPedido);
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
@@ -293,6 +297,7 @@ export interface RegisterMovementInput {
   fecha?: string;
   responsable?: string | null;
   nota?: string | null;
+  numeroPedido?: string | null;
   createdBy?: string | null;
 }
 
@@ -318,7 +323,8 @@ export async function registerInventoryMovement(
       p_fecha: input.fecha ?? null,
       p_responsable: input.responsable ?? null,
       p_nota: input.nota ?? null,
-      p_created_by: input.createdBy ?? null
+      p_created_by: input.createdBy ?? null,
+      p_numero_pedido: input.numeroPedido ?? null
     })
     .single();
 

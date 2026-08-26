@@ -24,6 +24,7 @@ export interface InventoryMovement {
   fecha: string;
   responsable: string | null;
   nota: string | null;
+  numeroPedido?: string | null;
   createdByUserId: string | null;
   createdByLabel?: string | null;
   createdAt: string;

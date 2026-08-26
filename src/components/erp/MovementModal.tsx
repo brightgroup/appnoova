@@ -14,6 +14,7 @@ export interface MovementFormValues {
   fecha: string;
   responsable: string;
   nota: string;
+  numeroPedido: string;
 }
 
 interface MovementModalProps {
@@ -36,6 +37,7 @@ export function MovementModal({ open, item, canAdjust, saving, error, onClose, o
   const [fecha, setFecha] = useState(TODAY());
   const [responsable, setResponsable] = useState("");
   const [nota, setNota] = useState("");
+  const [numeroPedido, setNumeroPedido] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -45,6 +47,7 @@ export function MovementModal({ open, item, canAdjust, saving, error, onClose, o
     setFecha(TODAY());
     setResponsable(item?.responsable ?? "");
     setNota("");
+    setNumeroPedido("");
   }, [open, item]);
 
   if (!open || !item) return null;
@@ -158,14 +161,25 @@ export function MovementModal({ open, item, canAdjust, saving, error, onClose, o
               />
             </div>
           </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1.5">Nota</label>
-            <input
-              value={nota}
-              onChange={e => setNota(e.target.value)}
-              placeholder="Opcional"
-              className={fieldClass}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5">Nota</label>
+              <input
+                value={nota}
+                onChange={e => setNota(e.target.value)}
+                placeholder="Opcional"
+                className={fieldClass}
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5">No. Pedido</label>
+              <input
+                value={numeroPedido}
+                onChange={e => setNumeroPedido(e.target.value)}
+                placeholder="Opcional"
+                className={fieldClass}
+              />
+            </div>
           </div>
         </div>
 
@@ -176,7 +190,7 @@ export function MovementModal({ open, item, canAdjust, saving, error, onClose, o
           <button
             type="button"
             disabled={!valid || saving}
-            onClick={() => onSubmit({ tipo, cantidad, delta, fecha, responsable, nota })}
+            onClick={() => onSubmit({ tipo, cantidad, delta, fecha, responsable, nota, numeroPedido })}
             className={btnPrimary}
           >
             {saving ? "Guardando…" : "Registrar"}

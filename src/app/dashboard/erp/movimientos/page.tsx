@@ -24,12 +24,12 @@ import { useSortableRows } from "@/hooks/useSortableRows";
 import { SortableTh } from "@/components/ui/SortableTh";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { useModuleWriteAccess } from "@/components/layout/DashboardRouteGuard";
-import { MovementModal, movementTypeLabel, type MovementFormValues } from "@/components/erp/MovementModal";
-import { ProductPickerModal } from "@/components/erp/ProductPickerModal";
+import { movementTypeLabel } from "@/components/erp/MovementModal";
+import { BatchMovementModal, type BatchMovementValues } from "@/components/erp/BatchMovementModal";
 import { formatMovementDateTime, type InventoryItem, type InventoryMovement, type InventoryMovementType } from "@/types/erp";
 
 type Filter = "all" | InventoryMovementType;
-type SortKey = "fecha" | "producto" | "tipo" | "cantidad" | "saldo" | "responsable" | "registrado_por";
+type SortKey = "fecha" | "producto" | "tipo" | "cantidad" | "saldo" | "pedido" | "responsable" | "registrado_por";
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "Todos" },
@@ -56,8 +56,7 @@ export default function ErpMovimientosPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
 
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [movementItem, setMovementItem] = useState<InventoryItem | null>(null);
+  const [batchOpen, setBatchOpen] = useState(false);
   const [movementSaving, setMovementSaving] = useState(false);
   const [movementError, setMovementError] = useState<string | null>(null);
 
@@ -89,28 +88,32 @@ export default function ErpMovimientosPage() {
     else alert((await res.json()).error ?? "Error al eliminar");
   }
 
-  async function submitMovement(values: MovementFormValues) {
-    if (!movementItem) return;
+  async function submitBatchMovement(values: BatchMovementValues) {
     setMovementSaving(true);
     setMovementError(null);
-    const body: Record<string, unknown> = {
-      item_id: movementItem.id,
-      tipo: values.tipo,
-      fecha: values.fecha,
-      responsable: values.responsable || null,
-      nota: values.nota || null
-    };
-    if (values.tipo === "ajuste") body.delta = Number(values.delta);
-    else body.cantidad = Number(values.cantidad);
-
-    const res = await authFetch("/api/erp/inventario/movimientos", { method: "POST", body: JSON.stringify(body) });
+    const res = await authFetch("/api/erp/inventario/movimientos/batch", {
+      method: "POST",
+      body: JSON.stringify({
+        tipo: values.tipo,
+        numero_pedido: values.numeroPedido || null,
+        fecha: values.fecha,
+        responsable: values.responsable || null,
+        nota: values.nota || null,
+        items: values.lines.map(l => ({ item_id: l.itemId, cantidad: l.cantidad }))
+      })
+    });
     const json = await res.json();
     setMovementSaving(false);
     if (!res.ok) {
       setMovementError(json.error ?? "Error al registrar");
       return;
     }
-    setMovementItem(null);
+    if (Array.isArray(json.errors) && json.errors.length > 0) {
+      setMovementError(`${json.errors.length} producto(s) no se pudieron registrar.`);
+      void load();
+      return;
+    }
+    setBatchOpen(false);
     void load();
   }
 
@@ -124,7 +127,8 @@ export default function ErpMovimientosPage() {
         return (
           item?.codigo.toLowerCase().includes(q) ||
           item?.nombre.toLowerCase().includes(q) ||
-          m.responsable?.toLowerCase().includes(q)
+          m.responsable?.toLowerCase().includes(q) ||
+          m.numeroPedido?.toLowerCase().includes(q)
         );
       });
     }
@@ -140,6 +144,7 @@ export default function ErpMovimientosPage() {
         case "tipo": return movementTypeLabel(m.tipo);
         case "cantidad": return m.delta;
         case "saldo": return m.existenciaResultante;
+        case "pedido": return m.numeroPedido ?? "";
         case "responsable": return m.responsable ?? "";
         case "registrado_por": return m.createdByLabel ?? "";
       }
@@ -160,7 +165,7 @@ export default function ErpMovimientosPage() {
         loading={loading}
         search={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Buscar por producto, código o responsable…"
+        searchPlaceholder="Buscar por producto, código, responsable o No. pedido…"
         onRefresh={() => load()}
         refreshing={loading}
         filters={
@@ -184,13 +189,14 @@ export default function ErpMovimientosPage() {
                 { header: "Tipo", value: (m: InventoryMovement) => movementTypeLabel(m.tipo) },
                 { header: "Cantidad", value: (m: InventoryMovement) => m.delta },
                 { header: "Saldo", value: (m: InventoryMovement) => m.existenciaResultante },
+                { header: "No. Pedido", value: (m: InventoryMovement) => m.numeroPedido ?? "" },
                 { header: "Responsable", value: (m: InventoryMovement) => m.responsable ?? "" },
                 { header: "Registrado por", value: (m: InventoryMovement) => m.createdByLabel ?? "" }
               ]}
               rows={sorted}
             />
             {canRegister && (
-              <button type="button" onClick={() => setPickerOpen(true)} className={btnPrimary}>
+              <button type="button" onClick={() => setBatchOpen(true)} className={btnPrimary}>
                 <Plus className="w-4 h-4" /> Registrar movimiento
               </button>
             )}
@@ -215,7 +221,7 @@ export default function ErpMovimientosPage() {
         {filtered.length === 0 ? (
           <div className={registryTableEmpty}>No hay movimientos con estos filtros.</div>
         ) : (
-          <table className={`${registryTable} min-w-[1100px]`}>
+          <table className={`${registryTable} min-w-[1250px]`}>
             <thead className={registryTableHead}>
               <tr className={registryTableHeadRow}>
                 <SortableTh label="Fecha" sortKey="fecha" activeKey={sort.key} direction={sort.direction} onSort={toggleSort} />
@@ -223,6 +229,7 @@ export default function ErpMovimientosPage() {
                 <SortableTh label="Tipo" sortKey="tipo" activeKey={sort.key} direction={sort.direction} onSort={toggleSort} />
                 <SortableTh label="Cantidad" sortKey="cantidad" activeKey={sort.key} direction={sort.direction} onSort={toggleSort} />
                 <SortableTh label="Saldo" sortKey="saldo" activeKey={sort.key} direction={sort.direction} onSort={toggleSort} />
+                <SortableTh label="Pedido" sortKey="pedido" activeKey={sort.key} direction={sort.direction} onSort={toggleSort} />
                 <SortableTh label="Responsable" sortKey="responsable" activeKey={sort.key} direction={sort.direction} onSort={toggleSort} />
                 <SortableTh label="Registrado por" sortKey="registrado_por" activeKey={sort.key} direction={sort.direction} onSort={toggleSort} />
                 {canManage && <th className="w-10" />}
@@ -251,6 +258,7 @@ export default function ErpMovimientosPage() {
                       {m.delta > 0 ? `+${m.delta}` : m.delta}
                     </td>
                     <td className={`${registryTableCell} font-mono text-white`}>{m.existenciaResultante}</td>
+                    <td className={`${registryTableCell} text-sm text-gray-400 font-mono`}>{m.numeroPedido || "—"}</td>
                     <td className={`${registryTableCell} text-sm text-gray-400`}>{m.responsable || "—"}</td>
                     <td className={`${registryTableCell} text-sm text-gray-400`}>{m.createdByLabel || "—"}</td>
                     {canManage && (
@@ -273,23 +281,13 @@ export default function ErpMovimientosPage() {
         )}
       </ChannelListPage>
 
-      <ProductPickerModal
-        open={pickerOpen}
+      <BatchMovementModal
+        open={batchOpen}
         items={items}
-        onClose={() => setPickerOpen(false)}
-        onSelect={item => {
-          setPickerOpen(false);
-          setMovementItem(item);
-        }}
-      />
-      <MovementModal
-        open={!!movementItem}
-        item={movementItem}
-        canAdjust={canManage}
         saving={movementSaving}
         error={movementError}
-        onClose={() => setMovementItem(null)}
-        onSubmit={submitMovement}
+        onClose={() => setBatchOpen(false)}
+        onSubmit={submitBatchMovement}
       />
     </>
   );
