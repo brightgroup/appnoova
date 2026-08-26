@@ -6,6 +6,8 @@ import { authFetch } from "@/lib/telephony-api";
 import type { InboxTextDetail } from "@/types/inbox";
 import type { TextChatMessage } from "@/types/text-agent-conversation";
 import {
+  ArchiveIcon,
+  ArchiveRestoreIcon,
   BackIcon,
   CloseIcon,
   ChevronDownIcon,
@@ -86,6 +88,7 @@ export default function MobileConversationPage() {
   const [detail, setDetail] = useState<InboxTextDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [assigningTo, setAssigningTo] = useState<"me" | "ai" | null>(null);
+  const [archiving, setArchiving] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -157,6 +160,22 @@ export default function MobileConversationPage() {
     }
   }
 
+  async function archive(archived: boolean) {
+    if (!id) return;
+    setArchiving(true);
+    try {
+      const res = await authFetch("/api/inbox", {
+        method: "PATCH",
+        body: JSON.stringify({ conversation_id: id, archived })
+      });
+      if (res.ok) {
+        setDetail(prev => (prev ? { ...prev, archived_at: archived ? new Date().toISOString() : null } : prev));
+      }
+    } finally {
+      setArchiving(false);
+    }
+  }
+
   async function handleSend(e: FormEvent) {
     e.preventDefault();
     const content = draft.trim();
@@ -204,7 +223,7 @@ export default function MobileConversationPage() {
   }
 
   const isHuman = detail.handoff_mode === "human";
-  const canReply = isHuman && Boolean(detail.assigned_to);
+  const canReply = isHuman && Boolean(detail.assigned_to) && !detail.archived_at;
 
   return (
     <div className="nv-m-chat-mode" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, position: "relative" }}>
@@ -232,6 +251,16 @@ export default function MobileConversationPage() {
             <ChannelIcon channel={detail.channel} />
             {detail.channel_label}
           </span>
+          <button
+            type="button"
+            className="chip state"
+            style={{ marginLeft: "auto" }}
+            disabled={archiving}
+            onClick={() => archive(!detail.archived_at)}
+          >
+            {detail.archived_at ? <ArchiveRestoreIcon width={13} height={13} /> : <ArchiveIcon width={13} height={13} />}
+            {detail.archived_at ? "Desarchivar" : "Archivar"}
+          </button>
         </div>
       </div>
 
@@ -314,6 +343,13 @@ export default function MobileConversationPage() {
               </button>
             </form>
           </>
+        ) : detail.archived_at ? (
+          <div className="handoff-banner">
+            <p>Conversación archivada. Desarchívala para responder.</p>
+            <button type="button" className="assign-btn" onClick={() => archive(false)} disabled={archiving}>
+              Desarchivar
+            </button>
+          </div>
         ) : (
           <div className="handoff-banner">
             <p>Asigna la conversación a ti (arriba) para tomar el control y responder al visitante.</p>
@@ -324,7 +360,7 @@ export default function MobileConversationPage() {
         )}
       </div>
 
-      {assigningTo ? (
+      {assigningTo || archiving ? (
         <div className="loading-overlay">
           <AppLoader />
         </div>
