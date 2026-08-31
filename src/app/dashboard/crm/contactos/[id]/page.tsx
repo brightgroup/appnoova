@@ -16,7 +16,7 @@ import {
   CrmContactNextStep,
   CrmContactTimeline
 } from "@/components/crm/CrmContactTimeline";
-import { computeContactNextStep } from "@/lib/crm-contact-timeline";
+import { computeContactNextStep } from "@/lib/crm-contact-next-step";
 import { enrichCrmContact } from "@/lib/crm-record";
 import type { CrmContact, CrmLead, CrmPropertyDefinition, CrmTenantLabels } from "@/types/crm";
 

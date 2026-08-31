@@ -1,4 +1,4 @@
-import { buildChatFallbackSummary } from "@/lib/text-chat-utils";
+import { buildChatFallbackSummary, hasExtractedData } from "@/lib/text-chat-utils";
 import type { GeminiUsage } from "@/lib/billing/meter";
 import { runInternalJsonPrompt } from "@/lib/llm/internal-json-prompt";
 import type { TextChatMessage } from "@/types/text-agent-conversation";
@@ -13,14 +13,6 @@ export interface ChatAnalysisResult {
 }
 
 const SENTIMENTS = ["Positivo", "Neutral", "Negativo"] as const;
-
-function hasExtractedData(data: Record<string, unknown> | undefined): boolean {
-  if (!data || typeof data !== "object") return false;
-  return Object.values(data).some(v => {
-    if (Array.isArray(v)) return v.length > 0;
-    return String(v ?? "").trim().length > 0;
-  });
-}
 
 function buildFallbackExtractedData(messages: TextChatMessage[]): Record<string, unknown> {
   const userLines = messages.filter(m => m.role === "user").map(m => m.content.trim()).filter(Boolean);
@@ -93,16 +85,4 @@ extracted_data debe tener: intencion_usuario, resultado_chat, datos_clave (array
     console.error("[text-chat-analysis] error:", err);
     return fallback;
   }
-}
-
-export function needsChatAnalysis(
-  conv: { summary?: string; extracted_data?: Record<string, unknown>; metadata?: Record<string, unknown> },
-  messages: TextChatMessage[]
-): boolean {
-  if (messages.length < 2) return false;
-  if (conv.metadata?.analyzed_at) return false;
-  if (hasExtractedData(conv.extracted_data)) return false;
-  const summary = String(conv.summary ?? "").trim();
-  if (!summary) return true;
-  return summary === buildChatFallbackSummary(messages);
 }

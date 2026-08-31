@@ -16,7 +16,7 @@ import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { getAuthHeaders } from "@/lib/text-agents-api";
-import { needsChatAnalysis } from "@/lib/text-chat-analysis";
+import { needsChatAnalysis } from "@/lib/text-chat-utils";
 import {
   channelLabel,
   chatQualityPercent,

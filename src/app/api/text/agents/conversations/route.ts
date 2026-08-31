@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isMissingTableError } from "@/lib/supabase-table-error";
-import { analyzeChatConversation, needsChatAnalysis } from "@/lib/text-chat-analysis";
+import { analyzeChatConversation } from "@/lib/text-chat-analysis";
 import { recordOriUsageForUser } from "@/lib/billing/meter";
-import { buildChatFallbackSummary, normalizeChatMessages } from "@/lib/text-chat-utils";
+import { buildChatFallbackSummary, needsChatAnalysis, normalizeChatMessages } from "@/lib/text-chat-utils";
 import { toTextConversationListItem, toTextConversationRecord } from "@/lib/text-conversation-record";
 import { textAgentsAdminClient, getTextAgentUserIdFromRequest } from "@/lib/text-agents-server";
 

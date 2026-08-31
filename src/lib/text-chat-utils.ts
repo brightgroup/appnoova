@@ -106,6 +106,26 @@ export function downloadChatJson(data: Record<string, unknown>, filename: string
   URL.revokeObjectURL(url);
 }
 
+export function hasExtractedData(data: Record<string, unknown> | undefined): boolean {
+  if (!data || typeof data !== "object") return false;
+  return Object.values(data).some(v => {
+    if (Array.isArray(v)) return v.length > 0;
+    return String(v ?? "").trim().length > 0;
+  });
+}
+
+export function needsChatAnalysis(
+  conv: { summary?: string; extracted_data?: Record<string, unknown>; metadata?: Record<string, unknown> },
+  messages: TextChatMessage[]
+): boolean {
+  if (messages.length < 2) return false;
+  if (conv.metadata?.analyzed_at) return false;
+  if (hasExtractedData(conv.extracted_data)) return false;
+  const summary = String(conv.summary ?? "").trim();
+  if (!summary) return true;
+  return summary === buildChatFallbackSummary(messages);
+}
+
 export function normalizeChatMessages(raw: unknown): TextChatMessage[] {
   if (!Array.isArray(raw)) return [];
   return raw
