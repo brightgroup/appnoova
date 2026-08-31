@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const ctx = await requireErpAccess(req, "manage");
+  const ctx = await requireErpAccess(req, "edit");
   if (ctx instanceof NextResponse) return ctx;
 
   const body = await req.json().catch(() => ({}));
