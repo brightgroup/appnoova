@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Noova 360 — Panorama de la plataforma</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0c0d10;
+      --bg-2: #14161b;
+      --ink: #f2f2ed;
+      --muted: #9aa0a8;
+      --faint: #6b7280;
+      --line: rgba(242, 242, 237, 0.1);
+      --in: #3d8bfd;
+      --in-soft: rgba(61, 139, 253, 0.12);
+      --mid: #7c6df2;
+      --mid-soft: rgba(124, 109, 242, 0.14);
+      --out: #34c759;
+      --out-soft: rgba(52, 199, 89, 0.12);
+      --card: #1a1c22;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "DM Sans", system-ui, sans-serif;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(124, 109, 242, 0.18), transparent 55%),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(61, 139, 253, 0.08), transparent 50%),
+        var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      padding: 40px 28px 56px;
+    }
+    .wrap { max-width: 1120px; margin: 0 auto; }
+
+    header {
+      text-align: center;
+      margin-bottom: 36px;
+      animation: rise 0.7s ease both;
+    }
+    h1 {
+      font-family: "Instrument Serif", Georgia, serif;
+      font-size: clamp(28px, 4vw, 42px);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 10px;
+    }
+    h1 i { font-style: italic; color: #c4b5fd; }
+    .lead {
+      font-size: 15px;
+      color: var(--muted);
+      max-width: 560px;
+      margin: 0 auto;
+      line-height: 1.5;
+    }
+
+    .flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+    }
+
+    .layer {
+      border-radius: 20px;
+      padding: 22px 22px 20px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      position: relative;
+      animation: rise 0.8s ease both;
+    }
+    .layer:nth-child(1) { animation-delay: 0.08s; }
+    .layer:nth-child(3) { animation-delay: 0.2s; }
+    .layer:nth-child(5) { animation-delay: 0.32s; }
+
+    .layer-in { box-shadow: inset 0 0 0 1px rgba(61, 139, 253, 0.15); }
+    .layer-mid {
+      background: linear-gradient(180deg, rgba(124, 109, 242, 0.1), transparent 40%), var(--card);
+      box-shadow: inset 0 0 0 1px rgba(124, 109, 242, 0.22);
+      padding-bottom: 24px;
+    }
+    .layer-out { box-shadow: inset 0 0 0 1px rgba(52, 199, 89, 0.15); }
+
+    .layer-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 5px 10px;
+      border-radius: 999px;
+    }
+    .layer-in .badge { background: var(--in-soft); color: #8ab4ff; }
+    .layer-mid .badge { background: var(--mid-soft); color: #c4b5fd; }
+    .layer-out .badge { background: var(--out-soft); color: #7dde96; }
+
+    .layer-head h2 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .layer-head p {
+      font-size: 13px;
+      color: var(--muted);
+      margin-left: auto;
+      max-width: 340px;
+      text-align: right;
+      line-height: 1.35;
+    }
+
+    .grid {
+      display: grid;
+      gap: 10px;
+    }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-5 { grid-template-columns: repeat(5, 1fr); }
+
+    .tile {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px 14px 13px;
+      min-height: 96px;
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .tile:hover {
+      background: rgba(255,255,255,0.055);
+      transform: translateY(-2px);
+    }
+    .tile strong {
+      display: block;
+      font-size: 13.5px;
+      font-weight: 600;
+      margin-bottom: 5px;
+      letter-spacing: -0.01em;
+    }
+    .tile span {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+      display: block;
+    }
+    .tile .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-bottom: 10px;
+    }
+    .layer-in .dot { background: var(--in); }
+    .layer-mid .dot { background: var(--mid); }
+    .layer-out .dot { background: var(--out); }
+
+    .mid-sections {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--faint);
+      margin: 2px 2px 0;
+    }
+
+    .connector {
+      display: flex;
+      justify-content: center;
+      padding: 6px 0;
+      color: var(--faint);
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+    .connector svg { opacity: 0.7; }
+
+    footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--faint);
+      animation: rise 1s ease both;
+    }
+    footer b { color: var(--muted); font-weight: 500; }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.45; transform: translateY(0); }
+      50% { opacity: 1; transform: translateY(3px); }
+    }
+
+    @media (max-width: 900px) {
+      .grid-4, .grid-3, .grid-5 { grid-template-columns: 1fr 1fr; }
+      .layer-head { flex-wrap: wrap; }
+      .layer-head p { text-align: left; margin-left: 0; max-width: none; width: 100%; }
+    }
+    @media (max-width: 560px) {
+      .grid-4, .grid-3, .grid-5 { grid-template-columns: 1fr; }
+      body { padding: 24px 16px 40px; }
+    }
+
+    @media print {
+      body { background: #fff; color: #111; padding: 16px; }
+      .layer { break-inside: avoid; background: #f7f7f8; border-color: #ddd; }
+      .tile { background: #fff; }
+      .tile span, .lead, .layer-head p, footer { color: #555; }
+      .connector { color: #888; animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Panorama de la plataforma <i>en 3 capas</i></h1>
+      <p class="lead">
+        Qué aporta el cliente, qué resuelve Noova y qué obtiene de vuelta —
+        un sistema conectado de punta a punta.
+      </p>
+    </header>
+
+    <div class="flow">
+      <!-- CAPA 1 -->
+      <section class="layer layer-in">
+        <div class="layer-head">
+          <span class="badge">Capa 1 · Insumos</span>
+          <h2>Lo que aporta el cliente</h2>
+          <p>Cuentas, datos y activos que ya tiene (o que quiere conectar).</p>
+        </div>
+        <div class="grid grid-4">
+          <div class="tile">
+            <div class="dot"></div>
+            <strong>WhatsApp Business + Meta</strong>
+            <span>WABA, número verificado y acceso Embedded Signup / cuentas Meta.</span>
+          </div>
+          <div class="tile">
+            <div class="dot"></div>
+            <strong>Datos y audiencias</strong>
+            <span>Excel/CRM, contactos, bases de campañas y catálogos de productos.</span>
+          </div>
+          <div class="tile">
+            <div class="dot"></div>
+            <strong>Contexto de marca</strong>
+            <span>Información de la empresa, tono, reglas y conocimiento del negocio.</span>
+          </div>
+          <div class="tile">
+            <div class="dot"></div>
+            <strong>Calendario / agenda</strong>
+            <span>Google Calendar (opcional) para que la IA agende citas reales.</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="connector" aria-hidden="true">
+        <svg width="24" height="28" viewBox="0 0 24 28" fill="none"><path d="M12 2v20M5 16l7 8 7-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+
+      <!-- CAPA 2 -->
+      <section class="layer layer-mid">
+        <div class="layer-head">
+          <span class="badge">Capa 2 · Noova 360</span>
+          <h2>Lo que hace la plataforma</h2>
+          <p>IA, canales, CRM y operación — en un solo lugar.</p>
+        </div>
+
+        <div class="mid-sections">
+          <div>
+            <div class="section-label">Canales e IA</div>
+            <div class="grid grid-4" style="margin-top:8px">
+              <div class="tile">
+                <div class="dot"></div>
+                <strong>Líneas telefónicas</strong>
+                <span>Provisión y operación de números (Telnyx) para voz entrante y saliente.</span>
+              </div>
+              <div class="tile">
+                <div class="dot"></div>
+                <strong>IA de llamadas</strong>
+                <span>Agentes de voz (Gemini / ElevenLabs premium) con prueba, historial y campañas.</span>
+              </div>
+              <div class="tile">
+                <div class="dot"></div>
+                <strong>IA de texto</strong>
+                <span>Agentes conversacionales en WhatsApp, Mi Link y widget web.</span>
+              </div>
+              <div class="tile">
+                <div class="dot"></div>
+                <strong>Canales digitales</strong>
+                <span>WhatsApp, Mi Link público y widget embebible en el sitio del cliente.</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="section-label">Operación comercial</div>
+            <div class="grid grid-4" style="margin-top:8px">
+              <div class="tile">
+                <div class="dot"></div>
+                <strong>CRM integrado</strong>
+                <span>Contactos, ficha, leads/pipeline y timeline de interacciones.</span>
+              </div>
+              <div class="tile">
+                <div class="dot"></div>
+                <strong>Inbox unificado</strong>
+                <span>Conversaciones omnicanal con traspaso a asesores humanos.</span>
+              </div>
+              <div class="tile">
+                <div class="dot"></div>
+                <strong>Campañas de voz</strong>
+                <span>Marcación saliente masiva con reglas, audiencias y resultados.</span>
+              </div>
+              <div class="tile">
+                <div class="dot"></div>
+                <strong>Equipo y permisos</strong>
+                <span>Roles, usuarios, notificaciones al equipo y app móvil PWA.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="connector" aria-hidden="true">
+        <svg width="24" height="28" viewBox="0 0 24 28" fill="none"><path d="M12 2v20M5 16l7 8 7-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+
+      <!-- CAPA 3 -->
+      <section class="layer layer-out">
+        <div class="layer-head">
+          <span class="badge">Capa 3 · Salidas</span>
+          <h2>Lo que obtiene el cliente</h2>
+          <p>Registro, evidencia y continuidad operativa.</p>
+        </div>
+        <div class="grid grid-5">
+          <div class="tile">
+            <div class="dot"></div>
+            <strong>Registro de chats</strong>
+            <span>Historial de WhatsApp, web y widget en un solo inbox.</span>
+          </div>
+          <div class="tile">
+            <div class="dot"></div>
+            <strong>Grabaciones de llamadas</strong>
+            <span>Audio e historial de llamadas con agente de voz.</span>
+          </div>
+          <div class="tile">
+            <div class="dot"></div>
+            <strong>CRM actualizado</strong>
+            <span>Contactos, leads y actividad alimentados por la operación.</span>
+          </div>
+          <div class="tile">
+            <div class="dot"></div>
+            <strong>Citas y notificaciones</strong>
+            <span>Agendas en Calendar y avisos al equipo (email / push).</span>
+          </div>
+          <div class="tile">
+            <div class="dot"></div>
+            <strong>Métricas y consumo</strong>
+            <span>Uso de minutos, mensajes, campañas y facturación por créditos.</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer>
+      <b>Noova 360</b> · El cliente aporta insumos · Noova opera canales + IA + CRM · El negocio recibe registro y control
+    </footer>
+  </div>
+</body>
+</html>

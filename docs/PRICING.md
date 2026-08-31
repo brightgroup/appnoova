@@ -1,8 +1,18 @@
 # Noova 360 — Pricing interno y comercial
 
 Documento de referencia para costos, márgenes y precios al cliente.  
-**Última actualización:** junio 2026 · **Fase WhatsApp:** Twilio (Fase 0)  
-**TRM de referencia:** $1 USD ≈ $4.200 COP
+**Última actualización:** 22 ago 2026 · **Fase WhatsApp:** Twilio (Fase 0)
+
+**TRM: ya NO es un valor fijo de referencia.** Desde la migración 041 el sistema sincroniza
+la TRM oficial (Superfinanciera, vía `datos.gov.co`) automáticamente cada hora antes de
+cobrar (`src/lib/billing/trm-colombia.ts` → `syncOfficialTrm`), y la guarda en
+`billing_settings.trm_cop`. Los créditos que se cobran por cada acción están fijos **en
+COP** (`billing_unit_prices.credits_cop`); lo único que se recalcula con la TRM es su
+equivalente en USD para mostrarlo en el panel — el consumo del cliente en créditos no se
+mueve por la TRM. Snapshot al momento de escribir esto: **TRM $3.048,12 COP** (vigente
+2026-08-22). Los números de créditos y precios por acción de este documento son una
+fotografía de esa fecha — para el valor en vivo, consultar `billing_settings` y
+`billing_unit_prices` (o el panel `/admin/pricing`), no este archivo.
 
 ---
 
@@ -152,22 +162,27 @@ El cliente no ve proveedores, categorías Meta ni tipos de mensaje Twilio.
 
 ---
 
-## 7. Precios al cliente (vigentes — fase lanzamiento)
+## 7. Precios al cliente (vigentes — snapshot 2026-08-22)
 
 ### Consumo por acción
 
-| Cada vez que… | Créditos | Precio COP | Tu costo | Margen |
-|---------------|----------|------------|----------|--------|
-| Escribes a **ORI** | 10 | **$10** | ~$3 | ~70% |
-| Un visitante escribe en **Mi Link** | 20 | **$20** | ~$8 | ~60% |
-| Llega o sales un **WhatsApp** (humano, sin IA) | 30 | **$30** | ~$21 | ~30% |
-| La **IA responde en WhatsApp** | 60 | **$60** | ~$46 | ~23% |
-| **ORI llena un formulario** | 50 | **$50** | ~$21 | ~58% |
-| **ORI escanea un documento** | 90 | **$90** | ~$25 | ~72% |
-| **ORI genera una cotización** | 70 | **$70** | ~$35 | ~50% |
-| **Agente de voz** (por minuto) | 900 | **$900** | ~$210 | ~77% |
+Precios (`credits_cop`) tomados en vivo de `billing_unit_prices`. El costo real se
+reconvierte a COP con la TRM vigente ($3.048,12) a partir del USD fijo de la sección 2 —
+como el USD real no cambió pero la TRM bajó y los créditos subieron desde el precio de
+lanzamiento, el margen por acción mejoró frente a los números originales de junio.
 
-**Referencia competencia:** Dapta ~$73 COP por respuesta IA en WhatsApp. **Noova: $60** (lanzamiento).
+| Cada vez que… | Créditos | Precio COP | Tu costo (COP, TRM viva) | Margen |
+|---------------|----------|------------|---------------------------|--------|
+| Escribes a **ORI** | 15,45 | **$15** | ~$2 | ~86% |
+| Un visitante escribe en **Mi Link** | 19,57 | **$20** | ~$6 | ~70% |
+| Llega o sales un **WhatsApp** (humano, sin IA) | 29,87 | **$30** | ~$15 | ~49% |
+| La **IA responde en WhatsApp** | 72,11 | **$72** | ~$34 | ~53% |
+| **ORI llena un formulario** | 50,48 | **$50** | ~$15 | ~70% |
+| **ORI escanea un documento** | 89,62 | **$90** | ~$18 | ~80% |
+| **ORI genera una cotización** | 90,00 | **$90** | ~$25 | ~72% |
+| **Agente de voz** (por minuto) | 927,10 | **$927** | ~$152 | ~84% |
+
+**Referencia competencia:** Dapta ~$73 COP por respuesta IA en WhatsApp. **Noova: ~$72** (equivalente tras el ajuste de precios).
 
 **Activación WhatsApp:** sin cargo adicional en fase de lanzamiento (onboarding manual incluido).
 
@@ -185,14 +200,14 @@ Pago en COP al TRM del día o equivalente acordado.
 | | |
 |---|---|
 | **Precio** | **Gratis · 14 días** |
-| **Créditos incluidos** | **15.000** |
+| **Créditos incluidos** | **8.500** |
 | **Incluye** | ORI, Mi Link, inbox, 1 agente de texto |
 | **No incluye** | WhatsApp en plan prueba (disponible al activar plan de pago) |
 
 **Equivale aprox. a:**
-- ~**500** mensajes de texto con IA (promedio ~$30), o
-- ~**1.500** mensajes a ORI ($10 c/u), o
-- ~**250** respuestas solo en WhatsApp ($60 c/u)
+- ~**236** mensajes de texto con IA (promedio ~$36), o
+- ~**550** mensajes a ORI ($15 c/u), o
+- ~**118** respuestas solo en WhatsApp ($72 c/u)
 
 **Copy landing:**  
 *Prueba Noova 14 días sin tarjeta. 15.000 créditos para ORI, tu link web e inbox.*
@@ -203,15 +218,15 @@ Pago en COP al TRM del día o equivalente acordado.
 
 | | |
 |---|---|
-| **Precio** | **$82 USD/mes** (~$344.000 COP) |
-| **Créditos incluidos** | **350.000 / mes** |
+| **Precio** | **$82 USD/mes** (~$250.000 COP a TRM viva $3.048) |
+| **Créditos incluidos** | **273.333 / mes** |
 | **Ideal para** | Corredor independiente o agencia pequeña (1–3 asesores) |
 | **Incluye** | ORI, Mi Link, inbox, CRM con ia, agentes de texto, **hasta 5 usuarios**, soporte por email |
 
 **Equivale aprox. a:**
-- ~**11.600** mensajes de texto con IA (promedio ~$30), o
-- ~**35.000** mensajes a ORI, o
-- ~**5.800** respuestas solo en WhatsApp ($60 c/u)
+- ~**7.593** mensajes de texto con IA (promedio ~$36), o
+- ~**17.690** mensajes a ORI, o
+- ~**3.791** respuestas solo en WhatsApp ($72 c/u)
 
 **Copy landing:**  
 *Todo lo esencial para empezar: copiloto ORI, link web con IA e inbox. Desde $82/mes.*
@@ -222,15 +237,19 @@ Pago en COP al TRM del día o equivalente acordado.
 
 | | |
 |---|---|
-| **Precio** | **$345 USD/mes** (~$1.449.000 COP) |
-| **Créditos incluidos** | **1.500.000 / mes** |
+| **Precio** | **$345 USD/mes** (~$1.051.600 COP a TRM viva $3.048) |
+| **Créditos incluidos** | **1.456.151 / mes** |
 | **Ideal para** | Agencia en crecimiento (6–15 asesores) |
-| **Incluye** | Misma plataforma que Esencial + **1.500.000 créditos** + **hasta 15 usuarios** + soporte prioritario |
+| **Incluye** | Misma plataforma que Esencial + **1.456.151 créditos** + **hasta 15 usuarios** + soporte prioritario |
 
 **Equivale aprox. a:**
-- ~**50.000** mensajes de texto con IA (promedio ~$30), o
-- ~**150.000** mensajes a ORI, o
-- ~**25.000** respuestas solo en WhatsApp ($60 c/u)
+- ~**40.449** mensajes de texto con IA (promedio ~$36), o
+- ~**94.251** mensajes a ORI, o
+- ~**20.193** respuestas solo en WhatsApp ($72 c/u)
+
+> ⚠️ Este cupo de créditos no se ha reajustado desde que se creó el plan (su ratio
+> créditos/USD implica una TRM de ~$4.220, muy por encima de la TRM viva de $3.048).
+> Esencial y Básico sí fueron reajustados recientemente (ratio ~$3.333). Ver §13.
 
 **Copy landing:**  
 *Para agencias que ya operan volumen: más créditos, más agentes, soporte prioritario.*
@@ -241,15 +260,17 @@ Pago en COP al TRM del día o equivalente acordado.
 
 | | |
 |---|---|
-| **Precio** | **$815 USD/mes** (~$3.423.000 COP) |
-| **Créditos incluidos** | **3.800.000 / mes** |
+| **Precio** | **$815 USD/mes** (~$2.484.200 COP a TRM viva $3.048) |
+| **Créditos incluidos** | **3.688.916 / mes** |
 | **Ideal para** | Agencias con equipo grande o alto volumen de consumo |
-| **Incluye** | Misma plataforma + **3.800.000 créditos** + **usuarios ilimitados** + soporte dedicado |
+| **Incluye** | Misma plataforma + **3.688.916 créditos** + **usuarios ilimitados** + soporte dedicado |
 
 **Equivale aprox. a:**
-- ~**126.600** mensajes de texto con IA (promedio ~$30), o
-- ~**380.000** mensajes a ORI, o
-- ~**63.300** respuestas solo en WhatsApp ($60 c/u)
+- ~**102.470** mensajes de texto con IA (promedio ~$36), o
+- ~**238.765** mensajes a ORI, o
+- ~**51.157** respuestas solo en WhatsApp ($72 c/u)
+
+> ⚠️ Igual que Crecimiento: cupo calculado con una TRM de ~$4.526, sin reajustar. Ver §13.
 
 **Copy landing:**  
 *Máximo volumen para operaciones grandes: escaneo, formularios, WhatsApp e IA a escala.*
@@ -261,7 +282,7 @@ Pago en COP al TRM del día o equivalente acordado.
 | | **Explorador** | **Esencial** | **Crecimiento** | **Escala** |
 |---|:---:|:---:|:---:|:---:|
 | **Precio/mes** | $0 | **$82** | **$345** | **$815** |
-| **Créditos/mes** | 15.000 | 350.000 | 1.500.000 | 3.800.000 |
+| **Créditos/mes** | 8.500 | 273.333 | 1.456.151 | 3.688.916 |
 | **Duración** | 14 días | Mensual | Mensual | Mensual |
 | ORI copiloto | ✅ | ✅ | ✅ | ✅ |
 | Mi Link (web) | ✅ | ✅ | ✅ | ✅ |
@@ -309,23 +330,23 @@ Desglose real: ORI **$10** · Mi Link **$20** · WhatsApp IA **$60**.
 ### Mensaje promedio (protagonista en landing)
 
 Mix típico corredor: **45% ORI + 20% Mi Link + 35% WhatsApp IA**  
-→ **~30 créditos (~$30 COP) por mensaje de texto promedio**
+→ **~36 créditos (~$36 COP) por mensaje de texto promedio** (snapshot 2026-08-22, precios en vivo)
 
-| Plan | Créditos | ≈ Mensajes texto (promedio ~$30) |
+| Plan | Créditos | ≈ Mensajes texto (promedio ~$36) |
 |------|----------|----------------------------------|
-| Prueba | 15.000 | ~500 |
-| Inicio | 350.000 | ~11.600 |
-| Profesional | 1.500.000 | ~50.000 |
-| Agencia | 3.800.000 | ~126.600 |
+| Prueba | 8.500 | ~236 |
+| Inicio | 273.333 | ~7.593 |
+| Profesional | 1.456.151 | ~40.449 |
+| Agencia | 3.688.916 | ~102.470 |
 
 ### Sección «Créditos reales por canal»
 
 | Canal | Créditos | Precio |
 |-------|----------|--------|
-| ORI | 10 | **$10** |
-| Mi Link | 20 | **$20** |
-| WhatsApp con IA | 60 | **$60** |
-| **Promedio mix típico** | **~30** | **~$30** |
+| ORI | 15,45 | **$15** |
+| Mi Link | 19,57 | **$20** |
+| WhatsApp con IA | 72,11 | **$72** |
+| **Promedio mix típico** | **~36** | **~$36** |
 
 ### Sección «Otros consumos»
 
@@ -337,7 +358,7 @@ Mix típico corredor: **45% ORI + 20% Mi Link + 35% WhatsApp IA**
 
 ## 12. Margen estimado si el cliente usa el 100% de créditos
 
-Mix típico agencia de seguros (referencia interna):
+Mix típico agencia de seguros (referencia interna, sin cambios):
 
 | Tipo | % créditos |
 |------|------------|
@@ -349,26 +370,49 @@ Mix típico agencia de seguros (referencia interna):
 | Formularios | 4% |
 | Cotizaciones | 1% |
 
-Costo promedio ponderado: **~$0,59 COP por crédito consumido**.
+Recalculado con los precios en vivo de §7 y la TRM viva ($3.048,12) — el costo real en USD
+de cada acción (sección 2) no cambió, pero los créditos se repreciaron al alza y la TRM
+bajó, así que el margen mejoró bastante frente al estimado original de junio.
 
-| Plan | Ingreso (USD) | Ingreso (~COP) | Créditos | Costo variable est. | Margen est. |
-|------|---------------|----------------|----------|---------------------|-------------|
-| Prueba | $0 | $0 | 15.000 | ~$8.850 | Adquisición |
-| Inicio | $82 | ~$344.000 | 350.000 | ~$206.500 | **~$137.500 (40%)** |
-| Profesional | $345 | ~$1.449.000 | 1.500.000 | ~$885.000 | **~$564.000 (39%)** |
-| Agencia | $815 | ~$3.423.000 | 3.800.000 | ~$2.242.000 | **~$1.181.000 (35%)** |
+Costo promedio ponderado: **~$0,353 COP por crédito consumido** (antes ~$0,59).
 
-**Peor caso** (100% WhatsApp con IA a $60): margen ~23% por mensaje — viable en lanzamiento; subir precio o migrar a 360dialog cuando escale el volumen.
+| Plan | Ingreso (USD) | Ingreso (~COP a TRM viva) | Créditos | Costo variable est. | Margen est. |
+|------|---------------|----------------------------|----------|---------------------|-------------|
+| Prueba | $0 | $0 | 8.500 | ~$3.000 | Adquisición |
+| Inicio (Esencial) | $82 | ~$249.946 | 273.333 | ~$96.486 | **~$153.460 (61%)** |
+| Profesional (Crecimiento) | $345 | ~$1.051.601 | 1.456.151 | ~$514.072 | **~$537.529 (51%)** |
+| Agencia (Escala) | $815 | ~$2.484.218 | 3.688.916 | ~$1.302.192 | **~$1.182.026 (48%)** |
+
+Nota: Crecimiento y Escala salen con margen más bajo que Esencial en este escenario porque
+su cupo de créditos está sobredimensionado (calculado con TRM ~$4.200-4.526, nunca
+reajustado — ver aviso en §8 y pendiente en §13); no es que esos planes sean intrínsecamente
+menos rentables.
+
+**Peor caso real** (100% créditos en WhatsApp con IA únicamente, a $72/cr): costo
+≈$33,53 COP/crédito → margen ~53% por mensaje en ese canal — sigue siendo mejor que el ~23%
+original porque el precio de ese canal subió de $60 a $72,11 desde el lanzamiento.
+
+**Importante:** como el precio al cliente por acción está fijo en COP y el costo real del
+proveedor está fijo en USD, una TRM más baja (peso fuerte) **mejora** el margen por crédito
+consumido — no lo empeora. La TRM no afecta el margen del plan en sí ($82 USD de ingreso
+menos el costo real en USD es fijo); solo afecta cuánto vale ese margen al convertirlo a
+pesos para reportes internos.
 
 ---
 
 ## 13. Decisiones pendientes
 
 - [ ] Migrar WhatsApp de Twilio → 360dialog Partner (~10–15 clientes activos pagando)
-- [ ] Revisar precio WhatsApp con IA ($60 → $65–70) post-lanzamiento
+- [x] Revisar precio WhatsApp con IA ($60 → $72,11 en `billing_unit_prices`, ya ajustado)
 - [x] Implementar wallet/créditos en base de datos (migración 041 — créditos mensuales no acumulables, medición en tiempo real, suspensión automática)
 - [ ] Conectar pasarela de pago (hoy el pago se marca manual desde /admin/billing)
 - [ ] Definir cobro en COP vs USD en pasarela de pago
+- [ ] **Reajustar `monthly_credits` de Crecimiento y Escala.** Esencial y Básico ya se
+      recalcularon a una TRM ~$3.333 (créditos/USD), pero Crecimiento (ratio ~$4.220) y
+      Escala (ratio ~$4.526) siguen con el cupo calculado a la TRM de lanzamiento — les
+      estamos regalando proporcionalmente más créditos que a Esencial. `monthly_credits`
+      en `plans` no se resincroniza solo con la TRM (a diferencia de `price_usd` en
+      `billing_unit_prices`, que sí); requiere un ajuste manual o un job nuevo.
 
 ---
 
@@ -378,3 +422,4 @@ Costo promedio ponderado: **~$0,59 COP por crédito consumido**.
 |-------|--------|
 | Jun 2026 | Documento inicial. WA Fase 0 Twilio. WhatsApp IA a $60 (lanzamiento). Planes $0 / $82 / $345 / $815 USD. |
 | Jun 2026 | Sistema de consumo/facturación (migración 041): planes en BD, billetera de créditos mensual no acumulable, ledger `usage_events` con costo real vs cobro, facturas + suspensión automática, panel cliente (/dashboard/facturacion) y panel proveedor (/admin/billing). IDs de plan: explorador/esencial/crecimiento/escala. |
+| 22 ago 2026 | Corregido: la TRM de referencia ($4.200) estaba desactualizada — el sistema sincroniza la TRM oficial automáticamente (`syncOfficialTrm`, cada hora, fuente `datos.gov.co`) y ya no es un valor fijo. Actualizados créditos por plan, precios por acción y tabla de márgenes con los valores en vivo (TRM $3.048,12). Detectado: Crecimiento/Escala no se han reajustado desde el lanzamiento (pendiente en §13). |
