@@ -67,22 +67,31 @@ export default function ErpInventarioPage() {
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    const url = search.trim() ? `/api/erp/inventario/items?q=${encodeURIComponent(search.trim())}` : "/api/erp/inventario/items";
-    const res = await authFetch(url);
+    const res = await authFetch("/api/erp/inventario/items");
     if (res.ok) {
       const json = await res.json();
       setItems(json.items ?? []);
     }
     if (!silent) setLoading(false);
-  }, [search]);
+  }, []);
 
   useEffect(() => { void load(); }, [load]);
 
   const filtered = useMemo(() => {
-    if (filter === "bajo_minimo") return items.filter(isLowStock);
-    if (filter === "sin_existencia") return items.filter(i => i.existencia <= 0);
-    return items;
-  }, [items, filter]);
+    let list = items;
+    if (filter === "bajo_minimo") list = list.filter(isLowStock);
+    else if (filter === "sin_existencia") list = list.filter(i => i.existencia <= 0);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        i =>
+          i.codigo.toLowerCase().includes(q) ||
+          i.nombre.toLowerCase().includes(q) ||
+          (i.marca?.toLowerCase().includes(q) ?? false)
+      );
+    }
+    return list;
+  }, [items, filter, search]);
 
   const getSortValue = useCallback((item: InventoryItem, key: SortKey): string | number | null => {
     switch (key) {
