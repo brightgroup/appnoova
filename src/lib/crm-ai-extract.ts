@@ -1,6 +1,7 @@
 import type { TextChatMessage } from "@/types/text-agent-conversation";
 import type { CrmContact, CrmFieldProvenanceEntry } from "@/types/crm";
-import { runOriJsonPrompt, type OriPromptResult } from "@/lib/crm-gemini";
+import type { OriPromptResult } from "@/lib/crm-gemini";
+import { runInternalJsonPrompt } from "@/lib/llm/internal-json-prompt";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
 
 const EXTRACTABLE_FIELDS = [
@@ -73,7 +74,7 @@ ${transcript}
 
 Extrae solo campos nuevos o que corrigen datos vacíos/incorrectos.`;
 
-  const { result: raw, usage, model } = await runOriJsonPrompt<{ suggestions?: CrmAiFieldSuggestion[] }>(
+  const { result: raw, usage, model } = await runInternalJsonPrompt<{ suggestions?: CrmAiFieldSuggestion[] }>(
     EXTRACT_SYSTEM,
     prompt
   );

@@ -44,3 +44,17 @@ export function resolveEngineChain(clientModel: string | null | undefined): LlmE
   // "caer al default en vez de romper" que resolveTextLlm en text-agent-options.ts.
   return [OPENAI_FLASH, GEMINI_FLASH];
 }
+
+/**
+ * Cadena para tareas de IA internas de fondo (extracción de leads, análisis
+ * de llamadas, captura de campañas — nada de esto lo elige el cliente, así
+ * que no hay "modelo elegido" que traducir). Antes esto llamaba solo a
+ * Gemini: todo el volumen caía sobre una sola cuenta/cuota. Ahora se reparte
+ * entre los dos proveedores (orden al azar en cada llamada) y, si el que
+ * arrancó primero falla, el segundo responde igual — mismo patrón de
+ * failover que `resolveEngineChain`, pero pensado para repartir carga en
+ * vez de respetar la elección de un cliente.
+ */
+export function resolveInternalEngineChain(): LlmEngine[] {
+  return Math.random() < 0.5 ? [OPENAI_FLASH, GEMINI_FLASH] : [GEMINI_FLASH, OPENAI_FLASH];
+}

@@ -1,7 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
-import { getOriApiKey, getOriModel } from "@/lib/google-ai";
 import { buildChatFallbackSummary } from "@/lib/text-chat-utils";
-import { readGeminiUsage, type GeminiUsage } from "@/lib/billing/meter";
+import type { GeminiUsage } from "@/lib/billing/meter";
+import { runInternalJsonPrompt } from "@/lib/llm/internal-json-prompt";
 import type { TextChatMessage } from "@/types/text-agent-conversation";
 
 const EMPTY_USAGE: GeminiUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
@@ -14,52 +13,6 @@ export interface ChatAnalysisResult {
 }
 
 const SENTIMENTS = ["Positivo", "Neutral", "Negativo"] as const;
-
-function extractNestedObject(text: string, key: string): Record<string, unknown> | null {
-  const marker = `"${key}"`;
-  const idx = text.indexOf(marker);
-  if (idx === -1) return null;
-  const start = text.indexOf("{", idx + marker.length);
-  if (start === -1) return null;
-
-  let depth = 0;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
-    if (ch === "{") depth++;
-    else if (ch === "}") {
-      depth--;
-      if (depth === 0) {
-        try {
-          return JSON.parse(text.slice(start, i + 1)) as Record<string, unknown>;
-        } catch {
-          return null;
-        }
-      }
-    }
-  }
-  return null;
-}
-
-function salvagePartialJson(text: string): Partial<ChatAnalysisResult> | null {
-  const summaryMatch = text.match(/"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-  const sentimentMatch = text.match(/"user_sentiment"\s*:\s*"(Positivo|Neutral|Negativo)"/);
-  if (!summaryMatch) return null;
-
-  return {
-    summary: summaryMatch[1].replace(/\\"/g, '"'),
-    user_sentiment: sentimentMatch?.[1] ?? "Neutral",
-    extracted_data: extractNestedObject(text, "extracted_data") ?? {}
-  };
-}
-
-function parseAnalysisJson(text: string): Partial<ChatAnalysisResult> | null {
-  const cleaned = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
-  try {
-    return JSON.parse(cleaned) as Partial<ChatAnalysisResult>;
-  } catch {
-    return salvagePartialJson(cleaned);
-  }
-}
 
 function hasExtractedData(data: Record<string, unknown> | undefined): boolean {
   if (!data || typeof data !== "object") return false;
@@ -96,7 +49,7 @@ function normalizeExtractedData(raw: unknown, messages: TextChatMessage[]): Reco
   return buildFallbackExtractedData(messages);
 }
 
-/** Análisis post-chat con Gemini (resumen, sentimiento y datos extraídos). */
+/** Análisis post-chat (resumen, sentimiento y datos extraídos) — motor con failover, ver runInternalJsonPrompt. */
 export async function analyzeChatConversation(
   messages: TextChatMessage[]
 ): Promise<ChatAnalysisResult> {
@@ -109,60 +62,32 @@ export async function analyzeChatConversation(
 
   if (messages.length < 2) return fallback;
 
-  const apiKey = getOriApiKey();
-  if (!apiKey) return fallback;
-
   const dialogue = messages
     .map(m => `${m.role === "user" ? "Usuario" : "Agente"}: ${m.content}`)
     .join("\n");
 
+  const system = `Analiza esta conversación de chat de un agente comercial (español colombiano).
+Responde SOLO JSON válido con forma: { "summary": "...", "user_sentiment": "Positivo|Neutral|Negativo", "extracted_data": {...} }
+El campo extracted_data es obligatorio y no puede ir vacío.
+extracted_data debe tener: intencion_usuario, resultado_chat, datos_clave (array), proximos_pasos, objeciones.`;
+
   try {
-    const ai = new GoogleGenAI({ apiKey });
-    const res = await ai.models.generateContent({
-      model: getOriModel(),
-      contents: [{
-        role: "user",
-        parts: [{
-          text: `Analiza esta conversación de chat de un agente comercial (español colombiano).
-Responde SOLO JSON válido, sin markdown. El campo extracted_data es obligatorio y no puede ir vacío.
-{
-  "summary": "2-3 oraciones claras sobre qué pasó y el resultado",
-  "user_sentiment": "Positivo|Neutral|Negativo",
-  "extracted_data": {
-    "intencion_usuario": "qué buscaba o necesitaba el usuario",
-    "resultado_chat": "cómo terminó la conversación",
-    "datos_clave": ["dato1", "dato2"],
-    "proximos_pasos": "acción sugerida",
-    "objeciones": "objeciones del usuario o vacío"
-  }
-}
-
-Conversación:
-${dialogue}`
-        }]
-      }],
-      config: {
-        temperature: 0.2,
-        maxOutputTokens: 1024,
-        responseMimeType: "application/json"
-      }
-    });
-
-    const raw = res.text?.trim() ?? "";
-    const parsed = parseAnalysisJson(raw);
+    const { result: parsed, usage } = await runInternalJsonPrompt<Partial<ChatAnalysisResult>>(
+      system,
+      `Conversación:\n${dialogue}`,
+      1024
+    );
     if (!parsed?.summary) return fallback;
 
     const sentiment = SENTIMENTS.includes(parsed.user_sentiment as typeof SENTIMENTS[number])
       ? parsed.user_sentiment!
       : "Neutral";
 
-    const extractedRaw = parsed.extracted_data ?? extractNestedObject(raw, "extracted_data");
-
     return {
       summary: parsed.summary,
       user_sentiment: sentiment,
-      extracted_data: normalizeExtractedData(extractedRaw, messages),
-      usage: readGeminiUsage(res)
+      extracted_data: normalizeExtractedData(parsed.extracted_data, messages),
+      usage
     };
   } catch (err) {
     console.error("[text-chat-analysis] error:", err);

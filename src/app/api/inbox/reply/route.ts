@@ -14,8 +14,7 @@ import {
 } from "@/lib/whatsapp/compliance";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import { signWhatsAppMessageMedia } from "@/lib/whatsapp/media-storage";
-import { enrichCrmLeadForConversationId } from "@/lib/crm-lead-enrich";
-import { enrichCrmContactFromWhatsAppConversation } from "@/lib/crm-contact-enrich";
+import { runAutoCrmEnrichment } from "@/lib/crm-auto-enrich";
 
 export async function POST(req: NextRequest) {
   const orgCtx = await requireOrgModule(req, "inbox", "edit");
@@ -118,14 +117,8 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (linkedContact?.id) {
-    void enrichCrmContactFromWhatsAppConversation(
-      db,
-      ownerUserId,
-      String(linkedContact.id),
-      conversationId
-    ).catch(err => console.error("[inbox/reply] contact enrich:", err));
-    void enrichCrmLeadForConversationId(db, ownerUserId, conversationId).catch(err =>
-      console.error("[inbox/reply] lead enrich:", err)
+    void runAutoCrmEnrichment(db, ownerUserId, String(linkedContact.id), conversationId).catch(err =>
+      console.error("[inbox/reply] crm enrich:", err)
     );
   }
 

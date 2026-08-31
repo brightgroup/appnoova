@@ -5,7 +5,8 @@ import type {
   CrmMotivoPerdida,
   CrmPipelineStage
 } from "@/types/crm";
-import { runOriJsonPrompt, type OriPromptResult } from "@/lib/crm-gemini";
+import type { OriPromptResult } from "@/lib/crm-gemini";
+import { runInternalJsonPrompt } from "@/lib/llm/internal-json-prompt";
 import {
   DEFAULT_STAGE_AI_CRITERIA,
   detectCommercialIntent,
@@ -134,7 +135,7 @@ ${leadBlock}
 Conversación:
 ${transcript}`;
 
-  const { result: raw, usage, model } = await runOriJsonPrompt<Partial<CrmLeadAnalysisResult>>(system, prompt);
+  const { result: raw, usage, model } = await runInternalJsonPrompt<Partial<CrmLeadAnalysisResult>>(system, prompt);
 
   const outcome =
     raw.outcome === "won" || raw.outcome === "lost" || raw.outcome === "open"

@@ -34,8 +34,7 @@ import { mergeWhatsAppMetadata } from "@/lib/whatsapp/conversation-meta";
 import { notifyPushForOrg } from "@/lib/push/send";
 import { emitAutomationEvent } from "@/lib/automations/events";
 import { syncCrmContactFromWhatsAppInbound } from "@/lib/crm-contact-sync";
-import { enrichCrmContactFromWhatsAppConversation } from "@/lib/crm-contact-enrich";
-import { enrichCrmLeadForConversationId } from "@/lib/crm-lead-enrich";
+import { runAutoCrmEnrichment } from "@/lib/crm-auto-enrich";
 import {
   canSendWhatsAppSessionMessage,
   detectWhatsAppOptOut,
@@ -164,18 +163,10 @@ async function syncAndEnrichCrmFromInbound(
 
     console.info(`[whatsapp/inbound] crm linked conversation ${conversationId} → contact ${contactId}`);
 
-    void enrichCrmContactFromWhatsAppConversation(
-      db,
-      channel.user_id,
-      contactId,
-      conversationId
-    ).catch(err => console.error("[whatsapp/inbound] crm enrich:", err));
-
-    void enrichCrmLeadForConversationId(
-      db,
-      channel.user_id,
-      conversationId
-    ).catch(err => console.error("[whatsapp/inbound] crm lead enrich:", err));
+    void runAutoCrmEnrichment(db, channel.user_id, contactId, conversationId, {
+      text: inbound.body,
+      hasMedia: inbound.media.length > 0
+    }).catch(err => console.error("[whatsapp/inbound] crm enrich:", err));
 
     return contactId;
   } catch (err) {
@@ -893,10 +884,6 @@ async function processTwilioWhatsAppInboundLocked(
       outboundWhatsAppChannel: channel
     });
   }
-
-  void enrichCrmLeadForConversationId(db, channel.user_id, userPersist.conversationId).catch(err =>
-    console.error("[whatsapp/inbound] crm lead enrich (post-ai):", err)
-  );
 
   // Le da tiempo al indicador de "escribiendo…" de mostrarse de verdad antes de reemplazarlo
   // con la respuesta — sin esto, una respuesta muy rápida de Gemini lo deja invisible.

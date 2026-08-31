@@ -1,7 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
-import { getOriApiKey, getOriModel } from "@/lib/google-ai";
 import { buildFallbackSummary } from "@/lib/voice-call-utils";
-import { readGeminiUsage, type GeminiUsage } from "@/lib/billing/meter";
+import type { GeminiUsage } from "@/lib/billing/meter";
+import { runInternalJsonPrompt } from "@/lib/llm/internal-json-prompt";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
 
 const EMPTY_USAGE: GeminiUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
@@ -14,54 +13,6 @@ export interface CallAnalysisResult {
 }
 
 const SENTIMENTS = ["Positivo", "Neutral", "Negativo"] as const;
-
-function extractNestedObject(text: string, key: string): Record<string, unknown> | null {
-  const marker = `"${key}"`;
-  const idx = text.indexOf(marker);
-  if (idx === -1) return null;
-  const start = text.indexOf("{", idx + marker.length);
-  if (start === -1) return null;
-
-  let depth = 0;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
-    if (ch === "{") depth++;
-    else if (ch === "}") {
-      depth--;
-      if (depth === 0) {
-        try {
-          return JSON.parse(text.slice(start, i + 1)) as Record<string, unknown>;
-        } catch {
-          return null;
-        }
-      }
-    }
-  }
-  return null;
-}
-
-function salvagePartialJson(text: string): Partial<CallAnalysisResult> | null {
-  const summaryMatch = text.match(/"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-  const sentimentMatch = text.match(/"user_sentiment"\s*:\s*"(Positivo|Neutral|Negativo)"/);
-  if (!summaryMatch) return null;
-
-  const extracted = extractNestedObject(text, "extracted_data") ?? {};
-
-  return {
-    summary: summaryMatch[1].replace(/\\"/g, '"'),
-    user_sentiment: sentimentMatch?.[1] ?? "Neutral",
-    extracted_data: extracted
-  };
-}
-
-function parseAnalysisJson(text: string): Partial<CallAnalysisResult> | null {
-  const cleaned = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
-  try {
-    return JSON.parse(cleaned) as Partial<CallAnalysisResult>;
-  } catch {
-    return salvagePartialJson(cleaned);
-  }
-}
 
 function hasExtractedData(data: Record<string, unknown> | undefined): boolean {
   if (!data || typeof data !== "object") return false;
@@ -98,7 +49,7 @@ function normalizeExtractedData(raw: unknown, transcript: TranscriptEntry[]): Re
   return buildFallbackExtractedData(transcript);
 }
 
-/** Análisis post-llamada con Gemini Flash (económico, solo texto/transcripción). */
+/** Análisis post-llamada (solo texto/transcripción) — motor con failover, ver runInternalJsonPrompt. */
 export async function analyzeCallTranscript(
   transcript: TranscriptEntry[]
 ): Promise<CallAnalysisResult> {
@@ -111,62 +62,33 @@ export async function analyzeCallTranscript(
 
   if (!transcript.length) return fallback;
 
-  const apiKey = getOriApiKey();
-  if (!apiKey) return fallback;
-
   const dialogue = transcript
     .map(t => `[${t.time_sec}s] ${t.role === "user" ? "Usuario" : "Agente"}: ${t.text}`)
     .join("\n");
 
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const res = await ai.models.generateContent({
-      model: getOriModel(),
-      contents: [{
-        role: "user",
-        parts: [{
-          text: `Analiza esta llamada de un agente de voz comercial (español colombiano).
-Responde SOLO JSON válido, sin markdown. El campo extracted_data es obligatorio y no puede ir vacío.
+  const system = `Analiza esta llamada de un agente de voz comercial (español colombiano).
+Responde SOLO JSON válido con forma: { "summary": "...", "user_sentiment": "Positivo|Neutral|Negativo", "extracted_data": {...} }
+El campo extracted_data es obligatorio y no puede ir vacío.
 Enfócate en el resultado comercial. Si hubo problemas de comunicación pero también conversación de negocio, el resumen debe priorizar el negocio.
-{
-  "summary": "2-3 oraciones claras sobre el motivo de la llamada y el resultado comercial",
-  "user_sentiment": "Positivo|Neutral|Negativo",
-  "extracted_data": {
-    "intencion_usuario": "qué buscaba o necesitaba el usuario",
-    "resultado_llamada": "cómo terminó la llamada",
-    "datos_clave": ["dato1", "dato2"],
-    "proximos_pasos": "acción sugerida",
-    "objeciones": "objeciones del usuario o vacío"
-  }
-}
+extracted_data debe tener: intencion_usuario, resultado_llamada, datos_clave (array), proximos_pasos, objeciones.`;
 
-Transcripción:
-${dialogue}`
-        }]
-      }],
-      config: {
-        temperature: 0.2,
-        maxOutputTokens: 1024,
-        responseMimeType: "application/json"
-      }
-    });
-
-    const raw = res.text?.trim() ?? "";
-    const parsed = parseAnalysisJson(raw);
+  try {
+    const { result: parsed, usage } = await runInternalJsonPrompt<Partial<CallAnalysisResult>>(
+      system,
+      `Transcripción:\n${dialogue}`,
+      1024
+    );
     if (!parsed?.summary) return fallback;
 
     const sentiment = SENTIMENTS.includes(parsed.user_sentiment as typeof SENTIMENTS[number])
       ? parsed.user_sentiment!
       : "Neutral";
 
-    const extractedFromNested = extractNestedObject(raw, "extracted_data");
-    const extractedRaw = parsed.extracted_data ?? extractedFromNested;
-
     return {
       summary: parsed.summary,
       user_sentiment: sentiment,
-      extracted_data: normalizeExtractedData(extractedRaw, transcript),
-      usage: readGeminiUsage(res)
+      extracted_data: normalizeExtractedData(parsed.extracted_data, transcript),
+      usage
     };
   } catch (err) {
     console.error("[call-analysis] error:", err);

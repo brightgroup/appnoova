@@ -1,6 +1,6 @@
 import { adminClient } from "@/lib/voice-agents-server";
 import { getOriApiKey } from "@/lib/google-ai";
-import { runOriJsonPrompt } from "@/lib/crm-gemini";
+import { runInternalJsonPrompt } from "@/lib/llm/internal-json-prompt";
 import { recordUsageSafe } from "@/lib/billing/meter";
 import { toVoiceCampaignRecord } from "@/lib/campaigns/record";
 import { primaryOutputField } from "@/lib/campaigns/output-fields";
@@ -337,7 +337,7 @@ export async function captureCampaignCallResults(input: {
 
   try {
     const prompt = `Campos a capturar:\n${fieldSpecLines(fields)}\n\nTranscripción de la llamada:\n${dialogue}`;
-    const { result: raw, usage, model } = await runOriJsonPrompt<{ campos?: Record<string, unknown>; no_volver_a_llamar?: boolean }>(
+    const { result: raw, usage, model } = await runInternalJsonPrompt<{ campos?: Record<string, unknown>; no_volver_a_llamar?: boolean }>(
       CAPTURE_SYSTEM,
       fields.length > 0
         ? prompt
