@@ -9,6 +9,7 @@ import {
   sendWhatsAppMediaOutboundForConversation
 } from "@/lib/whatsapp/process-inbound";
 import { sendWhatsAppTemplateForConversation } from "@/lib/whatsapp/send-template";
+import { persistHumanReply } from "@/lib/text-conversation-persist";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type Ctx = { params: Promise<{ token: string }> };
@@ -102,7 +103,25 @@ function buildSendForTarget(
     return { error: `Falta '${target.messageTextPath}' en el JSON recibido` };
   }
   return {
-    send: (db, ownerUserId, conversationId) => sendWhatsAppOutboundForConversation(db, ownerUserId, conversationId, replyText)
+    // sendWhatsAppOutboundForConversation es compartida con la respuesta manual del Inbox
+    // (esa ya persiste antes de enviar) — acá se persiste después de enviar, para no duplicar
+    // el mensaje en ese otro flujo. Antes este envío salía por WhatsApp pero no quedaba
+    // registrado en el historial del chat de Noova.
+    send: async (db, ownerUserId, conversationId) => {
+      const sendResult = await sendWhatsAppOutboundForConversation(db, ownerUserId, conversationId, replyText);
+      if (!sendResult.ok) return sendResult;
+      const persist = await persistHumanReply({
+        db,
+        userId: ownerUserId,
+        conversationId,
+        content: replyText,
+        assignedTo: ownerUserId
+      });
+      if (!persist.ok) {
+        return { ok: false, error: persist.error ?? "Mensaje enviado pero no se guardó en Inbox" };
+      }
+      return { ok: true };
+    }
   };
 }
 

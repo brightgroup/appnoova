@@ -14,8 +14,10 @@ import { generateTextAgentReply } from "@/lib/text-agent-generate";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import {
   persistAssistantReplyOnly,
+  persistHumanReply,
   persistUserMessageOnly
 } from "@/lib/text-conversation-persist";
+import { uploadWhatsAppMedia } from "@/lib/whatsapp/media-storage";
 import {
   detectAssistantHandoffOffer,
   detectUserHandoffIntent,
@@ -1097,7 +1099,13 @@ export async function sendWhatsAppOutboundForConversation(
   }
 }
 
-/** Envía imagen o documento (por URL) a una conversación — usado por el nodo de automatización "Enviar mensaje de WhatsApp" con tipo Imagen/Documento. */
+/**
+ * Envía imagen o documento (por URL) a una conversación — usado por el nodo de automatización
+ * "Enviar mensaje de WhatsApp" con tipo Imagen/Documento. Además de enviarlo, guarda una copia
+ * propia del archivo (storage de Noova) y deja el mensaje visible en el historial del chat
+ * (Inbox), igual que una respuesta humana — antes este envío salía por WhatsApp pero no quedaba
+ * registrado en la conversación.
+ */
 export async function sendWhatsAppMediaOutboundForConversation(
   db: SupabaseClient,
   userId: string,
@@ -1110,26 +1118,66 @@ export async function sendWhatsAppMediaOutboundForConversation(
   if (!resolved.ok) return resolved;
   const { channel, channelRaw, contactE164, outboundOrgId } = resolved.ctx;
 
+  let externalId: string | undefined;
   try {
-    await sendWhatsAppMediaMessage({ db, channel, channelRaw, toE164: contactE164, mediaUrl, mediaType, caption });
-
-    if (outboundOrgId) {
-      await recordUsageSafe({
-        db,
-        organizationId: outboundOrgId,
-        userId,
-        eventType: "whatsapp_manual",
-        channel: WHATSAPP_CONVERSATION_CHANNEL,
-        provider: "twilio",
-        twilioMessages: 1,
-        referenceType: "text_agent_conversation",
-        referenceId: conversationId
-      });
-    }
-
-    return { ok: true };
+    const sent = await sendWhatsAppMediaMessage({ db, channel, channelRaw, toE164: contactE164, mediaUrl, mediaType, caption });
+    externalId = sent.externalId;
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error al enviar el adjunto por WhatsApp";
     return { ok: false, error: msg };
   }
+
+  // Copia propia del archivo (best-effort): así se puede mostrar en el Inbox de Noova sin
+  // depender de que la URL externa (la que mandó n8n) siga viva después. Si falla la descarga o
+  // la subida, el mensaje igual se registra — solo sin adjunto visible — nunca se pierde ni se
+  // reintenta el envío por WhatsApp, que ya se hizo arriba.
+  let mediaStoragePath: string | undefined;
+  let mediaMime: string | undefined;
+  try {
+    const res = await fetch(mediaUrl);
+    if (res.ok) {
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const headerType = res.headers.get("content-type")?.split(";")[0]?.trim();
+      mediaMime = headerType && headerType !== "application/octet-stream" ? headerType : mediaType === "document" ? "application/pdf" : "image/jpeg";
+      const path = await uploadWhatsAppMedia(db, userId, externalId ?? `n8n-${Date.now()}`, 0, buffer, mediaMime);
+      if (path) mediaStoragePath = path;
+    }
+  } catch (err) {
+    console.warn(
+      "[whatsapp] no se pudo guardar copia del adjunto enviado por automatización:",
+      err instanceof Error ? err.message : err
+    );
+  }
+
+  const trimmedCaption = caption?.trim();
+  const persist = await persistHumanReply({
+    db,
+    userId,
+    conversationId,
+    content: trimmedCaption || (mediaStoragePath ? "" : "[Adjunto enviado por WhatsApp]"),
+    assignedTo: userId,
+    mediaType,
+    mediaStoragePath,
+    mediaMime
+  });
+
+  if (!persist.ok) {
+    return { ok: false, error: persist.error ?? "Adjunto enviado pero no se guardó en Inbox" };
+  }
+
+  if (outboundOrgId) {
+    await recordUsageSafe({
+      db,
+      organizationId: outboundOrgId,
+      userId,
+      eventType: "whatsapp_manual",
+      channel: WHATSAPP_CONVERSATION_CHANNEL,
+      provider: "twilio",
+      twilioMessages: 1,
+      referenceType: "text_agent_conversation",
+      referenceId: conversationId
+    });
+  }
+
+  return { ok: true };
 }

@@ -344,6 +344,11 @@ interface PersistHumanReplyInput {
   conversationId: string;
   content: string;
   assignedTo: string;
+  /** Adjunto opcional (ej. enviado por un workflow de automatización) — mismo contrato que persistUserMessageOnly. */
+  mediaType?: TextChatMessage["media_type"];
+  mediaLabel?: string;
+  mediaStoragePath?: string;
+  mediaMime?: string;
 }
 
 export async function persistHumanReply(input: PersistHumanReplyInput): Promise<{
@@ -364,7 +369,16 @@ export async function persistHumanReply(input: PersistHumanReplyInput): Promise<
 
   const messages = mergeChatMessages(
     normalizeChatMessages(row.messages),
-    [{ role: "human", content: input.content }],
+    [
+      {
+        role: "human",
+        content: input.content,
+        ...(input.mediaType ? { media_type: input.mediaType } : {}),
+        ...(input.mediaLabel ? { media_label: input.mediaLabel } : {}),
+        ...(input.mediaStoragePath ? { media_storage_path: input.mediaStoragePath } : {}),
+        ...(input.mediaMime ? { media_mime: input.mediaMime } : {})
+      }
+    ],
     nowIso
   );
   const messagesCount = messages.length;
