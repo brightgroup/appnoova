@@ -252,19 +252,41 @@ function InboxPageInner() {
     })();
   }, []);
 
+  // Antes: 2000ms fijo, sin pausar en pestaña oculta — con varios agentes con el inbox
+  // abierto todo el día esto multiplicaba requests (y validaciones de auth en el server, que
+  // pegan a la API de Supabase, no son locales) de forma innecesaria. 4000ms + pausa en
+  // pestaña oculta + refresco inmediato al volver a foco mantiene la sensación de "vivo" con
+  // una fracción del tráfico.
   useEffect(() => {
-    const timer = window.setInterval(() => loadList(true), 2000);
-    return () => window.clearInterval(timer);
+    const timer = window.setInterval(() => {
+      if (document.hidden) return;
+      loadList(true);
+    }, 4000);
+    const onVisible = () => {
+      if (!document.hidden) loadList(true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [loadList]);
 
   useEffect(() => {
     if (!selectedId) return;
     loadDetail(selectedId);
     const timer = window.setInterval(() => {
-      if (mediaPlaybackCountRef.current > 0) return;
+      if (document.hidden || mediaPlaybackCountRef.current > 0) return;
       void loadDetail(selectedId, true);
-    }, 2000);
-    return () => window.clearInterval(timer);
+    }, 4000);
+    const onVisible = () => {
+      if (!document.hidden && mediaPlaybackCountRef.current === 0) void loadDetail(selectedId, true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [selectedId, loadDetail]);
 
   const loadWaTemplates = useCallback(async (conversationId: string) => {

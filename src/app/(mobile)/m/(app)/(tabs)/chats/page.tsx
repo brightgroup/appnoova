@@ -57,9 +57,17 @@ export default function MobileChatsPage() {
 
   useEffect(() => {
     load();
-    pollRef.current = setInterval(() => load(true), 2000);
+    pollRef.current = setInterval(() => {
+      if (document.hidden) return;
+      load(true);
+    }, 4000);
+    const onVisible = () => {
+      if (!document.hidden) load(true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [load]);
 
