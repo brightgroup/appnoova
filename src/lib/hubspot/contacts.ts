@@ -8,10 +8,12 @@ export interface HubspotContact {
 }
 
 /**
- * Busca un contacto por su teléfono de WhatsApp — `hs_whatsapp_phone_number`
- * es la propiedad estándar que HubSpot usa para el canal nativo de WhatsApp,
- * no es específica de ningún cliente, así que sirve igual para cualquier
- * organización que use este nodo.
+ * Busca un contacto por su teléfono de WhatsApp. HubSpot asocia sola una
+ * conversación de WhatsApp a un contacto comparando el remitente contra las
+ * propiedades estándar `phone`/`mobilephone` — NO contra `hs_whatsapp_phone_number`
+ * (esa la seguimos guardando porque no estorba y algún reporte la usa, pero el
+ * match de asociación real es por las otras dos). Se busca por las tres para
+ * encontrar también contactos creados antes de este cambio o creados a mano.
  */
 export async function searchContactByPhone(
   db: SupabaseClient,
@@ -26,6 +28,8 @@ export async function searchContactByPhone(
       method: "POST",
       body: JSON.stringify({
         filterGroups: [
+          { filters: [{ propertyName: "phone", operator: "EQ", value: phone }] },
+          { filters: [{ propertyName: "mobilephone", operator: "EQ", value: phone }] },
           { filters: [{ propertyName: "hs_whatsapp_phone_number", operator: "EQ", value: phone }] }
         ],
         limit: 1
@@ -42,7 +46,12 @@ export interface CreateContactInput {
   placeholderEmailDomain: string;
 }
 
-/** Crea un contacto nuevo a partir de los datos del remitente de WhatsApp — equivale a "Create or update a contact" en n8n. */
+/**
+ * Crea un contacto nuevo a partir de los datos del remitente de WhatsApp — equivale a
+ * "Create or update a contact" en n8n. Guarda el teléfono en `phone` y `mobilephone`
+ * (las propiedades que HubSpot compara para asociar sola la conversación al contacto)
+ * además de `hs_whatsapp_phone_number`, para no perder esa referencia.
+ */
 export async function createContact(
   db: SupabaseClient,
   conn: HubspotConnectionSecrets,
@@ -54,6 +63,8 @@ export async function createContact(
       properties: {
         email: `${input.phone}@${input.placeholderEmailDomain}`,
         firstname: input.fullName || undefined,
+        phone: input.phone,
+        mobilephone: input.phone,
         hs_whatsapp_phone_number: input.phone
       }
     })
