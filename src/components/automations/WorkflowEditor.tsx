@@ -886,10 +886,12 @@ const EXAMPLE_JSON_REPLY_TEMPLATE = JSON.stringify(
   2
 );
 
+/** Los dos campos son opcionales e independientes — manda uno, el otro, o ambos en la misma llamada (ver modo "Mensaje libre"). */
 const EXAMPLE_JSON_REPLY_MEDIA = JSON.stringify(
   {
     conversation_id: "5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02",
-    media: { url: "https://.../guia-envio.pdf", caption: "Aquí tu guía de envío" }
+    reply: { text: "Aquí tu guía de envío" },
+    media: { url: "https://.../guia-envio.pdf" }
   },
   null,
   2
@@ -1932,9 +1934,12 @@ function NodeConfigPanel({
         })()}
 
         {type === "action.send_whatsapp_message" && (() => {
-          const messageType = node.data.messageType === "template" || node.data.messageType === "media" ? node.data.messageType : "text";
-          const example =
-            messageType === "template" ? EXAMPLE_JSON_REPLY_TEMPLATE : messageType === "media" ? EXAMPLE_JSON_REPLY_MEDIA : EXAMPLE_JSON_REPLY_DEFAULT;
+          // "text" y "media" (valores guardados históricamente) son hoy el mismo modo — "libre":
+          // ambos campos (texto y adjunto) están siempre disponibles y son independientes, no
+          // excluyentes. Solo "template" sigue siendo un modo aparte (usa una plantilla HSM ya
+          // aprobada, no texto libre). Ver buildSendForTarget en route.ts para la resolución real.
+          const messageType = node.data.messageType === "template" ? "template" : "text";
+          const example = messageType === "template" ? EXAMPLE_JSON_REPLY_TEMPLATE : EXAMPLE_JSON_REPLY_MEDIA;
           const selectedTemplate = templates.find(t => t.id === node.data.templateId);
 
           return (
@@ -1947,11 +1952,10 @@ function NodeConfigPanel({
                 <SelectField
                   label="Tipo de mensaje"
                   value={messageType}
-                  onChange={v => onSetData({ messageType: v as "text" | "template" | "media" })}
+                  onChange={v => onSetData({ messageType: v as "text" | "template" })}
                   options={[
-                    { value: "text", label: "Texto" },
-                    { value: "template", label: "Plantilla (HSM)" },
-                    { value: "media", label: "Imagen / Documento" }
+                    { value: "text", label: "Mensaje libre (texto y/o adjunto)" },
+                    { value: "template", label: "Plantilla (HSM)" }
                   ]}
                 />
 
@@ -1963,12 +1967,34 @@ function NodeConfigPanel({
                 />
 
                 {messageType === "text" && (
-                  <JsonPathField
-                    label="Campo con el texto a enviar"
-                    value={node.data.messageTextPath}
-                    onChange={messageTextPath => onSetData({ messageTextPath })}
-                    placeholder="reply.text"
-                  />
+                  <>
+                    <JsonPathField
+                      label="Campo con el texto (opcional si solo mandas un adjunto)"
+                      value={node.data.messageTextPath}
+                      onChange={messageTextPath => onSetData({ messageTextPath })}
+                      placeholder="reply.text"
+                    />
+                    <SelectField
+                      label="Tipo de archivo"
+                      value={node.data.mediaType ?? "image"}
+                      onChange={v => onSetData({ mediaType: v as "image" | "document" })}
+                      options={[
+                        { value: "image", label: "Imagen" },
+                        { value: "document", label: "Documento" }
+                      ]}
+                    />
+                    <JsonPathField
+                      label="Campo con la URL del archivo (opcional si solo mandas texto)"
+                      value={node.data.mediaUrlPath}
+                      onChange={mediaUrlPath => onSetData({ mediaUrlPath })}
+                      placeholder="media.url"
+                    />
+                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                      Puedes mandar el texto, el adjunto, o ambos en la misma llamada — no hay que elegir. Si el JSON
+                      trae un adjunto, el texto llega combinado como su caption en el mismo mensaje de WhatsApp; si
+                      solo trae texto, se envía como mensaje de texto normal.
+                    </p>
+                  </>
                 )}
 
                 {messageType === "template" && (
@@ -1997,32 +2023,6 @@ function NodeConfigPanel({
                       value={node.data.variablesPath}
                       onChange={variablesPath => onSetData({ variablesPath })}
                       placeholder="variables"
-                    />
-                  </>
-                )}
-
-                {messageType === "media" && (
-                  <>
-                    <SelectField
-                      label="Tipo de archivo"
-                      value={node.data.mediaType ?? "image"}
-                      onChange={v => onSetData({ mediaType: v as "image" | "document" })}
-                      options={[
-                        { value: "image", label: "Imagen" },
-                        { value: "document", label: "Documento" }
-                      ]}
-                    />
-                    <JsonPathField
-                      label="Campo con la URL del archivo"
-                      value={node.data.mediaUrlPath}
-                      onChange={mediaUrlPath => onSetData({ mediaUrlPath })}
-                      placeholder="media.url"
-                    />
-                    <JsonPathField
-                      label="Campo con el texto/caption (opcional)"
-                      value={node.data.captionPath}
-                      onChange={captionPath => onSetData({ captionPath })}
-                      placeholder="media.caption"
                     />
                   </>
                 )}

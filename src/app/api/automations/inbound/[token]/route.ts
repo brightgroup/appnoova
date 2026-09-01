@@ -86,43 +86,48 @@ function buildSendForTarget(
     };
   }
 
-  if (target.messageType === "media") {
-    const mediaUrl = resolveJsonPath(body, target.mediaUrlPath)?.trim();
-    if (!mediaUrl) {
-      return { error: `Falta '${target.mediaUrlPath}' en el JSON recibido` };
-    }
-    const caption = resolveJsonPath(body, target.captionPath)?.trim();
+  // Modo "libre" (antes texto e imagen/documento eran mutuamente excluyentes, un nodo por
+  // tipo): se resuelve lo que realmente venga en ESTE JSON, no lo que se eligió al armar el
+  // nodo — mandas texto, adjunto, o ambos en la misma llamada, como en Zapier. Si trae
+  // adjunto, el texto viaja como caption en el mismo mensaje de WhatsApp; si no trae adjunto
+  // pero sí texto, se manda como texto normal. `captionPath` se revisa como respaldo para no
+  // romper nodos guardados antes de este cambio (usaban un campo de caption aparte).
+  const mediaUrl = resolveJsonPath(body, target.mediaUrlPath)?.trim();
+  const text =
+    resolveJsonPath(body, target.messageTextPath)?.trim() || resolveJsonPath(body, target.captionPath)?.trim();
+
+  if (mediaUrl) {
     return {
       send: (db, ownerUserId, conversationId) =>
-        sendWhatsAppMediaOutboundForConversation(db, ownerUserId, conversationId, mediaUrl, target.mediaType, caption)
+        sendWhatsAppMediaOutboundForConversation(db, ownerUserId, conversationId, mediaUrl, target.mediaType, text)
     };
   }
 
-  const replyText = resolveJsonPath(body, target.messageTextPath)?.trim();
-  if (!replyText) {
-    return { error: `Falta '${target.messageTextPath}' en el JSON recibido` };
-  }
-  return {
-    // sendWhatsAppOutboundForConversation es compartida con la respuesta manual del Inbox
-    // (esa ya persiste antes de enviar) — acá se persiste después de enviar, para no duplicar
-    // el mensaje en ese otro flujo. Antes este envío salía por WhatsApp pero no quedaba
-    // registrado en el historial del chat de Noova.
-    send: async (db, ownerUserId, conversationId) => {
-      const sendResult = await sendWhatsAppOutboundForConversation(db, ownerUserId, conversationId, replyText);
-      if (!sendResult.ok) return sendResult;
-      const persist = await persistHumanReply({
-        db,
-        userId: ownerUserId,
-        conversationId,
-        content: replyText,
-        assignedTo: ownerUserId
-      });
-      if (!persist.ok) {
-        return { ok: false, error: persist.error ?? "Mensaje enviado pero no se guardó en Inbox" };
+  if (text) {
+    return {
+      // sendWhatsAppOutboundForConversation es compartida con la respuesta manual del Inbox
+      // (esa ya persiste antes de enviar) — acá se persiste después de enviar, para no duplicar
+      // el mensaje en ese otro flujo. Antes este envío salía por WhatsApp pero no quedaba
+      // registrado en el historial del chat de Noova.
+      send: async (db, ownerUserId, conversationId) => {
+        const sendResult = await sendWhatsAppOutboundForConversation(db, ownerUserId, conversationId, text);
+        if (!sendResult.ok) return sendResult;
+        const persist = await persistHumanReply({
+          db,
+          userId: ownerUserId,
+          conversationId,
+          content: text,
+          assignedTo: ownerUserId
+        });
+        if (!persist.ok) {
+          return { ok: false, error: persist.error ?? "Mensaje enviado pero no se guardó en Inbox" };
+        }
+        return { ok: true };
       }
-      return { ok: true };
-    }
-  };
+    };
+  }
+
+  return { error: `Falta '${target.messageTextPath}' o '${target.mediaUrlPath}' en el JSON recibido` };
 }
 
 /**
