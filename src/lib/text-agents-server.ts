@@ -10,6 +10,13 @@ export function textAgentsAdminClient() {
   );
 }
 
+/**
+ * Verifica el JWT del request y devuelve el user id. `getClaims()` valida localmente con
+ * WebCrypto contra la llave pública del proyecto (asimétrica) en vez de pegarle a la API de
+ * Auth en cada request como hacía `getUser()` — ver el comentario largo en
+ * `voice-agents-server.ts::getAuthUserFromRequest` (mismo patrón, mismo trade-off de
+ * revocación acotado a la vida del token).
+ */
 export async function getTextAgentUserIdFromRequest(req: NextRequest): Promise<string | null> {
   const auth = req.headers.get("authorization");
   if (!auth?.startsWith("Bearer ")) return null;
@@ -19,7 +26,7 @@ export async function getTextAgentUserIdFromRequest(req: NextRequest): Promise<s
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-  if (error || !user) return null;
-  return user.id;
+  const { data, error } = await supabase.auth.getClaims(token);
+  if (error || !data) return null;
+  return data.claims.sub;
 }

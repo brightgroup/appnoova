@@ -9,6 +9,16 @@ export function adminClient() {
   );
 }
 
+/**
+ * Verifica el JWT del request y devuelve el usuario (solo los campos que el resto del código
+ * usa: id/email/user_metadata). `getClaims()` valida localmente con WebCrypto contra la llave
+ * pública del proyecto (asimétrica, ver Supabase → Auth → JWT Signing Keys) en vez de pegarle a
+ * la API de Auth en cada request como hacía `getUser()` — mismo nivel de seguridad de firma,
+ * pero sin ese round-trip. Único trade-off real: si se banea/borra a un usuario o se cierra su
+ * sesión a la fuerza, un token ya emitido sigue validando localmente hasta que expira (hoy 1h),
+ * en vez de cortarse al instante. Si el proyecto alguna vez vuelve a firmar con secreto simétrico,
+ * `getClaims()` cae solo de vuelta a validar por red — no rompe nada.
+ */
 export async function getAuthUserFromRequest(req: NextRequest) {
   const auth = req.headers.get("authorization");
   if (!auth?.startsWith("Bearer ")) return null;
@@ -18,9 +28,14 @@ export async function getAuthUserFromRequest(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-  if (error || !user) return null;
-  return user;
+  const { data, error } = await supabase.auth.getClaims(token);
+  if (error || !data) return null;
+  const { claims } = data;
+  return {
+    id: claims.sub,
+    email: claims.email ?? null,
+    user_metadata: claims.user_metadata ?? {}
+  };
 }
 
 export async function getUserIdFromRequest(req: NextRequest): Promise<string | null> {
