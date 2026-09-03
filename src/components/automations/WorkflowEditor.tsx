@@ -1984,7 +1984,7 @@ function NodeConfigPanel({
                       ]}
                     />
                     <JsonPathField
-                      label="Campo con la URL del archivo (opcional si solo mandas texto)"
+                      label="Campo con el archivo (opcional si solo mandas texto)"
                       value={node.data.mediaUrlPath}
                       onChange={mediaUrlPath => onSetData({ mediaUrlPath })}
                       placeholder="media.url"
@@ -1993,6 +1993,14 @@ function NodeConfigPanel({
                       Puedes mandar el texto, el adjunto, o ambos en la misma llamada — no hay que elegir. Si el JSON
                       trae un adjunto, el texto llega combinado como su caption en el mismo mensaje de WhatsApp; si
                       solo trae texto, se envía como mensaje de texto normal.
+                    </p>
+                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                      Ese campo acepta dos formas: un <strong className="text-gray-300">link normal</strong>{" "}
+                      (<code>https://...</code>, si el archivo ya está alojado en algún lado) o el{" "}
+                      <strong className="text-gray-300">archivo embebido</strong> directo en base64, como{" "}
+                      <code>{"data:application/pdf;base64,JVBERi0..."}</code> — útil si tu sistema de origen no tiene
+                      dónde alojar el PDF/imagen y solo puede mandar el binario. En n8n se arma con una expresión
+                      como <code>{"{{ 'data:' + $binary.data.mimeType + ';base64,' + $binary.data.data }}"}</code>.
                     </p>
                   </>
                 )}
