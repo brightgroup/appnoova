@@ -43,6 +43,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ transaction_id: transaction.id });
   } catch (err) {
     console.error("[paddle:checkout]", err);
-    return NextResponse.json({ error: "No se pudo iniciar el checkout" }, { status: 502 });
+    const message = err instanceof Error ? err.message : "No se pudo iniciar el checkout";
+    const clientMessage = message.includes("default payment link")
+      ? "Paddle Live no tiene Default payment link. En vendors.paddle.com → Checkout → Checkout settings pon https://app.noova360.com/dashboard/facturacion y guarda."
+      : message.startsWith("Paddle API error")
+        ? message
+        : "No se pudo iniciar el checkout";
+    return NextResponse.json({ error: clientMessage }, { status: 422 });
   }
 }

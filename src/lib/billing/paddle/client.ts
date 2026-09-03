@@ -51,11 +51,16 @@ export async function createPaddleCheckoutTransaction(params: {
   organizationId: string;
   customerEmail?: string;
 }): Promise<PaddleTransaction> {
+  const checkoutUrl = (
+    process.env.NEXT_PUBLIC_APP_URL || "https://app.noova360.com"
+  ).replace(/\/$/, "") + "/dashboard/facturacion";
+
   return paddleFetch<PaddleTransaction>("/transactions", {
     method: "POST",
     body: JSON.stringify({
       items: [{ price_id: params.priceId, quantity: 1 }],
       custom_data: { organization_id: params.organizationId },
+      checkout: { url: checkoutUrl },
       ...(params.customerEmail
         ? { customer: { email: params.customerEmail } }
         : {}),
