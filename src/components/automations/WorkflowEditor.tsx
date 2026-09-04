@@ -886,7 +886,7 @@ const EXAMPLE_JSON_REPLY_TEMPLATE = JSON.stringify(
   2
 );
 
-/** Los dos campos son opcionales e independientes — manda uno, el otro, o ambos en la misma llamada (ver modo "Mensaje libre"). */
+/** Los dos campos son opcionales e independientes — manda uno, el otro, o ambos en la misma llamada. Forma JSON: solo para texto o un link ya alojado; para mandar el archivo en sí, ver EXAMPLE_MULTIPART_REPLY. */
 const EXAMPLE_JSON_REPLY_MEDIA = JSON.stringify(
   {
     conversation_id: "5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02",
@@ -896,6 +896,16 @@ const EXAMPLE_JSON_REPLY_MEDIA = JSON.stringify(
   null,
   2
 );
+
+/** Forma recomendada para mandar el archivo en sí — multipart/form-data, un campo por dato. */
+const EXAMPLE_MULTIPART_REPLY = [
+  "Content-Type: multipart/form-data",
+  "",
+  "conversation_id: 5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02",
+  "reply: Aquí tu guía de envío        (opcional)",
+  "file: (el archivo — imagen o PDF)   (opcional si solo mandas texto)",
+  "filename: guia-envio.pdf            (opcional)"
+].join("\n");
 
 /** Select estándar de la app (mismo componente/estilo que Agentes de Texto) con su label — reutilizado por cualquier dropdown simple del editor. */
 function SelectField({
@@ -1939,13 +1949,14 @@ function NodeConfigPanel({
           // excluyentes. Solo "template" sigue siendo un modo aparte (usa una plantilla HSM ya
           // aprobada, no texto libre). Ver buildSendForTarget en route.ts para la resolución real.
           const messageType = node.data.messageType === "template" ? "template" : "text";
-          const example = messageType === "template" ? EXAMPLE_JSON_REPLY_TEMPLATE : EXAMPLE_JSON_REPLY_MEDIA;
+          const example = messageType === "template" ? EXAMPLE_JSON_REPLY_TEMPLATE : EXAMPLE_MULTIPART_REPLY;
+          const exampleLabel = messageType === "template" ? "Ver ejemplo de JSON que espera recibir" : "Ver ejemplo de los campos que espera recibir";
           const selectedTemplate = templates.find(t => t.id === node.data.templateId);
 
           return (
             <div>
-              <InfoNote example={example} exampleLabel="Ver ejemplo de JSON que espera recibir">
-                Conéctalo a un nodo <strong className="text-white">Webhook entrante</strong>. Cuando llegue el JSON, Noova
+              <InfoNote example={example} exampleLabel={exampleLabel}>
+                Conéctalo a un nodo <strong className="text-white">Webhook entrante</strong>. Cuando llegue la llamada, Noova
                 envía el mensaje elegido por WhatsApp en el chat de esa conversación.
               </InfoNote>
               <div className="space-y-4">
@@ -1968,12 +1979,6 @@ function NodeConfigPanel({
 
                 {messageType === "text" && (
                   <>
-                    <JsonPathField
-                      label="Campo con el texto (opcional si solo mandas un adjunto)"
-                      value={node.data.messageTextPath}
-                      onChange={messageTextPath => onSetData({ messageTextPath })}
-                      placeholder="reply.text"
-                    />
                     <SelectField
                       label="Tipo de archivo"
                       value={node.data.mediaType ?? "image"}
@@ -1983,45 +1988,45 @@ function NodeConfigPanel({
                         { value: "document", label: "Documento" }
                       ]}
                     />
+
+                    <div className="rounded-lg border border-white/[.08] bg-white/[.03] p-3 space-y-2">
+                      <p className="text-[11px] font-semibold text-gray-300">
+                        Forma recomendada para mandar archivos: multipart/form-data
+                      </p>
+                      <p className="text-[11px] text-gray-500 leading-relaxed">
+                        En n8n, en el nodo <strong className="text-gray-300">HTTP Request</strong> que llama a este
+                        webhook: <strong className="text-gray-300">Body Content Type</strong> = &ldquo;Form-Data/Multipart&rdquo;,
+                        y agregas estos campos (organizados igual que cualquier otro form-data de n8n, uno por uno):
+                      </p>
+                      <ul className="text-[11px] text-gray-500 leading-relaxed list-disc pl-4 space-y-0.5">
+                        <li><code>conversation_id</code> — obligatorio</li>
+                        <li><code>file</code> — el binary property del archivo (imagen o PDF); opcional si solo mandas texto</li>
+                        <li><code>reply</code> — el texto/caption; opcional si solo mandas archivo</li>
+                        <li><code>filename</code> — opcional, el nombre que va a ver el destinatario en WhatsApp (si no lo mandas, se usa el nombre del propio archivo)</li>
+                      </ul>
+                      <p className="text-[11px] text-gray-500 leading-relaxed">
+                        Puedes mandar el texto, el archivo, o ambos en el mismo POST — no hay que elegir. Si mandas
+                        ambos, llegan combinados en un solo mensaje de WhatsApp (el texto como caption del archivo).
+                      </p>
+                    </div>
+
+                    <p className="text-[11px] text-gray-500 leading-relaxed pt-1">
+                      Alternativa más simple si solo necesitas mandar texto, o un archivo que ya está alojado en
+                      algún link público (sin necesidad de subirlo): manda JSON en vez de multipart, con estos
+                      campos (rutas dentro del JSON, configurables abajo):
+                    </p>
                     <JsonPathField
-                      label="Campo con el archivo (opcional si solo mandas texto)"
+                      label="Campo con el texto (JSON)"
+                      value={node.data.messageTextPath}
+                      onChange={messageTextPath => onSetData({ messageTextPath })}
+                      placeholder="reply.text"
+                    />
+                    <JsonPathField
+                      label="Campo con el link del archivo (JSON)"
                       value={node.data.mediaUrlPath}
                       onChange={mediaUrlPath => onSetData({ mediaUrlPath })}
                       placeholder="media.url"
                     />
-                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                      Puedes mandar el texto, el adjunto, o ambos en la misma llamada — no hay que elegir. Si el JSON
-                      trae un adjunto, el texto llega combinado como su caption en el mismo mensaje de WhatsApp; si
-                      solo trae texto, se envía como mensaje de texto normal.
-                    </p>
-                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                      Ese campo acepta dos formas: un <strong className="text-gray-300">link normal</strong>{" "}
-                      (<code>https://...</code>, si el archivo ya está alojado en algún lado) o el{" "}
-                      <strong className="text-gray-300">archivo embebido</strong> directo en base64, como{" "}
-                      <code>{"data:application/pdf;base64,JVBERi0..."}</code> — útil si tu sistema de origen no tiene
-                      dónde alojar el PDF/imagen y solo puede mandar el binario. En n8n se arma con una expresión
-                      como <code>{"{{ 'data:' + $binary.data.mimeType + ';base64,' + $binary.data.data }}"}</code>.
-                    </p>
-                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                      Si el base64 le pesa al servidor de origen (~33% más grande), hay dos formas más de mandar el
-                      archivo <strong className="text-gray-300">crudo</strong>, sin base64, a esta misma URL de
-                      webhook:
-                    </p>
-                    <p className="text-[11px] text-gray-500 leading-relaxed pl-3 border-l border-white/[.08]">
-                      <strong className="text-gray-300">multipart/form-data (recomendado)</strong> — todo en un solo
-                      POST, sin nada en la URL: campos <code>conversation_id</code>, <code>file</code> (el archivo),{" "}
-                      <code>reply</code> (texto, opcional) y <code>filename</code> (opcional, para controlar el
-                      nombre que ve el destinatario en WhatsApp — si no lo mandas, se usa el nombre del propio
-                      archivo). En n8n, HTTP Request → Body Content Type = &ldquo;Form-Data/Multipart&rdquo;, agregando
-                      el binary property como <code>file</code> y el resto como campos de texto normales.
-                    </p>
-                    <p className="text-[11px] text-gray-500 leading-relaxed pl-3 border-l border-white/[.08]">
-                      <strong className="text-gray-300">Binario puro</strong> — el cuerpo entero del POST es el
-                      archivo (<code>Content-Type</code> = el del archivo, ej. <code>application/pdf</code>), y como
-                      no hay body para nada más, <code>conversation_id</code> y <code>caption</code> van como
-                      parámetros en la URL: <code>...?conversation_id=...&amp;caption=...</code>. En n8n: Body
-                      Content Type = &ldquo;n8n Binary File&rdquo;.
-                    </p>
                   </>
                 )}
 
