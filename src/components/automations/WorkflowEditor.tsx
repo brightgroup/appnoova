@@ -2002,6 +2002,14 @@ function NodeConfigPanel({
                       dónde alojar el PDF/imagen y solo puede mandar el binario. En n8n se arma con una expresión
                       como <code>{"{{ 'data:' + $binary.data.mimeType + ';base64,' + $binary.data.data }}"}</code>.
                     </p>
+                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                      Si el base64 le pesa al servidor de origen (~33% más grande), hay una tercera forma: mandar el
+                      archivo <strong className="text-gray-300">crudo</strong>, sin JSON, directo como cuerpo del POST
+                      a esta misma URL de webhook — con <code>Content-Type</code> del archivo (ej.{" "}
+                      <code>application/pdf</code>) y <code>conversation_id</code> (y <code>caption</code> opcional)
+                      como parámetros en la URL: <code>...?conversation_id=...&amp;caption=...</code>. En n8n, en el
+                      HTTP Request: Body Content Type = &ldquo;n8n Binary File&rdquo;.
+                    </p>
                   </>
                 )}
 

@@ -1117,14 +1117,84 @@ function decodeDataUri(uri: string): { buffer: Buffer; mimeType: string } | null
 }
 
 /**
+ * Núcleo compartido: sube un archivo YA EN MEMORIA (buffer) al storage propio de Noova, lo
+ * envía por WhatsApp desde esa URL propia (Twilio/Meta solo saben enviar por link, no reciben
+ * bytes directo) y deja el mensaje visible en el historial del chat (Inbox) — usado tanto por
+ * el archivo embebido en JSON (data URI) como por el POST binario directo al webhook.
+ */
+async function sendWhatsAppMediaBufferForConversation(
+  db: SupabaseClient,
+  userId: string,
+  conversationId: string,
+  buffer: Buffer,
+  mimeType: string,
+  mediaType: "image" | "document",
+  caption?: string
+): Promise<{ ok: boolean; error?: string; code?: string }> {
+  const resolved = await resolveOutboundWhatsAppContext(db, userId, conversationId);
+  if (!resolved.ok) return resolved;
+  const { channel, channelRaw, contactE164, outboundOrgId } = resolved.ctx;
+
+  const mediaMime = mimeType && mimeType !== "application/octet-stream" ? mimeType : mediaType === "document" ? "application/pdf" : "image/jpeg";
+  const path = await uploadWhatsAppMedia(db, userId, `bin-${Date.now()}`, 0, buffer, mediaMime);
+  if (!path) {
+    return { ok: false, error: "No se pudo guardar el archivo recibido" };
+  }
+  const signed = await signedUrlForPath(db, path);
+  if (!signed) {
+    return { ok: false, error: "No se pudo generar la URL del archivo para enviarlo" };
+  }
+
+  try {
+    await sendWhatsAppMediaMessage({ db, channel, channelRaw, toE164: contactE164, mediaUrl: signed, mediaType, caption });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error al enviar el adjunto por WhatsApp";
+    return { ok: false, error: msg };
+  }
+
+  const trimmedCaption = caption?.trim();
+  const persist = await persistHumanReply({
+    db,
+    userId,
+    conversationId,
+    content: trimmedCaption || "",
+    assignedTo: userId,
+    mediaType,
+    mediaStoragePath: path,
+    mediaMime
+  });
+
+  if (!persist.ok) {
+    return { ok: false, error: persist.error ?? "Adjunto enviado pero no se guardó en Inbox" };
+  }
+
+  if (outboundOrgId) {
+    await recordUsageSafe({
+      db,
+      organizationId: outboundOrgId,
+      userId,
+      eventType: "whatsapp_manual",
+      channel: WHATSAPP_CONVERSATION_CHANNEL,
+      provider: "twilio",
+      twilioMessages: 1,
+      referenceType: "text_agent_conversation",
+      referenceId: conversationId
+    });
+  }
+
+  return { ok: true };
+}
+
+/**
  * Envía imagen o documento a una conversación — usado por el nodo de automatización "Enviar
  * mensaje de WhatsApp" con tipo Imagen/Documento. `mediaUrl` acepta tanto un link normal
  * (Twilio/Meta lo van a buscar ellos) como un data URI (`data:application/pdf;base64,...`) con
  * el archivo embebido tal cual en el JSON — para el caso en que el sistema de origen (ej. n8n)
- * no tiene dónde alojar el archivo y solo puede mandar el binario directo. Además de enviarlo,
- * guarda una copia propia del archivo (storage de Noova) y deja el mensaje visible en el
- * historial del chat (Inbox), igual que una respuesta humana — antes este envío salía por
- * WhatsApp pero no quedaba registrado en la conversación.
+ * no tiene dónde alojar el archivo y solo puede mandar el binario directo (ver también
+ * `sendWhatsAppMediaBinaryOutboundForConversation`, para mandar el binario crudo sin pasar por
+ * base64/JSON). Además de enviarlo, guarda una copia propia del archivo (storage de Noova) y
+ * deja el mensaje visible en el historial del chat (Inbox), igual que una respuesta humana —
+ * antes este envío salía por WhatsApp pero no quedaba registrado en la conversación.
  */
 export async function sendWhatsAppMediaOutboundForConversation(
   db: SupabaseClient,
@@ -1134,66 +1204,47 @@ export async function sendWhatsAppMediaOutboundForConversation(
   mediaType: "image" | "document",
   caption?: string
 ): Promise<{ ok: boolean; error?: string; code?: string }> {
+  if (mediaUrl.startsWith("data:")) {
+    const embedded = decodeDataUri(mediaUrl);
+    if (!embedded) {
+      return { ok: false, error: "El archivo embebido en el JSON (data:...) no se pudo decodificar — debe venir en base64" };
+    }
+    return sendWhatsAppMediaBufferForConversation(db, userId, conversationId, embedded.buffer, embedded.mimeType, mediaType, caption);
+  }
+
   const resolved = await resolveOutboundWhatsAppContext(db, userId, conversationId);
   if (!resolved.ok) return resolved;
   const { channel, channelRaw, contactE164, outboundOrgId } = resolved.ctx;
 
-  const embedded = mediaUrl.startsWith("data:") ? decodeDataUri(mediaUrl) : null;
-  if (mediaUrl.startsWith("data:") && !embedded) {
-    return { ok: false, error: "El archivo embebido en el JSON (data:...) no se pudo decodificar — debe venir en base64" };
-  }
-
-  let mediaStoragePath: string | undefined;
-  let mediaMime: string | undefined;
-  let sendUrl = mediaUrl;
-
-  if (embedded) {
-    // Twilio y Meta solo saben enviar por link (lo van a buscar ellos) — no reciben el binario
-    // directo en este flujo — así que el archivo embebido se sube primero a storage propio de
-    // Noova para conseguir una URL real que sí puedan ir a buscar.
-    mediaMime = embedded.mimeType && embedded.mimeType !== "application/octet-stream" ? embedded.mimeType : mediaType === "document" ? "application/pdf" : "image/jpeg";
-    const path = await uploadWhatsAppMedia(db, userId, `n8n-${Date.now()}`, 0, embedded.buffer, mediaMime);
-    if (!path) {
-      return { ok: false, error: "No se pudo guardar el archivo embebido en el JSON" };
-    }
-    mediaStoragePath = path;
-    const signed = await signedUrlForPath(db, path);
-    if (!signed) {
-      return { ok: false, error: "No se pudo generar la URL del archivo embebido para enviarlo" };
-    }
-    sendUrl = signed;
-  }
-
   let externalId: string | undefined;
   try {
-    const sent = await sendWhatsAppMediaMessage({ db, channel, channelRaw, toE164: contactE164, mediaUrl: sendUrl, mediaType, caption });
+    const sent = await sendWhatsAppMediaMessage({ db, channel, channelRaw, toE164: contactE164, mediaUrl, mediaType, caption });
     externalId = sent.externalId;
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error al enviar el adjunto por WhatsApp";
     return { ok: false, error: msg };
   }
 
-  // Si no vino embebido (era un link normal), igual se intenta guardar copia propia
-  // (best-effort): así se puede mostrar en el Inbox de Noova sin depender de que la URL externa
-  // (la que mandó n8n) siga viva después. Si falla la descarga o la subida, el mensaje igual se
-  // registra — solo sin adjunto visible — nunca se pierde ni se reintenta el envío por WhatsApp,
-  // que ya se hizo arriba.
-  if (!mediaStoragePath) {
-    try {
-      const res = await fetch(mediaUrl);
-      if (res.ok) {
-        const buffer = Buffer.from(await res.arrayBuffer());
-        const headerType = res.headers.get("content-type")?.split(";")[0]?.trim();
-        mediaMime = headerType && headerType !== "application/octet-stream" ? headerType : mediaType === "document" ? "application/pdf" : "image/jpeg";
-        const path = await uploadWhatsAppMedia(db, userId, externalId ?? `n8n-${Date.now()}`, 0, buffer, mediaMime);
-        if (path) mediaStoragePath = path;
-      }
-    } catch (err) {
-      console.warn(
-        "[whatsapp] no se pudo guardar copia del adjunto enviado por automatización:",
-        err instanceof Error ? err.message : err
-      );
+  // Copia propia del archivo (best-effort): así se puede mostrar en el Inbox de Noova sin
+  // depender de que la URL externa (la que mandó n8n) siga viva después. Si falla la descarga o
+  // la subida, el mensaje igual se registra — solo sin adjunto visible — nunca se pierde ni se
+  // reintenta el envío por WhatsApp, que ya se hizo arriba.
+  let mediaStoragePath: string | undefined;
+  let mediaMime: string | undefined;
+  try {
+    const res = await fetch(mediaUrl);
+    if (res.ok) {
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const headerType = res.headers.get("content-type")?.split(";")[0]?.trim();
+      mediaMime = headerType && headerType !== "application/octet-stream" ? headerType : mediaType === "document" ? "application/pdf" : "image/jpeg";
+      const path = await uploadWhatsAppMedia(db, userId, externalId ?? `n8n-${Date.now()}`, 0, buffer, mediaMime);
+      if (path) mediaStoragePath = path;
     }
+  } catch (err) {
+    console.warn(
+      "[whatsapp] no se pudo guardar copia del adjunto enviado por automatización:",
+      err instanceof Error ? err.message : err
+    );
   }
 
   const trimmedCaption = caption?.trim();
@@ -1227,4 +1278,23 @@ export async function sendWhatsAppMediaOutboundForConversation(
   }
 
   return { ok: true };
+}
+
+/**
+ * Igual que `sendWhatsAppMediaOutboundForConversation`, pero para cuando el sistema de origen
+ * (ej. n8n) manda el binario crudo como cuerpo del POST — sin JSON, sin base64 — porque
+ * codificar el archivo en base64 antes de mandarlo le pesó a su servidor (~33% más grande en
+ * memoria/CPU para armar el JSON). Usado por el POST binario directo del webhook
+ * (`Content-Type` distinto de `application/json`, con `conversation_id` en la URL).
+ */
+export async function sendWhatsAppMediaBinaryOutboundForConversation(
+  db: SupabaseClient,
+  userId: string,
+  conversationId: string,
+  buffer: Buffer,
+  mimeType: string,
+  mediaType: "image" | "document",
+  caption?: string
+): Promise<{ ok: boolean; error?: string; code?: string }> {
+  return sendWhatsAppMediaBufferForConversation(db, userId, conversationId, buffer, mimeType, mediaType, caption);
 }
