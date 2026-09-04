@@ -1970,13 +1970,6 @@ function NodeConfigPanel({
                   ]}
                 />
 
-                <JsonPathField
-                  label="Campo con el ID de la conversación"
-                  value={node.data.conversationIdPath}
-                  onChange={conversationIdPath => onSetData({ conversationIdPath })}
-                  placeholder="conversation_id"
-                />
-
                 {messageType === "text" && (
                   <>
                     <div className="rounded-lg border border-white/[.08] bg-white/[.03] p-3 space-y-2">
@@ -2011,14 +2004,27 @@ function NodeConfigPanel({
                         Alternativa: mandar JSON en vez de multipart (solo texto, o un archivo ya alojado en un link)
                       </summary>
                       <div className="mt-3 space-y-4 pl-3 border-l border-white/[.08]">
+                        <p className="text-[11px] text-gray-500 leading-relaxed">
+                          Acá el body del POST es JSON, y estos tres campos no son un valor fijo — son la{" "}
+                          <strong className="text-gray-300">ruta dentro de ese JSON</strong> donde Noova va a buscar
+                          cada dato, por si tu sistema no usa exactamente esos nombres. Ej.: si tu JSON trae{" "}
+                          <code>{"{ reply: { text: \"...\" } }"}</code>, la ruta es <code>reply.text</code>. Si las
+                          dejas vacías, usa esos mismos nombres por defecto.
+                        </p>
                         <JsonPathField
-                          label="Campo con el texto (JSON)"
+                          label="Ruta al ID de la conversación"
+                          value={node.data.conversationIdPath}
+                          onChange={conversationIdPath => onSetData({ conversationIdPath })}
+                          placeholder="conversation_id"
+                        />
+                        <JsonPathField
+                          label="Ruta al texto"
                           value={node.data.messageTextPath}
                           onChange={messageTextPath => onSetData({ messageTextPath })}
                           placeholder="reply.text"
                         />
                         <JsonPathField
-                          label="Campo con el link del archivo (JSON)"
+                          label="Ruta al link del archivo"
                           value={node.data.mediaUrlPath}
                           onChange={mediaUrlPath => onSetData({ mediaUrlPath })}
                           placeholder="media.url"
@@ -2039,6 +2045,18 @@ function NodeConfigPanel({
 
                 {messageType === "template" && (
                   <>
+                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                      Las plantillas solo se piden por JSON. Estos campos son la ruta dentro de ese JSON donde Noova
+                      va a buscar cada dato — ej. <code>reply.text</code> lee{" "}
+                      <code>{"{ reply: { text: \"...\" } }"}</code>. Si las dejas vacías, usa esos mismos nombres por
+                      defecto.
+                    </p>
+                    <JsonPathField
+                      label="Ruta al ID de la conversación"
+                      value={node.data.conversationIdPath}
+                      onChange={conversationIdPath => onSetData({ conversationIdPath })}
+                      placeholder="conversation_id"
+                    />
                     <div>
                       <SelectField
                         label="Plantilla"
@@ -2059,18 +2077,13 @@ function NodeConfigPanel({
                       ) : null}
                     </div>
                     <JsonPathField
-                      label="Campo con las variables (arreglo, en orden)"
+                      label="Ruta al arreglo de variables (en orden)"
                       value={node.data.variablesPath}
                       onChange={variablesPath => onSetData({ variablesPath })}
                       placeholder="variables"
                     />
                   </>
                 )}
-
-                <p className="text-[11px] text-gray-500 leading-relaxed">
-                  Rutas dentro del JSON recibido, separadas por puntos — ej. <code>reply.text</code> lee{" "}
-                  <code>{"{ reply: { text: \"...\" } }"}</code>. Si las dejas vacías usa esos mismos nombres por defecto.
-                </p>
               </div>
             </div>
           );
