@@ -1127,12 +1127,26 @@ function sanitizeFilename(name: string): string | undefined {
 }
 
 /**
+ * Deriva imagen/documento del mime type real del archivo — así el workflow no tiene que
+ * preconfigurar de antemano si este nodo siempre va a mandar imágenes o siempre PDFs; el mismo
+ * nodo sirve para ambos y Noova decide según lo que realmente llegó. `fallback` (la config del
+ * nodo) solo se usa si el mime no es claro (ej. `application/octet-stream`, o no vino).
+ */
+function inferMediaType(mimeType: string | undefined, fallback: "image" | "document"): "image" | "document" {
+  const type = mimeType?.split(";")[0]?.trim().toLowerCase();
+  if (!type || type === "application/octet-stream") return fallback;
+  return type.startsWith("image/") ? "image" : "document";
+}
+
+/**
  * Núcleo compartido: sube un archivo YA EN MEMORIA (buffer) al storage propio de Noova, lo
  * envía por WhatsApp desde esa URL propia (Twilio/Meta solo saben enviar por link, no reciben
  * bytes directo) y deja el mensaje visible en el historial del chat (Inbox) — usado tanto por
  * el archivo embebido en JSON (data URI) como por el POST binario/multipart directo al webhook.
  * `filename`, si viene, es el nombre que el destinatario ve en WhatsApp (no el nombre interno
  * en storage) — sin esto, Twilio infería un nombre feo tipo "bin-1730764912345.pdf".
+ * `mediaTypeFallback` es la config del nodo — solo se usa si `mimeType` no alcanza a decir si es
+ * imagen o documento (ver `inferMediaType`).
  */
 async function sendWhatsAppMediaBufferForConversation(
   db: SupabaseClient,
@@ -1140,10 +1154,11 @@ async function sendWhatsAppMediaBufferForConversation(
   conversationId: string,
   buffer: Buffer,
   mimeType: string,
-  mediaType: "image" | "document",
+  mediaTypeFallback: "image" | "document",
   caption?: string,
   filename?: string
 ): Promise<{ ok: boolean; error?: string; code?: string }> {
+  const mediaType = inferMediaType(mimeType, mediaTypeFallback);
   const resolved = await resolveOutboundWhatsAppContext(db, userId, conversationId);
   if (!resolved.ok) return resolved;
   const { channel, channelRaw, contactE164, outboundOrgId } = resolved.ctx;

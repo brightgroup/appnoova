@@ -1979,54 +1979,61 @@ function NodeConfigPanel({
 
                 {messageType === "text" && (
                   <>
-                    <SelectField
-                      label="Tipo de archivo"
-                      value={node.data.mediaType ?? "image"}
-                      onChange={v => onSetData({ mediaType: v as "image" | "document" })}
-                      options={[
-                        { value: "image", label: "Imagen" },
-                        { value: "document", label: "Documento" }
-                      ]}
-                    />
-
                     <div className="rounded-lg border border-white/[.08] bg-white/[.03] p-3 space-y-2">
                       <p className="text-[11px] font-semibold text-gray-300">
                         Forma recomendada para mandar archivos: multipart/form-data
                       </p>
                       <p className="text-[11px] text-gray-500 leading-relaxed">
-                        En n8n, en el nodo <strong className="text-gray-300">HTTP Request</strong> que llama a este
-                        webhook: <strong className="text-gray-300">Body Content Type</strong> = &ldquo;Form-Data/Multipart&rdquo;,
-                        y agregas estos campos (organizados igual que cualquier otro form-data de n8n, uno por uno):
+                        Cualquier sistema que pueda hacer una petición HTTP POST puede llamar a este webhook — n8n,
+                        Zapier, Make, un script propio, Postman para pruebas, etc. Con el cuerpo como{" "}
+                        <strong className="text-gray-300">multipart/form-data</strong>, estos campos:
                       </p>
                       <ul className="text-[11px] text-gray-500 leading-relaxed list-disc pl-4 space-y-0.5">
                         <li><code>conversation_id</code> — obligatorio</li>
-                        <li><code>file</code> — el binary property del archivo (imagen o PDF); opcional si solo mandas texto</li>
+                        <li><code>file</code> — el archivo (imagen o PDF); opcional si solo mandas texto</li>
                         <li><code>reply</code> — el texto/caption; opcional si solo mandas archivo</li>
                         <li><code>filename</code> — opcional, el nombre que va a ver el destinatario en WhatsApp (si no lo mandas, se usa el nombre del propio archivo)</li>
                       </ul>
                       <p className="text-[11px] text-gray-500 leading-relaxed">
                         Puedes mandar el texto, el archivo, o ambos en el mismo POST — no hay que elegir. Si mandas
                         ambos, llegan combinados en un solo mensaje de WhatsApp (el texto como caption del archivo).
+                        Tampoco hay que decirle a Noova si el archivo es imagen o PDF — lo detecta solo por el tipo
+                        real del archivo que llega.
+                      </p>
+                      <p className="text-[11px] text-gray-600 leading-relaxed pt-1 border-t border-white/[.06]">
+                        En n8n, por ejemplo: HTTP Request → Body Content Type = &ldquo;Form-Data/Multipart&rdquo;,
+                        agregando el binary property como <code>file</code> y el resto como campos de texto.
                       </p>
                     </div>
 
-                    <p className="text-[11px] text-gray-500 leading-relaxed pt-1">
-                      Alternativa más simple si solo necesitas mandar texto, o un archivo que ya está alojado en
-                      algún link público (sin necesidad de subirlo): manda JSON en vez de multipart, con estos
-                      campos (rutas dentro del JSON, configurables abajo):
-                    </p>
-                    <JsonPathField
-                      label="Campo con el texto (JSON)"
-                      value={node.data.messageTextPath}
-                      onChange={messageTextPath => onSetData({ messageTextPath })}
-                      placeholder="reply.text"
-                    />
-                    <JsonPathField
-                      label="Campo con el link del archivo (JSON)"
-                      value={node.data.mediaUrlPath}
-                      onChange={mediaUrlPath => onSetData({ mediaUrlPath })}
-                      placeholder="media.url"
-                    />
+                    <details className="group">
+                      <summary className="text-[11px] text-gray-500 hover:text-gray-300 cursor-pointer select-none">
+                        Alternativa: mandar JSON en vez de multipart (solo texto, o un archivo ya alojado en un link)
+                      </summary>
+                      <div className="mt-3 space-y-4 pl-3 border-l border-white/[.08]">
+                        <JsonPathField
+                          label="Campo con el texto (JSON)"
+                          value={node.data.messageTextPath}
+                          onChange={messageTextPath => onSetData({ messageTextPath })}
+                          placeholder="reply.text"
+                        />
+                        <JsonPathField
+                          label="Campo con el link del archivo (JSON)"
+                          value={node.data.mediaUrlPath}
+                          onChange={mediaUrlPath => onSetData({ mediaUrlPath })}
+                          placeholder="media.url"
+                        />
+                        <SelectField
+                          label="Si el archivo no trae un tipo claro, asumir"
+                          value={node.data.mediaType ?? "image"}
+                          onChange={v => onSetData({ mediaType: v as "image" | "document" })}
+                          options={[
+                            { value: "image", label: "Imagen" },
+                            { value: "document", label: "Documento" }
+                          ]}
+                        />
+                      </div>
+                    </details>
                   </>
                 )}
 
