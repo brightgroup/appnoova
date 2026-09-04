@@ -40,13 +40,20 @@ export async function uploadWhatsAppMedia(
   return path;
 }
 
+/**
+ * `downloadFilename`, si viene, hace que Supabase Storage sirva la URL firmada con
+ * `Content-Disposition: attachment; filename="..."` — así Twilio/Meta (que infieren el nombre
+ * del archivo de la URL/respuesta, no de nuestro nombre interno en el bucket) le muestran al
+ * destinatario de WhatsApp el nombre real del archivo en vez del nombre interno de storage.
+ */
 export async function signedUrlForPath(
   db: SupabaseClient,
-  path: string
+  path: string,
+  downloadFilename?: string
 ): Promise<string | null> {
   const { data, error } = await db.storage
     .from(WHATSAPP_MEDIA_BUCKET)
-    .createSignedUrl(path, SIGNED_URL_TTL_SEC);
+    .createSignedUrl(path, SIGNED_URL_TTL_SEC, downloadFilename ? { download: downloadFilename } : undefined);
 
   if (error || !data?.signedUrl) {
     console.warn("[whatsapp/media-storage] sign:", error?.message);

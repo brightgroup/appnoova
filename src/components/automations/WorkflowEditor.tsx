@@ -2003,12 +2003,24 @@ function NodeConfigPanel({
                       como <code>{"{{ 'data:' + $binary.data.mimeType + ';base64,' + $binary.data.data }}"}</code>.
                     </p>
                     <p className="text-[11px] text-gray-500 leading-relaxed">
-                      Si el base64 le pesa al servidor de origen (~33% más grande), hay una tercera forma: mandar el
-                      archivo <strong className="text-gray-300">crudo</strong>, sin JSON, directo como cuerpo del POST
-                      a esta misma URL de webhook — con <code>Content-Type</code> del archivo (ej.{" "}
-                      <code>application/pdf</code>) y <code>conversation_id</code> (y <code>caption</code> opcional)
-                      como parámetros en la URL: <code>...?conversation_id=...&amp;caption=...</code>. En n8n, en el
-                      HTTP Request: Body Content Type = &ldquo;n8n Binary File&rdquo;.
+                      Si el base64 le pesa al servidor de origen (~33% más grande), hay dos formas más de mandar el
+                      archivo <strong className="text-gray-300">crudo</strong>, sin base64, a esta misma URL de
+                      webhook:
+                    </p>
+                    <p className="text-[11px] text-gray-500 leading-relaxed pl-3 border-l border-white/[.08]">
+                      <strong className="text-gray-300">multipart/form-data (recomendado)</strong> — todo en un solo
+                      POST, sin nada en la URL: campos <code>conversation_id</code>, <code>file</code> (el archivo),{" "}
+                      <code>reply</code> (texto, opcional) y <code>filename</code> (opcional, para controlar el
+                      nombre que ve el destinatario en WhatsApp — si no lo mandas, se usa el nombre del propio
+                      archivo). En n8n, HTTP Request → Body Content Type = &ldquo;Form-Data/Multipart&rdquo;, agregando
+                      el binary property como <code>file</code> y el resto como campos de texto normales.
+                    </p>
+                    <p className="text-[11px] text-gray-500 leading-relaxed pl-3 border-l border-white/[.08]">
+                      <strong className="text-gray-300">Binario puro</strong> — el cuerpo entero del POST es el
+                      archivo (<code>Content-Type</code> = el del archivo, ej. <code>application/pdf</code>), y como
+                      no hay body para nada más, <code>conversation_id</code> y <code>caption</code> van como
+                      parámetros en la URL: <code>...?conversation_id=...&amp;caption=...</code>. En n8n: Body
+                      Content Type = &ldquo;n8n Binary File&rdquo;.
                     </p>
                   </>
                 )}

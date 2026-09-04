@@ -132,22 +132,117 @@ function buildSendForTarget(
 }
 
 /**
- * Callback público (sin sesión) para el "webhook inverso": un sistema externo
- * (n8n u otro) llama esta URL para reenviar una respuesta al cliente final
- * por el mismo chat de WhatsApp. El token de la URL siempre resuelve a un
- * nodo `trigger.webhook` dentro de un workflow (URL propia generada al
- * agregar el nodo) — el mapeo de campos y el tipo de mensaje (texto,
- * plantilla o media) los define cada nodo `action.send_whatsapp_message`
- * conectado a ese disparador. Los conectores (`automation_connection`) solo
- * manejan el lado de salida — no tienen callback propio.
+ * Rama del webhook para multipart/form-data: todo el mensaje va en un solo POST — el
+ * conversation_id, el texto de respuesta, el archivo y su nombre — sin nada en query params
+ * (a diferencia de `handleBinaryWebhookPost`) y sin base64 (a diferencia del modo JSON). Es la
+ * forma recomendada cuando el archivo es pesado o se necesita controlar el nombre que ve el
+ * destinatario en WhatsApp. Campos de form-data esperados:
+ * - `conversation_id` (obligatorio)
+ * - `file` (el archivo — opcional si solo mandas texto; también acepta `media`/`document`/`image`)
+ * - `reply` (texto/caption — opcional si solo mandas archivo; también acepta `caption`/`text`)
+ * - `filename` (opcional — si no viene, se usa el nombre del propio archivo subido)
  */
+async function handleMultipartWebhookPost(
+  req: NextRequest,
+  db: SupabaseClient,
+  trigger: WebhookTriggerLookup,
+  targets: SendMessageTarget[]
+): Promise<NextResponse> {
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "multipart/form-data inválido" }, { status: 400 });
+  }
+
+  const conversationId = form.get("conversation_id")?.toString().trim();
+  const text =
+    form.get("reply")?.toString().trim() ||
+    form.get("caption")?.toString().trim() ||
+    form.get("text")?.toString().trim() ||
+    undefined;
+  const filenameField = form.get("filename")?.toString().trim();
+  const filePart = form.get("file") ?? form.get("media") ?? form.get("document") ?? form.get("image");
+  const file = filePart instanceof File ? filePart : null;
+
+  const requestBodyLog = `[multipart: campos=${Array.from(form.keys()).join(",")}${
+    file ? `, archivo="${file.name}" (${file.size} bytes, ${file.type || "sin content-type"})` : ""
+  }]`;
+
+  if (!conversationId) {
+    return NextResponse.json({ error: "Falta el campo 'conversation_id' en el form-data" }, { status: 400 });
+  }
+  if (!file && !text) {
+    return NextResponse.json({ error: "Falta el archivo ('file') o el texto ('reply') en el form-data" }, { status: 400 });
+  }
+
+  const sendTargets = targets.filter(t => t.messageType !== "template");
+  if (sendTargets.length === 0) {
+    await db.from("automation_event_log").insert({
+      organization_id: trigger.organizationId,
+      workflow_id: trigger.workflowId,
+      conversation_id: conversationId,
+      event_type: "webhook.received",
+      status: "captured",
+      request_body: requestBodyLog
+    });
+    return NextResponse.json(
+      { error: "Este webhook no está conectado a ningún nodo de 'Enviar mensaje de WhatsApp'" },
+      { status: 422 }
+    );
+  }
+
+  let lastResponse: NextResponse | null = null;
+  for (const target of sendTargets) {
+    lastResponse = await deliverReply(db, {
+      organizationId: trigger.organizationId,
+      conversationId,
+      workflowId: trigger.workflowId,
+      requestBody: requestBodyLog,
+      send: async (dbInner, ownerUserId, convId) => {
+        if (file) {
+          const buffer = Buffer.from(await file.arrayBuffer());
+          const filename = filenameField || (file.name && file.name !== "blob" ? file.name : undefined);
+          return sendWhatsAppMediaBinaryOutboundForConversation(
+            dbInner,
+            ownerUserId,
+            convId,
+            buffer,
+            file.type || "application/octet-stream",
+            target.mediaType,
+            text,
+            filename
+          );
+        }
+        const sendResult = await sendWhatsAppOutboundForConversation(dbInner, ownerUserId, convId, text!);
+        if (!sendResult.ok) return sendResult;
+        const persist = await persistHumanReply({
+          db: dbInner,
+          userId: ownerUserId,
+          conversationId: convId,
+          content: text!,
+          assignedTo: ownerUserId
+        });
+        if (!persist.ok) {
+          return { ok: false, error: persist.error ?? "Mensaje enviado pero no se guardó en Inbox" };
+        }
+        return { ok: true };
+      }
+    });
+  }
+  return lastResponse ?? NextResponse.json({ ok: true });
+}
+
 /**
  * Rama del webhook para cuando el sistema de origen (ej. n8n) manda el binario crudo del
  * archivo (imagen/PDF) como cuerpo del POST — sin JSON, sin base64 — porque codificar el
  * archivo en base64 antes de mandarlo le pesó a su servidor (~33% más de tamaño/CPU para armar
- * el JSON). Se activa solo cuando `Content-Type` no es `application/json`. Como el cuerpo
- * entero es el archivo, `conversation_id` (y opcionalmente `caption`) van en la URL como query
- * params: `.../inbound/TOKEN?conversation_id=...&caption=...`.
+ * el JSON). Se activa solo cuando `Content-Type` no es `application/json` ni
+ * `multipart/form-data`. Como el cuerpo entero es el archivo, `conversation_id` (y
+ * opcionalmente `caption`) van en la URL como query params:
+ * `.../inbound/TOKEN?conversation_id=...&caption=...`. Si necesitas mandar además el nombre del
+ * archivo o prefieres no exponer el conversation_id en la URL, usa multipart/form-data en su
+ * lugar (`handleMultipartWebhookPost`).
  */
 async function handleBinaryWebhookPost(
   req: NextRequest,
@@ -203,6 +298,21 @@ async function handleBinaryWebhookPost(
   return lastResponse ?? NextResponse.json({ ok: true });
 }
 
+/**
+ * Callback público (sin sesión) para el "webhook inverso": un sistema externo
+ * (n8n u otro) llama esta URL para reenviar una respuesta al cliente final
+ * por el mismo chat de WhatsApp. El token de la URL siempre resuelve a un
+ * nodo `trigger.webhook` dentro de un workflow (URL propia generada al
+ * agregar el nodo) — el mapeo de campos y el tipo de mensaje (texto,
+ * plantilla o media) los define cada nodo `action.send_whatsapp_message`
+ * conectado a ese disparador. Los conectores (`automation_connection`) solo
+ * manejan el lado de salida — no tienen callback propio.
+ *
+ * Acepta tres formatos de body, según `Content-Type`: JSON (con `media.url` como link o data
+ * URI embebido), multipart/form-data (recomendado para archivos pesados o con nombre propio —
+ * ver `handleMultipartWebhookPost`), o el binario crudo con metadatos en query params (ver
+ * `handleBinaryWebhookPost`).
+ */
 export async function POST(req: NextRequest, ctx: Ctx) {
   const { token } = await ctx.params;
   const db = textAgentsAdminClient();
@@ -219,6 +329,9 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   const targets = findSendMessageTargets(workflow.graph, trigger.nodeId);
 
   const contentType = (req.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  if (contentType === "multipart/form-data") {
+    return handleMultipartWebhookPost(req, db, trigger, targets);
+  }
   if (contentType && contentType !== "application/json") {
     return handleBinaryWebhookPost(req, db, trigger, targets, contentType);
   }

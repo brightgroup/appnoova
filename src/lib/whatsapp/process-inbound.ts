@@ -1116,11 +1116,23 @@ function decodeDataUri(uri: string): { buffer: Buffer; mimeType: string } | null
   }
 }
 
+/** Deja solo caracteres seguros para un nombre de archivo visible (sin rutas, sin caracteres de control). */
+function sanitizeFilename(name: string): string | undefined {
+  const cleaned = name
+    .trim()
+    .replace(/[\\/]/g, "_")
+    .replace(/[^\w.\-\s()áéíóúÁÉÍÓÚñÑ]/g, "")
+    .slice(0, 150);
+  return cleaned || undefined;
+}
+
 /**
  * Núcleo compartido: sube un archivo YA EN MEMORIA (buffer) al storage propio de Noova, lo
  * envía por WhatsApp desde esa URL propia (Twilio/Meta solo saben enviar por link, no reciben
  * bytes directo) y deja el mensaje visible en el historial del chat (Inbox) — usado tanto por
- * el archivo embebido en JSON (data URI) como por el POST binario directo al webhook.
+ * el archivo embebido en JSON (data URI) como por el POST binario/multipart directo al webhook.
+ * `filename`, si viene, es el nombre que el destinatario ve en WhatsApp (no el nombre interno
+ * en storage) — sin esto, Twilio infería un nombre feo tipo "bin-1730764912345.pdf".
  */
 async function sendWhatsAppMediaBufferForConversation(
   db: SupabaseClient,
@@ -1129,24 +1141,35 @@ async function sendWhatsAppMediaBufferForConversation(
   buffer: Buffer,
   mimeType: string,
   mediaType: "image" | "document",
-  caption?: string
+  caption?: string,
+  filename?: string
 ): Promise<{ ok: boolean; error?: string; code?: string }> {
   const resolved = await resolveOutboundWhatsAppContext(db, userId, conversationId);
   if (!resolved.ok) return resolved;
   const { channel, channelRaw, contactE164, outboundOrgId } = resolved.ctx;
 
   const mediaMime = mimeType && mimeType !== "application/octet-stream" ? mimeType : mediaType === "document" ? "application/pdf" : "image/jpeg";
+  const safeFilename = filename ? sanitizeFilename(filename) : undefined;
   const path = await uploadWhatsAppMedia(db, userId, `bin-${Date.now()}`, 0, buffer, mediaMime);
   if (!path) {
     return { ok: false, error: "No se pudo guardar el archivo recibido" };
   }
-  const signed = await signedUrlForPath(db, path);
+  const signed = await signedUrlForPath(db, path, safeFilename);
   if (!signed) {
     return { ok: false, error: "No se pudo generar la URL del archivo para enviarlo" };
   }
 
   try {
-    await sendWhatsAppMediaMessage({ db, channel, channelRaw, toE164: contactE164, mediaUrl: signed, mediaType, caption });
+    await sendWhatsAppMediaMessage({
+      db,
+      channel,
+      channelRaw,
+      toE164: contactE164,
+      mediaUrl: signed,
+      mediaType,
+      caption,
+      filename: safeFilename
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error al enviar el adjunto por WhatsApp";
     return { ok: false, error: msg };
@@ -1202,14 +1225,15 @@ export async function sendWhatsAppMediaOutboundForConversation(
   conversationId: string,
   mediaUrl: string,
   mediaType: "image" | "document",
-  caption?: string
+  caption?: string,
+  filename?: string
 ): Promise<{ ok: boolean; error?: string; code?: string }> {
   if (mediaUrl.startsWith("data:")) {
     const embedded = decodeDataUri(mediaUrl);
     if (!embedded) {
       return { ok: false, error: "El archivo embebido en el JSON (data:...) no se pudo decodificar — debe venir en base64" };
     }
-    return sendWhatsAppMediaBufferForConversation(db, userId, conversationId, embedded.buffer, embedded.mimeType, mediaType, caption);
+    return sendWhatsAppMediaBufferForConversation(db, userId, conversationId, embedded.buffer, embedded.mimeType, mediaType, caption, filename);
   }
 
   const resolved = await resolveOutboundWhatsAppContext(db, userId, conversationId);
@@ -1218,7 +1242,16 @@ export async function sendWhatsAppMediaOutboundForConversation(
 
   let externalId: string | undefined;
   try {
-    const sent = await sendWhatsAppMediaMessage({ db, channel, channelRaw, toE164: contactE164, mediaUrl, mediaType, caption });
+    const sent = await sendWhatsAppMediaMessage({
+      db,
+      channel,
+      channelRaw,
+      toE164: contactE164,
+      mediaUrl,
+      mediaType,
+      caption,
+      filename: filename ? sanitizeFilename(filename) : undefined
+    });
     externalId = sent.externalId;
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error al enviar el adjunto por WhatsApp";
@@ -1294,7 +1327,8 @@ export async function sendWhatsAppMediaBinaryOutboundForConversation(
   buffer: Buffer,
   mimeType: string,
   mediaType: "image" | "document",
-  caption?: string
+  caption?: string,
+  filename?: string
 ): Promise<{ ok: boolean; error?: string; code?: string }> {
-  return sendWhatsAppMediaBufferForConversation(db, userId, conversationId, buffer, mimeType, mediaType, caption);
+  return sendWhatsAppMediaBufferForConversation(db, userId, conversationId, buffer, mimeType, mediaType, caption, filename);
 }
