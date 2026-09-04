@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireOrgModule } from "@/lib/module-auth";
 import { adminClient } from "@/lib/voice-agents-server";
 import { createPaddleCheckoutTransaction } from "@/lib/billing/paddle/client";
+import { isSuperAdminUser } from "@/lib/admin-server";
+import { isInternalCheckoutPlan } from "@/lib/billing/plan-visibility";
 
 /** POST { plan_id } — crea una transacción Paddle en borrador para abrir el checkout overlay. */
 export async function POST(req: NextRequest) {
@@ -17,12 +19,21 @@ export async function POST(req: NextRequest) {
   const db = adminClient();
   const { data: plan } = await db
     .from("plans")
-    .select("id, name, paddle_price_id_sandbox, paddle_price_id_live")
+    .select(
+      "id, name, is_public, is_system, is_active, features, paddle_price_id_sandbox, paddle_price_id_live"
+    )
     .eq("id", planId)
     .maybeSingle();
 
-  if (!plan) {
+  if (!plan || plan.is_active === false) {
     return NextResponse.json({ error: "Plan no encontrado" }, { status: 404 });
+  }
+
+  if (isInternalCheckoutPlan(plan) || (plan.is_public !== true && plan.is_system !== true)) {
+    const superAdmin = await isSuperAdminUser(ctx.userId);
+    if (!superAdmin) {
+      return NextResponse.json({ error: "Plan no disponible" }, { status: 403 });
+    }
   }
 
   const priceId =

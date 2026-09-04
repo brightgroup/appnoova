@@ -1,0 +1,55 @@
+-- Plan QA USD 1 — solo superadmin en Facturación (is_public = false).
+-- No entra al catálogo público ni a la landing.
+
+insert into public.plans (
+  id,
+  name,
+  price_usd,
+  monthly_credits,
+  trial_days,
+  whatsapp_included,
+  max_text_agents,
+  max_users,
+  support_level,
+  sort_order,
+  features,
+  is_active,
+  is_system,
+  is_public,
+  paddle_price_id_sandbox,
+  paddle_price_id_live
+) values (
+  'paddle_qa',
+  'QA Paddle $1',
+  1,
+  3333,
+  0,
+  false,
+  1,
+  1,
+  'email',
+  999,
+  '{"internal_test": true}'::jsonb,
+  true,
+  false,
+  false,
+  'pri_01m1mvkwpvaspgam364qkhtdbk',
+  'pri_01m1mvkw0fj6c0p3wssfntm3er'
+)
+on conflict (id) do update set
+  name                    = excluded.name,
+  price_usd               = excluded.price_usd,
+  monthly_credits         = excluded.monthly_credits,
+  trial_days              = excluded.trial_days,
+  whatsapp_included       = excluded.whatsapp_included,
+  max_text_agents         = excluded.max_text_agents,
+  max_users               = excluded.max_users,
+  support_level           = excluded.support_level,
+  sort_order              = excluded.sort_order,
+  features                = excluded.features,
+  is_active               = excluded.is_active,
+  is_system               = excluded.is_system,
+  is_public               = excluded.is_public,
+  paddle_price_id_sandbox = excluded.paddle_price_id_sandbox,
+  paddle_price_id_live    = excluded.paddle_price_id_live,
+  updated_at              = now();

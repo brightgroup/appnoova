@@ -15,6 +15,8 @@ import {
   resolveBillingBalances,
   resolvePlanMonthlyCredits,
 } from "@/lib/billing/wallet-display";
+import { isSuperAdminUser } from "@/lib/admin-server";
+import { planVisibleInBillingCatalog } from "@/lib/billing/plan-visibility";
 
 interface UsageEventRow {
   created_at: string;
@@ -79,10 +81,9 @@ export async function GET(req: NextRequest) {
   const allPlans = plansRes.data ?? [];
   const subscription = subRes.data;
   const currentPlanId = subscription?.plan_id;
-  const plans = allPlans.filter(
-    (p) =>
-      p.is_active !== false &&
-      (p.is_public === true || p.is_system === true || p.id === currentPlanId)
+  const superAdmin = await isSuperAdminUser(ctx.userId);
+  const plans = allPlans.filter((p) =>
+    planVisibleInBillingCatalog(p, { superAdmin, currentPlanId })
   );
   const events = (eventsRes.data ?? []) as UsageEventRow[];
 

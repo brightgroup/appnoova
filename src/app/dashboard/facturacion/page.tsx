@@ -52,6 +52,7 @@ interface Plan {
   id: string; name: string; price_usd: number; monthly_credits: number;
   trial_days: number; whatsapp_included: boolean; max_text_agents: number | null;
   max_users: number | null; support_level: string;
+  is_public?: boolean;
 }
 type DailyPoint = BillingChartDay;
 interface UsageDetail { id: string; name: string; type: string; credits: number; }
@@ -148,6 +149,15 @@ const PLAN_COPY: Record<string, { tagline: string; features: string[]; ideal: st
     tagline: "Alto volumen y equipo grande",
     features: ["3.800.000 créditos/mes", "Usuarios ilimitados", "Misma plataforma completa", "Soporte dedicado"],
     ideal: "Operación grande · más de 15 personas o alto consumo",
+  },
+  paddle_qa: {
+    tagline: "Solo superadmin · no aparece a clientes",
+    features: [
+      "Cobro real de USD 1 para probar Paddle Live",
+      "No está en la landing ni en el catálogo público",
+      "Si pagas, este org pasa a este plan (luego reasigna Crecimiento en /admin)",
+    ],
+    ideal: "Prueba interna de checkout",
   },
 };
 
@@ -747,6 +757,15 @@ export default function FacturacionPage() {
                         }`}
                       >
                         {/* Badges */}
+                        {p.id === "paddle_qa" && !isActive && (
+                          <Badge
+                            variant="accent"
+                            uppercase
+                            className="absolute -top-2.5 left-1/2 -translate-x-1/2"
+                          >
+                            QA interno
+                          </Badge>
+                        )}
                         {p.id === "crecimiento" && !isActive && (
                           <Badge
                             variant="accent"
