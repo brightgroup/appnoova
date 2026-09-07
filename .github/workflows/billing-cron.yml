@@ -1,0 +1,51 @@
+# Job diario de facturación: marca facturas vencidas, suspende cuentas en mora
+# pasado el periodo de gracia, renueva periodos al día y desconecta WhatsApp de
+# cuentas suspendidas (ver src/app/api/cron/billing/route.ts).
+#
+# Antes de esta migración nada llamaba a esta ruta — el sistema nunca suspendía
+# a nadie por falta de pago. Corre en GitHub Actions, igual que el backup de la
+# base de datos (backup-db-drive.yml), porque la app corre en Coolify, no en
+# Vercel (no hay Vercel Cron disponible).
+#
+# Requisitos en GitHub → Settings → Secrets and variables → Actions:
+#   APP_URL      = https://app.noova360.com (o el dominio de producción real)
+#   CRON_SECRET  = el mismo valor que la variable de entorno CRON_SECRET en Coolify
+
+name: Billing Cron
+
+on:
+  schedule:
+    - cron: '0 9 * * *' # 09:00 UTC (~04:00 hora Colombia)
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: billing-cron
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ejecutar /api/cron/billing
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "Faltan secrets APP_URL / CRON_SECRET." >&2
+            exit 1
+          fi
+          response=$(curl -sS -o response.json -w "%{http_code}" \
+            -H "x-cron-secret: ${CRON_SECRET}" \
+            "${APP_URL%/}/api/cron/billing")
+          echo "HTTP $response"
+          cat response.json
+          echo
+          if [ "$response" -ge 300 ]; then
+            echo "El cron de facturación respondió con error." >&2
+            exit 1
+          fi
