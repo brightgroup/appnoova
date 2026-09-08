@@ -944,7 +944,7 @@ export default function FacturacionPage() {
                             </button>
                           )}
                           <button
-                            onClick={() => { setBuyPackageId(data?.credit_packages?.[0]?.id ?? null); setShowBuyCredits(true); }}
+                            onClick={() => { setBuyPackageId(null); setShowBuyCredits(true); }}
                             className="text-xs font-semibold text-[var(--nv-text-muted)] hover:text-[var(--nv-text)] transition-colors"
                           >
                             Comprar créditos
@@ -1000,21 +1000,39 @@ export default function FacturacionPage() {
                   <p className="text-sm text-[var(--nv-text-muted)]">Elige un monto. Siempre puedes comprar más después.</p>
 
                   <div className="grid grid-cols-2 gap-2">
-                    {(data?.credit_packages ?? []).map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => setBuyPackageId(p.id)}
-                        className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                          buyPackageId === p.id
-                            ? "border-[var(--nv-accent)] bg-[var(--nv-accent)]/10"
-                            : "border-[var(--nv-border)] hover:border-[var(--nv-border-strong)]"
-                        }`}
-                      >
-                        <p className="text-sm font-bold text-[var(--nv-text)]">US$ {fmtN(p.price_usd)}</p>
-                        <p className="text-[11px] text-[var(--nv-text-muted)] mt-0.5">{fmtN(p.credits)} créditos</p>
-                      </button>
-                    ))}
+                    {(data?.credit_packages ?? []).map((p) => {
+                      const selected = buyPackageId === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setBuyPackageId(p.id)}
+                          className={`relative rounded-lg border-2 px-3 py-2.5 text-left transition-colors ${
+                            selected
+                              ? "border-[var(--nv-accent)] bg-[var(--nv-accent)]/15"
+                              : "border-[var(--nv-border)] hover:border-[var(--nv-border-strong)]"
+                          }`}
+                        >
+                          {selected && (
+                            <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[var(--nv-accent)] flex items-center justify-center">
+                              <CheckCircle2 className="w-3 h-3 text-white" />
+                            </span>
+                          )}
+                          <p className="text-sm font-bold text-[var(--nv-text)]">US$ {fmtN(p.price_usd)}</p>
+                          <p className="text-[11px] text-[var(--nv-text-muted)] mt-0.5">{fmtN(p.credits)} créditos</p>
+                        </button>
+                      );
+                    })}
                   </div>
+
+                  {buyPackageId && (
+                    <div className="rounded-lg bg-[var(--nv-bg-control)] px-3 py-2 flex items-center justify-between text-sm">
+                      <span className="text-[var(--nv-text-muted)]">Total a pagar</span>
+                      <span className="font-bold text-[var(--nv-text)]">
+                        US$ {fmtN(data?.credit_packages?.find(p => p.id === buyPackageId)?.price_usd ?? 0)}
+                      </span>
+                    </div>
+                  )}
 
                   {buyCreditsError && <p className="text-xs text-red-400">{buyCreditsError}</p>}
                   <p className="text-[11px] text-[var(--nv-text-faint)]">
@@ -1376,7 +1394,7 @@ export default function FacturacionPage() {
                       </div>
                       <p className="nv-promo-body text-sm leading-relaxed">
                         Configura un umbral mínimo en dólares. Cuando tu saldo baje de ese nivel, se cobra el
-                        monto elegido a tu tarjeta guardada, sin superar el tope mensual que definas.
+                        monto elegido a tu tarjeta guardada, al instante.
                       </p>
                       {autoData?.settings?.admin_enabled === false && (
                         <p className="text-xs text-amber-400 mt-3">
@@ -1394,7 +1412,7 @@ export default function FacturacionPage() {
                       {[
                         { step: 1, title: "Umbral mínimo",   desc: "Cuando el saldo baja del nivel configurado" },
                         { step: 2, title: "Recarga inmediata", desc: "Se cobra a tu tarjeta guardada al instante" },
-                        { step: 3, title: "Tope mensual",     desc: "Sin superar el presupuesto definido" },
+                        { step: 3, title: "Desactívala cuando quieras", desc: "Sin compromiso, un clic y queda apagada" },
                       ].map(({ step, title, desc }) => (
                         <div key={step} className="rounded-xl border border-white/[.06] bg-white/[.02] p-4">
                           <span className="inline-flex w-5 h-5 items-center justify-center rounded-full bg-[#072b55]/60 text-[#2f8fff] text-[10px] font-bold mb-3">{step}</span>
@@ -1425,15 +1443,6 @@ export default function FacturacionPage() {
                             type="number"
                             value={Math.round(autoForm.threshold_credits * creditUsdRate * 100) / 100}
                             onChange={e => setAutoForm(f => ({ ...f, threshold_credits: Math.round(Number(e.target.value) / creditUsdRate) }))}
-                            className="w-full rounded-lg border border-white/[.12] bg-noova-main px-3 py-2 text-sm text-white"
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-xs text-gray-400 mb-1.5">Tope mensual (USD)</label>
-                          <input
-                            type="number"
-                            value={autoForm.monthly_cap_usd}
-                            onChange={e => setAutoForm(f => ({ ...f, monthly_cap_usd: Number(e.target.value) }))}
                             className="w-full rounded-lg border border-white/[.12] bg-noova-main px-3 py-2 text-sm text-white"
                           />
                         </div>

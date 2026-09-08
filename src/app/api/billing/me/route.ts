@@ -83,9 +83,17 @@ export async function GET(req: NextRequest) {
   const subscription = subRes.data;
   const currentPlanId = subscription?.plan_id;
   const superAdmin = await isSuperAdminUser(ctx.userId);
-  const plans = allPlans.filter((p) =>
+  const visiblePlans = allPlans.filter((p) =>
     planVisibleInBillingCatalog(p, { superAdmin, currentPlanId })
   );
+  // Si el plan actual es un clon privado con precio a la medida (ej.
+  // "esencial_cmarket", mismo nombre que el público "esencial"), no mostrar
+  // los dos — el selector se vería con "Esencial" duplicado.
+  const currentVisiblePlan = visiblePlans.find((p) => p.id === currentPlanId);
+  const plans =
+    currentVisiblePlan && currentVisiblePlan.is_public !== true && currentVisiblePlan.is_system !== true
+      ? visiblePlans.filter((p) => p.id === currentPlanId || p.name !== currentVisiblePlan.name)
+      : visiblePlans;
   const events = (eventsRes.data ?? []) as UsageEventRow[];
 
   const catalogPlan = plans.find((p) => p.id === subscription?.plan_id);
