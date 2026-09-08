@@ -863,6 +863,25 @@ export default function FacturacionPage() {
                               </td>
                               <td className={registryTableCell}>
                                 <div className="flex items-center gap-1 text-gray-500">
+                                  {/* Solo se puede pagar desde aquí la factura del plan
+                                      ACTUAL de la org — una factura vieja de un plan ya
+                                      reemplazado no debe pagarse por este botón, porque el
+                                      checkout fijaría ese plan viejo como el plan vigente. */}
+                                  {(inv.status === "pending" || inv.status === "overdue") &&
+                                    sub?.billing_provider !== "paddle" &&
+                                    inv.plan_id === sub?.plan_id && (
+                                      <button
+                                        onClick={() => openPlanCheckout(
+                                          "/api/billing/paddle/checkout",
+                                          { plan_id: sub!.plan_id },
+                                          () => void load()
+                                        )}
+                                        disabled={payingPlan}
+                                        className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-[var(--nv-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                                      >
+                                        {payingPlan ? "Abriendo…" : "Pagar"}
+                                      </button>
+                                  )}
                                   <button className="p-1.5 hover:bg-white/[.06] rounded-md hover:text-white" title="Ver detalle"><Eye className="w-3.5 h-3.5" /></button>
                                   <button className="p-1.5 hover:bg-white/[.06] rounded-md hover:text-white" title="Descargar"><Download className="w-3.5 h-3.5" /></button>
                                 </div>
