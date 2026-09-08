@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { CreditCard, Loader2 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 
@@ -81,6 +81,47 @@ async function ensurePaddleInitialized() {
   });
 }
 
+/**
+ * Abre un overlay de Paddle a partir de cualquier endpoint que devuelva
+ * `{ transaction_id }` (pago de plan, compra de créditos, etc.) — reutilizable
+ * fuera de PaddleCheckoutButton.
+ */
+export function usePaddleCheckout() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const openCheckout = useCallback(
+    async (endpoint: string, body: Record<string, unknown>, onCompleted?: () => void) => {
+      setLoading(true);
+      setError(null);
+      try {
+        await ensurePaddleInitialized();
+
+        const res = await authFetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}));
+          throw new Error(json?.error || "No se pudo iniciar el pago");
+        }
+        const { transaction_id } = await res.json();
+
+        activeOnCompleted = onCompleted ?? null;
+        window.Paddle!.Checkout.open({ transactionId: transaction_id });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error al iniciar el pago");
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  return { openCheckout, loading, error };
+}
+
 export function PaddleCheckoutButton({
   planId,
   planName,
@@ -90,34 +131,9 @@ export function PaddleCheckoutButton({
   planName: string;
   onCheckoutCompleted?: () => void;
 }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { openCheckout, loading, error } = usePaddleCheckout();
 
-  const handleClick = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await ensurePaddleInitialized();
-
-      const res = await authFetch("/api/billing/paddle/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan_id: planId }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error || "No se pudo iniciar el checkout");
-      }
-      const { transaction_id } = await res.json();
-
-      activeOnCompleted = onCheckoutCompleted ?? null;
-      window.Paddle!.Checkout.open({ transactionId: transaction_id });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al iniciar el pago");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleClick = () => openCheckout("/api/billing/paddle/checkout", { plan_id: planId }, onCheckoutCompleted);
 
   return (
     <div className="space-y-1">

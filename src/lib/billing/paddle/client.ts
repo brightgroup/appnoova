@@ -49,7 +49,15 @@ export interface PaddleTransaction {
 export async function createPaddleCheckoutTransaction(params: {
   priceId: string;
   organizationId: string;
-  planId: string;
+  /**
+   * Datos propios para identificar de qué se trata la transacción en el
+   * webhook — dos objetos internos (planes, paquetes de créditos) pueden
+   * compartir el mismo price_id de Paddle, así que el webhook no puede
+   * reconstruir el significado solo a partir del price_id. Ej.
+   * `{ plan_id }` para un plan, `{ kind: "topup", package_id }` para una
+   * compra de créditos.
+   */
+  customData?: Record<string, string>;
   customerEmail?: string;
 }): Promise<PaddleTransaction> {
   const checkoutUrl = (
@@ -60,11 +68,7 @@ export async function createPaddleCheckoutTransaction(params: {
     method: "POST",
     body: JSON.stringify({
       items: [{ price_id: params.priceId, quantity: 1 }],
-      // plan_id explícito: dos planes internos pueden compartir el mismo
-      // price_id de Paddle (ej. un plan privado con precio idéntico a uno
-      // público), así que el webhook no puede reconstruir el plan solo a
-      // partir del price_id.
-      custom_data: { organization_id: params.organizationId, plan_id: params.planId },
+      custom_data: { organization_id: params.organizationId, ...params.customData },
       checkout: { url: checkoutUrl },
       ...(params.customerEmail
         ? { customer: { email: params.customerEmail } }
@@ -114,6 +118,23 @@ export async function chargeSubscriptionOneOff(
       items: [{ price_id: priceId, quantity: 1 }],
     }),
   });
+}
+
+export interface PaddlePaymentMethod {
+  id: string;
+  type: string; // "card" | "paypal" | ...
+  card?: {
+    type?: string; // "visa" | "mastercard" | ...
+    last4?: string;
+    expiry_month?: number;
+    expiry_year?: number;
+  } | null;
+}
+
+/** Métodos de pago guardados por el cliente (para mostrar "Visa •••• 4242" en la UI). */
+export async function listPaddlePaymentMethods(customerId: string): Promise<PaddlePaymentMethod[]> {
+  const res = await paddleFetch<PaddlePaymentMethod[]>(`/customers/${customerId}/payment-methods`);
+  return res ?? [];
 }
 
 /** URL de un solo uso al portal de cliente de Paddle (actualizar tarjeta, ver facturas). */

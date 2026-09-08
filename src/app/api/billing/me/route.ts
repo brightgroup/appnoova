@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 
   const chartFrom = new Date(Date.now() - CHART_HISTORY_DAYS * 86_400_000).toISOString();
 
-  const [subRes, walletRes, invoicesRes, plansRes, eventsRes] = await Promise.all([
+  const [subRes, walletRes, invoicesRes, plansRes, eventsRes, creditPackagesRes] = await Promise.all([
     db
       .from("organization_subscriptions")
       .select("*, plans(name, price_usd, monthly_credits, whatsapp_included, support_level)")
@@ -75,6 +75,7 @@ export async function GET(req: NextRequest) {
       .eq("organization_id", orgId)
       .gte("created_at", chartFrom)
       .order("created_at", { ascending: true }),
+    db.from("credit_packages").select("id, credits, price_usd").eq("is_active", true).order("sort_order"),
   ]);
 
   const wallet = walletRes.data;
@@ -151,10 +152,11 @@ export async function GET(req: NextRequest) {
   (voiceRes.data ?? []).forEach((a) => agentNames.set(a.id, a.name));
   (textRes.data ?? []).forEach((a) => agentNames.set(a.id, a.name));
 
-  const detailsMap = new Map<string, { id: string; name: string; type: string; credits: number }>();
+  const detailsMap = new Map<string, { id: string; name: string; type: string; credits: number; date: string }>();
   events.forEach((ev, idx) => {
     const refId = ev.reference_id ?? "global";
-    const key = `${ev.event_type}-${refId}`;
+    const day = ev.created_at.slice(0, 10);
+    const key = `${ev.event_type}-${refId}-${day}`;
     const agentName = ev.reference_id ? (agentNames.get(ev.reference_id) ?? null) : null;
     const type = USAGE_TYPE_LABELS[ev.event_type] ?? ev.event_type;
 
@@ -201,11 +203,11 @@ export async function GET(req: NextRequest) {
     if (existing) {
       existing.credits += ev.credits_charged;
     } else {
-      detailsMap.set(key, { id: `${key}-${idx}`, name, type, credits: ev.credits_charged });
+      detailsMap.set(key, { id: `${key}-${idx}`, name, type, credits: ev.credits_charged, date: day });
     }
   });
 
-  const usageDetails = Array.from(detailsMap.values()).sort((a, b) => b.credits - a.credits);
+  const usageDetails = Array.from(detailsMap.values()).sort((a, b) => b.date === a.date ? b.credits - a.credits : b.date.localeCompare(a.date));
 
   const categoryTotals = Object.fromEntries(
     BILLING_CHART_CATEGORIES.map((c) => [c.key, 0])
@@ -253,6 +255,7 @@ export async function GET(req: NextRequest) {
     plans,
     daily_chart: dailyChart,
     usage_details: usageDetails,
+    credit_packages: creditPackagesRes.data ?? [],
     stats: {
       avg_daily: avgDaily30,
       peak_daily: peakDay,

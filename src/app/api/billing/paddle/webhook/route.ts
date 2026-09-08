@@ -9,7 +9,7 @@ interface PaddleTransactionEvent {
     status?: string;
     subscription_id?: string | null;
     customer_id?: string | null;
-    custom_data?: { organization_id?: string; plan_id?: string } | null;
+    custom_data?: { organization_id?: string; plan_id?: string; kind?: string; package_id?: string } | null;
     currency_code?: string;
     items?: { price?: { id?: string } }[];
     billing_period?: { starts_at?: string; ends_at?: string } | null;
@@ -39,6 +39,28 @@ export async function POST(req: NextRequest) {
         const priceId = txn.items?.[0]?.price?.id;
         if (!organizationId || !priceId) {
           console.warn("[paddle:webhook] transaction.completed sin organization_id/price_id", txn.id);
+          break;
+        }
+
+        // Compra manual de créditos (no confundir con un pago de plan: no debe
+        // tocar el periodo de la suscripción ni resetear créditos incluidos).
+        if (txn.custom_data?.kind === "topup") {
+          const packageId = txn.custom_data.package_id;
+          const { data: pkg } = await db
+            .from("credit_packages")
+            .select("credits")
+            .eq("id", packageId ?? "")
+            .maybeSingle();
+          if (!pkg) {
+            console.error(`[paddle:webhook] topup sin paquete válido (package_id=${packageId})`, txn.id);
+            break;
+          }
+          const { error } = await db.rpc("billing_admin_add_credits", {
+            p_org: organizationId,
+            p_credits: pkg.credits,
+            p_reason: `Compra de créditos (Paddle transaction ${txn.id})`,
+          });
+          if (error) throw error;
           break;
         }
 

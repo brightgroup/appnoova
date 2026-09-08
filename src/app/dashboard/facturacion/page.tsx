@@ -19,7 +19,7 @@ import { InfoBox } from "@/components/ui/InfoBox";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { usePricingCatalog } from "@/hooks/usePricingCatalog";
-import { PaddleCheckoutButton } from "@/components/billing/PaddleCheckoutButton";
+import { PaddleCheckoutButton, usePaddleCheckout } from "@/components/billing/PaddleCheckoutButton";
 import type { PlanPromoDisplay } from "@/lib/billing/plan-promo";
 import {
   BILLING_CHART_CATEGORIES,
@@ -57,7 +57,7 @@ interface Plan {
   is_public?: boolean;
 }
 type DailyPoint = BillingChartDay;
-interface UsageDetail { id: string; name: string; type: string; credits: number; }
+interface UsageDetail { id: string; name: string; type: string; credits: number; date: string; }
 interface Stats {
   avg_daily: number; peak_daily: number; peak_day_label: string;
   category_totals: Record<string, number>;
@@ -70,6 +70,7 @@ interface BillingData {
   wallet: Wallet | null;
   invoices: Invoice[]; plans: Plan[];
   daily_chart: DailyPoint[]; usage_details: UsageDetail[]; stats: Stats;
+  credit_packages?: { id: string; credits: number; price_usd: number }[];
 }
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -180,6 +181,10 @@ export default function FacturacionPage() {
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelMsg, setCancelMsg] = useState("");
   const [portalBusy, setPortalBusy] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<{ brand: string | null; last4: string | null } | null>(null);
+  const [showBuyCredits, setShowBuyCredits] = useState(false);
+  const [buyPackageId, setBuyPackageId] = useState<string | null>(null);
+  const { openCheckout: openCreditsCheckout, loading: buyingCredits, error: buyCreditsError } = usePaddleCheckout();
   const [data, setData]       = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
@@ -202,6 +207,11 @@ export default function FacturacionPage() {
   const [autoSaving, setAutoSaving] = useState(false);
   const [autoMsg, setAutoMsg] = useState("");
   const [autoForm, setAutoForm] = useState({ package_credits: 50000, threshold_credits: 5000, monthly_cap_usd: 100 });
+  // Tarifa real 1 crédito = USD 0.0003; derivada del primer paquete cargado para no
+  // hardcodearla dos veces, con ese valor como respaldo si aún no hay datos.
+  const creditUsdRate = autoData?.packages?.[0]?.credits
+    ? autoData.packages[0].price_usd / autoData.packages[0].credits
+    : 0.0003;
 
   const [hoverBar, setHoverBar] = useState<DailyPoint | null>(null);
   const [chartRange, setChartRange] = useState<ChartRangeId>("30");
@@ -278,6 +288,16 @@ export default function FacturacionPage() {
     else alert(json.error ?? "No se pudo abrir el portal de pagos");
     setPortalBusy(false);
   }
+
+  useEffect(() => {
+    if (data?.subscription?.billing_provider !== "paddle") { setPaymentMethod(null); return; }
+    let cancelled = false;
+    authFetch("/api/billing/payment-method")
+      .then((res) => res.json())
+      .then((json) => { if (!cancelled) setPaymentMethod(json.payment_method ?? null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [data?.subscription?.billing_provider]);
 
   // Derivados del estado
   const wallet   = data?.wallet;
@@ -881,7 +901,24 @@ export default function FacturacionPage() {
                   </div>
 
                   {sub?.billing_provider === "paddle" && (
-                    <div className="mt-4 pt-4 border-t border-[var(--nv-border)]">
+                    <div className="mt-4 pt-4 border-t border-[var(--nv-border)] space-y-3">
+                      {paymentMethod?.last4 && (
+                        <div className="flex items-center justify-between rounded-lg border border-[var(--nv-border)] bg-[var(--nv-bg-control)] px-3 py-2">
+                          <span className="flex items-center gap-2 text-xs text-[var(--nv-text)]">
+                            <CreditCard className="w-3.5 h-3.5 text-[var(--nv-text-muted)]" />
+                            {paymentMethod.brand ? `${paymentMethod.brand.charAt(0).toUpperCase()}${paymentMethod.brand.slice(1)}` : "Tarjeta"}
+                            {" "}•••• {paymentMethod.last4}
+                          </span>
+                          <button
+                            onClick={handleOpenPortal}
+                            disabled={portalBusy}
+                            className="text-[11px] font-semibold text-[#99c9ff] hover:underline disabled:opacity-50"
+                          >
+                            {portalBusy ? "Abriendo…" : "Cambiar"}
+                          </button>
+                        </div>
+                      )}
+
                       {sub.paddle_cancel_scheduled_at ? (
                         <div className="flex items-center justify-between flex-wrap gap-3">
                           <p className="text-xs text-amber-400">
@@ -897,12 +934,20 @@ export default function FacturacionPage() {
                         </div>
                       ) : (
                         <div className="flex items-center gap-4 flex-wrap">
+                          {!paymentMethod?.last4 && (
+                            <button
+                              onClick={handleOpenPortal}
+                              disabled={portalBusy}
+                              className="text-xs font-semibold text-[var(--nv-text-muted)] hover:text-[var(--nv-text)] transition-colors disabled:opacity-50"
+                            >
+                              {portalBusy ? "Abriendo…" : "Actualizar método de pago"}
+                            </button>
+                          )}
                           <button
-                            onClick={handleOpenPortal}
-                            disabled={portalBusy}
-                            className="text-xs font-semibold text-[var(--nv-text-muted)] hover:text-[var(--nv-text)] transition-colors disabled:opacity-50"
+                            onClick={() => { setBuyPackageId(data?.credit_packages?.[0]?.id ?? null); setShowBuyCredits(true); }}
+                            className="text-xs font-semibold text-[var(--nv-text-muted)] hover:text-[var(--nv-text)] transition-colors"
                           >
-                            {portalBusy ? "Abriendo…" : "Actualizar método de pago"}
+                            Comprar créditos
                           </button>
                           <button
                             onClick={() => { setCancelMsg(""); setShowCancelConfirm(true); }}
@@ -942,6 +987,58 @@ export default function FacturacionPage() {
                       className="px-4 py-2 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 text-sm font-semibold hover:bg-red-500/25 transition-colors disabled:opacity-50"
                     >
                       {cancelBusy ? "Cancelando…" : "Sí, cancelar"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showBuyCredits && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+                <div className="w-full max-w-sm rounded-2xl bg-[var(--nv-bg-module)] border border-[var(--nv-border)] p-6 space-y-4">
+                  <h3 className="text-base font-bold text-[var(--nv-text)]">¿Necesitas más créditos?</h3>
+                  <p className="text-sm text-[var(--nv-text-muted)]">Elige un monto. Siempre puedes comprar más después.</p>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {(data?.credit_packages ?? []).map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => setBuyPackageId(p.id)}
+                        className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                          buyPackageId === p.id
+                            ? "border-[var(--nv-accent)] bg-[var(--nv-accent)]/10"
+                            : "border-[var(--nv-border)] hover:border-[var(--nv-border-strong)]"
+                        }`}
+                      >
+                        <p className="text-sm font-bold text-[var(--nv-text)]">US$ {fmtN(p.price_usd)}</p>
+                        <p className="text-[11px] text-[var(--nv-text-muted)] mt-0.5">{fmtN(p.credits)} créditos</p>
+                      </button>
+                    ))}
+                  </div>
+
+                  {buyCreditsError && <p className="text-xs text-red-400">{buyCreditsError}</p>}
+                  <p className="text-[11px] text-[var(--nv-text-faint)]">
+                    Se cobra a tu tarjeta al confirmar el pago.
+                  </p>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      onClick={() => setShowBuyCredits(false)}
+                      className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--nv-text-muted)] hover:text-[var(--nv-text)]"
+                    >
+                      Volver
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!buyPackageId) return;
+                        void openCreditsCheckout("/api/billing/credits/checkout", { package_id: buyPackageId }, () => {
+                          setShowBuyCredits(false);
+                          void load();
+                        });
+                      }}
+                      disabled={buyingCredits || !buyPackageId}
+                      className={`${btnPrimary} disabled:opacity-50`}
+                    >
+                      {buyingCredits ? "Abriendo…" : "Comprar ahora"}
                     </button>
                   </div>
                 </div>
@@ -1173,6 +1270,7 @@ export default function FacturacionPage() {
                     <table className={registryTable}>
                       <thead className={registryTableHead}>
                         <tr className={registryTableHeadRow}>
+                          <th className={registryTableHeadCell}>Fecha</th>
                           <th className={registryTableHeadCell}>Nombre / Canal</th>
                           <th className={registryTableHeadCell}>Tipo</th>
                           <th className={`${registryTableHeadCell} text-right`}>Créditos</th>
@@ -1193,6 +1291,9 @@ export default function FacturacionPage() {
                           return (
                             <tr key={u.id} className={registryTableRow}>
                               <td className={registryTableCellFirst}>
+                                <p className="text-xs text-[var(--nv-text-muted)] tabular-nums">{fmtDate(`${u.date}T00:00:00`)}</p>
+                              </td>
+                              <td className={registryTableCell}>
                                 <p className="text-sm font-medium text-white">{u.name}</p>
                               </td>
                               <td className={registryTableCell}>
@@ -1274,8 +1375,8 @@ export default function FacturacionPage() {
                         </button>
                       </div>
                       <p className="nv-promo-body text-sm leading-relaxed">
-                        Configura un umbral mínimo de créditos. Cuando tu saldo baje de ese nivel, se cobra el
-                        paquete elegido a tu tarjeta guardada, sin superar el tope mensual que definas.
+                        Configura un umbral mínimo en dólares. Cuando tu saldo baje de ese nivel, se cobra el
+                        monto elegido a tu tarjeta guardada, sin superar el tope mensual que definas.
                       </p>
                       {autoData?.settings?.admin_enabled === false && (
                         <p className="text-xs text-amber-400 mt-3">
@@ -1307,25 +1408,23 @@ export default function FacturacionPage() {
                       <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Configuración</p>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-xs text-gray-400 mb-1.5">Paquete de recarga</label>
+                          <label className="block text-xs text-gray-400 mb-1.5">Monto a recargar</label>
                           <select
                             value={autoForm.package_credits}
                             onChange={e => setAutoForm(f => ({ ...f, package_credits: Number(e.target.value) }))}
                             className="w-full rounded-lg border border-white/[.12] bg-noova-main px-3 py-2 text-sm text-white"
                           >
                             {(autoData?.packages ?? []).map(p => (
-                              <option key={p.id} value={p.credits}>
-                                {fmtN(p.credits)} créditos — US$ {fmtN(p.price_usd)}
-                              </option>
+                              <option key={p.id} value={p.credits}>US$ {fmtN(p.price_usd)}</option>
                             ))}
                           </select>
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-400 mb-1.5">Umbral mínimo (créditos)</label>
+                          <label className="block text-xs text-gray-400 mb-1.5">Recargar cuando el saldo baje de (USD)</label>
                           <input
                             type="number"
-                            value={autoForm.threshold_credits}
-                            onChange={e => setAutoForm(f => ({ ...f, threshold_credits: Number(e.target.value) }))}
+                            value={Math.round(autoForm.threshold_credits * creditUsdRate * 100) / 100}
+                            onChange={e => setAutoForm(f => ({ ...f, threshold_credits: Math.round(Number(e.target.value) / creditUsdRate) }))}
                             className="w-full rounded-lg border border-white/[.12] bg-noova-main px-3 py-2 text-sm text-white"
                           />
                         </div>

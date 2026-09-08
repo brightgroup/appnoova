@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     const transaction = await createPaddleCheckoutTransaction({
       priceId,
       organizationId: ctx.organizationId,
-      planId,
+      customData: { plan_id: planId },
     });
     return NextResponse.json({ transaction_id: transaction.id });
   } catch (err) {
