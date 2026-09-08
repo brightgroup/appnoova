@@ -15,7 +15,7 @@ export async function GET(
 
   await db.rpc("billing_sync_wallet", { p_org: orgId });
 
-  const [orgRes, subRes, walletRes, invoicesRes, recentRes] = await Promise.all([
+  const [orgRes, subRes, walletRes, invoicesRes, recentRes, autorechargeRes] = await Promise.all([
     db.from("organizations").select("id, name, slug, status").eq("id", orgId).maybeSingle(),
     db
       .from("organization_subscriptions")
@@ -34,7 +34,8 @@ export async function GET(
       .select("id, event_type, channel, credits_charged, provider, provider_cost_cop, total_tokens, created_at")
       .eq("organization_id", orgId)
       .order("created_at", { ascending: false })
-      .limit(50)
+      .limit(50),
+    db.from("organization_autorecharge").select("*").eq("organization_id", orgId).maybeSingle(),
   ]);
 
   const wallet = walletRes.data;
@@ -59,7 +60,8 @@ export async function GET(
     wallet: wallet ?? null,
     usage,
     invoices: invoicesRes.data ?? [],
-    recent_events: recentRes.data ?? []
+    recent_events: recentRes.data ?? [],
+    autorecharge: autorechargeRes.data ?? null,
   });
 }
 

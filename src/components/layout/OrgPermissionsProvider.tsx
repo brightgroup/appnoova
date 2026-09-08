@@ -37,6 +37,7 @@ interface OrgPermissionsContextValue {
   roleSlug: string;
   roleName: string;
   orgName: string;
+  orgStatus: string;
   can: (module: OrgPermissionModuleKey, min?: PermissionLevel) => boolean;
   canAccessPath: (pathname: string) => boolean;
   flags: ReturnType<typeof buildPermissionFlags>;
@@ -59,6 +60,7 @@ export function OrgPermissionsProvider({
   const [roleSlug, setRoleSlug] = useState("");
   const [roleName, setRoleName] = useState("");
   const [orgName, setOrgName] = useState("");
+  const [orgStatus, setOrgStatus] = useState("active");
   const [branding, setBranding] = useState<OrgBranding>(DEFAULT_ORG_BRANDING);
   const [modules, setModules] = useState<OrgModules>(DEFAULT_ORG_MODULES);
 
@@ -80,6 +82,7 @@ export function OrgPermissionsProvider({
       setRoleSlug(json.membership?.role_slug ?? "");
       setRoleName(json.membership?.role_name ?? "");
       setOrgName(json.organization?.name ?? "");
+      setOrgStatus(json.organization?.status ?? "active");
       setBranding(json.branding ?? DEFAULT_ORG_BRANDING);
       setModules(json.modules ?? DEFAULT_ORG_MODULES);
     } catch {
@@ -102,6 +105,7 @@ export function OrgPermissionsProvider({
       roleSlug,
       roleName,
       orgName,
+      orgStatus,
       can: (module, min = "view") => canAccessModule(permissions, module, min),
       canAccessPath: (pathname) => canAccessDashboardPath(permissions, pathname),
       flags,
@@ -109,7 +113,7 @@ export function OrgPermissionsProvider({
       modules,
       refresh: load,
     };
-  }, [loading, permissions, roleSlug, roleName, orgName, branding, modules, load]);
+  }, [loading, permissions, roleSlug, roleName, orgName, orgStatus, branding, modules, load]);
 
   return (
     <OrgPermissionsContext.Provider value={value}>
@@ -128,6 +132,7 @@ export function useOrgPermissions(): OrgPermissionsContextValue {
       roleSlug: "",
       roleName: "",
       orgName: "",
+      orgStatus: "active",
       can: () => true,
       canAccessPath: () => true,
       flags: buildPermissionFlags(permissions),

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ensurePricingConfig } from "@/lib/billing/pricing-config";
+import { maybeTriggerAutoRecharge } from "@/lib/billing/autorecharge";
 import {
   creditsForEvent,
   creditsFromUsdPrice,
@@ -229,10 +230,17 @@ export async function recordUsage(input: RecordUsageInput): Promise<RecordUsageR
   }
 
   const row = Array.isArray(data) ? data[0] : data;
+  const remaining = row?.remaining == null ? null : Number(row.remaining);
+
+  // Fire-and-forget: nunca debe bloquear ni fallar el flujo de consumo.
+  void maybeTriggerAutoRecharge(input.db, input.organizationId, remaining).catch((err) => {
+    console.error("[autorecharge] trigger:", err);
+  });
+
   return {
     ok: true,
     credits,
-    remaining: row?.remaining == null ? null : Number(row.remaining),
+    remaining,
     blocked: Boolean(row?.blocked)
   };
 }
@@ -377,6 +385,9 @@ export async function chargeVoiceAttempt(input: {
 export function billingBlockedMessage(reason: string): string {
   if (reason === "no_credits") {
     return "Te quedaste sin créditos este mes. Recarga o espera tu próxima fecha de facturación.";
+  }
+  if (reason === "disabled") {
+    return "Esta cuenta fue desactivada por un administrador.";
   }
   return "Tu cuenta está suspendida. Regulariza el pago para continuar.";
 }

@@ -86,9 +86,26 @@ const SECTIONS = [
       <>
         <p>
           Los planes de pago se cobran por adelantado, de forma mensual y recurrente, en dólares
-          estadounidenses (USD). El pago es procesado por{" "}
-          <strong>Paddle.com Market Limited</strong>, nuestro revendedor autorizado y Merchant of Record:
+          estadounidenses (USD) o en la moneda local que se acuerde para tu contrato. El pago es procesado
+          por <strong>Paddle.com Market Limited</strong>, nuestro revendedor autorizado y Merchant of Record:
           Paddle emite la factura de la compra, aparece en tu extracto bancario y gestiona la recaudación.
+        </p>
+        <p>
+          <strong>Al activar un plan de pago autorizas expresamente</strong> a que Paddle guarde tu método de
+          pago (tarjeta) de forma segura y lo cargue automáticamente al inicio de cada ciclo, sin que debas
+          autorizar cada cobro individualmente, hasta que canceles tu suscripción. Puedes cancelar en
+          cualquier momento desde tu panel en Facturación → Plan actual, o pidiéndolo a{" "}
+          <a href="mailto:info@bgsoluciones.com.co" className="text-[#99c9ff] hover:underline">
+            info@bgsoluciones.com.co
+          </a>
+          . La cancelación detiene los cobros futuros y conservas acceso hasta el final del ciclo ya pagado
+          (ver sección 13).
+        </p>
+        <p>
+          Si el cobro automático falla (tarjeta vencida, fondos insuficientes), Paddle reintenta el cobro y
+          te lo notifica; si no se resuelve dentro del periodo de gracia de tu plan, tu cuenta se suspende
+          conforme a la sección 13. Puedes actualizar tu método de pago en cualquier momento desde el portal
+          de pagos de Paddle, enlazado desde tu panel de Facturación.
         </p>
         <p>
           Los precios pueden cambiar; si un cambio te afecta, te avisaremos con al menos 30 días de
@@ -111,8 +128,16 @@ const SECTIONS = [
           Cada plan incluye una asignación mensual de créditos que se consumen según el uso de la
           plataforma (mensajes de WhatsApp, minutos de voz, documentos procesados, etc.). Los créditos no
           consumidos <strong>no se acumulan</strong> al siguiente ciclo. Si tu saldo se agota, algunas
-          funciones pueden pausarse hasta la siguiente renovación o hasta que compres créditos adicionales,
-          cuando esa opción esté disponible.
+          funciones pueden pausarse hasta la siguiente renovación o hasta que compres créditos adicionales.
+        </p>
+        <p>
+          <strong>Recarga automática (opcional):</strong> si activas esta función desde tu panel de
+          Facturación, cuando tu saldo baje del umbral que definas se te cobrará automáticamente, con la
+          misma tarjeta guardada, el paquete de créditos que hayas elegido, sin superar el tope mensual que
+          configures. Es una función que activas tú mismo (opt-in), puedes desactivarla en cualquier momento,
+          y nosotros también podemos deshabilitarla para tu cuenta si detectamos un uso indebido. A diferencia
+          de los créditos incluidos en el plan, los créditos comprados por recarga{" "}
+          <strong>no vencen</strong> al cerrar el ciclo.
         </p>
       </>
     )
@@ -232,15 +257,23 @@ const SECTIONS = [
     content: (
       <>
         <p>
-          Podemos suspender tu acceso si tu cuenta tiene pagos vencidos más allá del periodo de gracia de
-          tu plan, o si incumples la sección de uso aceptable. En caso de incumplimiento grave, podemos
-          terminar tu cuenta de inmediato.
+          Si tu pago no se procesa (cobro automático fallido o transferencia no recibida), tienes un periodo
+          de gracia de <strong>5 días calendario</strong> desde la fecha límite de pago de tu ciclo para
+          regularizarlo. Pasado ese plazo sin pago, tu cuenta se <strong>suspende automáticamente</strong>:
+          se bloquea el acceso al panel completo (salvo la sección de Facturación, para que puedas pagar) y
+          tus agentes dejan de responder a tus clientes finales (WhatsApp, widget, voz) hasta que se
+          regularice el pago. Tus datos e historial no se eliminan por una suspensión — se conservan y el
+          acceso se restablece apenas se registra el pago.
+        </p>
+        <p>
+          También podemos suspender o terminar tu cuenta de inmediato si incumples la sección de uso
+          aceptable, sin que aplique el periodo de gracia anterior.
         </p>
         <p>
           Puedes cancelar tu suscripción en cualquier momento; conservas acceso hasta el final del ciclo ya
-          pagado. Nosotros también podemos terminar este acuerdo por conveniencia, dando aviso previo de al
-          menos 30 días, salvo en casos de incumplimiento grave o riesgo legal, en los que la terminación
-          puede ser inmediata.
+          pagado, y a partir de ahí no se te cobra de nuevo. Nosotros también podemos terminar este acuerdo
+          por conveniencia, dando aviso previo de al menos 30 días, salvo en casos de incumplimiento grave o
+          riesgo legal, en los que la terminación puede ser inmediata.
         </p>
       </>
     )

@@ -11,7 +11,9 @@ import { adminClient } from "@/lib/voice-agents-server";
 
 /** GET — organización activa, membresía y permisos del usuario */
 export async function GET(req: NextRequest) {
-  const ctx = await getOrgContextFromRequest(req);
+  // skipBillingGate: esta ruta es la fuente de verdad de `organization.status`
+  // para el candado de suspensión del dashboard — no puede bloquearse a sí misma.
+  const ctx = await getOrgContextFromRequest(req, { skipBillingGate: true });
   if (ctx instanceof NextResponse) return ctx;
 
   const db = adminClient();

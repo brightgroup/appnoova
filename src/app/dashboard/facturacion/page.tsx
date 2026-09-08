@@ -42,6 +42,8 @@ interface Subscription {
   monthly_credits: number; current_period_start: string;
   current_period_end: string; trial_ends_at: string | null;
   custom_label?: string;
+  billing_provider?: string;
+  paddle_cancel_scheduled_at?: string | null;
   plans?: { name: string; price_usd: number; monthly_credits: number; whatsapp_included: boolean; support_level: string };
 }
 interface Invoice {
@@ -173,6 +175,11 @@ const daysUntil = (iso: string | null) =>
 
 export default function FacturacionPage() {
   const [tab, setTab]         = useState("overview");
+  const [showPlanPicker, setShowPlanPicker] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelMsg, setCancelMsg] = useState("");
+  const [portalBusy, setPortalBusy] = useState(false);
   const [data, setData]       = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
@@ -183,9 +190,18 @@ export default function FacturacionPage() {
   const [uFilter,    setUFilter]    = useState("todos");
   const [uSearch,    setUSearch]    = useState("");
 
-  // Auto-recarga (UI placeholder — sin pasarela aún)
-  const [autoOn, setAutoOn] = useState(false);
-  const [rechargeQ, setRechargeQ] = useState("50000");
+  // Auto-recarga
+  interface AutoRechargeSettings {
+    enabled: boolean; admin_enabled: boolean;
+    threshold_credits: number; package_credits: number; monthly_cap_usd: number;
+    last_recharge_at: string | null;
+  }
+  interface CreditPackage { id: string; credits: number; price_usd: number; }
+  const [autoData, setAutoData] = useState<{ settings: AutoRechargeSettings | null; packages: CreditPackage[]; available: boolean } | null>(null);
+  const [autoLoading, setAutoLoading] = useState(true);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [autoMsg, setAutoMsg] = useState("");
+  const [autoForm, setAutoForm] = useState({ package_credits: 50000, threshold_credits: 5000, monthly_cap_usd: 100 });
 
   const [hoverBar, setHoverBar] = useState<DailyPoint | null>(null);
   const [chartRange, setChartRange] = useState<ChartRangeId>("30");
@@ -202,6 +218,66 @@ export default function FacturacionPage() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  async function handleCancelPlan() {
+    setCancelBusy(true); setCancelMsg("");
+    const res = await authFetch("/api/billing/paddle/subscription/cancel", { method: "POST" });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok) { setShowCancelConfirm(false); await load(); }
+    else setCancelMsg(json.error ?? "No se pudo cancelar");
+    setCancelBusy(false);
+  }
+
+  async function handleResumePlan() {
+    setCancelBusy(true); setCancelMsg("");
+    const res = await authFetch("/api/billing/paddle/subscription/resume", { method: "POST" });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok) await load();
+    else setCancelMsg(json.error ?? "No se pudo deshacer la cancelación");
+    setCancelBusy(false);
+  }
+
+  const loadAutorecharge = useCallback(async () => {
+    setAutoLoading(true);
+    const res = await authFetch("/api/billing/autorecharge");
+    const json = await res.json().catch(() => null);
+    if (res.ok && json) {
+      setAutoData(json);
+      if (json.settings) {
+        setAutoForm({
+          package_credits: json.settings.package_credits,
+          threshold_credits: json.settings.threshold_credits,
+          monthly_cap_usd: json.settings.monthly_cap_usd,
+        });
+      }
+    }
+    setAutoLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (tab === "auto" && autoData === null) void loadAutorecharge();
+  }, [tab, autoData, loadAutorecharge]);
+
+  async function handleSaveAutorecharge(nextEnabled: boolean) {
+    setAutoSaving(true); setAutoMsg("");
+    const res = await authFetch("/api/billing/autorecharge", {
+      method: "PUT",
+      body: JSON.stringify({ enabled: nextEnabled, ...autoForm }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok) await loadAutorecharge();
+    else setAutoMsg(json.error ?? "No se pudo guardar");
+    setAutoSaving(false);
+  }
+
+  async function handleOpenPortal() {
+    setPortalBusy(true);
+    const res = await authFetch("/api/billing/paddle/portal", { method: "POST" });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok && json.url) window.location.href = json.url;
+    else alert(json.error ?? "No se pudo abrir el portal de pagos");
+    setPortalBusy(false);
+  }
 
   // Derivados del estado
   const wallet   = data?.wallet;
@@ -616,7 +692,10 @@ export default function FacturacionPage() {
                       <p className="font-semibold">Estás en periodo de prueba</p>
                       <p className={`text-sm ${textMuted} mt-0.5`}>Termina el {fmtDate(sub.trial_ends_at)}. Activa un plan para continuar sin interrupciones.</p>
                     </div>
-                    <button onClick={() => setTab("plans")} className="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0f7eff] hover:bg-[#3392ff] text-white text-sm font-semibold transition-colors">
+                    <button
+                      onClick={() => { setTab("plans"); setShowPlanPicker(true); }}
+                      className="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0f7eff] hover:bg-[#3392ff] text-white text-sm font-semibold transition-colors"
+                    >
                       Ver planes <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -734,10 +813,149 @@ export default function FacturacionPage() {
             )}
 
             {/* ══════════════════════════════════════════════════════
-                TAB 3 — PLANES (cards Noova, datos reales de la BD)
+                TAB 3 — PLANES: solo el plan actual + "Ajustar plan"
+                (estilo Claude/Anthropic — no un muro de todos los planes)
             ══════════════════════════════════════════════════════ */}
-            {tab === "plans" && (
+            {tab === "plans" && !showPlanPicker && (
+              <div className="max-w-2xl space-y-5">
+                <div className="rounded-2xl border border-[var(--nv-border)] bg-[var(--nv-bg-module)] p-6">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div>
+                      <p className="text-xs text-[var(--nv-text-muted)] font-medium uppercase tracking-wide mb-1.5">
+                        Plan actual
+                      </p>
+                      <p className="text-2xl font-bold capitalize text-[var(--nv-text)]">{planName}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <Badge variant={sBadge.variant}>{sBadge.label}</Badge>
+                        {planPromo?.label && (
+                          <span className="text-[10px] text-[#2f8fff] bg-[#072b55]/60 px-2 py-0.5 rounded-md font-medium">
+                            {planPromo.label}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {effectivePriceUsd > 0 && (
+                      <div className="text-right">
+                        <p className="text-2xl font-extrabold text-[var(--nv-text)]">
+                          US$ {fmtN(effectivePriceUsd)}
+                          <span className="text-sm font-normal text-[var(--nv-text-muted)]">/mes</span>
+                        </p>
+                        {planPromo?.price_discount_pct ? (
+                          <p className="text-xs text-[var(--nv-text-faint)] line-through">${fmtN(planPromo.price_usd_catalog)} USD/mes</p>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-5 pt-5 border-t border-[var(--nv-border)] space-y-2">
+                    <div className="flex justify-between text-[11px] text-[var(--nv-text-muted)] mb-1">
+                      <span>Créditos usados</span>
+                      <span>{fmtN(usedCredits)} / {fmtN(planMonthlyCredits)}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-[var(--nv-bg-control)] overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${usedPct >= 90 ? "bg-red-500" : usedPct >= 70 ? "bg-[var(--nv-hubspot-teal)]" : "bg-[var(--nv-accent)]"}`}
+                        style={{ width: `${usedPct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-5 pt-5 border-t border-[var(--nv-border)] flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <p className="text-xs text-[var(--nv-text-muted)]">Próxima renovación</p>
+                      <p className="text-sm font-semibold text-[var(--nv-text)]">
+                        {fmtDate(wallet?.period_end ?? null)}
+                        {daysLeft != null && (
+                          <span className={`ml-2 font-normal ${daysLeft <= 5 ? "text-amber-400" : "text-[var(--nv-text-muted)]"}`}>
+                            en {daysLeft} día{daysLeft === 1 ? "" : "s"}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowPlanPicker(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--nv-border-strong)] hover:border-[var(--nv-accent)]/50 hover:bg-[var(--nv-hover)] text-sm font-semibold text-[var(--nv-text)] transition-colors"
+                    >
+                      Ajustar plan <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {sub?.billing_provider === "paddle" && (
+                    <div className="mt-4 pt-4 border-t border-[var(--nv-border)]">
+                      {sub.paddle_cancel_scheduled_at ? (
+                        <div className="flex items-center justify-between flex-wrap gap-3">
+                          <p className="text-xs text-amber-400">
+                            Tu plan se cancela el {fmtDate(sub.paddle_cancel_scheduled_at)} — conservas acceso hasta esa fecha.
+                          </p>
+                          <button
+                            onClick={handleResumePlan}
+                            disabled={cancelBusy}
+                            className="text-xs font-semibold text-[#99c9ff] hover:underline disabled:opacity-50"
+                          >
+                            {cancelBusy ? "Deshaciendo…" : "Deshacer cancelación"}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-4 flex-wrap">
+                          <button
+                            onClick={handleOpenPortal}
+                            disabled={portalBusy}
+                            className="text-xs font-semibold text-[var(--nv-text-muted)] hover:text-[var(--nv-text)] transition-colors disabled:opacity-50"
+                          >
+                            {portalBusy ? "Abriendo…" : "Actualizar método de pago"}
+                          </button>
+                          <button
+                            onClick={() => { setCancelMsg(""); setShowCancelConfirm(true); }}
+                            className="text-xs font-semibold text-red-400/80 hover:text-red-400 transition-colors"
+                          >
+                            Cancelar plan
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {showCancelConfirm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+                <div className="w-full max-w-sm rounded-2xl bg-[var(--nv-bg-module)] border border-[var(--nv-border)] p-6 space-y-4">
+                  <h3 className="text-base font-bold text-[var(--nv-text)]">¿Cancelar tu plan?</h3>
+                  <p className="text-sm text-[var(--nv-text-muted)]">
+                    Conservas acceso completo hasta el{" "}
+                    <span className="font-semibold text-[var(--nv-text)]">{fmtDate(wallet?.period_end ?? null)}</span>,
+                    fin del ciclo ya pagado. Después no se te cobrará de nuevo y tu cuenta pasará a suspendida.
+                    Puedes deshacer la cancelación en cualquier momento antes de esa fecha.
+                  </p>
+                  {cancelMsg && <p className="text-xs text-red-400">{cancelMsg}</p>}
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      onClick={() => setShowCancelConfirm(false)}
+                      className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--nv-text-muted)] hover:text-[var(--nv-text)]"
+                    >
+                      Volver
+                    </button>
+                    <button
+                      onClick={handleCancelPlan}
+                      disabled={cancelBusy}
+                      className="px-4 py-2 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 text-sm font-semibold hover:bg-red-500/25 transition-colors disabled:opacity-50"
+                    >
+                      {cancelBusy ? "Cancelando…" : "Sí, cancelar"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {tab === "plans" && showPlanPicker && (
               <div className="max-w-5xl space-y-5">
+                <button
+                  onClick={() => setShowPlanPicker(false)}
+                  className="inline-flex items-center gap-1.5 text-sm text-[var(--nv-text-muted)] hover:text-[var(--nv-text)] transition-colors"
+                >
+                  ← Volver a mi plan
+                </button>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {plans.map(p => {
                     const isActive  = p.id === sub?.plan_id;
@@ -882,7 +1100,11 @@ export default function FacturacionPage() {
                         )}
                         {!isActive && p.price_usd > 0 && (
                           <div className="px-5 pb-5">
-                            <PaddleCheckoutButton planId={p.id} planName={p.name} onCheckoutCompleted={load} />
+                            <PaddleCheckoutButton
+                            planId={p.id}
+                            planName={p.name}
+                            onCheckoutCompleted={() => { void load(); setShowPlanPicker(false); }}
+                          />
                           </div>
                         )}
                       </div>
@@ -894,10 +1116,9 @@ export default function FacturacionPage() {
                 <div className="rounded-xl border border-[var(--nv-border)] bg-[var(--nv-bg-control)] p-4 flex items-start gap-3 text-sm text-[var(--nv-text-muted)]">
                   <Info className="w-4 h-4 text-[#0f7eff] shrink-0 mt-0.5" />
                   <p>
-                    Los planes se activan manualmente por tu asesor.
-                    Escríbenos a{" "}
-                    <a href="mailto:info@bgsoluciones.com.co" className="text-[#99c9ff] hover:underline">info@bgsoluciones.com.co</a>
-                    {" "}para cambiar de plan, solicitar descuentos o resolver dudas.
+                    Al elegir un plan pagas con tarjeta al instante y el cambio aplica de inmediato.
+                    ¿Dudas, quieres un plan a la medida o prefieres pagar por transferencia? Escríbenos a{" "}
+                    <a href="mailto:info@bgsoluciones.com.co" className="text-[#99c9ff] hover:underline">info@bgsoluciones.com.co</a>.
                   </p>
                 </div>
               </div>
@@ -1021,89 +1242,114 @@ export default function FacturacionPage() {
             ══════════════════════════════════════════════════════ */}
             {tab === "auto" && (
               <div className="max-w-2xl space-y-5">
-
-                {/* Banner "próximamente" */}
-                <InfoBox layout="row" variant="warning" icon={Info}>
-                  Esta funcionalidad estará disponible al integrar la pasarela de pago.
-                  Por ahora, las recargas se coordinan con tu asesor en{" "}
-                  <a href="mailto:info@bgsoluciones.com.co" className="hover:underline font-semibold">
-                    info@bgsoluciones.com.co
-                  </a>.
-                </InfoBox>
-
-                <div className={promoCard}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[var(--nv-accent)] flex items-center justify-center shrink-0">
-                        <Zap className="w-5 h-5 text-white" />
+                {autoLoading ? (
+                  <p className="text-sm text-gray-500">Cargando…</p>
+                ) : !autoData?.available ? (
+                  <InfoBox layout="row" variant="warning" icon={Info}>
+                    La recarga automática cobra a la tarjeta guardada en Paddle — actívala primero pagando tu
+                    plan con tarjeta desde <strong>Plan actual → Ajustar plan</strong>.
+                  </InfoBox>
+                ) : (
+                  <>
+                    <div className={promoCard}>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-[var(--nv-accent)] flex items-center justify-center shrink-0">
+                            <Zap className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="nv-promo-title text-sm font-bold">Recarga automática</h3>
+                            <p className="nv-promo-subtitle text-xs mt-0.5">Sin interrupciones en tu operación</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleSaveAutorecharge(!autoData?.settings?.enabled)}
+                          disabled={autoSaving}
+                          className={`relative w-11 h-6 rounded-full border transition-colors disabled:opacity-50 ${
+                            autoData?.settings?.enabled ? "bg-[var(--nv-accent)] border-[var(--nv-accent)]" : "bg-white/[.06] border-white/[.12]"
+                          }`}
+                        >
+                          <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${autoData?.settings?.enabled ? "translate-x-5" : "translate-x-0.5"}`} />
+                        </button>
                       </div>
-                      <div>
-                        <h3 className="nv-promo-title text-sm font-bold">Recarga automática</h3>
-                        <p className="nv-promo-subtitle text-xs mt-0.5">Sin interrupciones en tu operación</p>
+                      <p className="nv-promo-body text-sm leading-relaxed">
+                        Configura un umbral mínimo de créditos. Cuando tu saldo baje de ese nivel, se cobra el
+                        paquete elegido a tu tarjeta guardada, sin superar el tope mensual que definas.
+                      </p>
+                      {autoData?.settings?.admin_enabled === false && (
+                        <p className="text-xs text-amber-400 mt-3">
+                          Deshabilitada por Noova para esta cuenta. Escríbenos si tienes dudas.
+                        </p>
+                      )}
+                      {autoData?.settings?.last_recharge_at && (
+                        <p className="text-[11px] text-gray-500 mt-3">
+                          Última recarga: {fmtDate(autoData.settings.last_recharge_at)}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { step: 1, title: "Umbral mínimo",   desc: "Cuando el saldo baja del nivel configurado" },
+                        { step: 2, title: "Recarga inmediata", desc: "Se cobra a tu tarjeta guardada al instante" },
+                        { step: 3, title: "Tope mensual",     desc: "Sin superar el presupuesto definido" },
+                      ].map(({ step, title, desc }) => (
+                        <div key={step} className="rounded-xl border border-white/[.06] bg-white/[.02] p-4">
+                          <span className="inline-flex w-5 h-5 items-center justify-center rounded-full bg-[#072b55]/60 text-[#2f8fff] text-[10px] font-bold mb-3">{step}</span>
+                          <p className="text-xs font-semibold text-white mb-1">{title}</p>
+                          <p className="text-[10px] text-gray-500 leading-relaxed">{desc}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="rounded-xl border border-white/[.08] bg-white/[.02] p-5 space-y-4">
+                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Configuración</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-1.5">Paquete de recarga</label>
+                          <select
+                            value={autoForm.package_credits}
+                            onChange={e => setAutoForm(f => ({ ...f, package_credits: Number(e.target.value) }))}
+                            className="w-full rounded-lg border border-white/[.12] bg-noova-main px-3 py-2 text-sm text-white"
+                          >
+                            {(autoData?.packages ?? []).map(p => (
+                              <option key={p.id} value={p.credits}>
+                                {fmtN(p.credits)} créditos — US$ {fmtN(p.price_usd)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-1.5">Umbral mínimo (créditos)</label>
+                          <input
+                            type="number"
+                            value={autoForm.threshold_credits}
+                            onChange={e => setAutoForm(f => ({ ...f, threshold_credits: Number(e.target.value) }))}
+                            className="w-full rounded-lg border border-white/[.12] bg-noova-main px-3 py-2 text-sm text-white"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-xs text-gray-400 mb-1.5">Tope mensual (USD)</label>
+                          <input
+                            type="number"
+                            value={autoForm.monthly_cap_usd}
+                            onChange={e => setAutoForm(f => ({ ...f, monthly_cap_usd: Number(e.target.value) }))}
+                            className="w-full rounded-lg border border-white/[.12] bg-noova-main px-3 py-2 text-sm text-white"
+                          />
+                        </div>
                       </div>
-                    </div>
-                    {/* Toggle visual (deshabilitado hasta integrar pasarela) */}
-                    <div
-                      className={`relative w-11 h-6 rounded-full border cursor-not-allowed transition-colors ${
-                        autoOn ? "bg-[var(--nv-accent)] border-[var(--nv-accent)]" : "bg-white/[.06] border-white/[.12]"
-                      }`}
-                      title="Disponible próximamente"
-                    >
-                      <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${autoOn ? "translate-x-5" : "translate-x-0.5"}`} />
-                    </div>
-                  </div>
-                  <p className="nv-promo-body text-sm leading-relaxed">
-                    Configura un umbral mínimo de créditos. Cuando tu saldo baje de ese nivel, se añaden créditos automáticamente
-                    para que tus agentes nunca se detengan.
-                  </p>
-                </div>
-
-                {/* Flujo de 3 pasos — minimalista, sin iconos emoji */}
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { step: 1, title: "Umbral mínimo",   desc: "Cuando el saldo baja del nivel configurado" },
-                    { step: 2, title: "Recarga inmediata", desc: "Se añaden créditos automáticamente" },
-                    { step: 3, title: "Tope mensual",     desc: "Sin superar el presupuesto definido" },
-                  ].map(({ step, title, desc }) => (
-                    <div key={step} className="rounded-xl border border-white/[.06] bg-white/[.02] p-4">
-                      <span className="inline-flex w-5 h-5 items-center justify-center rounded-full bg-[#072b55]/60 text-[#2f8fff] text-[10px] font-bold mb-3">{step}</span>
-                      <p className="text-xs font-semibold text-white mb-1">{title}</p>
-                      <p className="text-[10px] text-gray-500 leading-relaxed">{desc}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Configuración (deshabilitada visualmente) */}
-                <div className="rounded-xl border border-white/[.08] bg-white/[.02] p-5 space-y-4 opacity-50 pointer-events-none">
-                  <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Configuración (próximamente)</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1.5">Paquete de recarga</label>
-                      <select
-                        value={rechargeQ}
-                        onChange={e => setRechargeQ(e.target.value)}
-                        className="w-full rounded-lg border border-white/[.12] bg-noova-main px-3 py-2 text-sm text-white"
+                      {autoMsg && <p className="text-xs text-red-400">{autoMsg}</p>}
+                      <button
+                        onClick={() => handleSaveAutorecharge(autoData?.settings?.enabled ?? true)}
+                        disabled={autoSaving}
+                        className={`${btnPrimary} w-full justify-center`}
                       >
-                        <option value="15000">15.000 créditos</option>
-                        <option value="50000">50.000 créditos</option>
-                        <option value="100000">100.000 créditos</option>
-                        <option value="350000">350.000 créditos</option>
-                      </select>
+                        {autoSaving ? "Guardando…" : "Guardar configuración"}
+                      </button>
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1.5">Umbral mínimo (créditos)</label>
-                      <input
-                        type="number"
-                        defaultValue={5000}
-                        className="w-full rounded-lg border border-white/[.12] bg-noova-main px-3 py-2 text-sm text-white"
-                      />
-                    </div>
-                  </div>
-                  <button className={`${btnPrimary} w-full justify-center`} disabled>
-                    Guardar configuración
-                  </button>
-                </div>
-
+                  </>
+                )}
               </div>
             )}
           </>

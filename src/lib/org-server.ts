@@ -3,6 +3,7 @@ import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
 import type { AccountStatus, OrgPermissionModuleKey, PermissionLevel } from "@/types/rbac";
 import { ORG_PERMISSION_MODULE_KEYS, PERMISSION_LEVEL_RANK } from "@/types/rbac";
 import { emptyOrgPermissions, type OrgPermissionsMap } from "@/lib/org-permissions";
+import { billingBlockedMessage } from "@/lib/billing/meter";
 
 export interface OrgMembership {
   id: string;
@@ -29,19 +30,21 @@ function relOne<T>(value: T | T[] | null | undefined): T | null {
 async function resolveOrganizationId(
   db: ReturnType<typeof adminClient>,
   userId: string
-): Promise<{ id: string; name: string } | null> {
+): Promise<{ id: string; name: string; status: string } | null> {
   const { data: active } = await db
     .from("user_active_organization")
-    .select("organization_id, organizations(id, name)")
+    .select("organization_id, organizations(id, name, status)")
     .eq("user_id", userId)
     .maybeSingle();
 
-  const orgFromActive = relOne(active?.organizations as { id: string; name: string } | { id: string; name: string }[] | null);
+  const orgFromActive = relOne(
+    active?.organizations as { id: string; name: string; status: string } | { id: string; name: string; status: string }[] | null
+  );
   if (orgFromActive?.id) return orgFromActive;
 
   const { data: owned } = await db
     .from("organizations")
-    .select("id, name")
+    .select("id, name, status")
     .eq("owner_user_id", userId)
     .eq("status", "active")
     .order("created_at")
@@ -52,14 +55,16 @@ async function resolveOrganizationId(
 
   const { data: member } = await db
     .from("organization_members")
-    .select("organization_id, organizations(id, name)")
+    .select("organization_id, organizations(id, name, status)")
     .eq("user_id", userId)
     .eq("status", "active")
     .order("joined_at")
     .limit(1)
     .maybeSingle();
 
-  const orgFromMember = relOne(member?.organizations as { id: string; name: string } | { id: string; name: string }[] | null);
+  const orgFromMember = relOne(
+    member?.organizations as { id: string; name: string; status: string } | { id: string; name: string; status: string }[] | null
+  );
   if (orgFromMember?.id) return orgFromMember;
 
   return null;
@@ -119,7 +124,7 @@ export async function getAllOrgPermissions(
 
 export async function getOrgContextFromRequest(
   req: NextRequest,
-  options?: { module?: string; minLevel?: PermissionLevel }
+  options?: { module?: string; minLevel?: PermissionLevel; skipBillingGate?: boolean }
 ): Promise<OrgContext | NextResponse> {
   const userId = await getUserIdFromRequest(req);
   if (!userId) {
@@ -158,6 +163,23 @@ export async function getOrgContextFromRequest(
       role_name: role?.name ?? "",
     },
   };
+
+  // Cuenta suspendida (mora) o desactivada por un admin: bloquear toda la API
+  // salvo el módulo de facturación (para que puedan ver el estado y pagar).
+  // Se lee `organizations.status` directamente — es el mismo campo que ya
+  // actualizan en conjunto billing_run_renewals, los webhooks de Paddle y la
+  // acción manual "Desactivar" del superadmin, y es lo que ve el dashboard.
+  // "no_credits" no bloquea aquí: eso ya lo controlan las rutas que consumen
+  // créditos vía checkBillingForOrg/checkBillingForUser.
+  if (options?.module !== "billing" && !options?.skipBillingGate) {
+    if (org.status === "suspended" || org.status === "disabled") {
+      const reason = org.status === "disabled" ? "disabled" : "suspended";
+      return NextResponse.json(
+        { error: billingBlockedMessage(reason), code: reason },
+        { status: 402 }
+      );
+    }
+  }
 
   if (options?.module && options.minLevel) {
     const level = await getOrgPermissionLevel(userId, org.id, options.module);

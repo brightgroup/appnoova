@@ -65,6 +65,12 @@ const SECTIONS = [
           estadounidenses (USD). Cada cobro te da acceso a la plataforma y a los créditos incluidos en tu
           plan durante ese ciclo de 30 días.
         </p>
+        <p>
+          Si activaste la <strong>recarga automática de créditos</strong>, cada recarga es un cobro
+          independiente por el paquete de créditos que elegiste, sujeto a la misma política de esta página.
+          Puedes desactivar la recarga automática en cualquier momento desde Facturación; eso no reembolsa
+          recargas ya cobradas, pero evita cobros futuros.
+        </p>
       </>
     )
   },
@@ -81,9 +87,18 @@ const SECTIONS = [
         </p>
         <p>
           Puedes cancelar la renovación automática de tu suscripción en cualquier momento desde{" "}
-          <strong>Facturación → Planes</strong> dentro de la plataforma, o escribiéndonos. Al cancelar,
+          <strong>Facturación → Plan actual</strong> dentro de la plataforma, o escribiéndonos. Al cancelar,
           conservas acceso a tu plan actual y a los créditos ya incluidos hasta el final del ciclo que ya
           pagaste; a partir de ahí no se generan nuevos cobros.
+        </p>
+        <p>
+          <strong>Derecho de retracto (Colombia, Ley 1480 de 2011, art. 47):</strong> si contrataste tu plan
+          a distancia (como es el caso al pagar desde la plataforma), tienes derecho a retractarte dentro de
+          los 5 días hábiles siguientes a tu primer pago. Al empezar a usar la plataforma inmediatamente
+          después de pagar, aceptas expresamente que el servicio comience de inmediato; aun así, si nos
+          escribes dentro de esos 5 días hábiles y tu uso del plan fue mínimo (por ejemplo, consumiste menos
+          del 10% de tus créditos del ciclo), te reembolsamos el cobro completo. Pasado ese plazo, o si tu
+          consumo fue mayor, aplica la política general de esta sección.
         </p>
       </>
     )

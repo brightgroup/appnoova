@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Building2, RefreshCw, Users, CheckCircle, PauseCircle, Ban, Trash2,
-  Plus, Pencil, MoreHorizontal, Shield
+  Plus, Pencil, MoreHorizontal, Shield, Wallet
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { AdminOrgModal, type AdminOrgFormValues } from "@/components/admin/AdminOrgModal";
+import { ManualActivateModal } from "@/components/admin/ManualActivateModal";
 import { AdminPageToolbar } from "@/components/admin/AdminPageToolbar";
 import { AdminStatusBadge } from "@/components/admin/admin-table-styles";
 import { NoovaAnchoredMenu } from "@/components/ui/NoovaAnchoredMenu";
@@ -52,6 +53,8 @@ export default function AdminOrganizationsPage() {
   const [menuId, setMenuId] = useState<string | null>(null);
   const [modal, setModal] = useState<{ mode: "create" | "edit"; org?: OrgRow } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [manualActivateOrg, setManualActivateOrg] = useState<OrgRow | null>(null);
+  const [manualActivateSaving, setManualActivateSaving] = useState(false);
 
   const fetchOrgs = useCallback(async () => {
     setLoading(true);
@@ -75,6 +78,22 @@ export default function AdminOrganizationsPage() {
     if (res.ok) await fetchOrgs();
     else alert((await res.json()).error ?? "Error");
     setBusyId(null);
+  }
+
+  async function handleManualActivate(values: { plan_id: string; months: number; reference: string }) {
+    if (!manualActivateOrg) return;
+    setManualActivateSaving(true);
+    const res = await authFetch(`/api/admin/billing/${manualActivateOrg.id}/manual-activate`, {
+      method: "POST",
+      body: JSON.stringify(values),
+    });
+    if (res.ok) {
+      setManualActivateOrg(null);
+      await fetchOrgs();
+    } else {
+      alert((await res.json()).error ?? "Error");
+    }
+    setManualActivateSaving(false);
   }
 
   async function deleteOrg(org: OrgRow) {
@@ -101,6 +120,7 @@ export default function AdminOrganizationsPage() {
           owner_password: values.owner_password || undefined,
           hide_noova_logo: values.hide_noova_logo,
           erp: values.erp,
+          seguros: values.seguros,
         }),
       });
       const json = await res.json();
@@ -122,6 +142,7 @@ export default function AdminOrganizationsPage() {
           status: values.status,
           hide_noova_logo: values.hide_noova_logo,
           erp: values.erp,
+          seguros: values.seguros,
           ...(values.plan !== modal.org.plan ? { plan: values.plan } : {}),
         }),
       });
@@ -198,6 +219,7 @@ export default function AdminOrganizationsPage() {
                   const protected_ = o.is_protected;
                   const whiteLabel = parseOrgBranding(o.settings).hide_noova_logo;
                   const erpEnabled = parseOrgModules(o.settings).erp;
+                  const segurosEnabled = parseOrgModules(o.settings).seguros;
                   return (
                     <tr key={o.id} className={registryTableRow}>
                       <td className={registryTableCellFirst}>
@@ -212,6 +234,11 @@ export default function AdminOrganizationsPage() {
                           {erpEnabled && (
                             <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#0f7eff]/15 text-[#99c9ff]">
                               ERP
+                            </span>
+                          )}
+                          {segurosEnabled && (
+                            <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#0f7eff]/15 text-[#99c9ff]">
+                              Seguros
                             </span>
                           )}
                         </p>
@@ -247,6 +274,11 @@ export default function AdminOrganizationsPage() {
                             <NoovaListMenuItem onClick={() => { setMenuId(null); setModal({ mode: "edit", org: o }); }}>
                               <span className="flex items-center gap-2"><Pencil className="w-3.5 h-3.5" /> Editar</span>
                             </NoovaListMenuItem>
+                            {!protected_ && (
+                              <NoovaListMenuItem onClick={() => { setMenuId(null); setManualActivateOrg(o); }}>
+                                <span className="flex items-center gap-2 text-[#99c9ff]"><Wallet className="w-3.5 h-3.5" /> Activar pago manual</span>
+                              </NoovaListMenuItem>
+                            )}
                             {!protected_ && o.status !== "active" && (
                               <NoovaListMenuItem onClick={() => patchOrg(o.id, { status: "active" })}>
                                 <span className="flex items-center gap-2 text-green-400"><CheckCircle className="w-3.5 h-3.5" /> Activar</span>
@@ -290,10 +322,20 @@ export default function AdminOrganizationsPage() {
           is_protected: modal.org.is_protected,
           hide_noova_logo: parseOrgBranding(modal.org.settings).hide_noova_logo,
           erp: parseOrgModules(modal.org.settings).erp,
+          seguros: parseOrgModules(modal.org.settings).seguros,
         } : undefined}
         saving={saving}
         onClose={() => setModal(null)}
         onSubmit={handleModalSubmit}
+      />
+
+      <ManualActivateModal
+        open={!!manualActivateOrg}
+        orgName={manualActivateOrg?.name ?? ""}
+        currentPlan={manualActivateOrg?.plan}
+        saving={manualActivateSaving}
+        onClose={() => setManualActivateOrg(null)}
+        onSubmit={handleManualActivate}
       />
     </div>
   );

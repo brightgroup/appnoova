@@ -29,7 +29,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Plan no encontrado" }, { status: 404 });
   }
 
-  if (isInternalCheckoutPlan(plan) || (plan.is_public !== true && plan.is_system !== true)) {
+  const { data: currentSub } = await db
+    .from("organization_subscriptions")
+    .select("plan_id")
+    .eq("organization_id", ctx.organizationId)
+    .maybeSingle();
+  const isCurrentPlan = currentSub?.plan_id === planId;
+
+  // Un plan privado (precio negociado a la medida de una org, ej. contratos
+  // enterprise) es pagable por su propia org aunque no esté en el catálogo
+  // público — solo se restringe a superadmin cuando NO es el plan ya asignado.
+  if (!isCurrentPlan && (isInternalCheckoutPlan(plan) || (plan.is_public !== true && plan.is_system !== true))) {
     const superAdmin = await isSuperAdminUser(ctx.userId);
     if (!superAdmin) {
       return NextResponse.json({ error: "Plan no disponible" }, { status: 403 });
@@ -50,6 +60,7 @@ export async function POST(req: NextRequest) {
     const transaction = await createPaddleCheckoutTransaction({
       priceId,
       organizationId: ctx.organizationId,
+      planId,
     });
     return NextResponse.json({ transaction_id: transaction.id });
   } catch (err) {

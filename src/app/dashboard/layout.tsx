@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LogOut, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, Building2, Loader2, Share2, Contact, Database, Plug, Workflow, Boxes } from "lucide-react";
+import { LogOut, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, Building2, Loader2, Share2, Contact, Database, Plug, Workflow, Boxes, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -17,11 +17,13 @@ import { AGENTES_TEXTO_NAV } from "@/lib/agentes-texto-nav";
 import { CRM_NAV } from "@/lib/crm-nav";
 import { CAMPAIGNS_NAV } from "@/lib/campaigns-nav";
 import { ERP_NAV } from "@/lib/erp-nav";
+import { SEGUROS_NAV } from "@/lib/seguros-nav";
 import { sidebarIconBase, sidebarNeonIcon } from "@/lib/sidebar-neon";
 import { DesktopOnlyGate } from "@/components/layout/DesktopOnlyGate";
 import { SidebarAccountMenu } from "@/components/layout/SidebarAccountMenu";
 import { OrgPermissionsProvider, useOrgPermissions } from "@/components/layout/OrgPermissionsProvider";
 import { DashboardRouteGuard } from "@/components/layout/DashboardRouteGuard";
+import { BillingSuspendedGate } from "@/components/layout/BillingSuspendedGate";
 import type { LucideIcon } from "lucide-react";
 
 function formatCreditsShort(n: number): string {
@@ -116,6 +118,7 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
   const showContextsSection = permFlags.can_view_contexts;
   const showTablesSection = permFlags.can_view_campaigns;
   const showErpSection = modules.erp && permFlags.can_view_erp;
+  const showSegurosSection = modules.seguros && permFlags.can_view_seguros;
 
   useEffect(() => {
     if (!checked) return;
@@ -164,6 +167,10 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
       setExpandedMenu("crm");
     } else if (pathname.startsWith("/dashboard/erp")) {
       setExpandedMenu("erp");
+    } else if (pathname.startsWith("/dashboard/seguros")) {
+      setExpandedMenu("seguros");
+    } else if (pathname.startsWith("/dashboard/campaigns") || pathname.startsWith("/dashboard/campanas-whatsapp")) {
+      setExpandedMenu("campaigns");
     }
   }, [pathname]);
 
@@ -422,6 +429,34 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
           </div>
           )}
 
+          {/* Seguros (Cotizaciones + Siniestros) */}
+          {showSegurosSection && (
+          <div>
+            <button
+              onClick={() => toggleMenu("seguros")}
+              className={`w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-gray-300 ${
+                sidebarOpen ? "hover:text-white hover:bg-white/[.08]" : "hover:text-white"
+              } ${
+                expandedMenu === "seguros" && sidebarOpen ? "text-white bg-white/[.08]" : ""
+              }`}
+              title="Seguros"
+            >
+              {sidebarOpen ? (
+                <>
+                  <ShieldCheck className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.crm}`} />
+                  <span className="flex-1 text-left">Seguros</span>
+                  <ChevronRight className={`w-4 h-4 transition-transform ml-2 ${expandedMenu === "seguros" ? "rotate-90" : ""}`} />
+                </>
+              ) : (
+                <ShieldCheck className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.crm}`} />
+              )}
+            </button>
+            {sidebarOpen && expandedMenu === "seguros" && (
+              <SidebarSubMenu pathname={pathname} items={SEGUROS_NAV} />
+            )}
+          </div>
+          )}
+
           {/* ERP */}
           {showErpSection && (
           <div>
@@ -651,9 +686,11 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
             Cargando...
           </div>
         )}
-        <DashboardRouteGuard>
-          {children}
-        </DashboardRouteGuard>
+        <BillingSuspendedGate>
+          <DashboardRouteGuard>
+            {children}
+          </DashboardRouteGuard>
+        </BillingSuspendedGate>
       </div>
     </div>
     </DesktopOnlyGate>

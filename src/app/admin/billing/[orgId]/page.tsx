@@ -39,6 +39,7 @@ interface DetailData {
     credits_charged: number; provider: string;
     provider_cost_cop: number; total_tokens: number | null; created_at: string;
   }[];
+  autorecharge: { enabled: boolean; admin_enabled: boolean; package_credits: number; threshold_credits: number } | null;
 }
 
 interface Row {
@@ -95,6 +96,7 @@ export default function AdminBillingDetailPage() {
     status: "active", notes: "", custom_label: "",
   });
   const [topupForm, setTopupForm] = useState({ credits: "", reason: "" });
+  const [autorechargeBusy, setAutorechargeBusy] = useState(false);
 
   // Cargar datos del detalle
   const load = useCallback(async () => {
@@ -166,6 +168,18 @@ export default function AdminBillingDetailPage() {
     else { setTopupMsg(credits > 0 ? `+${num(credits)} créditos añadidos` : `${num(Math.abs(credits))} créditos removidos`); setTopupForm({ credits: "", reason: "" }); await load(); }
     setTopping(false);
   }, [orgId, topupForm, load]);
+
+  const toggleAutorechargeAdmin = useCallback(async () => {
+    const next = !(detail?.autorecharge?.admin_enabled ?? true);
+    setAutorechargeBusy(true);
+    const res = await authFetch(`/api/admin/billing/${orgId}/autorecharge`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ admin_enabled: next }),
+    });
+    if (res.ok) await load();
+    setAutorechargeBusy(false);
+  }, [orgId, detail?.autorecharge?.admin_enabled, load]);
 
   const markPaid = useCallback(async (invoiceId: string) => {
     setPayingId(invoiceId);
@@ -485,6 +499,29 @@ export default function AdminBillingDetailPage() {
                 Aplicar ajuste
               </button>
               <p className="text-[10px] text-gray-600 mt-2 text-center">Queda registrado en las notas de la suscripción.</p>
+            </div>
+
+            {/* Interruptor de recarga automática */}
+            <div className="rounded-xl border border-white/[.08] bg-white/[.02] p-5 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold">Recarga automática</h3>
+                <p className="text-[10px] text-gray-500 mt-0.5">
+                  {detail?.autorecharge?.enabled
+                    ? `El cliente la tiene activada — paquete de ${num(detail.autorecharge.package_credits)} cr, umbral ${num(detail.autorecharge.threshold_credits)} cr.`
+                    : "El cliente no la ha activado."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={toggleAutorechargeAdmin}
+                disabled={autorechargeBusy}
+                title={detail?.autorecharge?.admin_enabled === false ? "Deshabilitada por Noova" : "Habilitada por Noova"}
+                className={`relative w-11 h-6 rounded-full border shrink-0 transition-colors disabled:opacity-50 ${
+                  detail?.autorecharge?.admin_enabled !== false ? "bg-[#0f7eff] border-[#0f7eff]" : "bg-white/[.06] border-white/[.12]"
+                }`}
+              >
+                <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${detail?.autorecharge?.admin_enabled !== false ? "translate-x-5" : "translate-x-0.5"}`} />
+              </button>
             </div>
 
             {/* Info de billetera */}

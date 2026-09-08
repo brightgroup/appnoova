@@ -4,17 +4,30 @@ import { useState } from "react";
 import { CreditCard, Loader2 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 
+type PaddleCheckoutSettings = {
+  displayMode?: "overlay" | "inline";
+  theme?: "light" | "dark";
+  locale?: string;
+  variant?: "one-page" | "multi-page";
+};
+
 declare global {
   interface Window {
     Paddle?: {
       Environment: { set: (env: "sandbox" | "production") => void };
-      Initialize: (opts: { token: string; eventCallback?: (e: { name: string }) => void }) => void;
+      Initialize: (opts: {
+        token: string;
+        eventCallback?: (e: { name: string }) => void;
+        checkout?: { settings?: PaddleCheckoutSettings };
+      }) => void;
       Checkout: { open: (opts: { transactionId: string }) => void };
     };
   }
 }
 
 let paddleLoadPromise: Promise<void> | null = null;
+let paddleInitialized = false;
+let activeOnCompleted: (() => void) | null = null;
 
 function loadPaddleJs(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
@@ -41,7 +54,31 @@ async function ensurePaddleInitialized() {
   if (process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN?.startsWith("test_")) {
     window.Paddle.Environment.set("sandbox");
   }
-  window.Paddle.Initialize({ token });
+
+  // Paddle.js rechaza una segunda llamada a Initialize, así que solo corre una vez:
+  // el eventCallback despacha al callback del checkout activo en cada momento.
+  if (paddleInitialized) return;
+  paddleInitialized = true;
+  window.Paddle.Initialize({
+    token,
+    eventCallback: (e) => {
+      if (e.name === "checkout.completed") {
+        activeOnCompleted?.();
+        activeOnCompleted = null;
+      }
+    },
+    checkout: {
+      settings: {
+        displayMode: "overlay",
+        // Fijo en "light": el brand color configurado en Paddle es negro, y en el
+        // tema oscuro del checkout se vería negro sobre negro (mismo patrón de
+        // contraste del rebrand de colores). El negro sí contrasta sobre claro.
+        theme: "light",
+        locale: "es",
+        variant: "one-page",
+      },
+    },
+  });
 }
 
 export function PaddleCheckoutButton({
@@ -73,12 +110,7 @@ export function PaddleCheckoutButton({
       }
       const { transaction_id } = await res.json();
 
-      window.Paddle!.Initialize({
-        token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN!,
-        eventCallback: (e) => {
-          if (e.name === "checkout.completed") onCheckoutCompleted?.();
-        },
-      });
+      activeOnCompleted = onCheckoutCompleted ?? null;
       window.Paddle!.Checkout.open({ transactionId: transaction_id });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al iniciar el pago");

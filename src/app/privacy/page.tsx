@@ -188,7 +188,10 @@ const SECTIONS = [
             plataforma bajo acuerdos de confidencialidad y seguridad.
           </li>
           <li>
-            <strong>Proveedores de pago:</strong> para el procesamiento seguro de transacciones de suscripción.
+            <strong>Paddle.com Market Limited (procesador de pagos):</strong> gestiona el cobro de tu suscripción
+            como nuestro Merchant of Record. Paddle es quien recibe y almacena los datos de tu tarjeta —
+            <strong> Noova 360 nunca ve ni guarda el número de tu tarjeta</strong>; de tu lado solo conservamos un
+            identificador de cliente de Paddle para asociar los pagos a tu cuenta.
           </li>
           <li>
             <strong>Modelos de IA de terceros:</strong> los mensajes pueden ser procesados por proveedores de
