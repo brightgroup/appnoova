@@ -20,6 +20,7 @@ import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { usePricingCatalog } from "@/hooks/usePricingCatalog";
 import { PaddleCheckoutButton, usePaddleCheckout } from "@/components/billing/PaddleCheckoutButton";
+import { CardBrandIcon } from "@/components/billing/CardBrandIcon";
 import type { PlanPromoDisplay } from "@/lib/billing/plan-promo";
 import {
   BILLING_CHART_CATEGORIES,
@@ -951,7 +952,7 @@ export default function FacturacionPage() {
                       {paymentMethod?.last4 && (
                         <div className="flex items-center justify-between rounded-lg border border-[var(--nv-border)] bg-[var(--nv-bg-control)] px-3 py-2">
                           <span className="flex items-center gap-2 text-xs text-[var(--nv-text)]">
-                            <CreditCard className="w-3.5 h-3.5 text-[var(--nv-text-muted)]" />
+                            <CardBrandIcon brand={paymentMethod.brand} />
                             {paymentMethod.brand ? `${paymentMethod.brand.charAt(0).toUpperCase()}${paymentMethod.brand.slice(1)}` : "Tarjeta"}
                             {" "}•••• {paymentMethod.last4}
                           </span>
