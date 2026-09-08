@@ -132,6 +132,27 @@ export async function listPolizas(
   return callAuthenticated(credentials, `/api/poliza/${query}`);
 }
 
+const MAX_PAGES_SAFETY = 500; // ~5.000 pólizas a 10/página — tope de seguridad, no un límite de negocio real.
+
+/**
+ * Trae TODAS las páginas de /api/poliza/ siguiendo `next` hasta agotarlas.
+ * Usada por el sync hacia la tabla `polizas` (a diferencia de listPolizas,
+ * que solo trae una página para el endpoint de preview).
+ */
+export async function listPolizasTodas(
+  credentials: SoftsegurosCredentials
+): Promise<Record<string, unknown>[]> {
+  const all: Record<string, unknown>[] = [];
+  let page = 1;
+  for (let i = 0; i < MAX_PAGES_SAFETY; i++) {
+    const response = await listPolizas(credentials, { page });
+    all.push(...(response.results ?? []));
+    if (!response.next) break;
+    page++;
+  }
+  return all;
+}
+
 /** Lista siniestros (endpoint paginado propio, distinto del genérico). */
 export async function listSiniestros(
   credentials: SoftsegurosCredentials,

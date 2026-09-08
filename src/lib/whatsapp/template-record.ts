@@ -234,5 +234,15 @@ export const PMV_BROKER_TEMPLATE_PRESETS: WhatsAppTemplatePreset[] = [
     variable_examples: [
       "Cita agendada — Juan Pérez, martes 22 de julio, 10:00 am. Motivo: asesoría inicial."
     ]
+  },
+  {
+    label: "Recordatorio de renovación",
+    hint: "Avisar a un cliente que su póliza está por vencer (S2 Renovaciones — cadencia 30/15/5 días).",
+    template_name: "recordatorio_renovacion",
+    category: "utility",
+    body_source:
+      "Hola {{contact_name}}, tu póliza de {{ramo}} con {{aseguradora}} vence el {{vence_el}} (en {{dias_restantes}} días). Escríbenos aquí para renovarla sin quedar sin cobertura.",
+    variable_labels: ["contact_name", "ramo", "aseguradora", "vence_el", "dias_restantes"],
+    variable_examples: ["Andrea", "Autos", "La Equidad", "15 de octubre", "15"]
   }
 ];
