@@ -320,6 +320,16 @@ export default function FacturacionPage() {
   const daysLeft    = daysUntil(wallet?.period_end ?? null);
   const blocked     = status === "suspended" || status === "canceled";
 
+  // Próxima factura por pagar (pending/overdue) — distinta de current_period_end:
+  // el periodo de la suscripción puede extenderse más adelante que el plazo real
+  // de pago de una factura ya emitida, así que hay que mostrar ambas fechas.
+  const nextDueInvoice = useMemo(() => {
+    return (data?.invoices ?? [])
+      .filter((inv) => inv.status === "pending" || inv.status === "overdue")
+      .sort((a, b) => a.due_date.localeCompare(b.due_date))[0] ?? null;
+  }, [data?.invoices]);
+  const dueDaysLeft = daysUntil(nextDueInvoice?.due_date ?? null);
+
   // Filtrado de facturas
   const filteredInv = useMemo(() => (data?.invoices ?? []).filter(inv => {
     const q = invSearch.toLowerCase();
@@ -472,6 +482,36 @@ export default function FacturacionPage() {
                         )}
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {nextDueInvoice && (
+                  <div className={`rounded-xl border p-4 flex items-start gap-3 ${
+                    nextDueInvoice.status === "overdue"
+                      ? "border-red-500/30 bg-red-500/10"
+                      : "border-amber-500/30 bg-amber-500/10"
+                  }`}>
+                    <AlertTriangle className={`w-5 h-5 shrink-0 mt-0.5 ${nextDueInvoice.status === "overdue" ? "text-red-400" : "text-amber-400"}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className={`font-semibold ${nextDueInvoice.status === "overdue" ? "text-red-300" : "text-amber-300"}`}>
+                        {nextDueInvoice.status === "overdue" ? "Factura vencida" : "Factura pendiente de pago"}
+                      </p>
+                      <p className="text-sm text-gray-300 mt-1">
+                        Vence el {fmtDate(nextDueInvoice.due_date)}
+                        {dueDaysLeft != null && (
+                          <span className="ml-1.5">
+                            ({dueDaysLeft > 0 ? `en ${dueDaysLeft} día${dueDaysLeft === 1 ? "" : "s"}` : dueDaysLeft === 0 ? "hoy" : `hace ${Math.abs(dueDaysLeft)} día${Math.abs(dueDaysLeft) === 1 ? "" : "s"}`})
+                          </span>
+                        )}
+                        {" · "}US$ {fmtN(nextDueInvoice.amount_usd)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setTab("invoices")}
+                      className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg border border-white/15 hover:bg-white/10 transition-colors"
+                    >
+                      Ver factura
+                    </button>
                   </div>
                 )}
 
@@ -891,6 +931,12 @@ export default function FacturacionPage() {
                           </span>
                         )}
                       </p>
+                      {nextDueInvoice && (
+                        <p className={`text-xs mt-1 ${nextDueInvoice.status === "overdue" ? "text-red-400" : "text-amber-400"}`}>
+                          Factura {nextDueInvoice.status === "overdue" ? "vencida" : "pendiente"}: vence {fmtDate(nextDueInvoice.due_date)}
+                          {dueDaysLeft != null && dueDaysLeft >= 0 ? ` (en ${dueDaysLeft} día${dueDaysLeft === 1 ? "" : "s"})` : ""}
+                        </p>
+                      )}
                     </div>
                     <button
                       onClick={() => setShowPlanPicker(true)}
