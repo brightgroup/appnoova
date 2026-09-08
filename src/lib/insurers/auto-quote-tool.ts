@@ -2,6 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getVehicleValuesByPlate, VerifikApiError, type VerifikFasecoldaValueByPlate } from "@/lib/insurers/verifik";
 import { getInsurerCredentials } from "@/lib/insurers/insurer-connections-db";
 import {
+  countRecentVehicleLookups,
+  logVehicleLookup,
+  VEHICLE_LOOKUP_MAX_PER_WINDOW
+} from "@/lib/insurers/vehicle-lookup-rate-limit";
+import {
   createQuotation,
   getQuotationDetail,
   LaEquidadApiError,
@@ -72,6 +77,8 @@ export interface AutoQuoteOptions {
   conversationId?: string | null;
   contactId?: string | null;
   leadId?: string | null;
+  /** Número del contacto (WhatsApp) — clave del límite anti-abuso de Verifik cuando se usa la cuenta compartida de Noova. */
+  contactE164?: string | null;
 }
 
 const REQUIRED_TOMADOR_FIELDS = ["nombre_tomador", "documento_tomador", "fecha_nacimiento_tomador"] as const;
@@ -158,12 +165,32 @@ export async function cotizarSeguroAuto(
   const placa = input.placa?.trim();
   if (!placa) return { ok: false, reason: "Falta la placa del vehículo." };
 
+  const ownVerifik = await getInsurerCredentials<{ token: string }>(ctx.db, ctx.organizationId, "verifik");
+  const contactKey = options.contactE164?.trim() || null;
+
+  // El límite anti-abuso solo protege la cuenta COMPARTIDA de Noova — si el
+  // corredor conectó su propia cuenta de Verifik, ese gasto es suyo, no hay
+  // nada que limitar de parte de Noova.
+  if (!ownVerifik && contactKey) {
+    const recentLookups = await countRecentVehicleLookups(ctx.db, ctx.organizationId, contactKey);
+    if (recentLookups >= VEHICLE_LOOKUP_MAX_PER_WINDOW) {
+      return {
+        ok: false,
+        reason:
+          "Ya consultamos varios vehículos para este contacto hoy. Un asesor humano puede continuar la cotización manualmente."
+      };
+    }
+  }
+
   let vehiculo: AutoQuoteVehicle;
   try {
-    vehiculo = toVehicleSummary(await getVehicleValuesByPlate(placa));
+    vehiculo = toVehicleSummary(await getVehicleValuesByPlate(placa, ownVerifik?.credentials.token));
   } catch (err) {
     const reason = err instanceof VerifikApiError ? err.message : "No se pudo consultar el vehículo por placa.";
     return { ok: false, reason };
+  }
+  if (!ownVerifik && contactKey) {
+    await logVehicleLookup(ctx.db, ctx.organizationId, contactKey, placa);
   }
 
   const faltantes = REQUIRED_TOMADOR_FIELDS.filter((field) => !input[field]?.trim());

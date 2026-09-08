@@ -36,8 +36,8 @@ export class VerifikApiError extends Error {
   }
 }
 
-function getApiToken(): string {
-  const token = process.env.VERIFIK_TOKEN?.trim();
+function getApiToken(orgToken?: string): string {
+  const token = orgToken?.trim() || process.env.VERIFIK_TOKEN?.trim();
   if (!token) {
     throw new Error("Falta VERIFIK_TOKEN en el entorno (token de la cuenta Verifik de Noova).");
   }
@@ -54,15 +54,23 @@ async function fetchWithTimeout(input: string, init: RequestInit): Promise<Respo
   }
 }
 
-/** Placa -> marca/línea/modelo/valor comercial/código Fasecolda. */
-export async function getVehicleValuesByPlate(plate: string): Promise<VerifikFasecoldaValueByPlate> {
+/**
+ * Placa -> marca/línea/modelo/valor comercial/código Fasecolda.
+ * `orgToken`: si el corredor conectó su propia cuenta de Verifik (ver
+ * insurer_connections, provider_key "verifik"), se usa esa en vez de la
+ * cuenta compartida de Noova (VERIFIK_TOKEN) — ver auto-quote-tool.ts.
+ */
+export async function getVehicleValuesByPlate(
+  plate: string,
+  orgToken?: string
+): Promise<VerifikFasecoldaValueByPlate> {
   const normalizedPlate = plate.replace(/[\s.-]/g, "").toUpperCase();
   const url = `${BASE_URL}/v2/co/fasecolda/values-by-plate?plate=${encodeURIComponent(normalizedPlate)}`;
 
   const res = await fetchWithTimeout(url, {
     headers: {
       Accept: "application/json",
-      Authorization: `Bearer ${getApiToken()}`
+      Authorization: `Bearer ${getApiToken(orgToken)}`
     }
   });
 

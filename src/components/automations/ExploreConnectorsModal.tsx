@@ -9,6 +9,7 @@ import { HubSpotLogo } from "@/components/icons/brands/HubSpotLogo";
 import { Badge } from "@/components/ui/Badge";
 import { CollapsibleGroup } from "@/components/ui/CollapsibleGroup";
 import { InsurerConnectorRow } from "@/components/automations/InsurerConnectorRow";
+import { VerifikConnectorRow } from "@/components/automations/VerifikConnectorRow";
 import { btnPrimary, btnGhost, modalInput } from "@/lib/brand-ui";
 
 interface ExploreConnectorsModalProps {
@@ -74,6 +75,9 @@ export function ExploreConnectorsModal({
             description="Cada corredor conecta sus propias credenciales por aseguradora."
           >
             <InsurerConnectorRow providerKey="la_equidad" letters="LE" name="La Equidad Seguros" />
+            <div className="border-t border-white/5">
+              <VerifikConnectorRow />
+            </div>
           </CollapsibleGroup>
         )
       });
