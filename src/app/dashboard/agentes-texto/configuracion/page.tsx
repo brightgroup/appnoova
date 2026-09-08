@@ -5,12 +5,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Save, Loader2, CheckCircle2, MessageSquare, Settings2,
-  History, Radio, BarChart3, FileCode2, CalendarClock, Bell, Users
+  History, Radio, BarChart3, FileCode2, CalendarClock, Bell, Users, Plug
 } from "lucide-react";
 import { InfoBox } from "@/components/ui/InfoBox";
 import { btnPrimary, tabActive, tabIdle } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { getTextTemplateMeta } from "@/lib/text-agent-templates";
+import { getPurposeMeta } from "@/lib/agent-purpose-catalog";
+import { AgentConnectorsPanel } from "@/components/agents/AgentConnectorsPanel";
 import { normalizeTextAgentForm } from "@/lib/text-agent-form";
 import { TEXT_LLM_MODELS, TEXT_OUTPUT_TOKEN_OPTIONS } from "@/lib/text-agent-options";
 import { llmModelIcon } from "@/lib/llm/provider-icon";
@@ -26,9 +28,9 @@ import { Switch } from "@/components/ui/Switch";
 import { defaultNotifyTeamRules, hasIncompleteWhatsAppNotifyRule } from "@/lib/text-notify-rules";
 import { defaultSchedulingRules } from "@/lib/scheduling/rules";
 
-type TabId = "probar" | "config" | "agendamiento" | "notificaciones" | "analisis" | "registro" | "canales";
+type TabId = "probar" | "config" | "conectores" | "agendamiento" | "notificaciones" | "analisis" | "registro" | "canales";
 
-const ENABLED_TABS: TabId[] = ["config", "probar", "registro", "agendamiento", "notificaciones"];
+const ENABLED_TABS: TabId[] = ["config", "conectores", "probar", "registro", "agendamiento", "notificaciones"];
 
 function parseTab(tab: string | null): TabId {
   if (tab && (ENABLED_TABS as string[]).includes(tab)) return tab as TabId;
@@ -166,10 +168,12 @@ function ConfigContent() {
   };
 
   const notifyIncomplete = hasIncompleteWhatsAppNotifyRule(form.notify_rules ?? {});
+  const isSegurosTemplate = getPurposeMeta("text", form.source_template).vertical === "seguros";
 
   const tabs: { id: TabId; label: string; icon: React.ElementType; warn?: boolean }[] = [
     { id: "probar", label: "Probar agente", icon: MessageSquare },
     { id: "config", label: "Configuración", icon: Settings2 },
+    { id: "conectores", label: "Conectores", icon: Plug },
     { id: "agendamiento", label: "Agendamiento", icon: CalendarClock },
     { id: "notificaciones", label: "Notificaciones", icon: Bell, warn: notifyIncomplete },
     { id: "analisis", label: "Análisis", icon: BarChart3 },
@@ -311,32 +315,6 @@ function ConfigContent() {
                 </Link>
               </Field>
 
-              <Field label="Tabla de datos (catálogo)">
-                <NoovaSelect
-                  value={form.data_table_id ?? ""}
-                  onChange={v => setForm(f => ({
-                    ...f,
-                    data_table_id: v || null
-                  }))}
-                  allowEmpty={true}
-                  emptyLabel="Sin tabla (solo prompt)"
-                  options={dataTables.map(t => ({
-                    value: t.id,
-                    label: `${t.name} · ${t.row_count} filas`
-                  }))}
-                />
-                <Link
-                  href="/dashboard/tablas"
-                  className="inline-block mt-2 text-[11px] text-[#0f7eff] hover:text-[#99c9ff]"
-                >
-                  Gestionar tablas de datos →
-                </Link>
-                <p className="text-[10px] text-gray-500 mt-1.5 leading-relaxed">
-                  Fuente autorizada de precios y productos. Hasta 150 filas: catálogo completo por mensaje.
-                  De 151 a 1.000: búsqueda por nombre, SKU o categoría antes de responder.
-                </p>
-              </Field>
-
               <SliderField
                 label="Temperatura"
                 hint="Creatividad del modelo (0.1 = precisa · 2 = más libre)"
@@ -429,6 +407,25 @@ function ConfigContent() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === "conectores" && (
+        <div className="flex-1 overflow-y-auto">
+          <AgentConnectorsPanel
+            showDataTable
+            dataTableId={form.data_table_id ?? null}
+            onChangeDataTableId={data_table_id => setForm(f => ({ ...f, data_table_id }))}
+            dataTables={dataTables}
+            isSegurosTemplate={isSegurosTemplate}
+            quotingRules={form.quoting_rules}
+            onChangeQuotingRules={value =>
+              setForm(f => ({
+                ...f,
+                quoting_rules: { ...value, insurer_connection_ids: f.quoting_rules?.insurer_connection_ids ?? [] }
+              }))
+            }
+          />
         </div>
       )}
 

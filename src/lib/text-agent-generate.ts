@@ -4,6 +4,7 @@ import { readGeminiUsage, type GeminiUsage } from "@/lib/billing/meter";
 import { withGeminiTimeout } from "@/lib/gemini-timeout";
 import { normalizeNotifyTeamRules, type NotifyTeamRules } from "@/lib/text-notify-rules";
 import { normalizeSchedulingRules, normalizeOrgBusinessHours, type SchedulingRules, type OrgBusinessHours } from "@/lib/scheduling/rules";
+import { normalizeQuotingRules, type QuotingRules } from "@/lib/insurers/quoting-rules";
 import { ALL_TEXT_AGENT_TOOLS } from "@/lib/agent-tools/all-text-tools";
 import {
   resolveEnabledTools,
@@ -32,13 +33,17 @@ export interface GenerateTextAgentReplyInput {
   schedulingRules?: SchedulingRules | unknown;
   businessHours?: OrgBusinessHours | unknown;
   calendarConnection?: CalendarConnectionRecord | null;
-  toolContext: Omit<AgentToolContext, "notifyRules" | "schedulingRules" | "businessHours" | "calendarConnection">;
+  quotingRules?: QuotingRules | unknown;
+  toolContext: Omit<
+    AgentToolContext,
+    "notifyRules" | "schedulingRules" | "businessHours" | "calendarConnection" | "quotingRules"
+  >;
 }
 
 export interface GenerateTextAgentReplyResult {
   text: string;
   usage: GeminiUsage;
-  toolResults: AgentToolResult[];
+  toolResults: { name: string; result: AgentToolResult }[];
   /**
    * Id de modelo del motor que realmente respondió (ej. "gpt-4o-mini" tras un
    * failover, aunque el agente esté configurado con "gemini-2.5-flash"). Lo llena
@@ -139,7 +144,8 @@ async function generateGeminiAgentReply(
     notifyRules: normalizeNotifyTeamRules(input.notifyRules),
     schedulingRules: normalizeSchedulingRules(input.schedulingRules),
     businessHours: normalizeOrgBusinessHours(input.businessHours),
-    calendarConnection: input.calendarConnection ?? null
+    calendarConnection: input.calendarConnection ?? null,
+    quotingRules: normalizeQuotingRules(input.quotingRules)
   };
 
   const enabledTools = resolveEnabledTools(ALL_TEXT_AGENT_TOOLS, rulesCtx);
@@ -160,7 +166,7 @@ async function generateGeminiAgentReply(
 
   const ai = new GoogleGenAI({ apiKey });
   const contents = toGeminiContents(input.messages);
-  const toolResults: AgentToolResult[] = [];
+  const toolResults: { name: string; result: AgentToolResult }[] = [];
 
   const baseConfig = {
     systemInstruction,
@@ -212,7 +218,7 @@ async function generateGeminiAgentReply(
         ...input.toolContext,
         ...rulesCtx
       });
-      toolResults.push(result);
+      toolResults.push({ name, result });
       functionResponseParts.push({
         functionResponse: {
           name,

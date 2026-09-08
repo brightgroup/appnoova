@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/Badge";
 import { GoogleCalendarLogo } from "@/components/icons/brands/GoogleCalendarLogo";
 import { HubSpotLogo } from "@/components/icons/brands/HubSpotLogo";
 import { ExploreConnectorsModal } from "@/components/automations/ExploreConnectorsModal";
+import { useOrgPermissions } from "@/components/layout/OrgPermissionsProvider";
 import {
   btnPrimary,
   registryTable,
@@ -41,9 +42,13 @@ interface HubspotConnectionStatus {
   } | null;
 }
 
+interface InsurerConnectionStatus {
+  connection: { status: "pending" | "active" | "disconnected" | "error" } | null;
+}
+
 interface ConnectorRow {
   id: string;
-  kind: "webhook" | "google_calendar" | "hubspot";
+  kind: "webhook" | "google_calendar" | "hubspot" | "insurer";
   name: string;
   detail: string;
   status: "active" | "disconnected" | "error" | "none";
@@ -52,9 +57,11 @@ interface ConnectorRow {
 
 export default function ConectoresPage() {
   const router = useRouter();
+  const { modules } = useOrgPermissions();
   const [connections, setConnections] = useState<AutomationConnectionRecord[]>([]);
   const [calendarStatus, setCalendarStatus] = useState<CalendarConnectionStatus | null>(null);
   const [hubspotStatus, setHubspotStatus] = useState<HubspotConnectionStatus | null>(null);
+  const [laEquidadStatus, setLaEquidadStatus] = useState<InsurerConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exploreOpen, setExploreOpen] = useState(false);
@@ -62,10 +69,11 @@ export default function ConectoresPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const [connRes, calRes, hubspotRes] = await Promise.all([
+    const [connRes, calRes, hubspotRes, laEquidadRes] = await Promise.all([
       authFetch("/api/automations/connections"),
       authFetch("/api/conectores/google-calendar/status"),
-      authFetch("/api/conectores/hubspot/status")
+      authFetch("/api/conectores/hubspot/status"),
+      modules.seguros ? authFetch("/api/seguros/conectores/la-equidad/status") : Promise.resolve(null)
     ]);
     const connJson = await connRes.json();
     if (!connRes.ok) setError(connJson.error ?? "Error al cargar conectores");
@@ -73,8 +81,9 @@ export default function ConectoresPage() {
 
     if (calRes.ok) setCalendarStatus(await calRes.json());
     if (hubspotRes.ok) setHubspotStatus(await hubspotRes.json());
+    if (laEquidadRes?.ok) setLaEquidadStatus(await laEquidadRes.json());
     setLoading(false);
-  }, []);
+  }, [modules.seguros]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -109,7 +118,19 @@ export default function ConectoresPage() {
       detail: hubspotStatus?.connection?.portalId ? `Portal ${hubspotStatus.connection.portalId}` : "—",
       status: (hubspotStatus?.connection?.status ?? "none") as ConnectorRow["status"],
       href: "/dashboard/conectores/hubspot"
-    }
+    },
+    ...(modules.seguros
+      ? [
+          {
+            id: "la-equidad",
+            kind: "insurer" as const,
+            name: "La Equidad Seguros",
+            detail: "Aseguradoras",
+            status: (laEquidadStatus?.connection?.status ?? "none") as ConnectorRow["status"],
+            href: ""
+          }
+        ]
+      : [])
   ];
 
   return (
@@ -147,7 +168,11 @@ export default function ConectoresPage() {
             </thead>
             <tbody>
               {rows.map(row => (
-                <tr key={row.id} className={registryTableRowClickable} onClick={() => router.push(row.href)}>
+                <tr
+                  key={row.id}
+                  className={registryTableRowClickable}
+                  onClick={() => (row.kind === "insurer" ? setExploreOpen(true) : router.push(row.href))}
+                >
                   <td className={registryTableCellFirst}>
                     <div className="flex items-center gap-3">
                       <div
@@ -156,13 +181,17 @@ export default function ConectoresPage() {
                             ? "bg-[#4285f4]/15"
                             : row.kind === "hubspot"
                               ? "bg-[#ff7a59]/15"
-                              : "bg-white/[.08]"
+                              : row.kind === "insurer"
+                                ? "bg-[#2463eb]/15"
+                                : "bg-white/[.08]"
                         }`}
                       >
                         {row.kind === "google_calendar" ? (
                           <GoogleCalendarLogo className="w-[18px] h-[18px] text-[#4285f4]" />
                         ) : row.kind === "hubspot" ? (
                           <HubSpotLogo className="w-[18px] h-[18px] text-[#ff7a59]" />
+                        ) : row.kind === "insurer" ? (
+                          <span className="text-[11px] font-bold text-[#6f95f2]">LE</span>
                         ) : (
                           <Webhook className="w-[18px] h-[18px] text-gray-300" />
                         )}
@@ -183,11 +212,15 @@ export default function ConectoresPage() {
 
       <ExploreConnectorsModal
         open={exploreOpen}
-        onClose={() => setExploreOpen(false)}
+        onClose={() => {
+          setExploreOpen(false);
+          void load();
+        }}
         onConnected={connectionId => {
           setExploreOpen(false);
           router.push(`/dashboard/conectores/${connectionId}`);
         }}
+        showAseguradoras={modules.seguros}
       />
     </>
   );

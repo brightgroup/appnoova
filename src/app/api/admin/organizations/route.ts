@@ -127,6 +127,7 @@ export async function POST(req: NextRequest) {
       plan,
       hideNoovaLogo: body.hide_noova_logo === true,
       erp: body.erp === true,
+      seguros: body.seguros === true,
     });
 
     return NextResponse.json(

@@ -37,6 +37,7 @@ export const TEXT_AGENT_TEMPLATES: Record<string, TextTemplateMeta> = Object.fro
     "website-qa",
     "meeting-scheduling",
     "support-follow-up",
+    "insurance-broker-assistant",
   ].map(id => [id, buildMeta(id)])
 );
 

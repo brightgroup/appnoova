@@ -81,6 +81,12 @@ export async function PATCH(
     });
   }
 
+  if (typeof body.seguros === "boolean") {
+    updates.settings = mergeOrgModulesSettings(updates.settings ?? org.settings, {
+      seguros: body.seguros,
+    });
+  }
+
   if (Object.keys(updates).length <= 1) {
     return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
   }

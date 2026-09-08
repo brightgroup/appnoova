@@ -117,6 +117,7 @@ export async function bootstrapOrganization(
     slug?: string;
     hideNoovaLogo?: boolean;
     erp?: boolean;
+    seguros?: boolean;
   }
 ): Promise<{ id: string; slug: string }> {
   const name = input.name.trim();
@@ -137,6 +138,9 @@ export async function bootstrapOrganization(
       : {};
   if (input.erp === true) {
     settings = mergeOrgModulesSettings(settings, { erp: true });
+  }
+  if (input.seguros === true) {
+    settings = mergeOrgModulesSettings(settings, { seguros: true });
   }
 
   const { data: org, error } = await db

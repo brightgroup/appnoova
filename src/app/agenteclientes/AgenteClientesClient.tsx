@@ -26,11 +26,14 @@ import {
 } from "lucide-react";
 
 import type { MicrositeQuickAction } from "@/types/microsite";
+import { toolAutoQuote } from "@/types/ori";
+import { AutoQuoteCard } from "@/components/insurers/AutoQuoteCard";
 
 interface Message {
   id: string;
   role: "user" | "assistant" | "human";
   content: string;
+  toolCalls?: { name: string; result: Record<string, unknown> }[];
 }
 
 type ScrollIntent = "assistant-start" | "user-sent" | "conversation-load";
@@ -472,7 +475,12 @@ export default function AgenteClientesClient() {
         setHandoffMode("human");
       }
       const assistantMsg = data.reply
-        ? { id: crypto.randomUUID(), role: "assistant" as const, content: data.reply }
+        ? {
+            id: crypto.randomUUID(),
+            role: "assistant" as const,
+            content: data.reply,
+            toolCalls: Array.isArray(data.tool_calls) ? data.tool_calls : undefined
+          }
         : null;
       const finalMessages = assistantMsg ? [...nextMessages, assistantMsg] : nextMessages;
 
@@ -653,6 +661,12 @@ export default function AgenteClientesClient() {
                     <div className={`ac-bubble ac-bubble--${msg.role}`}>
                       {msg.content}
                     </div>
+                    {msg.toolCalls?.map((call, ci) => {
+                      const autoQuote = toolAutoQuote(call);
+                      return autoQuote ? (
+                        <AutoQuoteCard key={ci} result={autoQuote} onSendMessage={sendMessage} />
+                      ) : null;
+                    })}
                   </div>
                 ))}
                 {showAiTyping && <TypingIndicator />}

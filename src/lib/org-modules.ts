@@ -12,10 +12,12 @@ type Db = ReturnType<typeof adminClient>;
 
 export interface OrgModules {
   erp: boolean;
+  seguros: boolean;
 }
 
 export const DEFAULT_ORG_MODULES: OrgModules = {
   erp: false,
+  seguros: false,
 };
 
 export function parseOrgModules(settings: unknown): OrgModules {
@@ -24,6 +26,7 @@ export function parseOrgModules(settings: unknown): OrgModules {
   if (!modules || typeof modules !== "object") return { ...DEFAULT_ORG_MODULES };
   return {
     erp: (modules as Record<string, unknown>).erp === true,
+    seguros: (modules as Record<string, unknown>).seguros === true,
   };
 }
 
@@ -61,6 +64,28 @@ export async function assertOrgErpEnabled(
   const modules = parseOrgModules(org?.settings);
   if (!modules.erp) {
     return { ok: false, message: "El módulo ERP no está habilitado para esta organización." };
+  }
+  return { ok: true };
+}
+
+/**
+ * Verificación server-side antes de servir cualquier dato de Noova Seguros
+ * (cotizador, renovaciones, siniestros, cartera, comisiones). Mismo motivo
+ * que assertOrgErpEnabled: el gating de sidebar/ruta es solo cosmético.
+ */
+export async function assertOrgSegurosEnabled(
+  db: Db,
+  organizationId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { data: org } = await db
+    .from("organizations")
+    .select("settings")
+    .eq("id", organizationId)
+    .maybeSingle();
+
+  const modules = parseOrgModules(org?.settings);
+  if (!modules.seguros) {
+    return { ok: false, message: "El módulo Noova Seguros no está habilitado para esta organización." };
   }
   return { ok: true };
 }

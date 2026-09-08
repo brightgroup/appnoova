@@ -1,5 +1,6 @@
 import type { NotifyTeamRules } from "@/lib/text-notify-rules";
 import type { SchedulingRules } from "@/lib/scheduling/rules";
+import type { QuotingRules } from "@/lib/insurers/quoting-rules";
 
 export type TextSourceTemplateId =
   | "customer-assistant"
@@ -7,7 +8,8 @@ export type TextSourceTemplateId =
   | "sales-inquiries"
   | "website-qa"
   | "meeting-scheduling"
-  | "support-follow-up";
+  | "support-follow-up"
+  | "insurance-broker-assistant";
 
 export interface TextAgentStats {
   conversations_count: number;
@@ -30,6 +32,7 @@ export interface TextAgentFormData {
   color?: string | null;
   notify_rules?: NotifyTeamRules;
   scheduling_rules?: SchedulingRules;
+  quoting_rules?: QuotingRules;
   /** Si es true, el agente no responde con IA: los chats quedan en cola humana. */
   human_only?: boolean;
 }

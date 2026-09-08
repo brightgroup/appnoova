@@ -5,8 +5,10 @@ import {
   toolProductRows,
   toolMovementRows,
   toolTruncationCaption,
+  toolAutoQuote,
   type OriToolCall
 } from "@/types/ori";
+import { AutoQuoteCard } from "@/components/insurers/AutoQuoteCard";
 
 /**
  * Renderiza los resultados de las tools de Ori como tabla real — los números
@@ -14,7 +16,14 @@ import {
  * de lo que el modelo haya redactado. El texto del modelo sigue siendo el
  * comentario alrededor; esto es la fuente de verdad visual.
  */
-export function OriToolResultView({ toolCalls }: { toolCalls: OriToolCall[] }) {
+export function OriToolResultView({
+  toolCalls,
+  onSendMessage
+}: {
+  toolCalls: OriToolCall[];
+  /** Necesario solo si alguna tool (ej. cotizar_seguro_auto) pide continuar la conversación desde su propia tarjeta. */
+  onSendMessage?: (text: string) => void;
+}) {
   if (!toolCalls.length) return null;
 
   return (
@@ -23,6 +32,11 @@ export function OriToolResultView({ toolCalls }: { toolCalls: OriToolCall[] }) {
         const productos = toolProductRows(call);
         const movimientos = toolMovementRows(call);
         const caption = toolTruncationCaption(call);
+        const autoQuote = toolAutoQuote(call);
+
+        if (autoQuote && onSendMessage) {
+          return <AutoQuoteCard key={i} result={autoQuote} onSendMessage={onSendMessage} />;
+        }
 
         if (productos.length > 0) {
           return (

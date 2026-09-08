@@ -764,6 +764,7 @@ async function processTwilioWhatsAppInboundLocked(
       schedulingRules: agent.scheduling_rules,
       businessHours,
       calendarConnection,
+      quotingRules: agent.quoting_rules,
       toolContext: {
         db,
         organizationId: orgId,
@@ -773,7 +774,8 @@ async function processTwilioWhatsAppInboundLocked(
         agentType: "text",
         agentName: String(agent.name),
         contactLabel: existing?.contact_label ? String(existing.contact_label) : contactLabel,
-        outboundWhatsAppChannel: channel
+        outboundWhatsAppChannel: channel,
+        contactE164: inbound.fromE164
       }
     });
     const withRealCards = resolveProductCards(

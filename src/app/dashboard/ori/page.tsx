@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Sparkles, History, FileText, Users, RefreshCw,
-  Mail, Phone, Loader2, Plus, Mic, ArrowUp
+  Mail, Phone, Loader2, Plus, Mic, ArrowUp, Shield
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
@@ -14,6 +14,9 @@ import { TEXT_LLM_MODELS, DEFAULT_TEXT_MODEL, resolveTextLlm } from "@/lib/text-
 import { llmModelIcon } from "@/lib/llm/provider-icon";
 import { OriToolResultView } from "@/components/ori/OriToolResultView";
 import type { OriToolCall } from "@/types/ori";
+import { useOrgPermissions } from "@/components/layout/OrgPermissionsProvider";
+import { ConnectorsQuickMenu } from "@/components/automations/ConnectorsQuickMenu";
+import { ExploreConnectorsModal } from "@/components/automations/ExploreConnectorsModal";
 
 const ORI_MODEL_STORAGE_KEY = "noova_ori_model";
 
@@ -53,6 +56,7 @@ const QUICK_ACTIONS = [
 ];
 
 export default function OriCopilotoPage() {
+  const { modules } = useOrgPermissions();
   const [userName, setUserName] = useState("Usuario");
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -61,9 +65,22 @@ export default function OriCopilotoPage() {
   const [contexts, setContexts] = useState<CompanyContext[]>([]);
   const [contextId, setContextId] = useState<string>("");
   const [model, setModel] = useState<string>(DEFAULT_TEXT_MODEL);
+  const [connectorsMenuOpen, setConnectorsMenuOpen] = useState(false);
+  const [exploreOpen, setExploreOpen] = useState(false);
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasChat = messages.length > 0;
+
+  const quickActions = modules.seguros
+    ? [
+        ...QUICK_ACTIONS,
+        {
+          icon: Shield,
+          label: "Cotizar seguro",
+          prompt: "Quiero cotizar un seguro de auto."
+        }
+      ]
+    : QUICK_ACTIONS;
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -223,7 +240,9 @@ export default function OriCopilotoPage() {
                     >
                       {msg.content}
                     </p>
-                    {msg.toolCalls && msg.toolCalls.length > 0 && <OriToolResultView toolCalls={msg.toolCalls} />}
+                    {msg.toolCalls && msg.toolCalls.length > 0 && (
+                      <OriToolResultView toolCalls={msg.toolCalls} onSendMessage={sendMessage} />
+                    )}
                   </div>
                 </div>
               ))}
@@ -270,14 +289,22 @@ export default function OriCopilotoPage() {
                 className="nv-ori-composer-input w-full bg-transparent px-6 pt-4 pb-2 text-base text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] resize-none focus:outline-none disabled:opacity-50 min-h-[56px] leading-relaxed"
               />
               <div className="flex items-center justify-between px-4 pb-4 pt-1">
-                <button
-                  type="button"
-                  title="Adjuntar (próximamente)"
-                  disabled
-                  className="p-2.5 rounded-xl text-gray-600 cursor-not-allowed opacity-40"
-                >
-                  <Plus className="w-[18px] h-[18px]" strokeWidth={1.75} />
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    title="Conectores"
+                    onClick={() => setConnectorsMenuOpen(v => !v)}
+                    className="p-2.5 rounded-xl text-[var(--nv-text-muted)] hover:text-white hover:bg-white/[.06] transition-colors"
+                  >
+                    <Plus className="w-[18px] h-[18px]" strokeWidth={1.75} />
+                  </button>
+                  {connectorsMenuOpen && (
+                    <ConnectorsQuickMenu
+                      onClose={() => setConnectorsMenuOpen(false)}
+                      onOpenExplore={() => setExploreOpen(true)}
+                    />
+                  )}
+                </div>
 
                 <div className="flex items-center gap-1.5">
                   <NoovaSelect
@@ -312,7 +339,7 @@ export default function OriCopilotoPage() {
 
             {!hasChat && (
               <div className="flex flex-col sm:flex-row sm:flex-wrap justify-center gap-2.5 mt-5">
-                {QUICK_ACTIONS.map(action => {
+                {quickActions.map(action => {
                   const Icon = action.icon;
                   return (
                     <button
@@ -332,6 +359,13 @@ export default function OriCopilotoPage() {
           </div>
         </div>
       </div>
+
+      <ExploreConnectorsModal
+        open={exploreOpen}
+        onClose={() => setExploreOpen(false)}
+        onConnected={() => setExploreOpen(false)}
+        showAseguradoras={modules.seguros}
+      />
     </div>
   );
 }

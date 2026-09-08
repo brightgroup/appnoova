@@ -310,6 +310,7 @@ export async function POST(
       schedulingRules: agent.scheduling_rules,
       businessHours,
       calendarConnection,
+      quotingRules: agent.quoting_rules,
       toolContext: {
         db,
         organizationId: billing.organizationId,
@@ -396,6 +397,10 @@ export async function POST(
     return NextResponse.json({
       reply,
       conversation_id: savedConversationId,
+      // El front solo renderiza algo para las tools con tarjeta propia (ver
+      // AutoQuoteCard) — el resto de ALL_TEXT_AGENT_TOOLS (notify_team,
+      // agendamiento) no tiene nada que mostrar aparte de la prosa del modelo.
+      tool_calls: generated.toolResults,
       ...(aiHandoff ? { handoff: true, handoff_mode: "human" as const } : {})
     });
   } catch (err: unknown) {

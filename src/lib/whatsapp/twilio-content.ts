@@ -78,6 +78,71 @@ export async function createTwilioContentTemplate(
   return { sid: String(json.sid) };
 }
 
+export interface CreateTwilioQuickReplyInput {
+  friendlyName: string;
+  language: string;
+  body: string;
+  /** Máximo 3 — límite de WhatsApp para mensajes de sesión (sin aprobación de plantilla). */
+  actions: { id: string; title: string }[];
+}
+
+/**
+ * Crea un Content de tipo `twilio/quick-reply` (botones táctiles) — Fase 2.5
+ * (Camino A) del plan de Noova Seguros. Dentro de la ventana de 24h de
+ * servicio al cliente NO requiere aprobación de plantilla; se crea un
+ * Content nuevo por envío (la IA genera preguntas/opciones distintas cada
+ * vez) y se manda de inmediato referenciando el SID — dos llamadas, no una,
+ * a diferencia de Meta que manda todo inline en un solo POST.
+ */
+export async function createTwilioQuickReplyContent(
+  input: CreateTwilioQuickReplyInput
+): Promise<TwilioContentResult> {
+  const json = await twilioContentFetch<{ sid: string }>("/Content", {
+    method: "POST",
+    body: JSON.stringify({
+      friendly_name: input.friendlyName,
+      language: input.language,
+      types: {
+        "twilio/quick-reply": {
+          body: input.body,
+          actions: input.actions
+        }
+      }
+    })
+  });
+  return { sid: String(json.sid) };
+}
+
+export interface CreateTwilioListPickerInput {
+  friendlyName: string;
+  language: string;
+  body: string;
+  button: string;
+  /** Máximo 10 — límite de WhatsApp. */
+  items: { id: string; item: string; description?: string }[];
+}
+
+/** Crea un Content de tipo `twilio/list-picker` (lista de hasta 10 opciones) — mismas reglas que quick-reply. */
+export async function createTwilioListPickerContent(
+  input: CreateTwilioListPickerInput
+): Promise<TwilioContentResult> {
+  const json = await twilioContentFetch<{ sid: string }>("/Content", {
+    method: "POST",
+    body: JSON.stringify({
+      friendly_name: input.friendlyName,
+      language: input.language,
+      types: {
+        "twilio/list-picker": {
+          body: input.body,
+          button: input.button,
+          items: input.items
+        }
+      }
+    })
+  });
+  return { sid: String(json.sid) };
+}
+
 export async function submitTwilioTemplateForApproval(input: {
   contentSid: string;
   templateName: string;

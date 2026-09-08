@@ -216,3 +216,26 @@ export interface CrmContactNextStep {
   action?: "inbox" | "lead" | "template" | "edit";
   href?: string;
 }
+
+export type PolizaPeriodicidadPago = "anual" | "semestral" | "trimestral" | "mensual";
+export type PolizaEstado = "cotizada" | "activa" | "vencida" | "cancelada" | "renovada";
+export type PolizaFuente = "manual" | "excel" | "pdf_ia" | "cotizador" | "softseguros";
+
+/** Registro operativo mínimo de póliza — Noova Seguros. No es administración de pólizas. */
+export interface Poliza {
+  id: string;
+  user_id: string;
+  contact_id: string;
+  aseguradora: string;
+  ramo: string;
+  numero_poliza: string | null;
+  vigencia_desde: string | null;
+  vigencia_hasta: string | null;
+  prima: number | null;
+  periodicidad_pago: PolizaPeriodicidadPago | null;
+  estado: PolizaEstado;
+  fuente: PolizaFuente;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}

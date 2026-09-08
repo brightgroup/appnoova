@@ -4,6 +4,7 @@ import type { NotifyTeamRules } from "@/lib/text-notify-rules";
 import type { SchedulingRules, OrgBusinessHours } from "@/lib/scheduling/rules";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import type { CalendarConnectionRecord } from "@/lib/google-calendar/connections-db";
+import type { QuotingRules } from "@/lib/insurers/quoting-rules";
 
 /**
  * Registro genérico de "tools" para agentes IA (texto y, a futuro, voz).
@@ -21,6 +22,8 @@ export interface AgentToolRulesContext {
   businessHours: OrgBusinessHours;
   /** Conexión de calendario activa de la organización (si hay), para tools de agendamiento. */
   calendarConnection?: CalendarConnectionRecord | null;
+  /** Interruptor propio del agente para el cotizador de seguros — ver src/lib/insurers/quoting-rules.ts. */
+  quotingRules: QuotingRules;
 }
 
 /** Contexto de ejecución de una tool (una vez el modelo decide invocarla). */
@@ -34,6 +37,8 @@ export interface AgentToolContext extends AgentToolRulesContext {
   agentName?: string | null;
   contactLabel?: string | null;
   outboundWhatsAppChannel?: WhatsAppChannelRecord | null;
+  /** Teléfono E.164 del cliente en la conversación — solo presente en canal WhatsApp. */
+  contactE164?: string | null;
 }
 
 export interface AgentToolResult {

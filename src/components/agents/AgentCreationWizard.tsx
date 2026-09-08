@@ -5,6 +5,7 @@ import {
   X, Loader2, ChevronRight, ChevronLeft, Check, Building2, Mic, MessageSquare,
 } from "lucide-react";
 import { btnPrimary, btnGhost } from "@/lib/brand-ui";
+import { useOrgPermissions } from "@/components/layout/OrgPermissionsProvider";
 import { TEXT_AGENT_PURPOSES, VOICE_AGENT_PURPOSES, type AgentChannel } from "@/lib/agent-purpose-catalog";
 import { generateAgentPrompt } from "@/lib/agent-prompt-generator";
 import { buildDefaultVoiceBusinessPrompt } from "@/lib/elevenlabs/voice-business-prompt";
@@ -49,13 +50,16 @@ export function AgentCreationWizard({
   getAuthHeaders,
   apiPath,
 }: AgentCreationWizardProps) {
-  const purposes = channel === "text" ? TEXT_AGENT_PURPOSES : VOICE_AGENT_PURPOSES;
+  const { modules } = useOrgPermissions();
+  const allPurposes = channel === "text" ? TEXT_AGENT_PURPOSES : VOICE_AGENT_PURPOSES;
+  // Las plantillas de vertical (ej. "seguros") solo se ofrecen si la organización tiene ese módulo encendido.
+  const purposes = allPurposes.filter(p => !p.vertical || modules[p.vertical]);
   const isVoice = channel === "voice";
   const [step, setStep] = useState<WizardStep>("agent");
   const [purposeId, setPurposeId] = useState(purposes[0].id);
+  const steps = STEPS;
+  const stepIds = useMemo(() => steps.map(s => s.id), [steps]);
   const [agentName, setAgentName] = useState("");
-  const [extraInstructions, setExtraInstructions] = useState("");
-  const [showExtra, setShowExtra] = useState(false);
   const [contextMode, setContextMode] = useState<"existing" | "new">("existing");
   const [contexts, setContexts] = useState<CompanyContext[]>([]);
   const [selectedContextId, setSelectedContextId] = useState<string>("");
@@ -80,8 +84,6 @@ export function AgentCreationWizard({
     setStep("agent");
     setPurposeId(purposes[0].id);
     setAgentName("");
-    setExtraInstructions("");
-    setShowExtra(false);
     setContextMode("existing");
     setSelectedContextId("");
     setCompanyName("");
@@ -186,7 +188,6 @@ export function AgentCreationWizard({
             purposeId,
             agentName: resolvedAgentName,
             companyName: resolvedCompanyName,
-            extraInstructions,
           })
         : generateAgentPrompt({
             channel,
@@ -194,13 +195,12 @@ export function AgentCreationWizard({
             purposeId,
             companyName: resolvedCompanyName,
             companyDescription: companyDescription.trim(),
-            extraInstructions,
           }),
-    [isVoice, channel, resolvedAgentName, purposeId, resolvedCompanyName, companyDescription, extraInstructions]
+    [isVoice, channel, resolvedAgentName, purposeId, resolvedCompanyName, companyDescription]
   );
 
   const purposeMeta = getPurposeMeta(channel, purposeId);
-  const stepIndex = STEPS.findIndex(s => s.id === step);
+  const stepIndex = steps.findIndex(s => s.id === step);
 
   const canContinueAgent = agentName.trim().length >= 2;
   const canContinueCompany =
@@ -278,8 +278,6 @@ export function AgentCreationWizard({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl p-4">
       <div className="relative bg-noova-surface border border-white/[.10] rounded-3xl w-full max-w-2xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
-        <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#0f7eff]/10 rounded-full blur-3xl pointer-events-none" />
-
         {/* Header */}
         <div className="relative px-6 pt-6 pb-3 shrink-0 border-b border-white/[.06]">
           <button
@@ -298,12 +296,12 @@ export function AgentCreationWizard({
               <h2 className="text-base font-bold text-white">
                 {isVoice ? "Nuevo agente de voz" : "Nuevo agente de texto"}
               </h2>
-              <p className="text-[11px] text-gray-500">Paso {stepIndex + 1} de {STEPS.length}</p>
+              <p className="text-[11px] text-gray-500">Paso {stepIndex + 1} de {steps.length}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {STEPS.map((s, i) => (
+            {steps.map((s, i) => (
               <div key={s.id} className="flex items-center gap-2 flex-1 min-w-0">
                 <div
                   className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
@@ -323,7 +321,7 @@ export function AgentCreationWizard({
                 >
                   {s.label}
                 </span>
-                {i < STEPS.length - 1 && (
+                {i < steps.length - 1 && (
                   <div className={`flex-1 h-px ${i < stepIndex ? "bg-[#0f7eff]/40" : "bg-white/[.08]"}`} />
                 )}
               </div>
@@ -451,22 +449,6 @@ export function AgentCreationWizard({
                 ) : null}
               </div>
 
-              <button
-                type="button"
-                onClick={() => setShowExtra(v => !v)}
-                className="text-[11px] text-gray-500 hover:text-gray-300 transition-colors"
-              >
-                {showExtra ? "− Ocultar instrucciones extra" : "+ Instrucciones extra (opcional)"}
-              </button>
-              {showExtra && (
-                <textarea
-                  value={extraInstructions}
-                  onChange={e => setExtraInstructions(e.target.value)}
-                  rows={2}
-                  placeholder="Ej. Captura email y motivo de contacto."
-                  className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#0f7eff]/50 resize-none"
-                />
-              )}
             </div>
           )}
 
@@ -475,32 +457,9 @@ export function AgentCreationWizard({
               <p className="text-xs text-gray-500">
                 {purposeMeta.label} · <span className="text-gray-400">{resolvedAgentName}</span>
               </p>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={contexts.length === 0}
-                  onClick={() => setContextMode("existing")}
-                  className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
-                    contextMode === "existing"
-                      ? "border-[#0f7eff]/40 bg-[#0f7eff]/10 text-[#99c9ff]"
-                      : "border-white/[.08] text-gray-400 hover:text-white disabled:opacity-40"
-                  }`}
-                >
-                  Contexto existente
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setContextMode("new")}
-                  className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
-                    contextMode === "new"
-                      ? "border-[#0f7eff]/40 bg-[#0f7eff]/10 text-[#99c9ff]"
-                      : "border-white/[.08] text-gray-400 hover:text-white"
-                  }`}
-                >
-                  Crear nuevo
-                </button>
-              </div>
+              <p className="text-sm text-gray-300">
+                ¿Sobre qué empresa va a hablar {resolvedAgentName}?
+              </p>
 
               {loadingContexts ? (
                 <div className="flex items-center gap-2 text-sm text-gray-400 py-6 justify-center">
@@ -508,7 +467,7 @@ export function AgentCreationWizard({
                 </div>
               ) : contextMode === "existing" ? (
                 <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Empresa *</label>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Empresa</label>
                   <select
                     value={selectedContextId}
                     onChange={e => setSelectedContextId(e.target.value)}
@@ -520,11 +479,18 @@ export function AgentCreationWizard({
                       </option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    onClick={() => setContextMode("new")}
+                    className="mt-2 text-[11px] text-gray-500 hover:text-gray-300 transition-colors"
+                  >
+                    + Usar otra empresa
+                  </button>
                 </div>
               ) : (
                 <>
                   <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1.5">Nombre *</label>
+                    <label className="block text-xs font-medium text-gray-400 mb-1.5">Nombre de la empresa</label>
                     <input
                       type="text"
                       value={companyName}
@@ -534,16 +500,25 @@ export function AgentCreationWizard({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1.5">Descripción *</label>
+                    <label className="block text-xs font-medium text-gray-400 mb-1.5">A qué se dedica</label>
                     <textarea
                       value={companyDescription}
                       onChange={e => setCompanyDescription(e.target.value)}
-                      rows={4}
-                      placeholder="Productos, servicios y propuesta de valor."
+                      rows={3}
+                      placeholder="Ej. Corredora de seguros en Bogotá, vendemos pólizas de auto, hogar y vida."
                       className="w-full bg-noova-main border border-white/[.12] rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#0f7eff]/50 resize-none"
                     />
-                    <p className="text-[10px] text-gray-600 mt-1">Mínimo 20 caracteres.</p>
+                    <p className="text-[10px] text-gray-600 mt-1">Con 2-3 frases alcanza.</p>
                   </div>
+                  {contexts.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setContextMode("existing")}
+                      className="text-[11px] text-gray-500 hover:text-gray-300 transition-colors"
+                    >
+                      ← Usar una empresa ya creada
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -565,7 +540,7 @@ export function AgentCreationWizard({
           ) : (
             <button
               type="button"
-              onClick={() => setStep("agent")}
+              onClick={() => setStep(stepIds[stepIndex - 1] ?? "agent")}
               className={`${btnGhost} gap-1.5`}
               disabled={saving}
             >
@@ -577,7 +552,7 @@ export function AgentCreationWizard({
             <button
               type="button"
               disabled={!canContinueAgent}
-              onClick={() => setStep("company")}
+              onClick={() => setStep(stepIds[stepIndex + 1] ?? "company")}
               className={`${btnPrimary} gap-1.5 disabled:opacity-40`}
             >
               Continuar <ChevronRight className="w-4 h-4" />

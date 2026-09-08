@@ -13,6 +13,8 @@ export interface AgentPurposeMeta {
   color: string;
   /** Código corto para el prompt operativo */
   purposeCode: string;
+  /** Plantilla de vertical — solo se ofrece en el wizard si la organización tiene ese módulo encendido. Ausente = sector-agnóstica. */
+  vertical?: "seguros";
 }
 
 export const TEXT_AGENT_PURPOSES: AgentPurposeMeta[] = [
@@ -81,6 +83,18 @@ export const TEXT_AGENT_PURPOSES: AgentPurposeMeta[] = [
     statColor: "text-[#67e8f9]",
     color: "from-[#1e40af] to-[#67e8f9]",
     purposeCode: "206",
+  },
+  {
+    id: "insurance-broker-assistant",
+    label: "Corredor de Seguros IA",
+    emoji: "🛡️",
+    tag: "Inbound",
+    description: "Asesor experto en seguros para Colombia: cotiza autos en tiempo real, explica coberturas y orienta en siniestros.",
+    stat: "Cotiza en minutos",
+    statColor: "text-[#6f95f2]",
+    color: "from-[#1e3a8a] to-[#6f95f2]",
+    purposeCode: "207",
+    vertical: "seguros",
   },
 ];
 

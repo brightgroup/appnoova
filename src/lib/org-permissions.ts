@@ -32,6 +32,7 @@ export const DASHBOARD_ROUTE_RULES: { prefix: string; rule: DashboardRouteRule }
   { prefix: "/dashboard/agentes-voz", rule: { module: "voice_agents", min: "view" } },
   { prefix: "/dashboard/crm", rule: { module: "crm", min: "view" } },
   { prefix: "/dashboard/campaigns", rule: { module: "campaigns", min: "view" } },
+  { prefix: "/dashboard/campanas-whatsapp", rule: { module: "campaigns", min: "view" } },
   { prefix: "/dashboard/canales", rule: { module: "channels", min: "view" } },
   { prefix: "/dashboard/conectores", rule: { module: "conectores", min: "view" } },
   { prefix: "/dashboard/workflows", rule: { module: "workflows", min: "view" } },
@@ -88,5 +89,8 @@ export function buildPermissionFlags(permissions: OrgPermissionsMap) {
     can_view_erp: canAccessModule(permissions, "erp", "view"),
     can_edit_erp: canAccessModule(permissions, "erp", "edit"),
     can_manage_erp: canAccessModule(permissions, "erp", "manage"),
+    can_view_seguros: canAccessModule(permissions, "seguros", "view"),
+    can_edit_seguros: canAccessModule(permissions, "seguros", "edit"),
+    can_manage_seguros: canAccessModule(permissions, "seguros", "manage"),
   };
 }

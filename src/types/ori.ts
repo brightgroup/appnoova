@@ -46,3 +46,9 @@ export function toolTruncationCaption(call: OriToolCall): string | null {
   if (mostrados >= total) return null;
   return `Mostrando ${mostrados} de ${total} — para el listado completo, revisa la tabla en ERP.`;
 }
+
+/** Resultado de la tool cotizar_seguro_auto (ver src/lib/insurers/auto-quote-tool.ts) — mismo shape para ORI y agentes. */
+export function toolAutoQuote(call: { name: string; result: Record<string, unknown> }): Record<string, unknown> | null {
+  if (call.name !== "cotizar_seguro_auto") return null;
+  return call.result;
+}

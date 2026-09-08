@@ -4,6 +4,7 @@ export interface WidgetMessage {
   id: string;
   role: "user" | "assistant" | "human";
   content: string;
+  toolCalls?: { name: string; result: Record<string, unknown> }[];
 }
 
 export interface WidgetChatState {

@@ -24,6 +24,8 @@ export interface AdminOrgFormValues {
   hide_noova_logo: boolean;
   /** Módulo ERP > Inventarios habilitado para esta organización. */
   erp: boolean;
+  /** Módulo Noova Seguros habilitado para esta organización. */
+  seguros: boolean;
 }
 
 interface AdminOrgModalProps {
@@ -67,6 +69,7 @@ export function AdminOrgModal({
   const [ownerPassword, setOwnerPassword] = useState("");
   const [hideNoovaLogo, setHideNoovaLogo] = useState(false);
   const [erp, setErp] = useState(false);
+  const [seguros, setSeguros] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [planOptions, setPlanOptions] = useState<{ value: string; label: string }[]>(FALLBACK_PLAN_OPTIONS);
 
@@ -101,6 +104,7 @@ export function AdminOrgModal({
       setOwnerPassword("");
       setHideNoovaLogo(initial?.hide_noova_logo === true);
       setErp(initial?.erp === true);
+      setSeguros(initial?.seguros === true);
       setCopiedLink(false);
     }
   }, [open, initial]);
@@ -298,6 +302,24 @@ export function AdminOrgModal({
               </span>
             </label>
           </div>
+
+          <div className="rounded-xl border border-white/[.08] bg-[#0d0e14]/80 p-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={seguros}
+                onChange={e => setSeguros(e.target.checked)}
+                className="mt-0.5 rounded border-white/20 bg-[#12131a] text-[#0f7eff] focus:ring-[#0f7eff]/40"
+              />
+              <span>
+                <span className="block text-sm font-medium text-white">Módulo Noova Seguros</span>
+                <span className="block text-xs text-gray-500 mt-1 leading-relaxed">
+                  Habilita «Noova Seguros» en el dashboard de esta organización: cotizador de autos y
+                  conectores de aseguradoras (La Equidad).
+                </span>
+              </span>
+            </label>
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-white/[.08] sticky bottom-0 bg-[#12131a]">
@@ -317,6 +339,7 @@ export function AdminOrgModal({
                 owner_password: ownerPassword.trim(),
                 hide_noova_logo: hideNoovaLogo,
                 erp,
+                seguros,
               })
             }
             className={btnPrimary}

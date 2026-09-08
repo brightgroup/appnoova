@@ -7,6 +7,7 @@ import {
   ShoppingBag,
   Globe,
   MessageCircle,
+  Shield,
   type LucideIcon,
 } from "lucide-react";
 import type { AgentChannel } from "@/lib/agent-purpose-catalog";
@@ -26,6 +27,7 @@ const TEXT_ICONS: Record<string, LucideIcon> = {
   "website-qa": Globe,
   "meeting-scheduling": Calendar,
   "support-follow-up": TrendingUp,
+  "insurance-broker-assistant": Shield,
 };
 
 export function getPurposeIcon(channel: AgentChannel, purposeId: string): LucideIcon {

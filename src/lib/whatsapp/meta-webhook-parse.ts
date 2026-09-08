@@ -24,6 +24,11 @@ interface MetaWebhookPayload {
           timestamp?: string;
           type?: string;
           text?: { body?: string };
+          interactive?: {
+            type?: string;
+            button_reply?: { id?: string; title?: string };
+            list_reply?: { id?: string; title?: string };
+          };
         }>;
       };
     }>;
@@ -53,8 +58,20 @@ export function parseMetaWhatsAppInboundMessages(payload: MetaWebhookPayload): M
       const contactName = value?.contacts?.[0]?.profile?.name?.trim() || null;
 
       for (const msg of value?.messages ?? []) {
-        if (msg.type !== "text" || !msg.id || !msg.from) continue;
-        const body = msg.text?.body?.trim() ?? "";
+        if (!msg.id || !msg.from) continue;
+
+        // La respuesta a un botón/lista (Fase 2.5) se normaliza como si el
+        // cliente hubiera escrito el título tal cual — el resto del pipeline
+        // (agente de texto, tools) no necesita saber que vino de un tap en
+        // vez de texto.
+        let body = "";
+        if (msg.type === "text") {
+          body = msg.text?.body?.trim() ?? "";
+        } else if (msg.type === "interactive") {
+          body = (msg.interactive?.button_reply?.title || msg.interactive?.list_reply?.title || "").trim();
+        } else {
+          continue;
+        }
         if (!body) continue;
 
         results.push({

@@ -22,7 +22,11 @@ import {
 } from "@/lib/billing/meter";
 import { providerForLlmModel } from "@/lib/billing/pricing";
 import { getOriInventoryAccess } from "@/lib/erp/ori-access-db";
-import { executeOriTool, ORI_TOOLS, ORI_GROUNDING_PROMPT } from "@/lib/agent-tools/ori-tools";
+import { getOriSegurosAccess } from "@/lib/insurers/ori-seguros-access";
+import { cotizarSeguroAutoTool } from "@/lib/agent-tools/auto-quote-ori-tool";
+import { consultarCotizacionesPendientesTool, solicitarCotizacionSeguroTool } from "@/lib/agent-tools/quote-queue-ori-tools";
+import { radicarSiniestroOriTool } from "@/lib/agent-tools/siniestro-ori-tool";
+import { executeOriTool, ORI_TOOLS, ORI_GROUNDING_PROMPT, type OriToolDefinition } from "@/lib/agent-tools/ori-tools";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -111,13 +115,23 @@ export async function POST(req: NextRequest) {
     extraNotes: timeRules.extra_notes,
   });
 
-  // Tools internas de Ori (hoy solo consultar_inventario) — nunca las de
-  // ALL_TEXT_AGENT_TOOLS, que alimentan al agente que habla con clientes
-  // externos. Se filtran por organización: erp encendido + toggle propio de Ori
-  // (ver src/lib/erp/ori-access-db.ts) — ninguna de las dos sola alcanza.
-  const oriTools = billing.organizationId && (await getOriInventoryAccess(billingDb, billing.organizationId))
-    ? ORI_TOOLS
-    : [];
+  // Tools internas de Ori — nunca las de ALL_TEXT_AGENT_TOOLS, que alimentan
+  // al agente que habla con clientes externos. Cada grupo se gatea por su
+  // propia condición de organización (inventario: erp + toggle propio en
+  // erp_ori_access; seguros: módulo seguros + al menos una aseguradora
+  // conectada, ver src/lib/insurers/ori-seguros-access.ts) y se componen acá.
+  const oriTools: OriToolDefinition[] = [];
+  if (billing.organizationId) {
+    if (await getOriInventoryAccess(billingDb, billing.organizationId)) oriTools.push(...ORI_TOOLS);
+    if (await getOriSegurosAccess(billingDb, billing.organizationId)) {
+      oriTools.push(
+        cotizarSeguroAutoTool,
+        consultarCotizacionesPendientesTool,
+        solicitarCotizacionSeguroTool,
+        radicarSiniestroOriTool
+      );
+    }
+  }
   const toolsEnabled = oriTools.length > 0;
   const toolsPromptBlock = [toolsEnabled ? ORI_GROUNDING_PROMPT : "", ...oriTools.map(t => t.promptBlock)]
     .filter(Boolean)

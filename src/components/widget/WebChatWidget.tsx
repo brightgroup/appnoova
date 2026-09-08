@@ -8,6 +8,8 @@ import { resolveMicrositeIcon } from "@/lib/microsite-icons";
 import { loadWidgetChat, saveWidgetChat, type WidgetMessage } from "@/lib/widget-storage";
 import { playWidgetMessageSound } from "@/lib/widget-sound";
 import { WidgetMessageAvatar } from "./WidgetMessageAvatar";
+import { toolAutoQuote } from "@/types/ori";
+import { AutoQuoteCard } from "@/components/insurers/AutoQuoteCard";
 
 type TabId = "home" | "chat";
 
@@ -164,7 +166,12 @@ export default function WebChatWidget({ config, previewMode = false }: WebChatWi
         if (data.reply) {
           setMessages(prev => [
             ...prev,
-            { id: crypto.randomUUID(), role: "assistant", content: String(data.reply) }
+            {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: String(data.reply),
+              toolCalls: Array.isArray(data.tool_calls) ? data.tool_calls : undefined
+            }
           ]);
         }
       } catch (e) {
@@ -283,6 +290,12 @@ export default function WebChatWidget({ config, previewMode = false }: WebChatWi
                     >
                       {msg.content}
                     </div>
+                    {msg.toolCalls?.map((call, ci) => {
+                      const autoQuote = toolAutoQuote(call);
+                      return autoQuote ? (
+                        <AutoQuoteCard key={ci} result={autoQuote} onSendMessage={sendMessage} />
+                      ) : null;
+                    })}
                   </div>
                   {msg.role === "user" && (
                     <WidgetMessageAvatar

@@ -17,6 +17,7 @@ import {
   type SchedulingRules,
   type OrgBusinessHours
 } from "@/lib/scheduling/rules";
+import { normalizeQuotingRules } from "@/lib/insurers/quoting-rules";
 import { ALL_TEXT_AGENT_TOOLS } from "@/lib/agent-tools/all-text-tools";
 import type {
   GenerateTextAgentReplyInput,
@@ -81,7 +82,8 @@ export async function generateOpenAiAgentReply(
     notifyRules: normalizeNotifyTeamRules(input.notifyRules) as NotifyTeamRules,
     schedulingRules: normalizeSchedulingRules(input.schedulingRules) as SchedulingRules,
     businessHours: normalizeOrgBusinessHours(input.businessHours) as OrgBusinessHours,
-    calendarConnection: input.calendarConnection ?? null
+    calendarConnection: input.calendarConnection ?? null,
+    quotingRules: normalizeQuotingRules(input.quotingRules)
   };
 
   const enabledTools = resolveEnabledTools(ALL_TEXT_AGENT_TOOLS, rulesCtx);
@@ -106,7 +108,7 @@ export async function generateOpenAiAgentReply(
     }))
   ];
 
-  const toolResults: AgentToolResult[] = [];
+  const toolResults: { name: string; result: AgentToolResult }[] = [];
   let usage: GeminiUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
   let response = await withLlmTimeout(
@@ -138,7 +140,7 @@ export async function generateOpenAiAgentReply(
         ...input.toolContext,
         ...rulesCtx
       });
-      toolResults.push(result);
+      toolResults.push({ name: call.function.name, result });
       messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
     }
 
