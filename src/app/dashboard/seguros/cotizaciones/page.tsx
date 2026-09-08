@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Car, Check, Copy, Loader2, MessageSquare, Plus, ShieldCheck, X } from "lucide-react";
+import { Car, Check, Copy, HeartPulse, Home, Loader2, MessageSquare, Plus, Send, ShieldCheck, X } from "lucide-react";
 import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
 import { Badge } from "@/components/ui/Badge";
 import { InfoBox } from "@/components/ui/InfoBox";
@@ -11,13 +11,24 @@ import { btnPrimary, btnGhost, modalInput } from "@/lib/brand-ui";
 
 interface QuoteRequest {
   id: string;
+  ramo: string;
   placa: string | null;
   vehiculo: { marca?: string; linea?: string };
+  datosRiesgo: Record<string, string | undefined>;
   tomador: { nombre_tomador?: string; documento_tomador?: string; fecha_nacimiento_tomador?: string };
   estado: "pendiente" | "cotizada" | "enviada_externa" | "cerrada" | "descartada";
   resultado: { aseguradora?: string; prima?: number | null } | null;
   conversationId: string | null;
   createdAt: string;
+}
+
+const RAMO_ICON: Record<string, typeof Car> = { autos: Car, vida: HeartPulse, hogar: Home };
+
+function ramoSummary(r: QuoteRequest): string {
+  if (r.ramo === "autos") return [r.vehiculo?.marca, r.vehiculo?.linea].filter(Boolean).join(" ") || "Vehículo";
+  if (r.ramo === "vida") return `Vida · suma deseada ${r.datosRiesgo?.suma_asegurada_deseada ?? "—"}`;
+  if (r.ramo === "hogar") return `Hogar · ${r.datosRiesgo?.tipo_inmueble ?? "inmueble"} estrato ${r.datosRiesgo?.estrato ?? "—"}`;
+  return r.ramo;
 }
 
 interface ExternalSource {
@@ -40,6 +51,10 @@ export default function CotizacionesQueuePage() {
   const [newSourceLabel, setNewSourceLabel] = useState("");
   const [creatingSource, setCreatingSource] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [manualEntryId, setManualEntryId] = useState<string | null>(null);
+  const [manualPrima, setManualPrima] = useState("");
+  const [manualAseguradora, setManualAseguradora] = useState("");
+  const [registeringId, setRegisteringId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -71,6 +86,31 @@ export default function CotizacionesQueuePage() {
       await load();
     } finally {
       setQuotingId(null);
+    }
+  }
+
+  async function handleRegistrarManual(id: string) {
+    const prima = Number(manualPrima.replace(/[^\d]/g, ""));
+    if (!prima) return;
+    setRegisteringId(id);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/seguros/cotizaciones/${id}/registrar-manual`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ prima, aseguradora: manualAseguradora.trim() || undefined })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "No se pudo registrar el precio");
+        return;
+      }
+      setManualEntryId(null);
+      setManualPrima("");
+      setManualAseguradora("");
+      await load();
+    } finally {
+      setRegisteringId(null);
     }
   }
 
@@ -120,7 +160,7 @@ export default function CotizacionesQueuePage() {
   return (
     <ChannelListPage
       title="Cotizaciones"
-      description="Lo que la IA ya calificó (placa + datos del tomador) y espera que un asesor solicite el precio real."
+      description="Lo que la IA ya calificó (auto, vida u hogar) y espera que un asesor solicite o registre el precio real."
       loading={loading}
       onRefresh={load}
       refreshing={loading}
@@ -132,47 +172,89 @@ export default function CotizacionesQueuePage() {
             No hay cotizaciones pendientes por ahora.
           </div>
         ) : (
-          pendientes.map(r => (
-            <div key={r.id} className="rounded-xl border border-white/[.08] bg-black/20 p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-[#2463eb]/15 flex items-center justify-center shrink-0">
-                <Car className="w-5 h-5 text-[#6f95f2]" />
+          pendientes.map(r => {
+            const RamoIcon = RAMO_ICON[r.ramo] ?? Car;
+            return (
+              <div key={r.id} className="rounded-xl border border-white/[.08] bg-black/20 p-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-[#2463eb]/15 flex items-center justify-center shrink-0">
+                    <RamoIcon className="w-5 h-5 text-[#6f95f2]" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-white">
+                      {ramoSummary(r)} {r.placa && <span className="text-gray-500 font-mono text-xs">{r.placa}</span>}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {r.tomador?.nombre_tomador} · {r.tomador?.documento_tomador}
+                    </p>
+                  </div>
+                  {r.conversationId && (
+                    <a
+                      href={`/dashboard/inbox?id=${r.conversationId}`}
+                      className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-white/[.06]"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" /> Ver chat
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleDescartar(r.id)}
+                    className="shrink-0 p-2 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10"
+                    title="Descartar"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  {r.ramo === "autos" ? (
+                    <button
+                      type="button"
+                      onClick={() => handleCotizar(r.id)}
+                      disabled={quotingId === r.id}
+                      className={`${btnPrimary} !text-xs !py-2 shrink-0 gap-1.5`}
+                    >
+                      {quotingId === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                      Solicitar cotización
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setManualEntryId(manualEntryId === r.id ? null : r.id)}
+                      className={`${btnPrimary} !text-xs !py-2 shrink-0 gap-1.5`}
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" /> Registrar precio
+                    </button>
+                  )}
+                </div>
+                {manualEntryId === r.id && (
+                  <div className="mt-3 pt-3 border-t border-white/[.06] flex items-center gap-2">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={manualPrima}
+                      onChange={e => setManualPrima(e.target.value)}
+                      placeholder="Prima en COP"
+                      className={`${modalInput} !py-1.5 !text-xs w-32`}
+                    />
+                    <input
+                      type="text"
+                      value={manualAseguradora}
+                      onChange={e => setManualAseguradora(e.target.value)}
+                      placeholder="Aseguradora (opcional)"
+                      className={`${modalInput} !py-1.5 !text-xs flex-1`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRegistrarManual(r.id)}
+                      disabled={registeringId === r.id || !manualPrima.trim()}
+                      className={`${btnPrimary} !text-xs !py-1.5 shrink-0 gap-1.5`}
+                    >
+                      {registeringId === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                      Guardar
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-white">
-                  {[r.vehiculo?.marca, r.vehiculo?.linea].filter(Boolean).join(" ") || "Vehículo"}{" "}
-                  <span className="text-gray-500 font-mono text-xs">{r.placa}</span>
-                </p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {r.tomador?.nombre_tomador} · {r.tomador?.documento_tomador}
-                </p>
-              </div>
-              {r.conversationId && (
-                <a
-                  href={`/dashboard/inbox?id=${r.conversationId}`}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-white/[.06]"
-                >
-                  <MessageSquare className="w-3.5 h-3.5" /> Ver chat
-                </a>
-              )}
-              <button
-                type="button"
-                onClick={() => handleDescartar(r.id)}
-                className="shrink-0 p-2 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10"
-                title="Descartar"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleCotizar(r.id)}
-                disabled={quotingId === r.id}
-                className={`${btnPrimary} !text-xs !py-2 shrink-0 gap-1.5`}
-              >
-                {quotingId === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-                Solicitar cotización
-              </button>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -184,8 +266,7 @@ export default function CotizacionesQueuePage() {
               <div key={r.id} className="rounded-xl border border-white/[.06] bg-black/10 p-3 flex items-center gap-4">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-gray-300">
-                    {[r.vehiculo?.marca, r.vehiculo?.linea].filter(Boolean).join(" ")}{" "}
-                    <span className="text-gray-500 font-mono">{r.placa}</span> — {r.tomador?.nombre_tomador}
+                    {ramoSummary(r)} {r.placa && <span className="text-gray-500 font-mono">{r.placa}</span>} — {r.tomador?.nombre_tomador}
                   </p>
                 </div>
                 <Badge variant={r.estado === "cotizada" || r.estado === "enviada_externa" ? "emerald" : "neutral"}>

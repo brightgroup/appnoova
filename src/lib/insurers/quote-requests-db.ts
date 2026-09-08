@@ -27,6 +27,8 @@ export interface QuoteRequestRecord {
   ramo: string;
   placa: string | null;
   vehiculo: AutoQuoteVehicle | Record<string, unknown>;
+  /** Datos del riesgo para ramos sin conector de aseguradora (vida, hogar, etc.) — vehiculo sigue siendo específico de autos. */
+  datosRiesgo: Record<string, unknown>;
   tomador: QuoteRequestTomador;
   estado: QuoteRequestEstado;
   resultado: QuoteRequestResultado | null;
@@ -46,6 +48,7 @@ interface QuoteRequestRow {
   ramo: string;
   placa: string | null;
   vehiculo: Record<string, unknown>;
+  datos_riesgo: Record<string, unknown>;
   tomador: Record<string, unknown>;
   estado: string;
   resultado: Record<string, unknown> | null;
@@ -66,6 +69,7 @@ function toRecord(row: QuoteRequestRow): QuoteRequestRecord {
     ramo: row.ramo,
     placa: row.placa,
     vehiculo: row.vehiculo ?? {},
+    datosRiesgo: row.datos_riesgo ?? {},
     tomador: (row.tomador ?? {}) as QuoteRequestTomador,
     estado: row.estado as QuoteRequestEstado,
     resultado: row.resultado as QuoteRequestResultado | null,
@@ -90,21 +94,27 @@ export async function upsertPendingQuoteRequest(
     leadId?: string | null;
     source: QuoteRequestSource;
     ramo?: string;
-    placa: string;
-    vehiculo: Record<string, unknown>;
+    /** Solo aplica a autos — otros ramos no tienen placa. */
+    placa?: string | null;
+    vehiculo?: Record<string, unknown>;
+    /** Datos del riesgo para ramos sin placa/vehículo (vida, hogar, etc.). */
+    datosRiesgo?: Record<string, unknown>;
     tomador: QuoteRequestTomador;
   }
 ): Promise<QuoteRequestRecord> {
+  const ramo = params.ramo ?? "autos";
+
   let existingId: string | null = null;
   if (params.conversationId) {
-    const { data } = await db
+    let query = db
       .from("insurance_quote_requests")
       .select("id")
       .eq("organization_id", params.organizationId)
       .eq("conversation_id", params.conversationId)
-      .eq("placa", params.placa)
-      .eq("estado", "pendiente")
-      .maybeSingle();
+      .eq("ramo", ramo)
+      .eq("estado", "pendiente");
+    query = params.placa ? query.eq("placa", params.placa) : query.is("placa", null);
+    const { data } = await query.maybeSingle();
     existingId = data?.id ?? null;
   }
 
@@ -114,9 +124,10 @@ export async function upsertPendingQuoteRequest(
     lead_id: params.leadId ?? null,
     conversation_id: params.conversationId ?? null,
     source: params.source,
-    ramo: params.ramo ?? "autos",
-    placa: params.placa,
-    vehiculo: params.vehiculo,
+    ramo,
+    placa: params.placa ?? null,
+    vehiculo: params.vehiculo ?? {},
+    datos_riesgo: params.datosRiesgo ?? {},
     tomador: params.tomador,
     estado: "pendiente" as const,
     updated_at: new Date().toISOString()

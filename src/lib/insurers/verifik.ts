@@ -72,5 +72,9 @@ export async function getVehicleValuesByPlate(plate: string): Promise<VerifikFas
   if (!res.ok) {
     throw new VerifikApiError(`Verifik devolvió un error (HTTP ${res.status})`, res.status, data);
   }
-  return data as VerifikFasecoldaValueByPlate;
+  // La respuesta real viene envuelta en {data: {...campos del vehículo...},
+  // signature, id} — devolver `data` (el sobre completo) sin desempacar
+  // dejaba marke/line1/homoloCode/etc. como undefined en todos los casos.
+  const vehicle = data && typeof data === "object" && "data" in data ? data.data : data;
+  return vehicle as VerifikFasecoldaValueByPlate;
 }

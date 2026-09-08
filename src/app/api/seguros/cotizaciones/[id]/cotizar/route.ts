@@ -19,6 +19,12 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   if (record.estado !== "pendiente") {
     return NextResponse.json({ error: `Esta cotización ya está en estado "${record.estado}"` }, { status: 400 });
   }
+  if (record.ramo !== "autos") {
+    return NextResponse.json(
+      { error: `El ramo "${record.ramo}" no tiene cotización automática — regístrala manualmente.` },
+      { status: 400 }
+    );
+  }
 
   const { nombre_tomador, documento_tomador, fecha_nacimiento_tomador } = record.tomador;
   if (!nombre_tomador || !documento_tomador || !fecha_nacimiento_tomador) {

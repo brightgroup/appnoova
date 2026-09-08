@@ -6,6 +6,7 @@ import {
   getWhatsAppChannelByE164
 } from "@/lib/whatsapp-server";
 import { processTwilioWhatsAppInbound } from "@/lib/whatsapp/process-inbound";
+import { resolvePendingInteractiveReply } from "@/lib/whatsapp/interactive-reply-resolve";
 import { validateTwilioWebhookRequest } from "@/lib/whatsapp/twilio-webhook-auth";
 import { twilioWhatsAppWebhookUrl } from "@/lib/telephony/app-url";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
@@ -73,11 +74,14 @@ export async function POST(req: NextRequest) {
     return new NextResponse("", { status: 200 });
   }
 
+  const fromE164 = parseTwilioWhatsAppAddress(fromRaw);
+  const resolvedBody = await resolvePendingInteractiveReply(db, channel.id, fromE164, body);
+
   const result = await processTwilioWhatsAppInbound(db, channel, {
     messageSid,
-    fromE164: parseTwilioWhatsAppAddress(fromRaw),
+    fromE164,
     toE164: businessE164,
-    body,
+    body: resolvedBody,
     profileName,
     media
   });

@@ -698,6 +698,11 @@ async function processTwilioWhatsAppInboundLocked(
   // El guardián del catálogo tuvo que eliminar un dato que el agente afirmó
   // sin respaldo: el cliente se queda sin respuesta y necesita un asesor.
   let catalogNeedsHuman = false;
+  // `presentar_opciones_whatsapp` ya le manda los botones/lista al cliente como
+  // efecto secundario de la tool — si además se envía el `reply` de texto normal
+  // (obligatorio para cerrar el turno, ver generateTextAgentReply), el cliente ve
+  // la pregunta duplicada: una vez en el mensaje interactivo, otra vez en texto.
+  let alreadyDeliveredInteractive = false;
 
   try {
     await updateWhatsAppConversationMetadata(
@@ -813,6 +818,9 @@ async function processTwilioWhatsAppInboundLocked(
         JSON.stringify(generated.toolResults)
       );
     }
+    alreadyDeliveredInteractive = generated.toolResults.some(
+      tr => tr.name === "presentar_opciones_whatsapp" && (tr.result as { ok?: boolean })?.ok === true
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error IA";
     console.error("[whatsapp/inbound] generación de respuesta falló tras reintento, escalando a humano:", msg);
@@ -897,18 +905,23 @@ async function processTwilioWhatsAppInboundLocked(
     await new Promise(resolve => setTimeout(resolve, MIN_TYPING_VISIBLE_MS - elapsedSinceTyping));
   }
 
-  const sendResult = await sendWhatsAppIfAllowed(
-    db,
-    channel,
-    inbound.fromE164,
-    reply,
-    nowIso,
-    optedOutAfter
-  );
+  // Cuando la tool ya entregó el mensaje interactivo, no hay un segundo envío
+  // de texto que contar aquí — ese envío ya se contabilizó dentro de la tool.
+  let sendResult: { ok: boolean; error?: string; sentCount?: number } = { ok: true, sentCount: 0 };
+  if (!alreadyDeliveredInteractive) {
+    sendResult = await sendWhatsAppIfAllowed(
+      db,
+      channel,
+      inbound.fromE164,
+      reply,
+      nowIso,
+      optedOutAfter
+    );
 
-  if (!sendResult.ok) {
-    console.error("[whatsapp/inbound] send:", sendResult.error);
-    return { ok: false, error: sendResult.error };
+    if (!sendResult.ok) {
+      console.error("[whatsapp/inbound] send:", sendResult.error);
+      return { ok: false, error: sendResult.error };
+    }
   }
 
   if (orgId) {

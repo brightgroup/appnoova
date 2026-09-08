@@ -8,7 +8,7 @@ import { resolveMicrositeIcon } from "@/lib/microsite-icons";
 import { loadWidgetChat, saveWidgetChat, type WidgetMessage } from "@/lib/widget-storage";
 import { playWidgetMessageSound } from "@/lib/widget-sound";
 import { WidgetMessageAvatar } from "./WidgetMessageAvatar";
-import { toolAutoQuote } from "@/types/ori";
+import { toolInsuranceQuote } from "@/types/ori";
 import { AutoQuoteCard } from "@/components/insurers/AutoQuoteCard";
 
 type TabId = "home" | "chat";
@@ -291,9 +291,9 @@ export default function WebChatWidget({ config, previewMode = false }: WebChatWi
                       {msg.content}
                     </div>
                     {msg.toolCalls?.map((call, ci) => {
-                      const autoQuote = toolAutoQuote(call);
-                      return autoQuote ? (
-                        <AutoQuoteCard key={ci} result={autoQuote} onSendMessage={sendMessage} />
+                      const quote = toolInsuranceQuote(call);
+                      return quote ? (
+                        <AutoQuoteCard key={ci} result={quote.result} ramo={quote.ramo} onSendMessage={sendMessage} />
                       ) : null;
                     })}
                   </div>

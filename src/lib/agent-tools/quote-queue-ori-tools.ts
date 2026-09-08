@@ -15,7 +15,7 @@ export const consultarCotizacionesPendientesTool: OriToolDefinition = {
   declaration: {
     name: "consultar_cotizaciones_pendientes",
     description:
-      "Lista las cotizaciones de seguro de auto que la IA ya calificó (tiene placa y datos del tomador) y están esperando que un asesor solicite el precio real. Úsala cuando te pregunten qué cotizaciones hay pendientes, o antes de solicitar una.",
+      "Lista las cotizaciones de seguro (auto, vida u hogar) que la IA ya calificó y están esperando que un asesor solicite/confirme el precio real. Úsala cuando te pregunten qué cotizaciones hay pendientes, o antes de solicitar una.",
     parameters: { type: Type.OBJECT, properties: {} }
   },
   promptBlock:
@@ -27,8 +27,10 @@ export const consultarCotizacionesPendientesTool: OriToolDefinition = {
       total: pendientes.length,
       cotizaciones: pendientes.map(q => ({
         id: q.id,
+        ramo: q.ramo,
         placa: q.placa,
         vehiculo: q.vehiculo,
+        datos_riesgo: q.datosRiesgo,
         tomador: q.tomador,
         desde: q.createdAt
       }))
@@ -60,6 +62,12 @@ export const solicitarCotizacionSeguroTool: OriToolDefinition = {
     if (!record) return { ok: false, reason: "No encontré esa cotización pendiente." };
     if (record.estado !== "pendiente") {
       return { ok: false, reason: `Esa cotización ya está en estado "${record.estado}", no "pendiente".` };
+    }
+    if (record.ramo !== "autos") {
+      return {
+        ok: false,
+        reason: `El ramo "${record.ramo}" todavía no tiene cotización automática — hay que cotizarlo manualmente contra la aseguradora y registrar el precio desde la plataforma.`
+      };
     }
     const { nombre_tomador, documento_tomador, fecha_nacimiento_tomador } = record.tomador;
     if (!nombre_tomador || !documento_tomador || !fecha_nacimiento_tomador) {

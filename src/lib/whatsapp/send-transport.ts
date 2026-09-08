@@ -5,6 +5,7 @@ import {
   sendTwilioTypingIndicator
 } from "@/lib/whatsapp/twilio-whatsapp";
 import { createTwilioQuickReplyContent, createTwilioListPickerContent } from "@/lib/whatsapp/twilio-content";
+import { savePendingInteractiveOptions } from "@/lib/whatsapp/interactive-reply-resolve";
 import {
   isMetaWhatsAppChannel,
   readMetaAccessToken,
@@ -171,6 +172,14 @@ export async function sendWhatsAppInteractiveMessage(
       accountSid: channel.twilio_subaccount_sid,
       authToken: channel.twilio_subaccount_auth_token
     });
+    if (input.db) {
+      await savePendingInteractiveOptions(
+        input.db,
+        channel.id,
+        toE164,
+        Object.fromEntries(buttons.map(b => [b.id, b.title]))
+      );
+    }
     return { externalId: twilio.sid };
   }
 
@@ -191,6 +200,14 @@ export async function sendWhatsAppInteractiveMessage(
       accountSid: channel.twilio_subaccount_sid,
       authToken: channel.twilio_subaccount_auth_token
     });
+    if (input.db) {
+      await savePendingInteractiveOptions(
+        input.db,
+        channel.id,
+        toE164,
+        Object.fromEntries(items.map(r => [r.id, r.title]))
+      );
+    }
     return { externalId: twilio.sid };
   }
 

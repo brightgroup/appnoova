@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 
 import type { MicrositeQuickAction } from "@/types/microsite";
-import { toolAutoQuote } from "@/types/ori";
+import { toolInsuranceQuote } from "@/types/ori";
 import { AutoQuoteCard } from "@/components/insurers/AutoQuoteCard";
 
 interface Message {
@@ -662,9 +662,9 @@ export default function AgenteClientesClient() {
                       {msg.content}
                     </div>
                     {msg.toolCalls?.map((call, ci) => {
-                      const autoQuote = toolAutoQuote(call);
-                      return autoQuote ? (
-                        <AutoQuoteCard key={ci} result={autoQuote} onSendMessage={sendMessage} />
+                      const quote = toolInsuranceQuote(call);
+                      return quote ? (
+                        <AutoQuoteCard key={ci} result={quote.result} ramo={quote.ramo} onSendMessage={sendMessage} />
                       ) : null;
                     })}
                   </div>

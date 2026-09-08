@@ -5,7 +5,7 @@ import {
   toolProductRows,
   toolMovementRows,
   toolTruncationCaption,
-  toolAutoQuote,
+  toolInsuranceQuote,
   type OriToolCall
 } from "@/types/ori";
 import { AutoQuoteCard } from "@/components/insurers/AutoQuoteCard";
@@ -32,10 +32,10 @@ export function OriToolResultView({
         const productos = toolProductRows(call);
         const movimientos = toolMovementRows(call);
         const caption = toolTruncationCaption(call);
-        const autoQuote = toolAutoQuote(call);
+        const quote = toolInsuranceQuote(call);
 
-        if (autoQuote && onSendMessage) {
-          return <AutoQuoteCard key={i} result={autoQuote} onSendMessage={onSendMessage} />;
+        if (quote && onSendMessage) {
+          return <AutoQuoteCard key={i} result={quote.result} ramo={quote.ramo} onSendMessage={onSendMessage} />;
         }
 
         if (productos.length > 0) {

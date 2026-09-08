@@ -3,21 +3,14 @@ import { parseOrgModules } from "@/lib/org-modules";
 
 /**
  * Si ORI (copiloto interno) puede cotizar seguros para esta organización.
- * A diferencia de ERP (que además exige un toggle propio en erp_ori_access),
- * acá alcanza con el módulo `seguros` encendido + al menos una aseguradora
- * conectada — ORI es el copiloto del propio corredor, no un canal público.
+ * Alcanza con el módulo `seguros` encendido — ORI es el copiloto del propio
+ * corredor, no un canal público. Antes exigía además una aseguradora
+ * conectada, pero eso bloqueaba de raíz las tools de vida/hogar (nunca van a
+ * tener conector) y hacía inútil la cola humana antes de conectar la primera
+ * aseguradora; cada tool ya avisa por su cuenta cuando algo puntual (ej. la
+ * cotización automática de autos) sí necesita un conector.
  */
 export async function getOriSegurosAccess(db: SupabaseClient, organizationId: string): Promise<boolean> {
-  const [{ data: org }, { data: connections }] = await Promise.all([
-    db.from("organizations").select("settings").eq("id", organizationId).maybeSingle(),
-    db
-      .from("insurer_connections")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("status", "active")
-      .limit(1)
-  ]);
-
-  if (!parseOrgModules(org?.settings).seguros) return false;
-  return (connections?.length ?? 0) > 0;
+  const { data: org } = await db.from("organizations").select("settings").eq("id", organizationId).maybeSingle();
+  return parseOrgModules(org?.settings).seguros;
 }

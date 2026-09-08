@@ -24,6 +24,8 @@ import { providerForLlmModel } from "@/lib/billing/pricing";
 import { getOriInventoryAccess } from "@/lib/erp/ori-access-db";
 import { getOriSegurosAccess } from "@/lib/insurers/ori-seguros-access";
 import { cotizarSeguroAutoTool } from "@/lib/agent-tools/auto-quote-ori-tool";
+import { calificarSeguroVidaOriTool } from "@/lib/agent-tools/life-quote-ori-tool";
+import { calificarSeguroHogarOriTool } from "@/lib/agent-tools/home-quote-ori-tool";
 import { consultarCotizacionesPendientesTool, solicitarCotizacionSeguroTool } from "@/lib/agent-tools/quote-queue-ori-tools";
 import { radicarSiniestroOriTool } from "@/lib/agent-tools/siniestro-ori-tool";
 import { executeOriTool, ORI_TOOLS, ORI_GROUNDING_PROMPT, type OriToolDefinition } from "@/lib/agent-tools/ori-tools";
@@ -118,14 +120,16 @@ export async function POST(req: NextRequest) {
   // Tools internas de Ori — nunca las de ALL_TEXT_AGENT_TOOLS, que alimentan
   // al agente que habla con clientes externos. Cada grupo se gatea por su
   // propia condición de organización (inventario: erp + toggle propio en
-  // erp_ori_access; seguros: módulo seguros + al menos una aseguradora
-  // conectada, ver src/lib/insurers/ori-seguros-access.ts) y se componen acá.
+  // erp_ori_access; seguros: módulo seguros encendido, ver
+  // src/lib/insurers/ori-seguros-access.ts) y se componen acá.
   const oriTools: OriToolDefinition[] = [];
   if (billing.organizationId) {
     if (await getOriInventoryAccess(billingDb, billing.organizationId)) oriTools.push(...ORI_TOOLS);
     if (await getOriSegurosAccess(billingDb, billing.organizationId)) {
       oriTools.push(
         cotizarSeguroAutoTool,
+        calificarSeguroVidaOriTool,
+        calificarSeguroHogarOriTool,
         consultarCotizacionesPendientesTool,
         solicitarCotizacionSeguroTool,
         radicarSiniestroOriTool
