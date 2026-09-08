@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { decryptToken, encryptToken } from "@/lib/crypto/token-cipher";
 
 /** Ampliar junto con el CHECK de 113_insurer_connections.sql al sumar una aseguradora. */
-export type InsurerProviderKey = "la_equidad" | "verifik";
+export type InsurerProviderKey = "la_equidad" | "verifik" | "placapi";
 
 export type InsurerConnectionStatus = "pending" | "active" | "disconnected" | "error";
 

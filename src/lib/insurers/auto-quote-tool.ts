@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getVehicleValuesByPlate, VerifikApiError, type VerifikFasecoldaValueByPlate } from "@/lib/insurers/verifik";
 import { getInsurerCredentials } from "@/lib/insurers/insurer-connections-db";
+import {
+  resolveVehicleDataProvider,
+  isVehicleProviderApiError,
+  type VehicleLookupResult
+} from "@/lib/insurers/vehicle-data-provider";
 import {
   countRecentVehicleLookups,
   logVehicleLookup,
@@ -46,14 +50,7 @@ export interface AutoQuoteInput {
   fecha_nacimiento_tomador?: string;
 }
 
-export interface AutoQuoteVehicle {
-  marca: string;
-  linea: string;
-  clase?: string;
-  categoria?: string;
-  combustible?: string;
-  codigo_fasecolda?: string;
-}
+export type AutoQuoteVehicle = VehicleLookupResult;
 
 export interface AutoQuoteResult {
   ok: boolean;
@@ -82,17 +79,6 @@ export interface AutoQuoteOptions {
 }
 
 const REQUIRED_TOMADOR_FIELDS = ["nombre_tomador", "documento_tomador", "fecha_nacimiento_tomador"] as const;
-
-function toVehicleSummary(v: VerifikFasecoldaValueByPlate): AutoQuoteVehicle {
-  return {
-    marca: v.marke,
-    linea: [v.line1, v.line2, v.line3].filter(Boolean).join(" "),
-    clase: v.class,
-    categoria: v.category,
-    combustible: v.fuel,
-    codigo_fasecolda: v.homoloCode
-  };
-}
 
 /** Llama de verdad a la aseguradora conectada y devuelve la prima — usado tanto en modo autónomo como cuando el asesor solicita el precio manualmente desde la cola. */
 export async function ejecutarCotizacionReal(
@@ -165,13 +151,20 @@ export async function cotizarSeguroAuto(
   const placa = input.placa?.trim();
   if (!placa) return { ok: false, reason: "Falta la placa del vehículo." };
 
-  const ownVerifik = await getInsurerCredentials<{ token: string }>(ctx.db, ctx.organizationId, "verifik");
+  const provider = await resolveVehicleDataProvider(ctx.db, ctx.organizationId);
   const contactKey = options.contactE164?.trim() || null;
 
+  // PlacApi exige placa + documento del propietario en la misma consulta —
+  // sin eso no se puede llamar, así que se pide como cualquier otro dato
+  // faltante antes de gastar ninguna consulta.
+  if (provider.requiresOwnerDocument && !input.documento_tomador?.trim()) {
+    return { ok: true, faltan_datos: ["documento_tomador"] };
+  }
+
   // El límite anti-abuso solo protege la cuenta COMPARTIDA de Noova — si el
-  // corredor conectó su propia cuenta de Verifik, ese gasto es suyo, no hay
-  // nada que limitar de parte de Noova.
-  if (!ownVerifik && contactKey) {
+  // corredor conectó su propia cuenta (de cualquiera de los dos
+  // proveedores), ese gasto es suyo, no hay nada que limitar de parte de Noova.
+  if (!provider.usingOwnAccount && contactKey) {
     const recentLookups = await countRecentVehicleLookups(ctx.db, ctx.organizationId, contactKey);
     if (recentLookups >= VEHICLE_LOOKUP_MAX_PER_WINDOW) {
       return {
@@ -184,12 +177,12 @@ export async function cotizarSeguroAuto(
 
   let vehiculo: AutoQuoteVehicle;
   try {
-    vehiculo = toVehicleSummary(await getVehicleValuesByPlate(placa, ownVerifik?.credentials.token));
+    vehiculo = await provider.lookup(placa, input.documento_tomador);
   } catch (err) {
-    const reason = err instanceof VerifikApiError ? err.message : "No se pudo consultar el vehículo por placa.";
+    const reason = isVehicleProviderApiError(err) ? err.message : "No se pudo consultar el vehículo por placa.";
     return { ok: false, reason };
   }
-  if (!ownVerifik && contactKey) {
+  if (!provider.usingOwnAccount && contactKey) {
     await logVehicleLookup(ctx.db, ctx.organizationId, contactKey, placa);
   }
 

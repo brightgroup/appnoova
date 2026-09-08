@@ -11,25 +11,39 @@ interface InsurerConnection {
 }
 
 /**
- * Fila de conector de Verifik — opcional. Si el corredor ya tiene su propia
- * cuenta de Verifik (para otros usos suyos), la conecta acá y el cotizador
- * de autos la usa en vez de la cuenta compartida de Noova (que cobra un
- * margen por consulta). Un solo campo (token JWT), a diferencia de
+ * Fila de conector de un solo campo (API key/token) para los proveedores de
+ * datos vehiculares opcionales (Verifik, PlacApi) — si el corredor ya tiene
+ * su propia cuenta, la conecta acá y el cotizador de autos la usa en vez de
+ * la cuenta compartida de Noova (que cobra un pequeño margen). Distinta de
  * InsurerConnectorRow (usuario/contraseña) que usan La Equidad/Softseguros.
  */
-export function VerifikConnectorRow() {
+export function VehicleDataConnectorRow({
+  providerKey,
+  letters,
+  name,
+  fieldLabel,
+  helpText
+}: {
+  providerKey: "verifik" | "placapi";
+  letters: string;
+  name: string;
+  fieldLabel: string;
+  helpText: string;
+}) {
   const [loading, setLoading] = useState(true);
   const [connection, setConnection] = useState<InsurerConnection | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [token, setToken] = useState("");
+  const [value, setValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  const bodyKey = providerKey === "placapi" ? "apiKey" : "token";
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const headers = await getAuthHeaders();
-      const res = await fetch("/api/seguros/conectores/verifik/status", { headers });
+      const res = await fetch(`/api/seguros/conectores/${providerKey}/status`, { headers });
       const data = await res.json();
       if (!cancelled && res.ok) setConnection(data.connection ?? null);
       if (!cancelled) setLoading(false);
@@ -37,29 +51,29 @@ export function VerifikConnectorRow() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [providerKey]);
 
   const isActive = connection?.status === "active";
 
   async function handleConnect() {
-    if (!token.trim()) return;
+    if (!value.trim()) return;
     setSubmitting(true);
     setError("");
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch("/api/seguros/conectores/verifik/connect", {
+      const res = await fetch(`/api/seguros/conectores/${providerKey}/connect`, {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ token: token.trim() })
+        body: JSON.stringify({ [bodyKey]: value.trim() })
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "No se pudo conectar con Verifik.");
+        setError(data.error || `No se pudo conectar con ${name}.`);
         return;
       }
       setConnection({ status: "active", lastError: null });
       setShowForm(false);
-      setToken("");
+      setValue("");
     } catch {
       setError("Error de red al conectar.");
     } finally {
@@ -71,7 +85,7 @@ export function VerifikConnectorRow() {
     setSubmitting(true);
     try {
       const headers = await getAuthHeaders();
-      await fetch("/api/seguros/conectores/verifik/disconnect", { method: "POST", headers });
+      await fetch(`/api/seguros/conectores/${providerKey}/disconnect`, { method: "POST", headers });
       setConnection({ status: "disconnected", lastError: null });
     } finally {
       setSubmitting(false);
@@ -82,10 +96,10 @@ export function VerifikConnectorRow() {
     <div className="p-4">
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-[#2463eb]/15 flex items-center justify-center shrink-0">
-          <span className="text-[11px] font-bold text-[#6f95f2]">VK</span>
+          <span className="text-[11px] font-bold text-[#6f95f2]">{letters}</span>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-white">Verifik (tu propia cuenta)</p>
+          <p className="text-sm font-medium text-white">{name}</p>
           {loading ? (
             <p className="text-[11px] text-gray-500">Cargando…</p>
           ) : isActive ? (
@@ -121,26 +135,22 @@ export function VerifikConnectorRow() {
 
       {showForm && !isActive && (
         <div className="mt-3 pl-11 space-y-2">
-          <p className="text-[11px] text-gray-500 leading-relaxed">
-            Si ya usas Verifik por tu cuenta (fuera de Noova), pega acá el token de tu panel
-            (Settings → API Key) para que el cotizador de autos use tu cuenta en vez de la de Noova —
-            sin este conector, cada consulta corre por la cuenta compartida de Noova con un pequeño margen.
-          </p>
+          <p className="text-[11px] text-gray-500 leading-relaxed">{helpText}</p>
           {error && <p className="text-[11px] text-red-400">{error}</p>}
           <div className="relative">
             <KeyRound className="w-3.5 h-3.5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="Token de Verifik (JWT)"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder={fieldLabel}
               className={`${modalInput} !pl-8`}
             />
           </div>
           <button
             type="button"
             onClick={handleConnect}
-            disabled={submitting || !token.trim()}
+            disabled={submitting || !value.trim()}
             className={`${btnPrimary} !text-xs !py-1.5 gap-1.5`}
           >
             {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}

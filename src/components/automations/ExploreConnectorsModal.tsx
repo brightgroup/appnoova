@@ -9,7 +9,7 @@ import { HubSpotLogo } from "@/components/icons/brands/HubSpotLogo";
 import { Badge } from "@/components/ui/Badge";
 import { CollapsibleGroup } from "@/components/ui/CollapsibleGroup";
 import { InsurerConnectorRow } from "@/components/automations/InsurerConnectorRow";
-import { VerifikConnectorRow } from "@/components/automations/VerifikConnectorRow";
+import { VehicleDataConnectorRow } from "@/components/automations/VehicleDataConnectorRow";
 import { btnPrimary, btnGhost, modalInput } from "@/lib/brand-ui";
 
 interface ExploreConnectorsModalProps {
@@ -76,7 +76,22 @@ export function ExploreConnectorsModal({
           >
             <InsurerConnectorRow providerKey="la_equidad" letters="LE" name="La Equidad Seguros" />
             <div className="border-t border-white/5">
-              <VerifikConnectorRow />
+              <VehicleDataConnectorRow
+                providerKey="placapi"
+                letters="PK"
+                name="PlacApi (tu propia cuenta)"
+                fieldLabel="API key de PlacApi"
+                helpText="Si ya usas PlacApi por tu cuenta (fuera de Noova), pega acá tu API key para que el cotizador de autos use tu cuenta en vez de la de Noova."
+              />
+            </div>
+            <div className="border-t border-white/5">
+              <VehicleDataConnectorRow
+                providerKey="verifik"
+                letters="VK"
+                name="Verifik (tu propia cuenta)"
+                fieldLabel="Token de Verifik (JWT)"
+                helpText="Si ya usas Verifik por tu cuenta (fuera de Noova), pega acá el token de tu panel (Settings → API Key) para que el cotizador de autos use tu cuenta en vez de la de Noova."
+              />
             </div>
           </CollapsibleGroup>
         )

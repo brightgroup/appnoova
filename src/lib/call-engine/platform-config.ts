@@ -42,7 +42,7 @@ export const DEFAULT_TIME_RULES: TimeRules = {
   extra_notes: [],
 };
 
-async function readSetting<T>(db: Db, key: string, fallback: T): Promise<T> {
+export async function readSetting<T>(db: Db, key: string, fallback: T): Promise<T> {
   const { data, error } = await db
     .from("platform_settings")
     .select("value")

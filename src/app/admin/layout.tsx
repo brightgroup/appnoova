@@ -24,6 +24,7 @@ const NAV_ITEMS = [
   { href: "/admin/pricing",       label: "Pricing",          icon: Settings2 },
   { href: "/admin/roles",         label: "Roles",            icon: KeyRound },
   { href: "/admin/motor-llamadas", label: "Motor de llamadas", icon: PhoneOutgoing },
+  { href: "/admin/seguros",       label: "Seguros",           icon: Shield },
   { href: "/admin/telephony",     label: "Líneas telefónicas", icon: Phone, badgeKey: "telephony" as const },
   { href: "/admin/whatsapp",      label: "WhatsApp",         icon: Phone },
   { href: "/admin/templates",     label: "Agentes IA",       icon: Settings },
