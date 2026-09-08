@@ -186,6 +186,7 @@ export default function FacturacionPage() {
   const [showBuyCredits, setShowBuyCredits] = useState(false);
   const [buyPackageId, setBuyPackageId] = useState<string | null>(null);
   const { openCheckout: openCreditsCheckout, loading: buyingCredits, error: buyCreditsError } = usePaddleCheckout();
+  const { openCheckout: openPlanCheckout, loading: payingPlan } = usePaddleCheckout();
   const [data, setData]       = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
@@ -507,12 +508,27 @@ export default function FacturacionPage() {
                         {" · "}US$ {fmtN(nextDueInvoice.amount_usd)}
                       </p>
                     </div>
-                    <button
-                      onClick={() => setTab("invoices")}
-                      className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg border border-white/15 hover:bg-white/10 transition-colors"
-                    >
-                      Ver factura
-                    </button>
+                    <div className="shrink-0 flex items-center gap-2">
+                      {sub?.billing_provider !== "paddle" && sub?.plan_id && (
+                        <button
+                          onClick={() => openPlanCheckout(
+                            "/api/billing/paddle/checkout",
+                            { plan_id: sub.plan_id },
+                            () => void load()
+                          )}
+                          disabled={payingPlan}
+                          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[var(--nv-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                        >
+                          {payingPlan ? "Abriendo…" : "Pagar ahora"}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setTab("invoices")}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-white/15 hover:bg-white/10 transition-colors"
+                      >
+                        Ver factura
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -1260,7 +1276,11 @@ export default function FacturacionPage() {
                             </div>
                           </div>
                         )}
-                        {!isActive && p.price_usd > 0 && (
+                        {/* El botón de pago con tarjeta debe verse incluso en el plan activo
+                            cuando el cliente todavía paga por transferencia (billing_provider
+                            !== 'paddle') — si no, un cliente en modo manual no tiene ninguna
+                            forma de pagar su plan actual desde el panel. */}
+                        {p.price_usd > 0 && (!isActive || sub?.billing_provider !== "paddle") && (
                           <div className="px-5 pb-5">
                             <PaddleCheckoutButton
                             planId={p.id}
