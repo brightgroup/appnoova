@@ -5,6 +5,7 @@ import { Loader2, Search } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { formatLeadValue, filterPipelineStages } from "@/lib/crm-record";
 import { inputSearch } from "@/lib/brand-ui";
+import { PlateBadge } from "@/components/crm/PlateBadge";
 import type { CrmLead, CrmPipelineStage } from "@/types/crm";
 
 const PAGE_SIZE = 25;
@@ -266,6 +267,9 @@ export function CrmLeadsKanban({ stages, outcome, currentUserName, onSelectLead,
                       </div>
                       {lead.contact?.name && (
                         <p className="text-xs text-gray-400 mt-0.5 truncate">{lead.contact.name}</p>
+                      )}
+                      {typeof lead.metadata?.placa === "string" && lead.metadata.placa && (
+                        <PlateBadge plate={lead.metadata.placa} className="mt-1.5" />
                       )}
                       {(lead.categoria_interes || lead.producto_interes) && (
                         <p className="mt-2 text-[11px] leading-snug text-gray-400 line-clamp-2">

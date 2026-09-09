@@ -20,6 +20,9 @@ export interface VerifikFasecoldaValueByPlate {
   category?: string;
   fuel?: string;
   bcpp?: string;
+  /** Año/modelo real del vehículo consultado (confirmado en respuesta real 2026-09-08, placa RIL102). */
+  year?: string;
+  /** Valor por año — confirmado en COP de miles (ej. "45100" = $45.100.000) contra un caso real. */
   valueModel?: Array<{ modelo?: string; valor?: string; estado?: string }>;
   homoloCode?: string;
   [key: string]: unknown;

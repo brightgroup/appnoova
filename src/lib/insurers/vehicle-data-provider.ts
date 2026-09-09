@@ -39,6 +39,10 @@ export interface VehicleLookupResult {
   categoria?: string;
   combustible?: string;
   codigo_fasecolda?: string;
+  /** Año/modelo del vehículo. */
+  modelo?: number;
+  /** Valor comercial de referencia, en COP (no en miles). */
+  valor_comercial?: number;
 }
 
 interface ResolvedProvider {
@@ -49,13 +53,22 @@ interface ResolvedProvider {
 }
 
 function mapVerifik(v: Awaited<ReturnType<typeof getVehicleValuesByPlate>>): VehicleLookupResult {
+  const modelo = v.year ? Number(v.year) : undefined;
+  const matchingYear = v.valueModel?.find(m => Number(m.modelo) === modelo);
+  // Verifik reporta el valor en miles de COP (confirmado contra un caso real:
+  // Jetta 2011 con valores 2008-2015 entre 27.900 y 45.100, consistentes con
+  // $27.9M-$45.1M) — se multiplica por 1000 para dejarlo en COP planos, igual
+  // que PlacApi (que sí devuelve el valor completo).
+  const valorComercial = matchingYear?.valor ? Number(matchingYear.valor) * 1000 : undefined;
   return {
     marca: v.marke,
     linea: [v.line1, v.line2, v.line3].filter(Boolean).join(" "),
     clase: v.class,
     categoria: v.category,
     combustible: v.fuel,
-    codigo_fasecolda: v.homoloCode
+    codigo_fasecolda: v.homoloCode,
+    modelo,
+    valor_comercial: valorComercial
   };
 }
 
@@ -66,7 +79,9 @@ function mapPlacApi(v: Awaited<ReturnType<typeof getVehicleValueByPlate>>): Vehi
     clase: v.clase,
     categoria: v.categoria,
     combustible: v.combustible,
-    codigo_fasecolda: v.codigo ?? v.codigoHomologado
+    codigo_fasecolda: v.codigo ?? v.codigoHomologado,
+    modelo: v.modelo,
+    valor_comercial: v.valorComercial
   };
 }
 

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AutoQuoteVehicle } from "@/lib/insurers/auto-quote-tool";
+import { syncQuoteToLeadMetadata } from "@/lib/crm-insurance-sync";
 
 export type QuoteRequestEstado = "pendiente" | "cotizada" | "enviada_externa" | "cerrada" | "descartada";
 export type QuoteRequestSource = "whatsapp" | "web" | "ori" | "manual";
@@ -138,6 +139,22 @@ export async function upsertPendingQuoteRequest(
     : await db.from("insurance_quote_requests").insert(payload).select("*").single();
 
   if (error || !data) throw new Error(error?.message ?? "No se pudo guardar la solicitud de cotización");
+
+  const vehiculo = params.vehiculo ?? {};
+  const strOrNull = (v: unknown) => (typeof v === "string" ? v : v == null ? null : String(v));
+  const numOrNull = (v: unknown) => (typeof v === "number" ? v : null);
+  await syncQuoteToLeadMetadata(db, params.leadId, {
+    placa: params.placa ?? null,
+    ramo: ramo === "autos" ? "Auto" : ramo === "vida" ? "Vida" : ramo === "hogar" ? "Hogar" : ramo,
+    vehiculo_marca: strOrNull(vehiculo.marca),
+    vehiculo_linea: strOrNull(vehiculo.linea),
+    vehiculo_modelo: numOrNull(vehiculo.modelo),
+    vehiculo_valor_comercial: numOrNull(vehiculo.valor_comercial),
+    vehiculo_codigo_fasecolda: strOrNull(vehiculo.codigo_fasecolda),
+    vehiculo_categoria: strOrNull(vehiculo.categoria),
+    vehiculo_combustible: strOrNull(vehiculo.combustible)
+  });
+
   return toRecord(data as QuoteRequestRow);
 }
 
@@ -198,7 +215,7 @@ export async function markQuoteRequestQuoted(
   id: string,
   params: { resultado: QuoteRequestResultado; quotedByUserId?: string | null; externalSource?: string | null }
 ): Promise<void> {
-  await db
+  const { data } = await db
     .from("insurance_quote_requests")
     .update({
       estado: params.externalSource ? "enviada_externa" : "cotizada",
@@ -207,7 +224,16 @@ export async function markQuoteRequestQuoted(
       external_source: params.externalSource ?? null,
       updated_at: new Date().toISOString()
     })
-    .eq("id", id);
+    .eq("id", id)
+    .select("lead_id")
+    .maybeSingle();
+
+  await syncQuoteToLeadMetadata(db, data?.lead_id as string | null | undefined, {
+    aseguradora_cotizada: params.resultado.aseguradora ?? null,
+    prima_cotizada: params.resultado.prima ?? null,
+    vigencia_desde: params.resultado.vigencia_desde ?? null,
+    vigencia_hasta: params.resultado.vigencia_hasta ?? null
+  });
 }
 
 export async function updateQuoteRequestEstado(

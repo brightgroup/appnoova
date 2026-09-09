@@ -15,6 +15,7 @@ import {
 } from "@/lib/crm-lead-utils";
 import { FUENTE_ORIGEN_OPTIONS } from "@/lib/crm-contactability";
 import { CrmOriQuotePanel } from "@/components/crm/CrmOriQuotePanel";
+import { PlateBadge } from "@/components/crm/PlateBadge";
 import { CrmFieldProvenanceBadge } from "@/components/crm/CrmFieldProvenanceBadge";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { btnGhost } from "@/lib/brand-ui";
@@ -166,11 +167,16 @@ export function CrmLeadForm({
         <div className="grid sm:grid-cols-2 gap-3">
           <div className="sm:col-span-2">
             <label className="text-xs text-gray-400 mb-1 block">Título</label>
-            <input
-              value={draft.title ?? ""}
-              onChange={e => onChange({ title: e.target.value })}
-              className="w-full rounded-xl border border-white/[.10] bg-white/[.04] px-3 py-2.5 text-sm text-white"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                value={draft.title ?? ""}
+                onChange={e => onChange({ title: e.target.value })}
+                className="w-full rounded-xl border border-white/[.10] bg-white/[.04] px-3 py-2.5 text-sm text-white"
+              />
+              {typeof draft.metadata?.placa === "string" && draft.metadata.placa && (
+                <PlateBadge plate={draft.metadata.placa} className="shrink-0" />
+              )}
+            </div>
             <CrmFieldProvenanceBadge provenance={prov.title} />
           </div>
           <div>

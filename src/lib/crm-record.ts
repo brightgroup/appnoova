@@ -166,6 +166,163 @@ export const DEFAULT_LEAD_PROPERTIES: Omit<
   "id" | "user_id" | "created_at" | "updated_at"
 >[] = [];
 
+/**
+ * Campos de seguros — se siembran solo para organizaciones con el módulo
+ * `seguros` activo (ver ensureInsuranceCrmProperties en crm-server.ts,
+ * llamado desde /api/admin/organizations/[id] al activar el checkbox). Los
+ * valores viven en crm_leads.metadata bajo cada field_key, igual que
+ * cualquier otro campo personalizado — el cotizador de autos/vida/hogar los
+ * escribe ahí cuando una insurance_quote_request queda ligada a un lead.
+ */
+export const INSURANCE_LEAD_PROPERTIES: Omit<
+  CrmPropertyDefinition,
+  "id" | "user_id" | "created_at" | "updated_at"
+>[] = [
+  {
+    entity_type: "lead",
+    field_key: "placa",
+    label: "Placa",
+    field_type: "text",
+    options: [],
+    is_builtin: true,
+    is_required: false,
+    sort_order: 100,
+    group_name: "Seguros"
+  },
+  {
+    entity_type: "lead",
+    field_key: "ramo",
+    label: "Ramo",
+    field_type: "select",
+    options: ["Auto", "Vida", "Hogar"],
+    is_builtin: true,
+    is_required: false,
+    sort_order: 101,
+    group_name: "Seguros"
+  },
+  {
+    entity_type: "lead",
+    field_key: "vehiculo_marca",
+    label: "Marca",
+    field_type: "text",
+    options: [],
+    is_builtin: true,
+    is_required: false,
+    sort_order: 102,
+    group_name: "Seguros"
+  },
+  {
+    entity_type: "lead",
+    field_key: "vehiculo_linea",
+    label: "Línea",
+    field_type: "text",
+    options: [],
+    is_builtin: true,
+    is_required: false,
+    sort_order: 103,
+    group_name: "Seguros"
+  },
+  {
+    entity_type: "lead",
+    field_key: "vehiculo_modelo",
+    label: "Año/modelo",
+    field_type: "text",
+    options: [],
+    is_builtin: true,
+    is_required: false,
+    sort_order: 104,
+    group_name: "Seguros"
+  },
+  {
+    entity_type: "lead",
+    field_key: "vehiculo_valor_comercial",
+    label: "Valor comercial (COP)",
+    field_type: "number",
+    options: [],
+    is_builtin: true,
+    is_required: false,
+    sort_order: 105,
+    group_name: "Seguros"
+  },
+  {
+    entity_type: "lead",
+    field_key: "vehiculo_codigo_fasecolda",
+    label: "Código Fasecolda",
+    field_type: "text",
+    options: [],
+    is_builtin: true,
+    is_required: false,
+    sort_order: 106,
+    group_name: "Seguros"
+  },
+  {
+    entity_type: "lead",
+    field_key: "vehiculo_categoria",
+    label: "Categoría",
+    field_type: "text",
+    options: [],
+    is_builtin: true,
+    is_required: false,
+    sort_order: 107,
+    group_name: "Seguros"
+  },
+  {
+    entity_type: "lead",
+    field_key: "vehiculo_combustible",
+    label: "Combustible",
+    field_type: "text",
+    options: [],
+    is_builtin: true,
+    is_required: false,
+    sort_order: 108,
+    group_name: "Seguros"
+  },
+  {
+    entity_type: "lead",
+    field_key: "aseguradora_cotizada",
+    label: "Aseguradora",
+    field_type: "text",
+    options: [],
+    is_builtin: true,
+    is_required: false,
+    sort_order: 109,
+    group_name: "Seguros"
+  },
+  {
+    entity_type: "lead",
+    field_key: "prima_cotizada",
+    label: "Prima cotizada (COP)",
+    field_type: "number",
+    options: [],
+    is_builtin: true,
+    is_required: false,
+    sort_order: 110,
+    group_name: "Seguros"
+  },
+  {
+    entity_type: "lead",
+    field_key: "vigencia_desde",
+    label: "Vigencia desde",
+    field_type: "date",
+    options: [],
+    is_builtin: true,
+    is_required: false,
+    sort_order: 111,
+    group_name: "Seguros"
+  },
+  {
+    entity_type: "lead",
+    field_key: "vigencia_hasta",
+    label: "Vigencia hasta",
+    field_type: "date",
+    options: [],
+    is_builtin: true,
+    is_required: false,
+    sort_order: 112,
+    group_name: "Seguros"
+  }
+];
+
 function parseTags(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return raw.map(v => String(v).trim()).filter(Boolean);

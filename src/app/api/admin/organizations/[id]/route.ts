@@ -5,6 +5,7 @@ import { adminClient } from "@/lib/voice-agents-server";
 import { uniqueOrgSlug } from "@/lib/admin-utils";
 import { mergeOrgBrandingSettings } from "@/lib/org-branding";
 import { mergeOrgModulesSettings } from "@/lib/org-modules";
+import { ensureInsuranceCrmProperties } from "@/lib/crm-server";
 import { isActivePlanId } from "@/lib/org-plans";
 import type { AccountStatus } from "@/types/rbac";
 
@@ -99,6 +100,10 @@ export async function PATCH(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (body.seguros === true && org.owner_user_id) {
+    await ensureInsuranceCrmProperties(db, org.owner_user_id);
+  }
 
   // Si cambió el plan, re-crear suscripción + billetera (reinicia créditos del periodo)
   if (typeof updates.plan === "string") {
