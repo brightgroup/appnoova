@@ -2,6 +2,7 @@ import { Type } from "@google/genai";
 import type { OriToolDefinition, OriToolContext, OriToolResult } from "@/lib/agent-tools/ori-tools";
 import { listQuoteRequests, getQuoteRequestById, markQuoteRequestQuoted } from "@/lib/insurers/quote-requests-db";
 import { ejecutarCotizacionReal, type AutoQuoteVehicle } from "@/lib/insurers/auto-quote-tool";
+import { getQuoteGuidanceForLead } from "@/lib/insurers/quote-guidance";
 
 /**
  * Tools de ORI para la cola de cotizaciones (Fase "rediseño 2026-09-05") — el
@@ -27,6 +28,7 @@ export const consultarCotizacionesPendientesTool: OriToolDefinition = {
       total: pendientes.length,
       cotizaciones: pendientes.map(q => ({
         id: q.id,
+        lead_id: q.leadId,
         ramo: q.ramo,
         placa: q.placa,
         vehiculo: q.vehiculo,
@@ -34,6 +36,43 @@ export const consultarCotizacionesPendientesTool: OriToolDefinition = {
         tomador: q.tomador,
         desde: q.createdAt
       }))
+    };
+  }
+};
+
+export const guiarCotizacionSeguroTool: OriToolDefinition = {
+  name: "guiar_cotizacion_seguro",
+  declaration: {
+    name: "guiar_cotizacion_seguro",
+    description:
+      "Dice cuál es el SIGUIENTE PASO pendiente de la cotización de seguro de un lead específico (identificado por su lead_id, no el id de la cotización) — úsala cuando el asesor te pida ayuda para avanzar una cotización dentro de una oportunidad. No cotiza ni registra nada por su cuenta, solo te dice qué falta y qué otra herramienta usar después (solicitar_cotizacion_seguro para autos con aseguradora conectada, o pedirle al asesor que registre el precio manual desde la plataforma si no).",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        lead_id: { type: Type.STRING, description: "Id del lead/oportunidad del CRM, no el id de la cotización." }
+      },
+      required: ["lead_id"]
+    }
+  },
+  promptBlock:
+    "Tienes una herramienta (guiar_cotizacion_seguro) para saber qué falta en la cotización de un lead específico — úsala cuando te pidan ayuda para avanzar una oportunidad de seguros. Dile al asesor exactamente el siguiente paso que te devuelva, no inventes uno distinto.",
+  async execute(args: Record<string, unknown>, ctx: OriToolContext): Promise<OriToolResult> {
+    const leadId = typeof args.lead_id === "string" ? args.lead_id.trim() : "";
+    if (!leadId) return { ok: false, reason: "Falta el lead_id." };
+
+    const guidance = await getQuoteGuidanceForLead(ctx.db, ctx.organizationId, leadId);
+    return {
+      ok: true,
+      paso: guidance.step,
+      mensaje: guidance.message,
+      cotizacion: guidance.quote
+        ? {
+            id: guidance.quote.id,
+            ramo: guidance.quote.ramo,
+            estado: guidance.quote.estado,
+            resultado: guidance.quote.resultado
+          }
+        : null
     };
   }
 };

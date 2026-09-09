@@ -7,6 +7,7 @@ import { getAuthHeaders } from "@/lib/text-agents-api";
 import { filterPipelineStages } from "@/lib/crm-record";
 import { CrmDetailLayout } from "@/components/crm/CrmDetailLayout";
 import { CrmLeadForm } from "@/components/crm/CrmLeadForm";
+import { useOrgPermissions } from "@/components/layout/OrgPermissionsProvider";
 import type { CrmContact, CrmLead, CrmPipelineStage, CrmPropertyDefinition } from "@/types/crm";
 
 export interface AssignableMember {
@@ -17,6 +18,7 @@ export interface AssignableMember {
 
 function LeadEditContent({ leadId }: { leadId: string }) {
   const router = useRouter();
+  const { modules } = useOrgPermissions();
   const [lead, setLead] = useState<CrmLead | null>(null);
   const [canManageAll, setCanManageAll] = useState(false);
   const [assignableMembers, setAssignableMembers] = useState<AssignableMember[]>([]);
@@ -142,6 +144,7 @@ function LeadEditContent({ leadId }: { leadId: string }) {
           leadId={lead.id}
           canManageAll={canManageAll}
           assignableMembers={assignableMembers}
+          showSeguroPanel={modules.seguros}
           onChange={patch => setDraft(d => ({ ...d, ...patch }))}
           onMetaChange={(key, value) =>
             setDraft(d => ({ ...d, metadata: { ...(d.metadata ?? {}), [key]: value } }))

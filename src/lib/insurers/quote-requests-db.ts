@@ -216,6 +216,23 @@ export async function findPendingQuoteRequestByPlaca(
   return toRecord(rows[0]);
 }
 
+/** Cotización más reciente ligada a un lead — usada por el panel guiado de ORI en la ficha del lead. */
+export async function getLatestQuoteRequestForLead(
+  db: SupabaseClient,
+  organizationId: string,
+  leadId: string
+): Promise<QuoteRequestRecord | null> {
+  const { data } = await db
+    .from("insurance_quote_requests")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("lead_id", leadId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data ? toRecord(data as QuoteRequestRow) : null;
+}
+
 export async function getQuoteRequestById(
   db: SupabaseClient,
   organizationId: string,

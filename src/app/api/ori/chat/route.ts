@@ -26,7 +26,11 @@ import { getOriSegurosAccess } from "@/lib/insurers/ori-seguros-access";
 import { cotizarSeguroAutoTool } from "@/lib/agent-tools/auto-quote-ori-tool";
 import { calificarSeguroVidaOriTool } from "@/lib/agent-tools/life-quote-ori-tool";
 import { calificarSeguroHogarOriTool } from "@/lib/agent-tools/home-quote-ori-tool";
-import { consultarCotizacionesPendientesTool, solicitarCotizacionSeguroTool } from "@/lib/agent-tools/quote-queue-ori-tools";
+import {
+  consultarCotizacionesPendientesTool,
+  solicitarCotizacionSeguroTool,
+  guiarCotizacionSeguroTool
+} from "@/lib/agent-tools/quote-queue-ori-tools";
 import { radicarSiniestroOriTool } from "@/lib/agent-tools/siniestro-ori-tool";
 import { executeOriTool, ORI_TOOLS, ORI_GROUNDING_PROMPT, type OriToolDefinition } from "@/lib/agent-tools/ori-tools";
 
@@ -132,6 +136,7 @@ export async function POST(req: NextRequest) {
         calificarSeguroHogarOriTool,
         consultarCotizacionesPendientesTool,
         solicitarCotizacionSeguroTool,
+        guiarCotizacionSeguroTool,
         radicarSiniestroOriTool
       );
     }

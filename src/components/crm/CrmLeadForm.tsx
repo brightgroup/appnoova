@@ -15,6 +15,7 @@ import {
 } from "@/lib/crm-lead-utils";
 import { FUENTE_ORIGEN_OPTIONS } from "@/lib/crm-contactability";
 import { CrmOriQuotePanel } from "@/components/crm/CrmOriQuotePanel";
+import { SeguroQuotePanel } from "@/components/crm/SeguroQuotePanel";
 import { PlateBadge } from "@/components/crm/PlateBadge";
 import { CrmFieldProvenanceBadge } from "@/components/crm/CrmFieldProvenanceBadge";
 import { getAuthHeaders } from "@/lib/text-agents-api";
@@ -56,6 +57,8 @@ interface CrmLeadFormProps {
   /** Solo quien tiene nivel `manage` en el módulo crm puede reasignar — ver src/lib/crm-auth.ts. */
   canManageAll?: boolean;
   assignableMembers?: { user_id: string; email: string; full_name?: string }[];
+  /** Organización con el módulo `seguros` activo — muestra el panel guiado de cotización. */
+  showSeguroPanel?: boolean;
 }
 
 export function CrmLeadForm({
@@ -70,7 +73,8 @@ export function CrmLeadForm({
   createdAt,
   updatedAt,
   canManageAll,
-  assignableMembers
+  assignableMembers,
+  showSeguroPanel
 }: CrmLeadFormProps) {
   const pipelineStages = filterPipelineStages(stages);
   const outcome = (draft.outcome ?? "open") as CrmLeadOutcome;
@@ -122,6 +126,11 @@ export function CrmLeadForm({
 
   return (
     <>
+      {showSeguroPanel && leadId && (
+        <FieldGroup title="Cotización de seguro">
+          <SeguroQuotePanel leadId={leadId} />
+        </FieldGroup>
+      )}
       {draft.contact_id && quoteEndpoint && (
         <FieldGroup title="ORI — Asistente de cotización">
           <CrmOriQuotePanel
