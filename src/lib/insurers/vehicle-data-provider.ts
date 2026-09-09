@@ -13,11 +13,12 @@ export interface VehicleDataProviderRules {
 }
 
 /**
- * Verifik queda como default hasta confirmar con una consulta real de PlacApi
- * (mapeo de campos y URL base sin verificar todavía, ver placapi.ts) —
- * cámbialo desde /admin/seguros una vez esté probado.
+ * PlacApi es el default desde el 2026-09-09 — confirmado con una consulta
+ * real (placa+documento reales, devolvió avalúo completo) y es 5-15x más
+ * barato que Verifik para el mismo dato. Cámbialo desde /admin/seguros si
+ * hace falta volver a Verifik.
  */
-export const DEFAULT_VEHICLE_DATA_PROVIDER_RULES: VehicleDataProviderRules = { provider: "verifik" };
+export const DEFAULT_VEHICLE_DATA_PROVIDER_RULES: VehicleDataProviderRules = { provider: "placapi" };
 
 export async function getVehicleDataProviderRules(db: SupabaseClient): Promise<VehicleDataProviderRules> {
   return readSetting(db, VEHICLE_DATA_PROVIDER_KEY, DEFAULT_VEHICLE_DATA_PROVIDER_RULES);
@@ -63,7 +64,9 @@ function mapPlacApi(v: Awaited<ReturnType<typeof getVehicleValueByPlate>>): Vehi
     marca: String(v.marca ?? ""),
     linea: String(v.linea ?? ""),
     clase: v.clase,
-    codigo_fasecolda: v.codigoFasecolda ?? v.codigoHomologado
+    categoria: v.categoria,
+    combustible: v.combustible,
+    codigo_fasecolda: v.codigo ?? v.codigoHomologado
   };
 }
 

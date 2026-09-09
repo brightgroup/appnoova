@@ -7,31 +7,33 @@
  * PROPIETARIO (no solo la placa) — se asume que es el mismo documento del
  * tomador que ya se le pide al cliente.
  *
- * Auth/transporte confirmados 2026-09-09 con una llamada real (POST,
- * `x-api-key`, body JSON, sobre {source, status, data, error, mode}).
- *
- * PENDIENTE DE VERIFICAR: `PlacApiVehicleValue` (los campos DENTRO de
- * `data` cuando sí hay resultado) sigue basado en la descripción pública,
- * no en una respuesta real con `data` no nulo — la primera prueba real
- * devolvió `data: null` (documento no coincidía con el propietario
- * registrado en RUNT para esa placa). Confirmar los nombres de campo con
- * una placa+documento que sí calcen antes de usarlo en producción.
+ * Auth/transporte y forma real de `data` confirmados 2026-09-09 con una
+ * consulta real completa (placa+documento reales, placa "RIL102"): POST,
+ * `x-api-key`, body JSON, respuesta {source, status, data, error, mode}
+ * con `data` = PlacApiVehicleValue de abajo.
  */
 
 const BASE_URL = "https://placapi.com";
 const REQUEST_TIMEOUT_MS = 15_000;
 
 export interface PlacApiVehicleValue {
-  codigoFasecolda?: string;
+  /** Código Fasecolda — este es el campo real, no "codigoFasecolda". */
+  codigo?: string;
   codigoHomologado?: string;
   marca?: string;
   linea?: string;
-  modelo?: string | number;
-  valorComercial?: number | string;
+  modelo?: number;
+  valorComercial?: number;
   rangoMercado?: { min?: number; max?: number };
   clase?: string;
+  categoria?: string;
+  tipologia?: string;
+  combustible?: string;
+  transmision?: string;
+  cilindraje?: number;
+  origen?: string;
   fichaTecnica?: Record<string, unknown>;
-  valoresPorAnio?: Array<{ modelo?: string | number; valor?: number | string }>;
+  valoresPorAnio?: Array<{ modelo?: number; valor?: number; estado?: string }>;
   [key: string]: unknown;
 }
 
