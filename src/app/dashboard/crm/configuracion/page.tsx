@@ -8,7 +8,9 @@ import {
   btnGhost, btnPrimary, btnFilterGroup, btnFilterActive, btnFilterIdle,
   registryPage, registryToolbar, registryContent, registryPanel, textMuted
 } from "@/lib/brand-ui";
-import { DEFAULT_CRM_STAGES } from "@/lib/crm-record";
+import { DEFAULT_CRM_STAGES, INSURANCE_PIPELINE_TEMPLATE } from "@/lib/crm-record";
+import { useOrgPermissions } from "@/components/layout/OrgPermissionsProvider";
+import { Sparkles } from "lucide-react";
 import { DEFAULT_STAGE_AI_CRITERIA } from "@/lib/crm-lead-ai-shared";
 import { CrmPropertyConfigPanel } from "@/components/crm/CrmPropertyConfigPanel";
 import { CrmTenantLabelsPanel } from "@/components/crm/CrmTenantLabelsPanel";
@@ -20,11 +22,13 @@ type Tab = "stages" | "contacts" | "leads" | "labels";
 type StageDraft = Omit<CrmPipelineStage, "user_id" | "created_at" | "updated_at"> & { id?: string };
 
 export default function CrmConfigPage() {
+  const { modules } = useOrgPermissions();
   const [tab, setTab] = useState<Tab>("stages");
   const [stages, setStages] = useState<StageDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createSaving, setCreateSaving] = useState(false);
@@ -52,6 +56,31 @@ export default function CrmConfigPage() {
 
   const updateStage = (index: number, patch: Partial<StageDraft>) => {
     setStages(prev => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+  };
+
+  const applyInsuranceTemplate = async () => {
+    setApplyingTemplate(true);
+    setSaveError(null);
+    try {
+      const existingSlugs = new Set(stages.map(s => s.slug));
+      const headers = await getAuthHeaders();
+      let latestStages: CrmPipelineStage[] = [];
+      for (const stage of INSURANCE_PIPELINE_TEMPLATE) {
+        if (existingSlugs.has(stage.slug)) continue;
+        const res = await fetch("/api/crm/stages", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ name: stage.name, slug: stage.slug, color: stage.color })
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && data?.stages) latestStages = data.stages;
+      }
+      if (latestStages.length) {
+        setStages(latestStages.filter((s: CrmPipelineStage) => !s.is_won && !s.is_lost));
+      }
+    } finally {
+      setApplyingTemplate(false);
+    }
   };
 
   const handleCreateStage = async (payload: { name: string; color: string; ai_enter_criteria: string | null }) => {
@@ -151,6 +180,18 @@ export default function CrmConfigPage() {
           </div>
           {tab === "stages" && (
             <div className="flex gap-2">
+              {modules.seguros && (
+                <button
+                  type="button"
+                  onClick={applyInsuranceTemplate}
+                  disabled={applyingTemplate}
+                  className={btnGhost}
+                  title="Agrega las etapas típicas de un corredor de seguros que todavía no tengas — no borra ni pisa las existentes."
+                >
+                  {applyingTemplate ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  Aplicar plantilla de corredor de seguros
+                </button>
+              )}
               <button type="button" onClick={() => { setCreateError(null); setCreateOpen(true); }} className={btnGhost}>
                 <Plus className="w-4 h-4" /> Etapa
               </button>

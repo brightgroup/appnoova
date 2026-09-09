@@ -62,6 +62,21 @@ export const DEFAULT_CRM_STAGES: Omit<CrmPipelineStage, "id" | "user_id" | "crea
   }
 ];
 
+/**
+ * Plantilla opcional de pipeline para corredores de seguros — el usuario la
+ * aplica con un botón desde /dashboard/crm/configuracion (no se aplica sola
+ * al activar el módulo, para no pisar un pipeline ya personalizado). Las que
+ * coincidan por slug con etapas que ya existen (ej. "nuevo", "negociacion",
+ * ya vienen en DEFAULT_CRM_STAGES) se saltan, solo se agregan las que falten.
+ */
+export const INSURANCE_PIPELINE_TEMPLATE: { name: string; slug: string; color: string }[] = [
+  { name: "Nuevo lead", slug: "nuevo", color: "#0f7eff" },
+  { name: "Calificado", slug: "calificado", color: "#8b5cf6" },
+  { name: "Cotizando", slug: "cotizando", color: "#006e80" },
+  { name: "Cotización enviada", slug: "cotizacion-enviada", color: "#f59e0b" },
+  { name: "Negociación", slug: "negociacion", color: "#3b82f6" }
+];
+
 /** Etapas activas del pipeline (excluye legacy ganado/perdido). */
 export function filterPipelineStages(stages: CrmPipelineStage[]): CrmPipelineStage[] {
   return stages.filter(s => !s.is_won && !s.is_lost);
