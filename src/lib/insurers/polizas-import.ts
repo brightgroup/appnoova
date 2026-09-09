@@ -16,17 +16,58 @@ export type PolizaImportField =
   | "vigenciaHasta"
   | "prima";
 
+/**
+ * Alias por campo, ordenados del más específico al más genérico — importa el orden porque el
+ * matching es por substring (ver suggestPolizaColumnMap) y un alias específico debe ganarle a uno
+ * genérico cuando ambos calzan en el mismo encabezado (ej. "numero_poliza" debe ganarle a "numero"
+ * suelto). Incluye tanto vocabulario suelto en español como los nombres de campo reales de
+ * Softseguros (numero_poliza, cliente_nombres, ramo_aseguradora_nombre, etc. — confirmados en vivo
+ * el 2026-09-09), porque muchos corredores exportan su Excel directo desde ahí.
+ */
 const HEADER_ALIASES: Record<PolizaImportField, string[]> = {
-  tomador: ["tomador", "cliente", "nombre", "asegurado", "contratante"],
-  documento: ["documento", "cedula", "cédula", "nit", "identificacion", "identificación"],
-  telefono: ["telefono", "teléfono", "celular", "whatsapp", "movil", "móvil"],
-  aseguradora: ["aseguradora", "compañia", "compañía", "compania"],
-  ramo: ["ramo", "producto", "tipo de poliza", "tipo de póliza"],
-  numeroPoliza: ["numero de poliza", "número de póliza", "poliza", "póliza", "no. poliza", "no poliza"],
-  vigenciaDesde: ["vigencia desde", "inicio vigencia", "fecha inicio", "desde"],
-  vigenciaHasta: ["vigencia hasta", "vence", "fecha vencimiento", "vencimiento", "hasta"],
-  prima: ["prima", "valor prima", "valor", "prima anual"]
+  numeroPoliza: [
+    "numero_poliza", "numero de poliza", "número de póliza", "no. de poliza", "no. poliza",
+    "no poliza", "nro poliza", "nro. poliza", "poliza no", "referencia poliza", "poliza", "póliza"
+  ],
+  tomador: [
+    "nombre_tomador", "nombre del tomador", "nombre tomador", "tomador",
+    "cliente_nombres", "nombre del cliente", "nombre cliente", "cliente",
+    "nombres y apellidos", "nombre completo", "asegurado", "contratante", "razon social",
+    "razón social", "nombre"
+  ],
+  documento: [
+    "cliente_numero_documento", "cedula_tomador", "numero de documento", "número de documento",
+    "documento de identidad", "numero documento", "documento", "cedula", "cédula", "nit",
+    "identificacion", "identificación", "cc", "no. documento"
+  ],
+  telefono: [
+    "cliente_celular", "numero de celular", "número de celular", "numero celular", "celular",
+    "telefono", "teléfono", "whatsapp", "movil", "móvil", "numero de contacto", "número de contacto"
+  ],
+  aseguradora: [
+    "ramo_aseguradora_nombre", "nombre de la aseguradora", "compañia aseguradora", "compañía aseguradora",
+    "entidad aseguradora", "aseguradora", "compañia", "compañía", "compania", "cia"
+  ],
+  ramo: [
+    "ramo_nombre", "ramo_global_nombre", "ramo del seguro", "tipo de seguro", "tipo de poliza",
+    "tipo de póliza", "linea de negocio", "línea de negocio", "producto", "ramo"
+  ],
+  vigenciaDesde: [
+    "fecha_inicio", "fecha de inicio", "inicio de vigencia", "vigencia desde", "inicio vigencia", "desde"
+  ],
+  vigenciaHasta: [
+    "fecha_fin", "fecha de vencimiento", "fecha de fin", "fin de vigencia", "vigencia hasta",
+    "fecha vencimiento", "vencimiento", "vence", "hasta"
+  ],
+  prima: [
+    "valor de la prima", "valor prima", "prima neta", "prima anual", "prima_total", "prima"
+  ]
 };
+
+/** Orden de resolución: los campos más específicos primero, para que no les "roben" el encabezado los genéricos que procesan después. */
+const FIELD_RESOLUTION_ORDER: PolizaImportField[] = [
+  "numeroPoliza", "documento", "telefono", "vigenciaDesde", "vigenciaHasta", "prima", "aseguradora", "ramo", "tomador"
+];
 
 const REQUIRED_FIELDS: PolizaImportField[] = ["tomador", "aseguradora", "ramo", "vigenciaHasta"];
 
@@ -35,7 +76,10 @@ function normalizeLabel(label: string): string {
     .trim()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[._-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function findHeaderRowIndex(matrix: unknown[][]): number {
@@ -85,11 +129,41 @@ export function parsePolizasWorkbook(buffer: ArrayBuffer): ParsedPolizasWorkbook
   return { headers, rows };
 }
 
+/**
+ * Heurística por substring (no exige igualdad exacta): un encabezado real casi nunca es idéntico
+ * a un alias suelto ("Nombre del Tomador" vs. "tomador") — por eso se hace calzar en ambas
+ * direcciones (el alias cabe en el encabezado, o el encabezado cabe en el alias). Se procesa en
+ * FIELD_RESOLUTION_ORDER (específico → genérico) y cada encabezado usado se descarta para los
+ * campos siguientes, para que "Fecha de Inicio" no termine también sugerido como "Vencimiento".
+ */
 export function suggestPolizaColumnMap(headers: string[]): Record<PolizaImportField, string | null> {
   const map = {} as Record<PolizaImportField, string | null>;
-  for (const field of Object.keys(HEADER_ALIASES) as PolizaImportField[]) {
-    map[field] = headers.find(h => HEADER_ALIASES[field].includes(normalizeLabel(h))) ?? null;
+  const normalized = headers.map(h => ({ original: h, norm: normalizeLabel(h) }));
+  const used = new Set<string>();
+
+  for (const field of FIELD_RESOLUTION_ORDER) {
+    // Los alias también se normalizan (los de Softseguros traen guion_bajo, no espacio) —
+    // si no, "fecha_inicio" nunca calza con el encabezado normalizado "fecha inicio".
+    const aliases = HEADER_ALIASES[field].map(normalizeLabel);
+    let best: { original: string; score: number } | null = null;
+
+    for (const candidate of normalized) {
+      if (used.has(candidate.original)) continue;
+      for (const alias of aliases) {
+        // Solo en una dirección (el encabezado contiene el alias) — la dirección inversa causaba
+        // falsos positivos: un encabezado corto y genérico como "Cliente" calzaba dentro de un
+        // alias compuesto como "cliente_numero_documento" y se lo robaba a "documento".
+        if (candidate.norm !== alias && !candidate.norm.includes(alias)) continue;
+        // Alias más largo = más específico = mejor candidato (evita que "nombre" solo gane sobre "nombre del tomador").
+        if (!best || alias.length > best.score) best = { original: candidate.original, score: alias.length };
+        break;
+      }
+    }
+
+    map[field] = best?.original ?? null;
+    if (best) used.add(best.original);
   }
+
   return map;
 }
 

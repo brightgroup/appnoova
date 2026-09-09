@@ -180,6 +180,15 @@ export default function PolizasPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [softsegurosConectado, setSoftsegurosConectado] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/seguros/conectores/softseguros/status", { headers });
+      if (res.ok) setSoftsegurosConectado((await res.json()).connection?.status === "active");
+    })();
+  }, []);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -341,11 +350,17 @@ export default function PolizasPage() {
                 <Settings className="w-4 h-4" />
               </Link>
             )}
+            {canEdit && (softsegurosConectado ? (
+              <button type="button" onClick={syncSoftseguros} disabled={syncing} className={btnGhost}>
+                <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} /> Sincronizar Softseguros
+              </button>
+            ) : (
+              <Link href="/dashboard/conectores" className={btnGhost} title="Conecta Softseguros para traer tu cartera automáticamente">
+                <RefreshCw className="w-4 h-4" /> Conectar Softseguros
+              </Link>
+            ))}
             {canEdit && (
               <>
-                <button type="button" onClick={syncSoftseguros} disabled={syncing} className={btnGhost}>
-                  <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} /> Sincronizar Softseguros
-                </button>
                 <button type="button" onClick={() => setImportOpen(true)} className={btnGhost}>
                   <Upload className="w-4 h-4" /> Importar Excel
                 </button>
@@ -380,7 +395,9 @@ export default function PolizasPage() {
             {search.trim() || filter !== "todas"
               ? "No hay pólizas con estos filtros."
               : canEdit
-                ? "Aún no hay pólizas. Crea una, importa tu Excel o sincroniza Softseguros."
+                ? softsegurosConectado
+                  ? "Aún no hay pólizas. Crea una, importa tu Excel o sincroniza Softseguros."
+                  : "Aún no hay pólizas. Crea una, importa tu Excel o conecta Softseguros para traerlas automáticamente."
                 : "Aún no hay pólizas registradas."}
           </div>
         ) : (
