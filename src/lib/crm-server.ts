@@ -5,6 +5,7 @@ import {
   DEFAULT_CRM_STAGES,
   DEFAULT_LEAD_PROPERTIES,
   INSURANCE_LEAD_PROPERTIES,
+  INSURANCE_PIPELINE_TEMPLATE,
   toCrmPropertyDefinition,
   toCrmStage
 } from "@/lib/crm-record";
@@ -23,6 +24,35 @@ export async function ensureDefaultCrmStages(db: SupabaseClient, userId: string)
       ...s
     }))
   );
+}
+
+/**
+ * Aplica INSURANCE_PIPELINE_TEMPLATE (crm-record.ts) — solo agrega las
+ * etapas que falten por slug, nunca borra ni pisa las existentes. La llama
+ * tanto el botón manual (/api/crm/pipeline/apply-template) como la
+ * activación del módulo `seguros` desde superadmin (para que un corredor
+ * nuevo quede con todo listo de una vez, sin un segundo paso aparte).
+ */
+export async function applyInsurancePipelineTemplate(db: SupabaseClient, userId: string): Promise<void> {
+  await ensureDefaultCrmStages(db, userId);
+
+  const { data: existing, count } = await db
+    .from("crm_pipeline_stages")
+    .select("slug", { count: "exact" })
+    .eq("user_id", userId);
+  const existingSlugs = new Set((existing ?? []).map(s => s.slug as string));
+
+  let sortOrder = count ?? 0;
+  const toInsert = INSURANCE_PIPELINE_TEMPLATE.filter(t => !existingSlugs.has(t.slug)).map(t => ({
+    user_id: userId,
+    name: t.name,
+    slug: t.slug,
+    color: t.color,
+    sort_order: sortOrder++,
+    is_won: false,
+    is_lost: false
+  }));
+  if (toInsert.length) await db.from("crm_pipeline_stages").insert(toInsert);
 }
 
 export async function getCrmStages(db: SupabaseClient, userId: string) {

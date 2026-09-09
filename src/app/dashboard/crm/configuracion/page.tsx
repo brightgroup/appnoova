@@ -8,7 +8,7 @@ import {
   btnGhost, btnPrimary, btnFilterGroup, btnFilterActive, btnFilterIdle,
   registryPage, registryToolbar, registryContent, registryPanel, textMuted
 } from "@/lib/brand-ui";
-import { DEFAULT_CRM_STAGES, INSURANCE_PIPELINE_TEMPLATE } from "@/lib/crm-record";
+import { DEFAULT_CRM_STAGES } from "@/lib/crm-record";
 import { useOrgPermissions } from "@/components/layout/OrgPermissionsProvider";
 import { Sparkles } from "lucide-react";
 import { DEFAULT_STAGE_AI_CRITERIA } from "@/lib/crm-lead-ai-shared";
@@ -62,21 +62,13 @@ export default function CrmConfigPage() {
     setApplyingTemplate(true);
     setSaveError(null);
     try {
-      const existingSlugs = new Set(stages.map(s => s.slug));
       const headers = await getAuthHeaders();
-      let latestStages: CrmPipelineStage[] = [];
-      for (const stage of INSURANCE_PIPELINE_TEMPLATE) {
-        if (existingSlugs.has(stage.slug)) continue;
-        const res = await fetch("/api/crm/stages", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ name: stage.name, slug: stage.slug, color: stage.color })
-        });
-        const data = await res.json().catch(() => null);
-        if (res.ok && data?.stages) latestStages = data.stages;
-      }
-      if (latestStages.length) {
-        setStages(latestStages.filter((s: CrmPipelineStage) => !s.is_won && !s.is_lost));
+      const res = await fetch("/api/crm/pipeline/apply-template", { method: "POST", headers });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.stages) {
+        setStages((data.stages as CrmPipelineStage[]).filter(s => !s.is_won && !s.is_lost));
+      } else {
+        setSaveError(data?.error ?? "No se pudo aplicar la plantilla.");
       }
     } finally {
       setApplyingTemplate(false);
