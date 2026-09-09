@@ -55,8 +55,12 @@ function LeadEditContent({ leadId }: { leadId: string }) {
     if (stagesRes.ok) setStages(stagesData.stages ?? []);
     if (contactsRes.ok) setContacts(contactsData.contacts ?? []);
     if (propsRes.ok) setProperties(props.properties ?? []);
-    setCanManageAll(Boolean(detail.can_manage_all));
-    if (detail.can_manage_all) {
+    // La reasignación de leads (y su selector "Asignado a") solo aplica a
+    // organizaciones con el módulo seguros — para las demás, canManageAll ya
+    // viene siempre true desde la API (ver crm-auth.ts) y no debe mostrar
+    // este control, que no restringe nada para ellas.
+    setCanManageAll(Boolean(detail.can_manage_all) && modules.seguros);
+    if (detail.can_manage_all && modules.seguros) {
       const membersRes = await fetch("/api/org/members", { headers });
       if (membersRes.ok) {
         const membersData = await membersRes.json();
@@ -72,7 +76,7 @@ function LeadEditContent({ leadId }: { leadId: string }) {
       }
     }
     setLoading(false);
-  }, [leadId]);
+  }, [leadId, modules.seguros]);
 
   useEffect(() => { load(); }, [load]);
 

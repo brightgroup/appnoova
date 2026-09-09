@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireOrgModule } from "@/lib/module-auth";
 import { resolveOrgCrmTenantUserId } from "@/lib/org-crm-tenant";
 import { getOrgPermissionLevel, type OrgContext } from "@/lib/org-server";
+import { adminClient } from "@/lib/voice-agents-server";
+import { parseOrgModules } from "@/lib/org-modules";
 import type { PermissionLevel } from "@/types/rbac";
 
 export interface CrmRequestContext extends OrgContext {}
@@ -39,6 +41,13 @@ export interface CrmLeadVisibility {
  * (`crm_leads.assigned_user_id`). Ver migración 130_crm_lead_assignment.sql.
  * Los contactos no usan esto todavía — siguen compartidos para cualquiera
  * con acceso al módulo crm.
+ *
+ * SOLO aplica para organizaciones con el módulo `seguros` activo — para el
+ * resto de clientes de Noova, `canManageAll` siempre da `true` (mismo
+ * comportamiento de siempre: cualquiera con acceso al CRM ve todo). Esto es
+ * a propósito: es un cambio de comportamiento real (oculta leads que antes
+ * se veían), no solo un campo nuevo, así que no debía aplicarse a clientes
+ * que no lo pidieron.
  */
 export async function getCrmLeadVisibility(
   req: NextRequest,
@@ -46,14 +55,17 @@ export async function getCrmLeadVisibility(
 ): Promise<CrmLeadVisibility | NextResponse> {
   const ctx = await requireCrmAccess(req, minLevel);
   if (ctx instanceof NextResponse) return ctx;
-  const [tenantUserId, level] = await Promise.all([
+  const db = adminClient();
+  const [tenantUserId, level, org] = await Promise.all([
     resolveOrgCrmTenantUserId(ctx.organizationId, ctx.userId),
-    getOrgPermissionLevel(ctx.userId, ctx.organizationId, "crm")
+    getOrgPermissionLevel(ctx.userId, ctx.organizationId, "crm"),
+    db.from("organizations").select("settings").eq("id", ctx.organizationId).maybeSingle()
   ]);
+  const segurosEnabled = parseOrgModules(org.data?.settings).seguros;
   return {
     organizationId: ctx.organizationId,
     callerUserId: ctx.userId,
     tenantUserId,
-    canManageAll: level === "manage"
+    canManageAll: segurosEnabled ? level === "manage" : true
   };
 }
