@@ -7,18 +7,18 @@
  * PROPIETARIO (no solo la placa) — se asume que es el mismo documento del
  * tomador que ya se le pide al cliente.
  *
- * PENDIENTE DE VERIFICAR: el mapeo de campos de `mapToVehicleShape` está
- * hecho sobre la descripción pública de la API (código FASECOLDA,
- * codigoHomologado, marca, línea, modelo, valorComercial, rangoMercado,
- * clase, fichaTecnica, valoresPorAnio) — NO contra una respuesta real
- * todavía. Confirmar los nombres exactos de los campos con la primera
- * consulta real antes de usarlo en producción.
+ * Auth/transporte confirmados 2026-09-09 con una llamada real (POST,
+ * `x-api-key`, body JSON, sobre {source, status, data, error, mode}).
+ *
+ * PENDIENTE DE VERIFICAR: `PlacApiVehicleValue` (los campos DENTRO de
+ * `data` cuando sí hay resultado) sigue basado en la descripción pública,
+ * no en una respuesta real con `data` no nulo — la primera prueba real
+ * devolvió `data: null` (documento no coincidía con el propietario
+ * registrado en RUNT para esa placa). Confirmar los nombres de campo con
+ * una placa+documento que sí calcen antes de usarlo en producción.
  */
 
-// PENDIENTE DE VERIFICAR TAMBIÉN: este host es una suposición (mismo patrón
-// api.<dominio> que Verifik) — confirmar contra la documentación real de la
-// cuenta antes de usarlo en producción.
-const BASE_URL = "https://api.placapi.com";
+const BASE_URL = "https://placapi.com";
 const REQUEST_TIMEOUT_MS = 15_000;
 
 export interface PlacApiVehicleValue {
@@ -33,6 +33,14 @@ export interface PlacApiVehicleValue {
   fichaTecnica?: Record<string, unknown>;
   valoresPorAnio?: Array<{ modelo?: string | number; valor?: number | string }>;
   [key: string]: unknown;
+}
+
+interface PlacApiEnvelope {
+  source?: string;
+  status?: string;
+  data?: PlacApiVehicleValue | null;
+  error?: string;
+  mode?: string;
 }
 
 export class PlacApiError extends Error {
@@ -64,28 +72,33 @@ async function fetchWithTimeout(input: string, init: RequestInit): Promise<Respo
   }
 }
 
-/** Placa + documento del propietario -> valor/código Fasecolda (ver nota de arriba: mapeo sin confirmar contra respuesta real). */
+/** Placa + documento del propietario (debe coincidir con el registrado en RUNT) -> valor/código Fasecolda. */
 export async function getVehicleValueByPlate(
   plate: string,
   ownerDocument: string,
-  apiKey?: string
+  apiKey?: string,
+  docType: string = "CC"
 ): Promise<PlacApiVehicleValue> {
   const normalizedPlate = plate.replace(/[\s.-]/g, "").toUpperCase();
-  const url = `${BASE_URL}/api/avaluo?placa=${encodeURIComponent(normalizedPlate)}&docNumber=${encodeURIComponent(ownerDocument.trim())}`;
 
-  const res = await fetchWithTimeout(url, {
+  const res = await fetchWithTimeout(`${BASE_URL}/api/avaluo`, {
+    method: "POST",
     headers: {
       Accept: "application/json",
-      Authorization: `Bearer ${getApiKey(apiKey)}`
-    }
+      "content-type": "application/json",
+      "x-api-key": getApiKey(apiKey)
+    },
+    body: JSON.stringify({ placa: normalizedPlate, docType, docNumber: ownerDocument.trim() })
   });
 
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  const data = (text ? JSON.parse(text) : null) as PlacApiEnvelope | null;
 
   if (!res.ok) {
     throw new PlacApiError(`PlacApi devolvió un error (HTTP ${res.status})`, res.status, data);
   }
-  const value = data && typeof data === "object" && "data" in data ? (data as { data: unknown }).data : data;
-  return value as PlacApiVehicleValue;
+  if (!data?.data) {
+    throw new PlacApiError(data?.error ?? "PlacApi no encontró el vehículo con esos datos.", res.status, data);
+  }
+  return data.data;
 }
