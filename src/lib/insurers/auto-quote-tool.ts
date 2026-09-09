@@ -204,6 +204,7 @@ export async function cotizarSeguroAuto(
     conversationId: options.conversationId,
     contactId: options.contactId,
     leadId: options.leadId,
+    contactE164: options.contactE164,
     source: options.source,
     placa,
     vehiculo: vehiculo as unknown as Record<string, unknown>,

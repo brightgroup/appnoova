@@ -48,7 +48,8 @@ export const calificarSeguroHogarAgentTool: AgentToolDefinition = {
       ctx,
       {
         source: ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp",
-        conversationId: ctx.conversationId
+        conversationId: ctx.conversationId,
+        contactE164: ctx.contactE164
       }
     );
     return { ...result };

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AutoQuoteVehicle } from "@/lib/insurers/auto-quote-tool";
-import { syncQuoteToLeadMetadata } from "@/lib/crm-insurance-sync";
+import { syncQuoteToLeadMetadata, resolveOrCreateInsuranceLead } from "@/lib/crm-insurance-sync";
 
 export type QuoteRequestEstado = "pendiente" | "cotizada" | "enviada_externa" | "cerrada" | "descartada";
 export type QuoteRequestSource = "whatsapp" | "web" | "ori" | "manual";
@@ -93,6 +93,8 @@ export async function upsertPendingQuoteRequest(
     conversationId?: string | null;
     contactId?: string | null;
     leadId?: string | null;
+    /** Si no hay leadId, se usa para encontrar/crear el lead de CRM del cliente (ver resolveOrCreateInsuranceLead). */
+    contactE164?: string | null;
     source: QuoteRequestSource;
     ramo?: string;
     /** Solo aplica a autos — otros ramos no tienen placa. */
@@ -104,6 +106,24 @@ export async function upsertPendingQuoteRequest(
   }
 ): Promise<QuoteRequestRecord> {
   const ramo = params.ramo ?? "autos";
+
+  let leadId = params.leadId ?? null;
+  let contactId = params.contactId ?? null;
+  if (!leadId && params.contactE164) {
+    const ramoLabel = ramo === "autos" ? "auto" : ramo === "vida" ? "vida" : ramo === "hogar" ? "hogar" : ramo;
+    const titulo = params.placa
+      ? `Seguro de ${ramoLabel} — ${params.placa}`
+      : `Seguro de ${ramoLabel} — ${params.tomador.nombre_tomador ?? "sin nombre"}`;
+    const resolved = await resolveOrCreateInsuranceLead(db, params.organizationId, {
+      contactE164: params.contactE164,
+      nombreTomador: params.tomador.nombre_tomador,
+      titulo
+    });
+    if (resolved) {
+      leadId = resolved.leadId;
+      contactId = contactId ?? resolved.contactId;
+    }
+  }
 
   let existingId: string | null = null;
   if (params.conversationId) {
@@ -121,8 +141,8 @@ export async function upsertPendingQuoteRequest(
 
   const payload = {
     organization_id: params.organizationId,
-    contact_id: params.contactId ?? null,
-    lead_id: params.leadId ?? null,
+    contact_id: contactId,
+    lead_id: leadId,
     conversation_id: params.conversationId ?? null,
     source: params.source,
     ramo,
@@ -143,7 +163,7 @@ export async function upsertPendingQuoteRequest(
   const vehiculo = params.vehiculo ?? {};
   const strOrNull = (v: unknown) => (typeof v === "string" ? v : v == null ? null : String(v));
   const numOrNull = (v: unknown) => (typeof v === "number" ? v : null);
-  await syncQuoteToLeadMetadata(db, params.leadId, {
+  await syncQuoteToLeadMetadata(db, leadId, {
     placa: params.placa ?? null,
     ramo: ramo === "autos" ? "Auto" : ramo === "vida" ? "Vida" : ramo === "hogar" ? "Hogar" : ramo,
     vehiculo_marca: strOrNull(vehiculo.marca),

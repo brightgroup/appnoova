@@ -31,6 +31,7 @@ export interface HomeQuoteOptions {
   conversationId?: string | null;
   contactId?: string | null;
   leadId?: string | null;
+  contactE164?: string | null;
 }
 
 const REQUIRED_FIELDS = [
@@ -69,6 +70,7 @@ export async function calificarSeguroHogar(
     conversationId: options.conversationId,
     contactId: options.contactId,
     leadId: options.leadId,
+    contactE164: options.contactE164,
     source: options.source,
     ramo: "hogar",
     tomador,
