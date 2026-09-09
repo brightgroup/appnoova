@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
-import { getCrmUserId } from "@/lib/crm-auth";
+import { getCrmLeadVisibility } from "@/lib/crm-auth";
 import { generateOriQuote, type CrmQuoteRecord } from "@/lib/crm-ai-extract";
 import { recordOriUsageForUser } from "@/lib/billing/meter";
 import { getTenantLabels } from "@/lib/crm-labels";
@@ -10,19 +10,22 @@ import { toCrmContact, toCrmLead } from "@/lib/crm-record";
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(_req: NextRequest, ctx: Ctx) {
-  const userId = await getCrmUserId(_req, "edit");
-  if (userId instanceof NextResponse) return userId;
+  const visibility = await getCrmLeadVisibility(_req, "edit");
+  if (visibility instanceof NextResponse) return visibility;
+  const { tenantUserId: userId, callerUserId, canManageAll } = visibility;
 
   const { id } = await ctx.params;
   const db = textAgentsAdminClient();
 
+  let leadQuery = db
+    .from("crm_leads")
+    .select("*, contact:crm_contacts(*), stage:crm_pipeline_stages(*)")
+    .eq("id", id)
+    .eq("user_id", userId);
+  if (!canManageAll) leadQuery = leadQuery.eq("assigned_user_id", callerUserId);
+
   const [{ data: row }, labels, companyContext] = await Promise.all([
-    db
-      .from("crm_leads")
-      .select("*, contact:crm_contacts(*), stage:crm_pipeline_stages(*)")
-      .eq("id", id)
-      .eq("user_id", userId)
-      .maybeSingle(),
+    leadQuery.maybeSingle(),
     getTenantLabels(db, userId),
     getDefaultCompanyContextContent(db, userId)
   ]);

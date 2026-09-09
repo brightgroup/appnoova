@@ -52,6 +52,9 @@ interface CrmLeadFormProps {
   onLeadSynced?: (lead: CrmLead) => void;
   createdAt?: string;
   updatedAt?: string;
+  /** Solo quien tiene nivel `manage` en el módulo crm puede reasignar — ver src/lib/crm-auth.ts. */
+  canManageAll?: boolean;
+  assignableMembers?: { user_id: string; email: string; full_name?: string }[];
 }
 
 export function CrmLeadForm({
@@ -64,7 +67,9 @@ export function CrmLeadForm({
   onMetaChange,
   onLeadSynced,
   createdAt,
-  updatedAt
+  updatedAt,
+  canManageAll,
+  assignableMembers
 }: CrmLeadFormProps) {
   const pipelineStages = filterPipelineStages(stages);
   const outcome = (draft.outcome ?? "open") as CrmLeadOutcome;
@@ -334,6 +339,24 @@ export function CrmLeadForm({
 
       <FieldGroup title="Asignación">
         <div className="grid sm:grid-cols-2 gap-3">
+          {canManageAll && assignableMembers && assignableMembers.length > 0 && (
+            <div>
+              <label className="text-xs text-gray-400 mb-1 block">
+                Asignado a <span className="text-gray-600">(quién puede ver y trabajar este lead)</span>
+              </label>
+              <NoovaSelect
+                value={draft.assigned_user_id ?? ""}
+                onChange={v => onChange({ assigned_user_id: v || null })}
+                options={[
+                  { value: "", label: "Sin asignar (solo tú)" },
+                  ...assignableMembers.map(m => ({
+                    value: m.user_id,
+                    label: m.full_name ? `${m.full_name} · ${m.email}` : m.email
+                  }))
+                ]}
+              />
+            </div>
+          )}
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Asesor responsable</label>
             <input

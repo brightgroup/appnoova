@@ -9,9 +9,17 @@ import { CrmDetailLayout } from "@/components/crm/CrmDetailLayout";
 import { CrmLeadForm } from "@/components/crm/CrmLeadForm";
 import type { CrmContact, CrmLead, CrmPipelineStage, CrmPropertyDefinition } from "@/types/crm";
 
+export interface AssignableMember {
+  user_id: string;
+  email: string;
+  full_name?: string;
+}
+
 function LeadEditContent({ leadId }: { leadId: string }) {
   const router = useRouter();
   const [lead, setLead] = useState<CrmLead | null>(null);
+  const [canManageAll, setCanManageAll] = useState(false);
+  const [assignableMembers, setAssignableMembers] = useState<AssignableMember[]>([]);
   const [stages, setStages] = useState<CrmPipelineStage[]>([]);
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [properties, setProperties] = useState<CrmPropertyDefinition[]>([]);
@@ -45,6 +53,22 @@ function LeadEditContent({ leadId }: { leadId: string }) {
     if (stagesRes.ok) setStages(stagesData.stages ?? []);
     if (contactsRes.ok) setContacts(contactsData.contacts ?? []);
     if (propsRes.ok) setProperties(props.properties ?? []);
+    setCanManageAll(Boolean(detail.can_manage_all));
+    if (detail.can_manage_all) {
+      const membersRes = await fetch("/api/org/members", { headers });
+      if (membersRes.ok) {
+        const membersData = await membersRes.json();
+        setAssignableMembers(
+          (membersData.members ?? [])
+            .filter((m: { status: string }) => m.status === "active")
+            .map((m: { user_id: string; email: string; full_name?: string }) => ({
+              user_id: m.user_id,
+              email: m.email,
+              full_name: m.full_name
+            }))
+        );
+      }
+    }
     setLoading(false);
   }, [leadId]);
 
@@ -116,6 +140,8 @@ function LeadEditContent({ leadId }: { leadId: string }) {
           contacts={contacts}
           properties={properties}
           leadId={lead.id}
+          canManageAll={canManageAll}
+          assignableMembers={assignableMembers}
           onChange={patch => setDraft(d => ({ ...d, ...patch }))}
           onMetaChange={(key, value) =>
             setDraft(d => ({ ...d, metadata: { ...(d.metadata ?? {}), [key]: value } }))

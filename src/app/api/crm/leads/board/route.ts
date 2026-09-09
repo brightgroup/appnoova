@@ -4,6 +4,7 @@ import { isMissingTableError } from "@/lib/supabase-table-error";
 import { toCrmLead } from "@/lib/crm-record";
 import { getCrmStages } from "@/lib/crm-server";
 import { getAuthUserFromRequest, userDisplayName } from "@/lib/voice-agents-server";
+import { getCrmLeadVisibility } from "@/lib/crm-auth";
 
 const PAGE_SIZE = 25;
 const LEAD_SELECT = "*, contact:crm_contacts(*), stage:crm_pipeline_stages(*)";
@@ -21,9 +22,9 @@ function resolveOutcome(outcome: string): "open" | "won" | "lost" {
 }
 
 export async function GET(req: NextRequest) {
-  const user = await getAuthUserFromRequest(req);
-  const userId = user?.id ?? null;
-  if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const visibility = await getCrmLeadVisibility(req, "view");
+  if (visibility instanceof NextResponse) return visibility;
+  const { tenantUserId: userId, callerUserId, canManageAll } = visibility;
 
   const db = textAgentsAdminClient();
   const sp = req.nextUrl.searchParams;
@@ -71,6 +72,7 @@ export async function GET(req: NextRequest) {
       .eq("user_id", userId)
       .eq("stage_id", stageId)
       .eq("outcome", effectiveOutcome);
+    if (!canManageAll) query = query.eq("assigned_user_id", callerUserId);
     if (asesor) query = query.ilike("asesor_responsable", asesor);
     if (orClause) query = query.or(orClause);
 
@@ -87,6 +89,7 @@ export async function GET(req: NextRequest) {
 
   // Sin stage_id: arranque del tablero — resumen (conteo + suma) y primera página por etapa.
   let summaryQuery = db.from("crm_leads").select("stage_id, value_amount").eq("user_id", userId).eq("outcome", effectiveOutcome);
+  if (!canManageAll) summaryQuery = summaryQuery.eq("assigned_user_id", callerUserId);
   if (asesor) summaryQuery = summaryQuery.ilike("asesor_responsable", asesor);
   if (orClause) summaryQuery = summaryQuery.or(orClause);
   const { data: summaryRows, error: summaryError } = await summaryQuery;
@@ -111,6 +114,7 @@ export async function GET(req: NextRequest) {
           .eq("user_id", userId)
           .eq("stage_id", stage.id)
           .eq("outcome", effectiveOutcome);
+        if (!canManageAll) pageQuery = pageQuery.eq("assigned_user_id", callerUserId);
         if (asesor) pageQuery = pageQuery.ilike("asesor_responsable", asesor);
         if (orClause) pageQuery = pageQuery.or(orClause);
         const { data, error } = await pageQuery.order("sort_order").range(0, PAGE_SIZE - 1);
@@ -123,12 +127,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
+  const authUser = await getAuthUserFromRequest(req);
   return NextResponse.json({
     stages,
     summary,
     pages,
     page_size: PAGE_SIZE,
-    current_user_name: user ? userDisplayName(user) : "Usuario",
+    current_user_name: authUser ? userDisplayName(authUser) : "Usuario",
     dbReady: true
   });
 }

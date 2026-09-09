@@ -323,6 +323,7 @@ export function toCrmLead(raw: Record<string, unknown>): CrmLead {
     motivo_perdida: parseMotivoPerdida(raw.motivo_perdida),
     motivo_perdida_detalle: raw.motivo_perdida_detalle ? String(raw.motivo_perdida_detalle) : null,
     asesor_responsable: raw.asesor_responsable ? String(raw.asesor_responsable) : null,
+    assigned_user_id: raw.assigned_user_id ? String(raw.assigned_user_id) : null,
     categoria_interes: raw.categoria_interes ? String(raw.categoria_interes) : null,
     producto_interes: raw.producto_interes ? String(raw.producto_interes) : null,
     score: score != null && !Number.isNaN(score) ? score : null,

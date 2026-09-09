@@ -151,6 +151,8 @@ export interface CrmLead {
   motivo_perdida: CrmMotivoPerdida | null;
   motivo_perdida_detalle: string | null;
   asesor_responsable: string | null;
+  /** Asesor con acceso real al lead (control de acceso) — distinto de asesor_responsable, que es solo texto libre. */
+  assigned_user_id: string | null;
   categoria_interes: string | null;
   producto_interes: string | null;
   score: number | null;
