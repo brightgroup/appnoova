@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Car, Check, Copy, HeartPulse, Home, Loader2, MessageSquare, Plus, Send, ShieldCheck, X } from "lucide-react";
+import { Car, Check, Copy, ExternalLink, HeartPulse, Home, Loader2, MessageSquare, Plus, Send, ShieldCheck, X } from "lucide-react";
 import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
 import { Badge } from "@/components/ui/Badge";
 import { InfoBox } from "@/components/ui/InfoBox";
@@ -19,6 +19,7 @@ interface QuoteRequest {
   estado: "pendiente" | "cotizada" | "enviada_externa" | "cerrada" | "descartada";
   resultado: { aseguradora?: string; prima?: number | null } | null;
   conversationId: string | null;
+  leadId: string | null;
   createdAt: string;
 }
 
@@ -188,6 +189,14 @@ export default function CotizacionesQueuePage() {
                       {r.tomador?.nombre_tomador} · {r.tomador?.documento_tomador}
                     </p>
                   </div>
+                  {r.leadId && (
+                    <a
+                      href={`/dashboard/crm/leads/${r.leadId}`}
+                      className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-white/[.06]"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> Ver oportunidad
+                    </a>
+                  )}
                   {r.conversationId && (
                     <a
                       href={`/dashboard/inbox?id=${r.conversationId}`}
@@ -269,6 +278,15 @@ export default function CotizacionesQueuePage() {
                     {ramoSummary(r)} {r.placa && <span className="text-gray-500 font-mono">{r.placa}</span>} — {r.tomador?.nombre_tomador}
                   </p>
                 </div>
+                {r.leadId && (
+                  <a
+                    href={`/dashboard/crm/leads/${r.leadId}`}
+                    className="shrink-0 text-gray-500 hover:text-white"
+                    title="Ver oportunidad"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
                 <Badge variant={r.estado === "cotizada" || r.estado === "enviada_externa" ? "emerald" : "neutral"}>
                   {r.estado === "cotizada" || r.estado === "enviada_externa"
                     ? formatCop(r.resultado?.prima)
