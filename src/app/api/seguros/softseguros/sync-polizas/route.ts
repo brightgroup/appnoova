@@ -4,7 +4,7 @@ import { adminClient } from "@/lib/voice-agents-server";
 import { getSoftsegurosCredentials, markSoftsegurosSynced, markSoftsegurosConnectionResult } from "@/lib/softseguros/connections-db";
 import { listPolizasTodas, SoftsegurosApiError } from "@/lib/softseguros/client";
 import { mapSoftsegurosPoliza } from "@/lib/softseguros/poliza-mapper";
-import { upsertPolizaPorNumero } from "@/lib/insurers/polizas-db";
+import { upsertPolizaPorNumero, findRamoCatalogoPorNombre } from "@/lib/insurers/polizas-db";
 import { findOrCreateContactForPoliza } from "@/lib/insurers/poliza-contact-match";
 
 /**
@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
   let contactosCreados = 0;
   const sinFechaVencimiento: string[] = [];
   const errores: { softsegurosId: string; error: string }[] = [];
+  const ramoIdCache = new Map<string, string | null>();
 
   for (const raw of rawPolizas) {
     const mapped = mapSoftsegurosPoliza(raw);
@@ -56,14 +57,33 @@ export async function POST(req: NextRequest) {
       });
       if (match.created) contactosCreados++;
 
+      let ramoId: string | null = null;
+      if (p.ramoGlobalNombre) {
+        if (!ramoIdCache.has(p.ramoGlobalNombre)) {
+          ramoIdCache.set(p.ramoGlobalNombre, await findRamoCatalogoPorNombre(db, p.ramoGlobalNombre));
+        }
+        ramoId = ramoIdCache.get(p.ramoGlobalNombre) ?? null;
+      }
+
       const { created } = await upsertPolizaPorNumero(db, ctx.crmUserId, p.numeroPoliza, {
         contactId: match.contactId,
         aseguradora: p.aseguradora,
         ramo: p.ramo,
+        ramoId,
         vigenciaDesde: p.vigenciaDesde,
         vigenciaHasta: p.vigenciaHasta,
         prima: p.prima,
         estado: p.estado,
+        tipoPoliza: p.tipoPoliza,
+        moneda: p.moneda,
+        tasaCambio: p.tasaCambio,
+        esSoat: p.esSoat,
+        aseguradoNombre: p.asegurado?.nombre ?? null,
+        aseguradoDocumento: p.asegurado?.documento ?? null,
+        comisionAgencia: p.comisionAgencia,
+        porcentajeComisionAgencia: p.porcentajeComisionAgencia,
+        comisionVendedor: p.comisionVendedor,
+        porcentajeComisionVendedor: p.porcentajeComisionVendedor,
         fuente: "softseguros",
         metadata: { softseguros_id: p.softsegurosId }
       });

@@ -16,7 +16,19 @@ export async function GET(req: NextRequest) {
     search
   });
 
-  return NextResponse.json({ polizas });
+  const contactIds = [...new Set(polizas.map(p => p.contactId))];
+  const { data: contactRows } = contactIds.length
+    ? await db.from("crm_contacts").select("id, name, documento_id").in("id", contactIds)
+    : { data: [] as { id: string; name: string; documento_id: string | null }[] };
+  const contactById = new Map((contactRows ?? []).map(c => [c.id, c]));
+
+  const polizasConContacto = polizas.map(p => ({
+    ...p,
+    contactName: contactById.get(p.contactId)?.name ?? null,
+    contactDocumento: contactById.get(p.contactId)?.documento_id ?? null
+  }));
+
+  return NextResponse.json({ polizas: polizasConContacto });
 }
 
 export async function POST(req: NextRequest) {
@@ -58,12 +70,15 @@ export async function POST(req: NextRequest) {
       contactId,
       aseguradora,
       ramo,
+      ramoId: body.ramo_id ? String(body.ramo_id) : null,
       numeroPoliza: body.numero_poliza ? String(body.numero_poliza) : null,
       vigenciaDesde: body.vigencia_desde ? String(body.vigencia_desde) : null,
       vigenciaHasta,
       prima: body.prima !== undefined && body.prima !== null && body.prima !== "" ? Number(body.prima) : null,
       periodicidadPago: body.periodicidad_pago ?? null,
       estado: body.estado ?? "activa",
+      tipoPoliza: body.tipo_poliza ?? "individual",
+      moneda: body.moneda ?? "COP",
       fuente: "manual"
     });
     return NextResponse.json({ poliza });

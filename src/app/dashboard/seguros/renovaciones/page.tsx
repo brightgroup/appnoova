@@ -10,6 +10,7 @@ import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import { InfoBox } from "@/components/ui/InfoBox";
 import { Badge } from "@/components/ui/Badge";
 import { useModuleWriteAccess } from "@/components/layout/DashboardRouteGuard";
+import { PolizasSubTabs } from "@/components/seguros/PolizasSubTabs";
 import type { PolizaRecord } from "@/lib/insurers/polizas-db";
 import type { RenovacionAvisoRecord } from "@/lib/insurers/renovacion-avisos-db";
 import type { RenovacionRule } from "@/lib/insurers/renovacion-rules-db";
@@ -106,6 +107,7 @@ export default function RenovacionesPage() {
     <ChannelListPage
       title="Renovaciones"
       description="Próximas pólizas a vencer y la cadencia de WhatsApp que las recuerda automáticamente."
+      tabs={<PolizasSubTabs active="renovaciones" />}
       loading={loading}
       onRefresh={() => load()}
       refreshing={loading}

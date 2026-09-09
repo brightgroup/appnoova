@@ -21,6 +21,8 @@ interface ChannelListPageProps {
   alerts?: React.ReactNode;
   footer?: React.ReactNode;
   error?: React.ReactNode;
+  /** Pestañas de navegación entre pantallas hermanas (ej. Pólizas ⇄ Renovaciones) — se renderiza justo bajo el título, distinto de `filters` (que filtra la lista de esta misma pantalla). */
+  tabs?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -39,6 +41,7 @@ export function ChannelListPage({
   alerts,
   footer,
   error,
+  tabs,
   children
 }: ChannelListPageProps) {
   return (
@@ -56,6 +59,7 @@ export function ChannelListPage({
             <p className={`text-xs ${textMuted} mt-0.5 max-w-2xl`}>{description}</p>
           </div>
         </div>
+        {tabs && <div className="mt-4">{tabs}</div>}
       </div>
 
       <div className={registryContent}>

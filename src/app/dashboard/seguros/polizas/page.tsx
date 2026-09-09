@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Upload, MoreHorizontal, ShieldCheck, Trash2, RefreshCw } from "lucide-react";
+import Link from "next/link";
+import { Plus, Upload, MoreHorizontal, ShieldCheck, Trash2, RefreshCw, Settings } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import {
   btnGhost,
@@ -13,6 +14,7 @@ import {
   registryTableCell,
   registryTableHead,
   registryTableHeadRow,
+  registryTableHeadCell,
   registryTableRowClickable,
   registryTableCellFirst,
   registryTableEmpty
@@ -29,10 +31,18 @@ import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { useModuleWriteAccess } from "@/components/layout/DashboardRouteGuard";
 import { PolizaModal, type PolizaFormValues } from "@/components/seguros/PolizaModal";
 import { PolizasImportDialog } from "@/components/seguros/PolizasImportDialog";
+import { PolizasSubTabs } from "@/components/seguros/PolizasSubTabs";
+import { PolizaColumnPicker } from "@/components/seguros/PolizaColumnPicker";
+import { POLIZA_STATIC_COLUMNS, usePolizaColumnPrefs, type PolizaColumnDef } from "@/lib/insurers/poliza-columns";
 import type { PolizaEstado, PolizaRecord } from "@/lib/insurers/polizas-db";
+import type { PolizaRamoCampoRecord } from "@/lib/insurers/poliza-ramo-campos-db";
+
+type PolizaRow = PolizaRecord & { contactName: string | null; contactDocumento: string | null };
+
+type SortKey = "aseguradora" | "ramo" | "numero_poliza" | "vigencia_hasta" | "prima" | "estado";
+const SORTABLE_KEYS = new Set<string>(["aseguradora", "ramo", "numero_poliza", "vigencia_hasta", "prima", "estado"]);
 
 type Filter = "todas" | PolizaEstado;
-type SortKey = "aseguradora" | "ramo" | "numero_poliza" | "vigencia_hasta" | "prima" | "estado";
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "todas", label: "Todas" },
@@ -43,11 +53,16 @@ const FILTERS: { id: Filter; label: string }[] = [
 
 const ESTADO_BADGE: Record<PolizaEstado, BadgeVariant> = {
   cotizada: "sky",
+  expedicion: "amber",
   activa: "emerald",
   vencida: "danger",
   cancelada: "neutral",
-  renovada: "violet"
+  no_renovada: "orange",
+  renovada: "violet",
+  devengada: "neutral"
 };
+
+const TIPO_POLIZA_LABEL: Record<string, string> = { individual: "Individual", colectiva: "Colectiva", masiva: "Masiva" };
 
 function diasRestantes(vigenciaHasta: string | null): number | null {
   if (!vigenciaHasta) return null;
@@ -57,15 +72,103 @@ function diasRestantes(vigenciaHasta: string | null): number | null {
   return Math.round((venc.getTime() - hoy.getTime()) / 86_400_000);
 }
 
-function formatCOP(value: number | null): string {
+function formatMoneda(value: number | null, moneda: string): string {
   if (value == null) return "—";
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
+  try {
+    return new Intl.NumberFormat("es-CO", { style: "currency", currency: moneda || "COP", maximumFractionDigits: 0 }).format(value);
+  } catch {
+    return `${moneda} ${value.toLocaleString("es-CO")}`;
+  }
+}
+
+function renderCustomValue(p: PolizaRow, campo: PolizaRamoCampoRecord): React.ReactNode {
+  const raw = p.metadata?.[campo.fieldKey];
+  if (raw == null || raw === "") return "—";
+  if (campo.fieldType === "boolean") return raw ? "Sí" : "No";
+  return String(raw);
+}
+
+/** Valor plano para exportar a Excel (ExportMenu exige string|number|boolean, no JSX). */
+function rawValue(p: PolizaRow, colKey: string, camposByKey: Map<string, PolizaRamoCampoRecord>): string | number | boolean {
+  if (colKey.startsWith("custom:")) {
+    const campo = camposByKey.get(colKey.slice(7));
+    const raw = campo ? p.metadata?.[campo.fieldKey] : null;
+    if (raw == null) return "";
+    if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") return raw;
+    return String(raw);
+  }
+  switch (colKey) {
+    case "tomador": return p.contactName ?? "";
+    case "aseguradora": return p.aseguradora;
+    case "ramo": return p.ramo;
+    case "numero_poliza": return p.numeroPoliza ?? "";
+    case "vigencia_desde": return p.vigenciaDesde ?? "";
+    case "vigencia_hasta": return p.vigenciaHasta ?? "";
+    case "prima": return p.prima ?? "";
+    case "moneda": return p.moneda;
+    case "tipo_poliza": return TIPO_POLIZA_LABEL[p.tipoPoliza] ?? p.tipoPoliza;
+    case "comision_agencia": return p.comisionAgencia ?? "";
+    case "comision_vendedor": return p.comisionVendedor ?? "";
+    case "estado": return p.estado;
+    default: return "";
+  }
+}
+
+function renderCell(p: PolizaRow, colKey: string, camposByKey: Map<string, PolizaRamoCampoRecord>): React.ReactNode {
+  if (colKey.startsWith("custom:")) {
+    const campo = camposByKey.get(colKey.slice(7));
+    return campo ? renderCustomValue(p, campo) : "—";
+  }
+  switch (colKey) {
+    case "tomador":
+      return p.contactName || "—";
+    case "aseguradora":
+      return (
+        <span className="inline-flex items-center gap-2 font-medium text-white">
+          <ShieldCheck className="w-4 h-4 text-[#99c9ff] shrink-0" /> {p.aseguradora}
+        </span>
+      );
+    case "ramo":
+      return p.ramo;
+    case "numero_poliza":
+      return <span className="font-mono text-gray-400">{p.numeroPoliza || "—"}</span>;
+    case "vigencia_desde":
+      return p.vigenciaDesde || "—";
+    case "vigencia_hasta": {
+      const dias = diasRestantes(p.vigenciaHasta);
+      if (!p.vigenciaHasta) return "—";
+      return (
+        <span className={dias !== null && dias <= 30 && p.estado === "activa" ? "text-amber-300 font-medium" : ""}>
+          {p.vigenciaHasta}
+          {dias !== null && p.estado === "activa" && (
+            <span className="block text-[11px] text-gray-500">{dias < 0 ? `Venció hace ${Math.abs(dias)}d` : `Faltan ${dias}d`}</span>
+          )}
+        </span>
+      );
+    }
+    case "prima":
+      return formatMoneda(p.prima, p.moneda);
+    case "moneda":
+      return p.moneda;
+    case "tipo_poliza":
+      return TIPO_POLIZA_LABEL[p.tipoPoliza] ?? p.tipoPoliza;
+    case "comision_agencia":
+      return formatMoneda(p.comisionAgencia, p.moneda);
+    case "comision_vendedor":
+      return formatMoneda(p.comisionVendedor, p.moneda);
+    case "estado":
+      return <Badge variant={ESTADO_BADGE[p.estado]}>{p.estado}</Badge>;
+    default:
+      return "—";
+  }
 }
 
 export default function PolizasPage() {
   const { canWrite: canEdit } = useModuleWriteAccess("seguros", "edit");
+  const { canWrite: canManage } = useModuleWriteAccess("seguros", "manage");
 
-  const [polizas, setPolizas] = useState<PolizaRecord[]>([]);
+  const [polizas, setPolizas] = useState<PolizaRow[]>([]);
+  const [campos, setCampos] = useState<PolizaRamoCampoRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("todas");
@@ -84,14 +187,25 @@ export default function PolizasPage() {
     const params = new URLSearchParams();
     if (filter !== "todas") params.set("estado", filter);
     if (search.trim()) params.set("q", search.trim());
-    const res = await fetch(`/api/seguros/polizas?${params.toString()}`, { headers });
-    if (res.ok) setPolizas((await res.json()).polizas ?? []);
+    const [polRes, camposRes] = await Promise.all([
+      fetch(`/api/seguros/polizas?${params.toString()}`, { headers }),
+      fetch("/api/seguros/ramo-campos", { headers })
+    ]);
+    if (polRes.ok) setPolizas((await polRes.json()).polizas ?? []);
+    if (camposRes.ok) setCampos((await camposRes.json()).campos ?? []);
     if (!silent) setLoading(false);
   }, [filter, search]);
 
   useEffect(() => { void load(); }, [load]);
 
-  const getSortValue = useCallback((p: PolizaRecord, key: SortKey): string | number | null => {
+  const camposByKey = useMemo(() => new Map(campos.map(c => [c.fieldKey, c])), [campos]);
+  const allColumns: PolizaColumnDef[] = useMemo(
+    () => [...POLIZA_STATIC_COLUMNS, ...campos.map(c => ({ key: `custom:${c.fieldKey}`, label: c.label }))],
+    [campos]
+  );
+  const { ready: columnsReady, ordered, visible, hidden, toggle, move } = usePolizaColumnPrefs(allColumns);
+
+  const getSortValue = useCallback((p: PolizaRow, key: SortKey): string | number | null => {
     switch (key) {
       case "aseguradora": return p.aseguradora;
       case "ramo": return p.ramo;
@@ -123,11 +237,14 @@ export default function PolizasPage() {
           body: JSON.stringify({
             aseguradora: values.aseguradora,
             ramo: values.ramo,
+            ramo_id: values.ramo_id,
             numero_poliza: values.numero_poliza || null,
             vigencia_desde: values.vigencia_desde || null,
             vigencia_hasta: values.vigencia_hasta || null,
             prima: values.prima === "" ? null : Number(values.prima),
-            periodicidad_pago: values.periodicidad_pago || null
+            periodicidad_pago: values.periodicidad_pago || null,
+            tipo_poliza: values.tipo_poliza,
+            moneda: values.moneda
           })
         })
       : await fetch("/api/seguros/polizas", {
@@ -140,11 +257,14 @@ export default function PolizasPage() {
             telefono: values.telefono || null,
             aseguradora: values.aseguradora,
             ramo: values.ramo,
+            ramo_id: values.ramo_id,
             numero_poliza: values.numero_poliza || null,
             vigencia_desde: values.vigencia_desde || null,
             vigencia_hasta: values.vigencia_hasta || null,
             prima: values.prima === "" ? null : Number(values.prima),
-            periodicidad_pago: values.periodicidad_pago || null
+            periodicidad_pago: values.periodicidad_pago || null,
+            tipo_poliza: values.tipo_poliza,
+            moneda: values.moneda
           })
         });
     const json = await res.json();
@@ -182,8 +302,9 @@ export default function PolizasPage() {
   return (
     <>
       <ChannelListPage
-        title="Cartera de pólizas"
+        title="Pólizas"
         description="Registro operativo de tus pólizas — lo justo para disparar renovaciones y siniestros."
+        tabs={<PolizasSubTabs active="polizas" />}
         loading={loading}
         search={search}
         onSearchChange={setSearch}
@@ -205,19 +326,21 @@ export default function PolizasPage() {
         }
         action={
           <div className="flex items-center gap-2 flex-wrap justify-end">
+            {columnsReady && <PolizaColumnPicker ordered={ordered} hidden={hidden} onToggle={toggle} onMove={move} />}
             <ExportMenu
-              filename="cartera-polizas"
+              filename="polizas"
               sheetName="Pólizas"
-              columns={[
-                { header: "Aseguradora", value: (p: PolizaRecord) => p.aseguradora },
-                { header: "Ramo", value: (p: PolizaRecord) => p.ramo },
-                { header: "Número", value: (p: PolizaRecord) => p.numeroPoliza ?? "" },
-                { header: "Vigencia hasta", value: (p: PolizaRecord) => p.vigenciaHasta ?? "" },
-                { header: "Prima", value: (p: PolizaRecord) => p.prima ?? "" },
-                { header: "Estado", value: (p: PolizaRecord) => p.estado }
-              ]}
+              columns={visible.map(col => ({
+                header: col.label,
+                value: (p: PolizaRow) => rawValue(p, col.key, camposByKey)
+              }))}
               rows={sorted}
             />
+            {canManage && (
+              <Link href="/dashboard/seguros/polizas/campos" className={btnGhost} title="Campos por ramo">
+                <Settings className="w-4 h-4" />
+              </Link>
+            )}
             {canEdit && (
               <>
                 <button type="button" onClick={syncSoftseguros} disabled={syncing} className={btnGhost}>
@@ -261,77 +384,66 @@ export default function PolizasPage() {
                 : "Aún no hay pólizas registradas."}
           </div>
         ) : (
-          <table className={`${registryTable} min-w-[900px]`}>
+          <table className={`${registryTable} min-w-[1100px]`}>
             <thead className={registryTableHead}>
               <tr className={registryTableHeadRow}>
-                <SortableTh label="Aseguradora" sortKey="aseguradora" activeKey={sort.key} direction={sort.direction} onSort={toggleSort} />
-                <SortableTh label="Ramo" sortKey="ramo" activeKey={sort.key} direction={sort.direction} onSort={toggleSort} />
-                <SortableTh label="Número" sortKey="numero_poliza" activeKey={sort.key} direction={sort.direction} onSort={toggleSort} />
-                <SortableTh label="Vence" sortKey="vigencia_hasta" activeKey={sort.key} direction={sort.direction} onSort={toggleSort} />
-                <SortableTh label="Prima" sortKey="prima" activeKey={sort.key} direction={sort.direction} onSort={toggleSort} />
-                <SortableTh label="Estado" sortKey="estado" activeKey={sort.key} direction={sort.direction} onSort={toggleSort} />
+                {visible.map(col =>
+                  SORTABLE_KEYS.has(col.key) ? (
+                    <SortableTh
+                      key={col.key}
+                      label={col.label}
+                      sortKey={col.key as SortKey}
+                      activeKey={sort.key}
+                      direction={sort.direction}
+                      onSort={toggleSort as (k: string) => void}
+                    />
+                  ) : (
+                    <th key={col.key} className={registryTableHeadCell}>{col.label}</th>
+                  )
+                )}
                 <th className="w-12" />
               </tr>
             </thead>
             <tbody>
-              {pageRows.map(p => {
-                const dias = diasRestantes(p.vigenciaHasta);
-                return (
-                  <tr key={p.id} className={registryTableRowClickable} onClick={() => setPolizaModal({ poliza: p })}>
-                    <td className={registryTableCellFirst}>
-                      <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
-                        <ShieldCheck className="w-4 h-4 text-[#99c9ff] shrink-0" />
-                        {p.aseguradora}
-                      </span>
+              {pageRows.map(p => (
+                <tr key={p.id} className={registryTableRowClickable} onClick={() => setPolizaModal({ poliza: p })}>
+                  {visible.map((col, colIdx) => (
+                    <td
+                      key={col.key}
+                      className={colIdx === 0 ? registryTableCellFirst : `${registryTableCell} text-sm text-gray-300`}
+                    >
+                      {renderCell(p, col.key, camposByKey)}
                     </td>
-                    <td className={`${registryTableCell} text-sm text-gray-300`}>{p.ramo}</td>
-                    <td className={`${registryTableCell} text-sm font-mono text-gray-400`}>{p.numeroPoliza || "—"}</td>
-                    <td className={registryTableCell}>
-                      {p.vigenciaHasta ? (
-                        <span className={`text-sm ${dias !== null && dias <= 30 && p.estado === "activa" ? "text-amber-300 font-medium" : "text-gray-300"}`}>
-                          {p.vigenciaHasta}
-                          {dias !== null && p.estado === "activa" && (
-                            <span className="block text-[11px] text-gray-500">
-                              {dias < 0 ? `Venció hace ${Math.abs(dias)}d` : `Faltan ${dias}d`}
-                            </span>
-                          )}
-                        </span>
-                      ) : "—"}
-                    </td>
-                    <td className={`${registryTableCell} text-sm text-gray-300`}>{formatCOP(p.prima)}</td>
-                    <td className={registryTableCell}>
-                      <Badge variant={ESTADO_BADGE[p.estado]}>{p.estado}</Badge>
-                    </td>
-                    <td className={registryTableCell} onClick={e => e.stopPropagation()}>
-                      <NoovaAnchoredMenu
-                        open={openMenuId === p.id}
-                        onClose={() => setOpenMenuId(null)}
-                        menuClassName="min-w-[160px]"
-                        anchor={
-                          <button
-                            type="button"
-                            onClick={e => { e.stopPropagation(); setOpenMenuId(prev => (prev === p.id ? null : p.id)); }}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/[.06]"
-                          >
-                            <MoreHorizontal className="w-4 h-4" />
-                          </button>
-                        }
-                      >
-                        {canEdit && (
-                          <NoovaListMenuItem onClick={() => { setOpenMenuId(null); setPolizaModal({ poliza: p }); }}>
-                            Editar
-                          </NoovaListMenuItem>
-                        )}
-                        {canEdit && (
-                          <NoovaListMenuItem danger onClick={() => { setOpenMenuId(null); deletePoliza(p); }}>
-                            <span className="flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" /> Eliminar</span>
-                          </NoovaListMenuItem>
-                        )}
-                      </NoovaAnchoredMenu>
-                    </td>
-                  </tr>
-                );
-              })}
+                  ))}
+                  <td className={registryTableCell} onClick={e => e.stopPropagation()}>
+                    <NoovaAnchoredMenu
+                      open={openMenuId === p.id}
+                      onClose={() => setOpenMenuId(null)}
+                      menuClassName="min-w-[160px]"
+                      anchor={
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); setOpenMenuId(prev => (prev === p.id ? null : p.id)); }}
+                          className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/[.06]"
+                        >
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                      }
+                    >
+                      {canEdit && (
+                        <NoovaListMenuItem onClick={() => { setOpenMenuId(null); setPolizaModal({ poliza: p }); }}>
+                          Editar
+                        </NoovaListMenuItem>
+                      )}
+                      {canEdit && (
+                        <NoovaListMenuItem danger onClick={() => { setOpenMenuId(null); deletePoliza(p); }}>
+                          <span className="flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" /> Eliminar</span>
+                        </NoovaListMenuItem>
+                      )}
+                    </NoovaAnchoredMenu>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         )}

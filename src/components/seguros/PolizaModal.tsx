@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { X, ShieldCheck, Search, UserPlus, Check } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { btnGhost, btnPrimary, nvControl } from "@/lib/brand-ui";
-import type { PolizaRecord, PolizaPeriodicidad } from "@/lib/insurers/polizas-db";
+import { PolizaBeneficiariosPanel } from "@/components/seguros/PolizaBeneficiariosPanel";
+import type { PolizaRecord, PolizaPeriodicidad, PolizaTipo } from "@/lib/insurers/polizas-db";
 
 const fieldClass = `w-full ${nvControl} px-4 py-2.5 text-sm`;
 
@@ -16,6 +17,11 @@ interface ContactoOption {
   documento_id: string | null;
 }
 
+interface RamoOption {
+  id: string;
+  nombre: string;
+}
+
 export interface PolizaFormValues {
   contact_id: string | null;
   tomador: string;
@@ -23,11 +29,14 @@ export interface PolizaFormValues {
   telefono: string;
   aseguradora: string;
   ramo: string;
+  ramo_id: string | null;
   numero_poliza: string;
   vigencia_desde: string;
   vigencia_hasta: string;
   prima: string;
   periodicidad_pago: PolizaPeriodicidad | "";
+  tipo_poliza: PolizaTipo;
+  moneda: string;
 }
 
 interface PolizaModalProps {
@@ -46,6 +55,20 @@ const PERIODICIDAD_OPTIONS: { value: PolizaPeriodicidad; label: string }[] = [
   { value: "mensual", label: "Mensual" }
 ];
 
+const TIPO_POLIZA_OPTIONS: { value: PolizaTipo; label: string }[] = [
+  { value: "individual", label: "Individual" },
+  { value: "colectiva", label: "Colectiva" },
+  { value: "masiva", label: "Masiva" }
+];
+
+const MONEDA_OPTIONS = ["COP", "USD", "EUR"];
+
+/** Ramos donde tiene sentido pedir beneficiarios — mismo criterio que has_formulario_adicional_beneficiarios de Softseguros. */
+function ramoUsaBeneficiarios(nombreRamo: string): boolean {
+  const n = nombreRamo.toLowerCase();
+  return n.includes("vida") || n.includes("salud") || n.includes("exequias");
+}
+
 export function PolizaModal({ open, poliza, saving, error, onClose, onSubmit }: PolizaModalProps) {
   const isEdit = Boolean(poliza);
 
@@ -57,13 +80,19 @@ export function PolizaModal({ open, poliza, saving, error, onClose, onSubmit }: 
   const [telefono, setTelefono] = useState("");
   const [aseguradora, setAseguradora] = useState("");
   const [ramo, setRamo] = useState("");
+  const [ramoId, setRamoId] = useState<string | null>(null);
+  const [ramoOptions, setRamoOptions] = useState<RamoOption[]>([]);
+  const [showRamoOptions, setShowRamoOptions] = useState(false);
   const [numeroPoliza, setNumeroPoliza] = useState("");
   const [vigenciaDesde, setVigenciaDesde] = useState("");
   const [vigenciaHasta, setVigenciaHasta] = useState("");
   const [prima, setPrima] = useState("");
   const [periodicidad, setPeriodicidad] = useState<PolizaPeriodicidad | "">("");
+  const [tipoPoliza, setTipoPoliza] = useState<PolizaTipo>("individual");
+  const [moneda, setMoneda] = useState("COP");
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ramoSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -75,11 +104,16 @@ export function PolizaModal({ open, poliza, saving, error, onClose, onSubmit }: 
     setTelefono("");
     setAseguradora(poliza?.aseguradora ?? "");
     setRamo(poliza?.ramo ?? "");
+    setRamoId(poliza?.ramoId ?? null);
+    setRamoOptions([]);
+    setShowRamoOptions(false);
     setNumeroPoliza(poliza?.numeroPoliza ?? "");
     setVigenciaDesde(poliza?.vigenciaDesde ?? "");
     setVigenciaHasta(poliza?.vigenciaHasta ?? "");
     setPrima(poliza?.prima != null ? String(poliza.prima) : "");
     setPeriodicidad(poliza?.periodicidadPago ?? "");
+    setTipoPoliza(poliza?.tipoPoliza ?? "individual");
+    setMoneda(poliza?.moneda ?? "COP");
   }, [open, poliza]);
 
   function onTomadorChange(value: string) {
@@ -102,6 +136,28 @@ export function PolizaModal({ open, poliza, saving, error, onClose, onSubmit }: 
     setContactId(c.id);
     setTomadorQuery(c.name);
     setShowOptions(false);
+  }
+
+  function onRamoChange(value: string) {
+    setRamo(value);
+    setRamoId(null);
+    setShowRamoOptions(true);
+    if (ramoSearchTimer.current) clearTimeout(ramoSearchTimer.current);
+    if (value.trim().length < 2) {
+      setRamoOptions([]);
+      return;
+    }
+    ramoSearchTimer.current = setTimeout(async () => {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/seguros/ramos?q=${encodeURIComponent(value.trim())}`, { headers });
+      if (res.ok) setRamoOptions((await res.json()).ramos ?? []);
+    }, 250);
+  }
+
+  function pickRamo(r: RamoOption) {
+    setRamoId(r.id);
+    setRamo(r.nombre);
+    setShowRamoOptions(false);
   }
 
   if (!open) return null;
@@ -189,9 +245,37 @@ export function PolizaModal({ open, poliza, saving, error, onClose, onSubmit }: 
               <label className="block text-xs text-gray-500 mb-1.5">Aseguradora</label>
               <input value={aseguradora} onChange={e => setAseguradora(e.target.value)} placeholder="Ej. La Equidad" className={fieldClass} />
             </div>
-            <div>
+            <div className="relative">
               <label className="block text-xs text-gray-500 mb-1.5">Ramo</label>
-              <input value={ramo} onChange={e => setRamo(e.target.value)} placeholder="Ej. Autos" className={fieldClass} />
+              <div className="relative">
+                <input
+                  value={ramo}
+                  onChange={e => onRamoChange(e.target.value)}
+                  onFocus={() => setShowRamoOptions(true)}
+                  placeholder="Ej. Autos, Vida…"
+                  className={fieldClass}
+                />
+                {ramoId && <Check className="w-4 h-4 text-emerald-400 absolute right-3 top-1/2 -translate-y-1/2" />}
+              </div>
+              {showRamoOptions && ramo.trim().length >= 2 && ramoOptions.length > 0 && (
+                <div className="absolute z-20 mt-1 w-full rounded-xl border border-white/[.10] bg-noova-surface shadow-2xl max-h-52 overflow-y-auto">
+                  {ramoOptions.map(r => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => pickRamo(r)}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-100 hover:bg-white/[.04] border-b border-white/[.04] last:border-0"
+                    >
+                      {r.nombre}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!ramoId && ramo.trim().length >= 2 && (
+                <p className="text-[11px] text-gray-600 mt-1">
+                  No está en el catálogo estándar — se guarda como texto libre.
+                </p>
+              )}
             </div>
           </div>
 
@@ -230,6 +314,29 @@ export function PolizaModal({ open, poliza, saving, error, onClose, onSubmit }: 
               </select>
             </div>
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5">Tipo de póliza</label>
+              <select value={tipoPoliza} onChange={e => setTipoPoliza(e.target.value as PolizaTipo)} className={fieldClass}>
+                {TIPO_POLIZA_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5">Moneda</label>
+              <select value={moneda} onChange={e => setMoneda(e.target.value)} className={fieldClass}>
+                {MONEDA_OPTIONS.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {isEdit && poliza && ramoUsaBeneficiarios(ramo) && (
+            <PolizaBeneficiariosPanel polizaId={poliza.id} />
+          )}
         </div>
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-white/[.08] sticky bottom-0 bg-noova-surface">
@@ -245,11 +352,14 @@ export function PolizaModal({ open, poliza, saving, error, onClose, onSubmit }: 
                 telefono,
                 aseguradora,
                 ramo,
+                ramo_id: ramoId,
                 numero_poliza: numeroPoliza,
                 vigencia_desde: vigenciaDesde,
                 vigencia_hasta: vigenciaHasta,
                 prima,
-                periodicidad_pago: periodicidad
+                periodicidad_pago: periodicidad,
+                tipo_poliza: tipoPoliza,
+                moneda
               })
             }
             className={btnPrimary}
