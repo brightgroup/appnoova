@@ -28,10 +28,10 @@ export async function ensureDefaultCrmStages(db: SupabaseClient, userId: string)
 
 /**
  * Aplica INSURANCE_PIPELINE_TEMPLATE (crm-record.ts) — solo agrega las
- * etapas que falten por slug, nunca borra ni pisa las existentes. La llama
- * tanto el botón manual (/api/crm/pipeline/apply-template) como la
- * activación del módulo `seguros` desde superadmin (para que un corredor
- * nuevo quede con todo listo de una vez, sin un segundo paso aparte).
+ * etapas que falten por slug, nunca borra ni pisa las existentes. Usada por
+ * el botón manual (/api/crm/pipeline/apply-template) — quien lo aprieta
+ * sabe que puede quedar con etapas parecidas a las que ya tenía, es su
+ * decisión consciente.
  */
 export async function applyInsurancePipelineTemplate(db: SupabaseClient, userId: string): Promise<void> {
   await ensureDefaultCrmStages(db, userId);
@@ -53,6 +53,23 @@ export async function applyInsurancePipelineTemplate(db: SupabaseClient, userId:
     is_lost: false
   }));
   if (toInsert.length) await db.from("crm_pipeline_stages").insert(toInsert);
+}
+
+/**
+ * Variante conservadora para la activación AUTOMÁTICA del módulo `seguros`
+ * desde superadmin: solo aplica la plantilla si el pipeline sigue siendo el
+ * genérico de fábrica (vacío, o exactamente DEFAULT_CRM_STAGES) — si el
+ * corredor ya personalizó su pipeline antes de activar seguros, no toca
+ * nada automáticamente (evita el caso real que pasó: etapas duplicadas
+ * mezclando "En cotización" propia con "Cotizando" de la plantilla). El
+ * botón manual sigue disponible para que lo aplique a propósito si quiere.
+ */
+export async function applyInsurancePipelineTemplateIfFresh(db: SupabaseClient, userId: string): Promise<void> {
+  const { data: existing } = await db.from("crm_pipeline_stages").select("slug").eq("user_id", userId);
+  const defaultSlugs = new Set(DEFAULT_CRM_STAGES.map(s => s.slug));
+  const isFresh = (existing ?? []).every(s => defaultSlugs.has(s.slug as string));
+  if (!isFresh) return;
+  await applyInsurancePipelineTemplate(db, userId);
 }
 
 export async function getCrmStages(db: SupabaseClient, userId: string) {
