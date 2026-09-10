@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSegurosCrmAccess } from "@/lib/insurers/api-guard";
 import { adminClient } from "@/lib/voice-agents-server";
 import { getSoftsegurosCredentials, markSoftsegurosSynced, markSoftsegurosConnectionResult } from "@/lib/softseguros/connections-db";
-import { listPolizasTodas, SoftsegurosApiError } from "@/lib/softseguros/client";
+import { listPolizasTodas, listSiniestrosTodas, listAmparosSiniestro, SoftsegurosApiError } from "@/lib/softseguros/client";
 import { mapSoftsegurosPoliza } from "@/lib/softseguros/poliza-mapper";
+import { mapSoftsegurosSiniestro } from "@/lib/softseguros/siniestro-mapper";
 import { upsertPolizaPorNumero, findRamoCatalogoPorNombre } from "@/lib/insurers/polizas-db";
 import { findOrCreateContactForPoliza } from "@/lib/insurers/poliza-contact-match";
+import { upsertSiniestroDesdeSoftseguros } from "@/lib/insurers/siniestros-db";
 
 /**
  * POST — trae toda la cartera desde Softseguros y la refleja en `polizas`.
@@ -96,6 +98,69 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Siniestros — segunda pasada, después de pólizas porque cada siniestro se ancla a una póliza
+  // ya sincronizada (se resuelve por metadata->>softseguros_id, no por número de póliza).
+  let siniestrosCreados = 0;
+  let siniestrosActualizados = 0;
+  const siniestrosErrores: { softsegurosId: string; error: string }[] = [];
+
+  try {
+    const [rawSiniestros, amparoCatalogo] = await Promise.all([
+      listSiniestrosTodas(credentials),
+      listAmparosSiniestro(credentials)
+    ]);
+
+    for (const raw of rawSiniestros) {
+      const mapped = mapSoftsegurosSiniestro(raw, amparoCatalogo);
+      if (mapped.ok === false) {
+        siniestrosErrores.push({ softsegurosId: String(raw.id ?? "?"), error: mapped.motivo });
+        continue;
+      }
+      const s = mapped.siniestro;
+
+      try {
+        const { data: poliza } = await db
+          .from("polizas")
+          .select("id, contact_id, aseguradora, ramo")
+          .eq("user_id", ctx.crmUserId)
+          .eq("metadata->>softseguros_id", s.polizaSoftsegurosId)
+          .maybeSingle();
+
+        if (!poliza) {
+          siniestrosErrores.push({
+            softsegurosId: s.softsegurosId,
+            error: `Póliza Softseguros #${s.polizaSoftsegurosId} no está sincronizada todavía`
+          });
+          continue;
+        }
+
+        const { created } = await upsertSiniestroDesdeSoftseguros(db, ctx.organizationId, {
+          softsegurosId: s.softsegurosId,
+          polizaId: poliza.id as string,
+          contactId: (poliza.contact_id as string) ?? null,
+          aseguradora: poliza.aseguradora as string,
+          ramo: poliza.ramo as string,
+          descripcion: s.descripcion,
+          fechaOcurrencia: s.fechaOcurrencia,
+          fechaAviso: s.fechaAviso,
+          estado: s.estado
+        });
+        if (created) siniestrosCreados++;
+        else siniestrosActualizados++;
+      } catch (err) {
+        siniestrosErrores.push({
+          softsegurosId: s.softsegurosId,
+          error: err instanceof Error ? err.message : "Error desconocido"
+        });
+      }
+    }
+  } catch (err) {
+    siniestrosErrores.push({
+      softsegurosId: "?",
+      error: err instanceof Error ? err.message : "Error consultando siniestros en Softseguros"
+    });
+  }
+
   await markSoftsegurosSynced(db, ctx.organizationId);
 
   return NextResponse.json({
@@ -104,6 +169,11 @@ export async function POST(req: NextRequest) {
     actualizadas,
     contactos_creados: contactosCreados,
     sin_fecha_vencimiento: sinFechaVencimiento,
-    errores
+    errores,
+    siniestros: {
+      creados: siniestrosCreados,
+      actualizados: siniestrosActualizados,
+      errores: siniestrosErrores
+    }
   });
 }

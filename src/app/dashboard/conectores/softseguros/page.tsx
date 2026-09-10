@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Info, KeyRound, Loader2, Unplug, User } from "lucide-react";
+import { CheckCircle2, Info, KeyRound, Loader2, RefreshCw, Unplug, User } from "lucide-react";
 import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
 import { InfoBox } from "@/components/ui/InfoBox";
 import { SoftsegurosLogo } from "@/components/icons/brands/SoftsegurosLogo";
@@ -21,6 +21,7 @@ export default function SoftsegurosConectorPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [banner, setBanner] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,6 +67,31 @@ export default function SoftsegurosConectorPage() {
     }
   }
 
+  async function handleSync() {
+    setSyncing(true);
+    setBanner(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/seguros/softseguros/sync-polizas", { method: "POST", headers });
+      const data = await res.json();
+      if (!res.ok) {
+        setBanner({ kind: "error", text: data.error || "No se pudo sincronizar." });
+        return;
+      }
+      const siniestrosMsg = data.siniestros
+        ? ` · ${data.siniestros.creados} siniestro(s) nuevo(s), ${data.siniestros.actualizados} actualizado(s)`
+        : "";
+      setBanner({
+        kind: "success",
+        text: `${data.creadas} póliza(s) creada(s), ${data.actualizadas} actualizada(s)${siniestrosMsg}.`
+      });
+    } catch {
+      setBanner({ kind: "error", text: "Error de red al sincronizar." });
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function handleDisconnect() {
     setDisconnecting(true);
     try {
@@ -82,7 +108,7 @@ export default function SoftsegurosConectorPage() {
   return (
     <ChannelListPage
       title="Softseguros"
-      description="Conecta tu cuenta de Softseguros para traer tu cartera de pólizas a Noova — solo lectura, nunca escribimos nada de vuelta."
+      description="Conecta tu cuenta de Softseguros para traer pólizas y siniestros a Noova, y para que ORI pueda buscar tus clientes en vivo — solo lectura, nunca escribimos nada de vuelta."
       loading={loading}
     >
       {banner && (
@@ -120,7 +146,15 @@ export default function SoftsegurosConectorPage() {
         </div>
 
         {isActive ? (
-          <div className="mt-5 pt-5 border-t border-white/[.08]">
+          <div className="mt-5 pt-5 border-t border-white/[.08] flex items-center gap-2">
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-[#99c9ff] hover:bg-[#0f7eff]/10 border border-[#0f7eff]/20"
+            >
+              {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Sincronizar ahora
+            </button>
             <button
               onClick={handleDisconnect}
               disabled={disconnecting}

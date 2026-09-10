@@ -304,7 +304,10 @@ export default function PolizasPage() {
       setSyncMessage(json.error ?? "No se pudo sincronizar con Softseguros");
       return;
     }
-    setSyncMessage(`${json.creadas} creada(s), ${json.actualizadas} actualizada(s).`);
+    const siniestrosMsg = json.siniestros
+      ? ` · ${json.siniestros.creados} siniestro(s) nuevo(s), ${json.siniestros.actualizados} actualizado(s)`
+      : "";
+    setSyncMessage(`${json.creadas} póliza(s) creada(s), ${json.actualizadas} actualizada(s)${siniestrosMsg}.`);
     void load(true);
   }
 

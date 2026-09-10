@@ -32,6 +32,8 @@ import {
   guiarCotizacionSeguroTool
 } from "@/lib/agent-tools/quote-queue-ori-tools";
 import { radicarSiniestroOriTool } from "@/lib/agent-tools/siniestro-ori-tool";
+import { buscarClienteSoftsegurosTool } from "@/lib/agent-tools/softseguros-cliente-ori-tool";
+import { consultarSiniestrosSoftsegurosTool } from "@/lib/agent-tools/consultar-siniestros-softseguros-ori-tool";
 import { executeOriTool, ORI_TOOLS, ORI_GROUNDING_PROMPT, type OriToolDefinition } from "@/lib/agent-tools/ori-tools";
 
 interface ChatMessage {
@@ -137,7 +139,9 @@ export async function POST(req: NextRequest) {
         consultarCotizacionesPendientesTool,
         solicitarCotizacionSeguroTool,
         guiarCotizacionSeguroTool,
-        radicarSiniestroOriTool
+        radicarSiniestroOriTool,
+        buscarClienteSoftsegurosTool,
+        consultarSiniestrosSoftsegurosTool
       );
     }
   }

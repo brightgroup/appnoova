@@ -162,6 +162,29 @@ export async function listSiniestros(
   return callAuthenticated(credentials, `/api/siniestro/list_paginado/${query}`);
 }
 
+/** Todas las páginas de siniestros — mismo patrón que listPolizasTodas, usado por el sync hacia `siniestros`. */
+export async function listSiniestrosTodas(
+  credentials: SoftsegurosCredentials
+): Promise<Record<string, unknown>[]> {
+  const all: Record<string, unknown>[] = [];
+  let page = 1;
+  for (let i = 0; i < MAX_PAGES_SAFETY; i++) {
+    const response = await listSiniestros(credentials, { page });
+    all.push(...(response.results ?? []));
+    if (!response.next) break;
+    page++;
+  }
+  return all;
+}
+
+/** Catálogo de estados de siniestro (Solicitado/En proceso/Pagado/Objetado) — paginado igual que los demás listados (verificado en vivo 2026-09-09: {count, results}, no un arreglo plano). */
+export async function listAmparosSiniestro(
+  credentials: SoftsegurosCredentials
+): Promise<{ id: number; nombre: string }[]> {
+  const response = await callAuthenticated<SoftsegurosListResponse>(credentials, "/api/amparosiniestro/");
+  return (response.results ?? []) as { id: number; nombre: string }[];
+}
+
 /** Marca un pago de póliza como comisionado — la mecánica exacta que describió el cliente real (Fase S6). */
 export async function comisionarPago(
   credentials: SoftsegurosCredentials,
@@ -170,13 +193,13 @@ export async function comisionarPago(
   return callAuthenticated(credentials, `/api/pagopoliza/${pagoPolizaId}/comisionar/`, { method: "POST" });
 }
 
-/** Busca un cliente por número de documento — útil para cruzar un contacto de Noova con su registro en Softseguros. */
+/** Busca un cliente por número de documento — útil para cruzar un contacto de Noova con su registro en Softseguros. El parámetro real es numero_documento (verificado en vivo 2026-09-09 — documento solo devuelve 400 "numero_documento requerido"). */
 export async function buscarClientePorDocumento(
   credentials: SoftsegurosCredentials,
   documento: string
 ): Promise<Record<string, unknown>> {
   return callAuthenticated(
     credentials,
-    `/api/cliente/listar_cliente_por_documento/?documento=${encodeURIComponent(documento)}`
+    `/api/cliente/listar_cliente_por_documento/?numero_documento=${encodeURIComponent(documento)}`
   );
 }
