@@ -35,10 +35,10 @@ function assertPaddleKeyMatchesMode(): void {
   }
 }
 
-export async function paddleFetch<T = unknown>(
+async function paddleRequest<T = unknown>(
   path: string,
   init?: RequestInit
-): Promise<T> {
+): Promise<{ data?: T; meta?: { pagination?: { has_more?: boolean } } }> {
   const method = (init?.method ?? "GET").toUpperCase();
   assertPaddleKeyMatchesMode();
   const headers: Record<string, string> = {
@@ -55,12 +55,21 @@ export async function paddleFetch<T = unknown>(
     headers,
   });
 
-  const json = await res.json();
+  const json = (await res.json()) as {
+    data?: T;
+    error?: { code?: string; detail?: string };
+    meta?: { pagination?: { has_more?: boolean } };
+  };
   if (!res.ok) {
     const code = json?.error?.code as string | undefined;
     const message = json?.error?.detail || code || res.statusText;
     throw new PaddleApiError(res.status, code, message);
   }
+  return json;
+}
+
+export async function paddleFetch<T = unknown>(path: string, init?: RequestInit): Promise<T> {
+  const json = await paddleRequest<T>(path, init);
   return json.data as T;
 }
 
@@ -103,20 +112,80 @@ export async function getPaddleTransaction(transactionId: string): Promise<Paddl
 }
 
 const TXN_ID_RE = /^txn_[a-z0-9]{26}$/i;
+const TXN_ID_ONE_SHORT_RE = /^txn_[a-z0-9]{25}$/i;
+const PADDLE_ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+async function transactionExists(transactionId: string): Promise<boolean> {
+  try {
+    await paddleFetch(`/transactions/${encodeURIComponent(transactionId)}`);
+    return true;
+  } catch (err) {
+    if (
+      err instanceof PaddleApiError &&
+      (err.status === 404 || err.code === "invalid_url" || err.code === "not_found")
+    ) {
+      return false;
+    }
+    throw err;
+  }
+}
+
+async function completeTruncatedTxnId(prefix: string): Promise<string | null> {
+  const hits: string[] = [];
+  for (const ch of PADDLE_ID_ALPHABET) {
+    const candidate = prefix + ch;
+    if (await transactionExists(candidate)) hits.push(candidate);
+    if (hits.length > 1) return null;
+  }
+  return hits[0] ?? null;
+}
+
+async function listRecentPaidTransactions(): Promise<PaddleTransaction[]> {
+  const from = new Date(Date.now() - 14 * 86_400_000).toISOString();
+  const to = new Date(Date.now() + 86_400_000).toISOString();
+  const out: PaddleTransaction[] = [];
+  let after: string | undefined;
+  for (let page = 0; page < 10; page++) {
+    const qs = [
+      "status=completed,paid,billed",
+      "per_page=30",
+      `created_at[GTE]=${encodeURIComponent(from)}`,
+      `created_at[LTE]=${encodeURIComponent(to)}`,
+    ];
+    if (after) qs.push(`after=${encodeURIComponent(after)}`);
+    const json = await paddleRequest<PaddleTransaction[]>(`/transactions?${qs.join("&")}`);
+    const rows = json.data ?? [];
+    out.push(...rows);
+    if (!json.meta?.pagination?.has_more || rows.length === 0) break;
+    after = rows[rows.length - 1]?.id;
+    if (!after) break;
+  }
+  return out;
+}
 
 /**
  * El ID de Paddle es `txn_` + 26 caracteres. Si quedó truncado al registrar el
- * cobro a mano, buscamos la transacción completed cuyo id empieza por ese prefijo.
+ * cobro a mano, completamos el último carácter o buscamos por fecha.
  */
 export async function resolvePaddleTransactionId(raw: string): Promise<string> {
   const id = raw.trim();
   if (TXN_ID_RE.test(id)) return id;
 
-  const listed = await paddleFetch<PaddleTransaction[]>(
-    "/transactions?status=completed&per_page=50"
+  let listed: PaddleTransaction[] = [];
+  try {
+    listed = await listRecentPaidTransactions();
+  } catch (err) {
+    console.warn("[paddle] no se pudo listar transacciones recientes", err);
+  }
+  const byPrefix = listed.filter(
+    (t) => typeof t?.id === "string" && (t.id.startsWith(id) || id.startsWith(t.id))
   );
-  const matches = (listed ?? []).filter((t) => typeof t?.id === "string" && (t.id.startsWith(id) || id.startsWith(t.id)));
-  if (matches.length === 1) return matches[0].id;
+  if (byPrefix.length === 1) return byPrefix[0].id;
+
+  if (TXN_ID_ONE_SHORT_RE.test(id)) {
+    const completed = await completeTruncatedTxnId(id);
+    if (completed) return completed;
+  }
 
   return id;
 }
