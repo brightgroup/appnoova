@@ -153,23 +153,39 @@ export default function ErpInventoryItemPage() {
     <>
       <ChannelListPage
         title={item.nombre}
-        description={`${item.codigo}${item.marca ? ` · ${item.marca}` : ""}`}
+        description={`${item.codigo}${item.marca ? ` · ${item.marca}` : ""}${item.activo ? "" : " · Eliminado"}`}
         backHref="/dashboard/erp/inventario"
         loading={false}
         onRefresh={() => load()}
         action={
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            {canEditItem && (
+            {canEditItem && item.activo && (
               <button type="button" onClick={() => setEditOpen(true)} className={btnGhost}>
                 <Pencil className="w-4 h-4" /> Editar
               </button>
             )}
-            {canManage && (
+            {canManage && !item.activo && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await authFetch(`/api/erp/inventario/items/${item.id}`, {
+                    method: "PATCH",
+                    body: JSON.stringify({ activo: true })
+                  });
+                  if (res.ok) void load(true);
+                  else alert((await res.json()).error ?? "Error al reactivar");
+                }}
+                className={btnPrimary}
+              >
+                Reactivar
+              </button>
+            )}
+            {canManage && item.activo && (
               <button type="button" onClick={deleteThisItem} className={`${btnGhost} text-red-300 hover:text-red-200`}>
                 <Trash2 className="w-4 h-4" /> Eliminar
               </button>
             )}
-            {canRegisterMovements && (
+            {canRegisterMovements && item.activo && (
               <button type="button" onClick={() => setMovementOpen(true)} className={btnPrimary}>
                 Registrar movimiento
               </button>
@@ -177,7 +193,14 @@ export default function ErpInventoryItemPage() {
           </div>
         }
         alerts={
-          <div className="mb-4 grid grid-cols-3 gap-3">
+          <>
+            {!item.activo && (
+              <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                Producto eliminado el {new Date(item.updatedAt).toLocaleString("es-CO")}. El kardex se conserva.
+                Para volver a usarlo, reactívalo o créalo de nuevo con el código {item.codigo}.
+              </div>
+            )}
+            <div className="mb-4 grid grid-cols-3 gap-3">
             <div className="rounded-xl border border-white/[.08] bg-white/[.02] px-4 py-3">
               <p className="text-xs text-gray-500">Existencia</p>
               <p className={`text-2xl font-semibold mt-1 flex items-center gap-2 ${low ? "text-amber-300" : "text-white"}`}>
@@ -193,6 +216,7 @@ export default function ErpInventoryItemPage() {
               <p className="text-2xl font-semibold mt-1 text-white truncate">{item.responsable || "—"}</p>
             </div>
           </div>
+          </>
         }
         footer={
           movements.length > 0 ? (

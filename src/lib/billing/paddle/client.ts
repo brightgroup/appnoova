@@ -32,10 +32,22 @@ export async function paddleFetch<T = unknown>(
 
   const json = await res.json();
   if (!res.ok) {
-    const message = json?.error?.detail || json?.error?.code || res.statusText;
-    throw new Error(`Paddle API error ${res.status}: ${message}`);
+    const code = json?.error?.code as string | undefined;
+    const message = json?.error?.detail || code || res.statusText;
+    throw new PaddleApiError(res.status, code, message);
   }
   return json.data as T;
+}
+
+export class PaddleApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string | undefined,
+    detail: string
+  ) {
+    super(`Paddle API error ${status}: ${detail}`);
+    this.name = "PaddleApiError";
+  }
 }
 
 export interface PaddleCustomer {
@@ -70,14 +82,22 @@ export async function getPaddleCustomer(customerId: string): Promise<PaddleCusto
 /** Link temporal (~1h) al PDF de factura/recibo de Paddle (Merchant of Record). */
 export async function getPaddleInvoicePdfUrl(
   transactionId: string,
-  disposition: "inline" | "attachment" = "inline"
+  disposition: "inline" | "attachment" = "attachment"
 ): Promise<string> {
-  const data = await paddleFetch<{ url: string }>(
+  const paths = [
+    `/transactions/${transactionId}/invoice`,
     `/transactions/${transactionId}/invoice?disposition=${disposition}`,
-    { signal: AbortSignal.timeout(15_000) }
-  );
-  if (!data?.url) throw new Error("Paddle no devolvió URL de factura");
-  return data.url;
+  ];
+  let lastError: unknown;
+  for (const path of paths) {
+    try {
+      const data = await paddleFetch<{ url: string }>(path, { signal: AbortSignal.timeout(15_000) });
+      if (data?.url) return data.url;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Paddle no devolvió URL de factura");
 }
 
 /** Crea una transacción en borrador para abrir el overlay checkout desde el frontend. */

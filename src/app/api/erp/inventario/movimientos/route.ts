@@ -66,6 +66,12 @@ export async function POST(req: NextRequest) {
 
   const item = await getInventoryItem(db, ctx.organizationId, itemId);
   if (!item) return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
+  if (!item.activo) {
+    return NextResponse.json(
+      { error: "Este producto está eliminado. Reactívalo o créalo de nuevo con el mismo código para registrar movimientos." },
+      { status: 409 }
+    );
+  }
 
   const fecha = typeof body.fecha === "string" && body.fecha.trim() ? body.fecha.trim() : undefined;
   const responsable = typeof body.responsable === "string" ? body.responsable.trim() || null : null;

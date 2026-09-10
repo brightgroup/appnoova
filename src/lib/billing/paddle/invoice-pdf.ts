@@ -1,8 +1,39 @@
 import { NextResponse } from "next/server";
 import { adminClient } from "@/lib/voice-agents-server";
-import { getPaddleInvoicePdfUrl } from "@/lib/billing/paddle/client";
+import {
+  PaddleApiError,
+  getPaddleInvoicePdfUrl,
+  getPaddleTransaction,
+} from "@/lib/billing/paddle/client";
 
 const PDF_FETCH_MS = 20_000;
+
+function paddleErrorMessage(err: unknown): { status: number; body: { error: string } } {
+  const detail = err instanceof Error ? err.message : "error desconocido";
+  const api = err instanceof PaddleApiError ? err : null;
+  const notReady =
+    api?.code === "transaction_invoice_not_ready" || /invoice_not_ready|not_ready/i.test(detail);
+
+  if (notReady) {
+    return {
+      status: 409,
+      body: { error: "Paddle aún está generando el PDF. Espera un minuto y reintenta." },
+    };
+  }
+  if (api?.status === 404 || /404/.test(detail)) {
+    return {
+      status: 502,
+      body: {
+        error:
+          "Paddle no tiene un PDF para este cobro. Abre el correo de confirmación de Paddle o el portal de cliente.",
+      },
+    };
+  }
+  if (detail.includes("PADDLE_API_KEY")) {
+    return { status: 502, body: { error: "Falta la API key de Paddle en el servidor." } };
+  }
+  return { status: 502, body: { error: `No se pudo generar el PDF (${detail}).` } };
+}
 
 export async function paddleInvoicePdfResponse(
   invoiceId: string,
@@ -29,23 +60,37 @@ export async function paddleInvoicePdfResponse(
     return NextResponse.json({ error: "El PDF de Paddle solo está disponible en facturas pagadas." }, { status: 409 });
   }
 
+  const txnId = invoice.paddle_transaction_id as string;
+
+  try {
+    const txn = await getPaddleTransaction(txnId);
+    if (txn.status !== "completed" && txn.status !== "billed") {
+      return NextResponse.json(
+        {
+          error: `El cobro en Paddle está en estado «${txn.status}». El PDF sale cuando el pago queda completed.`,
+        },
+        { status: 409 }
+      );
+    }
+  } catch (err) {
+    console.error("[billing:invoice-pdf] txn", txnId, err);
+    const mapped = paddleErrorMessage(err);
+    if (err instanceof PaddleApiError && err.status === 404) {
+      return NextResponse.json(
+        { error: "Noova no encontró esa transacción en Paddle. El PDF está en el correo de confirmación de Paddle." },
+        { status: 502 }
+      );
+    }
+    return NextResponse.json(mapped.body, { status: mapped.status });
+  }
+
   let paddleUrl: string;
   try {
-    paddleUrl = await getPaddleInvoicePdfUrl(invoice.paddle_transaction_id, "inline");
+    paddleUrl = await getPaddleInvoicePdfUrl(txnId, "attachment");
   } catch (err) {
-    console.error("[billing:invoice-pdf] url", invoice.paddle_transaction_id, err);
-    const detail = err instanceof Error ? err.message : "error desconocido";
-    const notReady = /404/.test(detail);
-    return NextResponse.json(
-      {
-        error: notReady
-          ? "Paddle aún está generando el PDF. Espera un minuto y reintenta."
-          : detail.includes("PADDLE_API_KEY")
-            ? "Falta la API key de Paddle en el servidor."
-            : `No se pudo generar el PDF (${detail}).`,
-      },
-      { status: notReady ? 409 : 502 }
-    );
+    console.error("[billing:invoice-pdf] url", txnId, err);
+    const mapped = paddleErrorMessage(err);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 
   try {
@@ -63,13 +108,12 @@ export async function paddleInvoicePdfResponse(
     return new NextResponse(bytes, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="factura-${invoice.id.slice(0, 8)}.pdf"`,
+        "Content-Disposition": `attachment; filename="factura-${invoice.id.slice(0, 8)}.pdf"`,
         "Cache-Control": "private, no-store",
       },
     });
   } catch (err) {
-    console.error("[billing:invoice-pdf] proxy", invoice.paddle_transaction_id, err);
-    // El VPS a veces no puede bajar el PDF de Paddle; el enlace firmado sí abre en el navegador.
+    console.error("[billing:invoice-pdf] proxy", txnId, err);
     return NextResponse.json({ url: paddleUrl });
   }
 }

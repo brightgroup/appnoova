@@ -12,6 +12,13 @@ export interface InventoryItem {
   updatedAt: string;
 }
 
+export interface InventoryMovementProduct {
+  id: string;
+  codigo: string;
+  nombre: string;
+  activo: boolean;
+}
+
 export type InventoryMovementType = "entrada" | "salida" | "ajuste" | "saldo_inicial";
 
 export interface InventoryMovement {
@@ -28,6 +35,7 @@ export interface InventoryMovement {
   createdByUserId: string | null;
   createdByLabel?: string | null;
   createdAt: string;
+  item?: InventoryMovementProduct | null;
 }
 
 export type InventoryAlertMode = "al_cruzar" | "resumen_diario" | "ambos";

@@ -39,6 +39,10 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "saldo_inicial", label: "Saldo inicial" }
 ];
 
+function movementProduct(m: InventoryMovement, itemsById: Map<string, InventoryItem>) {
+  return m.item ?? itemsById.get(m.itemId) ?? null;
+}
+
 function movementIcon(tipo: InventoryMovementType) {
   if (tipo === "entrada" || tipo === "saldo_inicial") return <ArrowDownCircle className="w-4 h-4 text-emerald-400" />;
   if (tipo === "salida") return <ArrowUpCircle className="w-4 h-4 text-amber-400" />;
@@ -123,7 +127,7 @@ export default function ErpMovimientosPage() {
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter(m => {
-        const item = itemsById.get(m.itemId);
+        const item = movementProduct(m, itemsById);
         return (
           item?.codigo.toLowerCase().includes(q) ||
           item?.nombre.toLowerCase().includes(q) ||
@@ -137,7 +141,7 @@ export default function ErpMovimientosPage() {
 
   const getSortValue = useCallback(
     (m: InventoryMovement, key: SortKey): string | number | null => {
-      const item = itemsById.get(m.itemId);
+      const item = movementProduct(m, itemsById);
       switch (key) {
         case "fecha": return m.createdAt;
         case "producto": return item?.nombre ?? "";
@@ -184,8 +188,11 @@ export default function ErpMovimientosPage() {
               sheetName="Movimientos"
               columns={[
                 { header: "Fecha", value: (m: InventoryMovement) => formatMovementDateTime(m) },
-                { header: "Código", value: (m: InventoryMovement) => itemsById.get(m.itemId)?.codigo ?? "" },
-                { header: "Producto", value: (m: InventoryMovement) => itemsById.get(m.itemId)?.nombre ?? "" },
+                { header: "Código", value: (m: InventoryMovement) => movementProduct(m, itemsById)?.codigo ?? "" },
+                { header: "Producto", value: (m: InventoryMovement) => {
+                  const p = movementProduct(m, itemsById);
+                  return p ? `${p.nombre}${p.activo ? "" : " (eliminado)"}` : "";
+                } },
                 { header: "Tipo", value: (m: InventoryMovement) => movementTypeLabel(m.tipo) },
                 { header: "Cantidad", value: (m: InventoryMovement) => m.delta },
                 { header: "Saldo", value: (m: InventoryMovement) => m.existenciaResultante },
@@ -237,17 +244,22 @@ export default function ErpMovimientosPage() {
             </thead>
             <tbody>
               {pageRows.map(m => {
-                const item = itemsById.get(m.itemId);
+                const item = movementProduct(m, itemsById);
                 return (
                   <tr
                     key={m.id}
                     className={registryTableRowClickable}
-                    onClick={() => item && router.push(`/dashboard/erp/inventario/${item.id}`)}
+                    onClick={() => router.push(`/dashboard/erp/inventario/${m.itemId}`)}
                   >
                     <td className={registryTableCellFirst}>{formatMovementDateTime(m)}</td>
                     <td className={registryTableCell}>
-                      <div className="text-sm text-white">{item?.nombre ?? "—"}</div>
-                      <div className="text-xs text-gray-500 font-mono">{item?.codigo ?? m.itemId}</div>
+                      <div className="text-sm text-white">
+                        {item?.nombre ?? "—"}
+                        {item && !item.activo && (
+                          <span className="ml-2 text-[10px] uppercase tracking-wide text-red-300/80">Eliminado</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 font-mono">{item?.codigo ?? "—"}</div>
                     </td>
                     <td className={registryTableCell}>
                       <span className="inline-flex items-center gap-1.5 text-sm text-gray-300">
@@ -283,7 +295,7 @@ export default function ErpMovimientosPage() {
 
       <BatchMovementModal
         open={batchOpen}
-        items={items}
+        items={items.filter(i => i.activo)}
         saving={movementSaving}
         error={movementError}
         onClose={() => setBatchOpen(false)}

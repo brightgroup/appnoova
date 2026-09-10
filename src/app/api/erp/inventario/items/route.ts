@@ -5,7 +5,8 @@ import {
   createInventoryItem,
   findInventoryItemByCodigo,
   listInventoryItems,
-  registerInventoryMovement
+  registerInventoryMovement,
+  updateInventoryItem
 } from "@/lib/erp/inventory-db";
 
 export async function GET(req: NextRequest) {
@@ -13,10 +14,11 @@ export async function GET(req: NextRequest) {
   if (ctx instanceof NextResponse) return ctx;
 
   const search = req.nextUrl.searchParams.get("q")?.trim() ?? "";
+  const includeInactive = req.nextUrl.searchParams.get("include_inactive") === "1";
   const db = adminClient();
 
   try {
-    const items = await listInventoryItems(db, ctx.organizationId, { search });
+    const items = await listInventoryItems(db, ctx.organizationId, { search, includeInactive });
     return NextResponse.json({ items });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Error al listar" }, { status: 500 });
@@ -51,11 +53,32 @@ export async function POST(req: NextRequest) {
   const db = adminClient();
 
   const existing = await findInventoryItemByCodigo(db, ctx.organizationId, codigo);
-  if (existing) {
+  if (existing?.activo) {
     return NextResponse.json({ error: `Ya existe un producto con el código ${codigo}` }, { status: 409 });
   }
 
   try {
+    if (existing && !existing.activo) {
+      let item = await updateInventoryItem(db, ctx.organizationId, existing.id, {
+        nombre,
+        marca: body.marca ?? null,
+        responsable: body.responsable ?? null,
+        stockMinimo,
+        activo: true
+      });
+      if (existencia !== 0 && item.existencia === 0) {
+        const result = await registerInventoryMovement(db, ctx.organizationId, {
+          itemId: item.id,
+          tipo: "saldo_inicial",
+          delta: existencia,
+          responsable: body.responsable ?? null,
+          nota: "Existencia inicial al reactivar el producto",
+          createdBy: ctx.userId
+        });
+        item = { ...item, existencia: result.existencia };
+      }
+      return NextResponse.json({ item, reactivated: true }, { status: 200 });
+    }
     let item = await createInventoryItem(db, ctx.organizationId, ctx.userId, {
       codigo,
       nombre,

@@ -34,13 +34,14 @@ import { MovementModal, type MovementFormValues } from "@/components/erp/Movemen
 import { InventoryImportDialog } from "@/components/erp/InventoryImportDialog";
 import { isLowStock, type InventoryItem } from "@/types/erp";
 
-type Filter = "all" | "bajo_minimo" | "sin_existencia";
+type Filter = "all" | "bajo_minimo" | "sin_existencia" | "eliminados";
 type SortKey = "codigo" | "nombre" | "marca" | "responsable" | "stock_minimo" | "existencia";
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "Todos" },
   { id: "bajo_minimo", label: "Bajo mínimo" },
-  { id: "sin_existencia", label: "Sin existencia" }
+  { id: "sin_existencia", label: "Sin existencia" },
+  { id: "eliminados", label: "Eliminados" }
 ];
 
 export default function ErpInventarioPage() {
@@ -67,7 +68,7 @@ export default function ErpInventarioPage() {
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    const res = await authFetch("/api/erp/inventario/items");
+    const res = await authFetch("/api/erp/inventario/items?include_inactive=1");
     if (res.ok) {
       const json = await res.json();
       setItems(json.items ?? []);
@@ -79,8 +80,12 @@ export default function ErpInventarioPage() {
 
   const filtered = useMemo(() => {
     let list = items;
-    if (filter === "bajo_minimo") list = list.filter(isLowStock);
-    else if (filter === "sin_existencia") list = list.filter(i => i.existencia <= 0);
+    if (filter === "eliminados") list = list.filter(i => !i.activo);
+    else {
+      list = list.filter(i => i.activo);
+      if (filter === "bajo_minimo") list = list.filter(isLowStock);
+      else if (filter === "sin_existencia") list = list.filter(i => i.existencia <= 0);
+    }
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter(
@@ -107,8 +112,10 @@ export default function ErpInventarioPage() {
 
   const pagination = useRegistryPagination(sorted.length, `${search}-${filter}`);
   const pageRows = pagination.pageRows(sorted);
-  const lowStockCount = useMemo(() => items.filter(isLowStock).length, [items]);
-  const noStockCount = useMemo(() => items.filter(i => i.existencia <= 0).length, [items]);
+  const lowStockCount = useMemo(() => items.filter(i => i.activo && isLowStock(i)).length, [items]);
+  const noStockCount = useMemo(() => items.filter(i => i.activo && i.existencia <= 0).length, [items]);
+  const activeCount = useMemo(() => items.filter(i => i.activo).length, [items]);
+  const deletedCount = useMemo(() => items.filter(i => !i.activo).length, [items]);
 
   async function submitItem(values: InventoryItemFormValues) {
     setItemSaving(true);
@@ -181,6 +188,15 @@ export default function ErpInventarioPage() {
     else alert((await res.json()).error ?? "Error al eliminar");
   }
 
+  async function reactivateItem(item: InventoryItem) {
+    const res = await authFetch(`/api/erp/inventario/items/${item.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ activo: true })
+    });
+    if (res.ok) void load(true);
+    else alert((await res.json()).error ?? "Error al reactivar");
+  }
+
   return (
     <>
       <ChannelListPage
@@ -195,7 +211,11 @@ export default function ErpInventarioPage() {
         filters={
           <div className={btnFilterGroup}>
             {FILTERS.map(({ id, label }) => {
-              const count = id === "all" ? items.length : id === "bajo_minimo" ? lowStockCount : noStockCount;
+              const count =
+                id === "all" ? activeCount
+                : id === "bajo_minimo" ? lowStockCount
+                : id === "sin_existencia" ? noStockCount
+                : deletedCount;
               return (
                 <button key={id} type="button" onClick={() => setFilter(id)} className={filter === id ? btnFilterActive : btnFilterIdle}>
                   {label} ({count})
@@ -291,7 +311,12 @@ export default function ErpInventarioPage() {
                         {item.codigo}
                       </span>
                     </td>
-                    <td className={`${registryTableCell} text-sm font-medium text-white`}>{item.nombre}</td>
+                    <td className={`${registryTableCell} text-sm font-medium text-white`}>
+                      {item.nombre}
+                      {!item.activo && (
+                        <span className="ml-2 text-[10px] uppercase tracking-wide text-red-300/80">Eliminado</span>
+                      )}
+                    </td>
                     <td className={`${registryTableCell} text-sm text-gray-300`}>{item.marca || "—"}</td>
                     <td className={`${registryTableCell} text-sm text-gray-400`}>{item.responsable || "—"}</td>
                     <td className={`${registryTableCell} text-sm text-gray-400`}>{item.stockMinimo ?? "—"}</td>
@@ -316,7 +341,7 @@ export default function ErpInventarioPage() {
                           </button>
                         }
                       >
-                        {canRegisterMovements && (
+                        {canRegisterMovements && item.activo && (
                           <NoovaListMenuItem onClick={() => { setOpenMenuId(null); setMovementItem(item); }}>
                             Registrar movimiento
                           </NoovaListMenuItem>
@@ -324,12 +349,17 @@ export default function ErpInventarioPage() {
                         <NoovaListMenuItem onClick={() => router.push(`/dashboard/erp/inventario/${item.id}`)}>
                           Ver kardex
                         </NoovaListMenuItem>
-                        {canEditItem && (
+                        {canEditItem && item.activo && (
                           <NoovaListMenuItem onClick={() => { setOpenMenuId(null); setItemModal({ item }); }}>
                             Editar
                           </NoovaListMenuItem>
                         )}
-                        {canManage && (
+                        {canManage && !item.activo && (
+                          <NoovaListMenuItem onClick={() => { setOpenMenuId(null); void reactivateItem(item); }}>
+                            Reactivar
+                          </NoovaListMenuItem>
+                        )}
+                        {canManage && item.activo && (
                           <NoovaListMenuItem danger onClick={() => { setOpenMenuId(null); deleteItem(item); }}>
                             <span className="flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" /> Eliminar</span>
                           </NoovaListMenuItem>

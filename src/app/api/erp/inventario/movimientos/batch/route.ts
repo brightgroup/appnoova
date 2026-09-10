@@ -53,6 +53,10 @@ export async function POST(req: NextRequest) {
         errors.push({ item_id: line.itemId, error: "Producto no encontrado" });
         continue;
       }
+      if (!item.activo) {
+        errors.push({ item_id: line.itemId, error: "Producto eliminado" });
+        continue;
+      }
       const delta = tipo === "salida" ? -line.cantidad : line.cantidad;
       const result = await registerInventoryMovement(db, ctx.organizationId, {
         itemId: line.itemId,

@@ -14,6 +14,13 @@ export interface InventoryItemRecord {
   updatedAt: string;
 }
 
+export interface InventoryMovementProductRef {
+  id: string;
+  codigo: string;
+  nombre: string;
+  activo: boolean;
+}
+
 interface InventoryItemRow {
   id: string;
   organization_id: string;
@@ -213,6 +220,7 @@ export interface InventoryMovementRecord {
   /** Nombre/email de quien lo registró en el sistema — se completa aparte con attachCreatedByLabels(). */
   createdByLabel?: string | null;
   createdAt: string;
+  item?: InventoryMovementProductRef | null;
 }
 
 interface InventoryMovementRow {
@@ -228,6 +236,7 @@ interface InventoryMovementRow {
   numero_pedido: string | null;
   created_by_user_id: string | null;
   created_at: string;
+  item?: { id: string; codigo: string; nombre: string; activo: boolean } | null;
 }
 
 function toMovementRecord(row: InventoryMovementRow): InventoryMovementRecord {
@@ -243,7 +252,15 @@ function toMovementRecord(row: InventoryMovementRow): InventoryMovementRecord {
     nota: row.nota,
     numeroPedido: row.numero_pedido,
     createdByUserId: row.created_by_user_id,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    item: row.item
+      ? {
+          id: row.item.id,
+          codigo: row.item.codigo,
+          nombre: row.item.nombre,
+          activo: row.item.activo
+        }
+      : null
   };
 }
 
@@ -254,7 +271,7 @@ export async function listInventoryMovements(
 ): Promise<InventoryMovementRecord[]> {
   let query = db
     .from("erp_inventory_movements")
-    .select("*")
+    .select("*, item:erp_inventory_items(id, codigo, nombre, activo)")
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
     .limit(opts.limit ?? 500);
