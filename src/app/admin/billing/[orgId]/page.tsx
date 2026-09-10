@@ -5,9 +5,10 @@ import { useParams } from "next/navigation";
 import {
   RefreshCw, Save, CheckCircle2, PlusCircle,
   Settings2, StickyNote, ChevronDown, ChevronUp, TrendingUp,
-  DollarSign, Wallet, Receipt, Activity, AlertCircle
+  DollarSign, Wallet, Receipt, Activity, AlertCircle, Download
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
+import { openInvoicePdf } from "@/lib/billing/open-invoice-pdf";
 import { AdminPageToolbar } from "@/components/admin/AdminPageToolbar";
 import { AdminStatusBadge } from "@/components/admin/admin-table-styles";
 import {
@@ -33,7 +34,10 @@ interface DetailData {
     period_start: string; period_end: string;
   } | null;
   usage: { event_type: string; events: number; credits: number; cost_cop: number }[];
-  invoices: { id: string; period_start: string; due_date: string; amount_usd: number; amount_cop: number; status: string }[];
+  invoices: {
+    id: string; period_start: string; due_date: string; amount_usd: number;
+    amount_cop: number; status: string; paddle_transaction_id?: string | null;
+  }[];
   recent_events: {
     id: number; event_type: string; channel: string;
     credits_charged: number; provider: string;
@@ -322,7 +326,21 @@ export default function AdminBillingDetailPage() {
                           <AdminStatusBadge status={inv.status} variant="invoice" />
                         </td>
                         <td className={registryTableCell}>
-                          {(inv.status === "pending" || inv.status === "overdue") && (
+                          <div className="flex items-center gap-2">
+                            {inv.paddle_transaction_id && inv.status === "paid" && (
+                              <button
+                                onClick={() =>
+                                  void openInvoicePdf(inv.id, true).catch((e) =>
+                                    alert(e instanceof Error ? e.message : "No se pudo abrir la factura")
+                                  )
+                                }
+                                className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border border-white/[.12] hover:bg-white/[.06] text-gray-200"
+                              >
+                                <Download className="w-3 h-3" />
+                                PDF Paddle
+                              </button>
+                            )}
+                            {(inv.status === "pending" || inv.status === "overdue") && (
                             <button
                               onClick={() => markPaid(inv.id)}
                               disabled={payingId === inv.id}
@@ -331,7 +349,8 @@ export default function AdminBillingDetailPage() {
                               {payingId === inv.id ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
                               Marcar pagada
                             </button>
-                          )}
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}

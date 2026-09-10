@@ -20,6 +20,7 @@ import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { usePricingCatalog } from "@/hooks/usePricingCatalog";
 import { PaddleCheckoutButton, usePaddleCheckout } from "@/components/billing/PaddleCheckoutButton";
+import { openInvoicePdf } from "@/lib/billing/open-invoice-pdf";
 import { CardBrandIcon } from "@/components/billing/CardBrandIcon";
 import type { PlanPromoDisplay } from "@/lib/billing/plan-promo";
 import {
@@ -50,6 +51,7 @@ interface Subscription {
 interface Invoice {
   id: string; plan_id?: string; period_start: string; period_end: string;
   due_date: string; amount_usd: number; amount_cop: number; status: string;
+  paddle_transaction_id?: string | null;
 }
 interface Plan {
   id: string; name: string; price_usd: number; monthly_credits: number;
@@ -190,6 +192,7 @@ export default function FacturacionPage() {
   const [data, setData]       = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
+  const [invoicePdfMsg, setInvoicePdfMsg] = useState("");
 
   // Filtros locales
   const [invFilter,  setInvFilter]  = useState("todos");
@@ -816,6 +819,9 @@ export default function FacturacionPage() {
                     <ExternalLink className="w-4 h-4" /> Historial completo
                   </button>
                 </div>
+                {invoicePdfMsg && (
+                  <p className="text-xs text-red-400">{invoicePdfMsg}</p>
+                )}
 
                 {/* Tabla */}
                 <div className={registryTableArea}>
@@ -882,8 +888,36 @@ export default function FacturacionPage() {
                                         {payingPlan ? "Abriendo…" : "Pagar"}
                                       </button>
                                   )}
-                                  <button className="p-1.5 hover:bg-white/[.06] rounded-md hover:text-white" title="Ver detalle"><Eye className="w-3.5 h-3.5" /></button>
-                                  <button className="p-1.5 hover:bg-white/[.06] rounded-md hover:text-white" title="Descargar"><Download className="w-3.5 h-3.5" /></button>
+                                  {inv.paddle_transaction_id && inv.status === "paid" ? (
+                                    <>
+                                      <button
+                                        className="p-1.5 hover:bg-white/[.06] rounded-md hover:text-white"
+                                        title="Ver factura Paddle"
+                                        onClick={() => {
+                                          setInvoicePdfMsg("");
+                                          void openInvoicePdf(inv.id).catch((e) =>
+                                            setInvoicePdfMsg(e instanceof Error ? e.message : "No se pudo abrir la factura")
+                                          );
+                                        }}
+                                      >
+                                        <Eye className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        className="p-1.5 hover:bg-white/[.06] rounded-md hover:text-white"
+                                        title="Descargar factura Paddle"
+                                        onClick={() => {
+                                          setInvoicePdfMsg("");
+                                          void openInvoicePdf(inv.id).catch((e) =>
+                                            setInvoicePdfMsg(e instanceof Error ? e.message : "No se pudo abrir la factura")
+                                          );
+                                        }}
+                                      >
+                                        <Download className="w-3.5 h-3.5" />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <span className="text-[10px] text-gray-600 px-1" title="Factura interna, sin PDF de Paddle">—</span>
+                                  )}
                                 </div>
                               </td>
                             </tr>

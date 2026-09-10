@@ -33,16 +33,45 @@ export async function paddleFetch<T = unknown>(
   return json.data as T;
 }
 
+export interface PaddleCustomer {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+}
+
 export interface PaddleTransaction {
   id: string;
   status: string;
   customer_id?: string | null;
   subscription_id?: string | null;
+  currency_code?: string;
   custom_data?: Record<string, unknown> | null;
-  items: { price: { id: string } }[];
+  items: { price?: { id?: string } }[];
+  billing_period?: { starts_at?: string; ends_at?: string } | null;
   details?: {
-    totals?: { total: string; currency_code: string };
+    totals?: { total?: string; currency_code?: string };
   };
+  customer?: PaddleCustomer | null;
+}
+
+export async function getPaddleTransaction(transactionId: string): Promise<PaddleTransaction> {
+  return paddleFetch<PaddleTransaction>(`/transactions/${transactionId}?include=customer`);
+}
+
+export async function getPaddleCustomer(customerId: string): Promise<PaddleCustomer> {
+  return paddleFetch<PaddleCustomer>(`/customers/${customerId}`);
+}
+
+/** Link temporal (~1h) al PDF de factura/recibo de Paddle (Merchant of Record). */
+export async function getPaddleInvoicePdfUrl(
+  transactionId: string,
+  disposition: "inline" | "attachment" = "inline"
+): Promise<string> {
+  const data = await paddleFetch<{ url: string }>(
+    `/transactions/${transactionId}/invoice?disposition=${disposition}`
+  );
+  if (!data?.url) throw new Error("Paddle no devolvió URL de factura");
+  return data.url;
 }
 
 /** Crea una transacción en borrador para abrir el overlay checkout desde el frontend. */

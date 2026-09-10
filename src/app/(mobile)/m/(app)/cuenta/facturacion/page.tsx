@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/telephony-api";
+import { openInvoicePdf } from "@/lib/billing/open-invoice-pdf";
 import { BackIcon, CalendarIcon, CreditsIcon } from "../../../icons";
 import { formatCOP, formatUSD, formatShortDate } from "../../../format";
 
@@ -14,6 +15,7 @@ interface Invoice {
   due_date: string;
   amount_cop: number;
   status: "pending" | "paid" | "overdue" | "void";
+  paddle_transaction_id?: string | null;
 }
 
 interface BillingMe {
@@ -189,6 +191,16 @@ export default function MobileFacturacionPage() {
                           <span className="inv-date">{formatShortDate(inv.due_date)}</span>
                           <span className="inv-amount">{formatCOP(inv.amount_cop)}</span>
                         </div>
+                        {inv.status === "paid" && inv.paddle_transaction_id ? (
+                          <button
+                            type="button"
+                            className="inv-amount"
+                            style={{ background: "none", border: 0, color: "#0f7eff", cursor: "pointer" }}
+                            onClick={() => void openInvoicePdf(inv.id).catch((e) => alert(e instanceof Error ? e.message : "No se pudo abrir"))}
+                          >
+                            Ver PDF
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                   ))}

@@ -39,11 +39,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const { data: payer } = await db.from("profiles").select("email").eq("id", ctx.userId).maybeSingle();
+
   try {
     const transaction = await createPaddleCheckoutTransaction({
       priceId,
       organizationId: ctx.organizationId,
       customData: { kind: "topup", package_id: packageId },
+      customerEmail: payer?.email ?? undefined,
     });
     return NextResponse.json({ transaction_id: transaction.id });
   } catch (err) {
