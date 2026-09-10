@@ -147,7 +147,7 @@ export async function notifyLowStock(ctx: LowStockNotifyContext): Promise<SendEm
     subject,
     html: buildHtml(ctx.items, organizationName)
   });
-  if (!result.sent) {
+  if (result.sent === false) {
     console.warn("[email:low-stock] no enviado", ctx.organizationId, result.reason, emails.length, "destinatarios");
   }
   return result;
