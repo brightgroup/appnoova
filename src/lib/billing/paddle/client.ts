@@ -112,32 +112,40 @@ export async function getPaddleTransaction(transactionId: string): Promise<Paddl
 }
 
 const TXN_ID_RE = /^txn_[a-z0-9]{26}$/i;
-const TXN_ID_ONE_SHORT_RE = /^txn_[a-z0-9]{25}$/i;
-const PADDLE_ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
 
-async function transactionExists(transactionId: string): Promise<boolean> {
-  try {
-    await paddleFetch(`/transactions/${encodeURIComponent(transactionId)}`);
-    return true;
-  } catch (err) {
-    if (
-      err instanceof PaddleApiError &&
-      (err.status === 404 || err.code === "invalid_url" || err.code === "not_found")
-    ) {
-      return false;
+/**
+ * true si `a` se puede convertir en `b` con una sola inserción, borrado o
+ * sustitución de carácter — sin importar en qué posición. Un ID de Paddle
+ * que quedó corrupto a mano (typo, carácter perdido al copiar) puede fallar
+ * en cualquier posición, no solo al final.
+ */
+function isOneEditAway(a: string, b: string): boolean {
+  if (a === b) return false;
+  const lenDiff = a.length - b.length;
+  if (lenDiff < -1 || lenDiff > 1) return false;
+
+  const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
+  let i = 0;
+  let j = 0;
+  let usedEdit = false;
+  while (i < shorter.length && j < longer.length) {
+    if (shorter[i] === longer[j]) {
+      i++;
+      j++;
+      continue;
     }
-    throw err;
+    if (usedEdit) return false;
+    usedEdit = true;
+    if (shorter.length === longer.length) {
+      // sustitución
+      i++;
+      j++;
+    } else {
+      // inserción/borrado: avanza solo en el más largo
+      j++;
+    }
   }
-}
-
-async function completeTruncatedTxnId(prefix: string): Promise<string | null> {
-  const hits: string[] = [];
-  for (const ch of PADDLE_ID_ALPHABET) {
-    const candidate = prefix + ch;
-    if (await transactionExists(candidate)) hits.push(candidate);
-    if (hits.length > 1) return null;
-  }
-  return hits[0] ?? null;
+  return true;
 }
 
 async function listRecentPaidTransactions(): Promise<PaddleTransaction[]> {
@@ -164,8 +172,10 @@ async function listRecentPaidTransactions(): Promise<PaddleTransaction[]> {
 }
 
 /**
- * El ID de Paddle es `txn_` + 26 caracteres. Si quedó truncado al registrar el
- * cobro a mano, completamos el último carácter o buscamos por fecha.
+ * El ID de Paddle es `txn_` + 26 caracteres. Si quedó corrupto al registrar
+ * el cobro a mano (carácter perdido o cambiado, en cualquier posición),
+ * buscamos entre los cobros recientes el único que está a una edición de
+ * distancia del ID guardado.
  */
 export async function resolvePaddleTransactionId(raw: string): Promise<string> {
   const id = raw.trim();
@@ -177,15 +187,16 @@ export async function resolvePaddleTransactionId(raw: string): Promise<string> {
   } catch (err) {
     console.warn("[paddle] no se pudo listar transacciones recientes", err);
   }
+
   const byPrefix = listed.filter(
     (t) => typeof t?.id === "string" && (t.id.startsWith(id) || id.startsWith(t.id))
   );
   if (byPrefix.length === 1) return byPrefix[0].id;
 
-  if (TXN_ID_ONE_SHORT_RE.test(id)) {
-    const completed = await completeTruncatedTxnId(id);
-    if (completed) return completed;
-  }
+  const byEdit = listed.filter(
+    (t) => typeof t?.id === "string" && isOneEditAway(id, t.id)
+  );
+  if (byEdit.length === 1) return byEdit[0].id;
 
   return id;
 }
