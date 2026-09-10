@@ -3,7 +3,7 @@ import { adminClient } from "@/lib/voice-agents-server";
 import {
   PaddleApiError,
   getPaddleInvoicePdfUrl,
-  getPaddleTransaction,
+  getPaddleMode,
 } from "@/lib/billing/paddle/client";
 
 function paddleErrorMessage(err: unknown): { status: number; body: { error: string } } {
@@ -12,6 +12,15 @@ function paddleErrorMessage(err: unknown): { status: number; body: { error: stri
   const notReady =
     api?.code === "transaction_invoice_not_ready" || /invoice_not_ready|not_ready/i.test(detail);
 
+  if (detail.includes("PADDLE_KEY_ENV_MISMATCH")) {
+    return {
+      status: 502,
+      body: {
+        error:
+          "Coolify tiene PADDLE_ENV=live pero la API key es de sandbox. En Environment pon la PADDLE_API_KEY live (pdl_live_…), no la de prueba.",
+      },
+    };
+  }
   if (notReady) {
     return {
       status: 409,
@@ -19,11 +28,14 @@ function paddleErrorMessage(err: unknown): { status: number; body: { error: stri
     };
   }
   if (api?.code === "invalid_url" || api?.status === 404 || /404/.test(detail)) {
+    const mode = getPaddleMode();
     return {
       status: 409,
       body: {
         error:
-          "Paddle no encontró este cobro en el entorno configurado (sandbox vs live). El PDF está en el correo de Paddle.",
+          mode === "sandbox"
+            ? "Este cobro es de Paddle live y el servidor está en sandbox. En Coolify pon PADDLE_ENV=live y la API key live."
+            : "Paddle live no tiene PDF para este cobro. Revisa que PADDLE_API_KEY sea la live, o abre el PDF del correo de Paddle.",
       },
     };
   }
@@ -59,31 +71,13 @@ export async function paddleInvoicePdfResponse(
     return NextResponse.json({ error: "El PDF de Paddle solo está disponible en facturas pagadas." }, { status: 409 });
   }
 
-  const txnId = invoice.paddle_transaction_id as string;
-
-  try {
-    const txn = await getPaddleTransaction(txnId);
-    if (txn.status !== "completed" && txn.status !== "billed") {
-      return NextResponse.json(
-        {
-          error: `El cobro en Paddle está en estado «${txn.status}». El PDF sale cuando el pago queda completed.`,
-        },
-        { status: 409 }
-      );
-    }
-  } catch (err) {
-    console.error("[billing:invoice-pdf] txn", txnId, err);
-    const mapped = paddleErrorMessage(err);
-    return NextResponse.json(mapped.body, { status: mapped.status });
-  }
+  const txnId = String(invoice.paddle_transaction_id).trim();
 
   try {
     const url = await getPaddleInvoicePdfUrl(txnId, disposition);
-    // Solo devolvemos la URL firmada (~1h). No retransmitimos el PDF: Coolify/Traefik
-    // corta esa respuesta y el cliente ve un 502 vacío.
     return NextResponse.json({ url });
   } catch (err) {
-    console.error("[billing:invoice-pdf] url", txnId, err);
+    console.error("[billing:invoice-pdf]", getPaddleMode(), txnId, err);
     const mapped = paddleErrorMessage(err);
     return NextResponse.json(mapped.body, { status: mapped.status });
   }

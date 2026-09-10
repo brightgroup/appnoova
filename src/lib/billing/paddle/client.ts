@@ -1,22 +1,38 @@
 /** Cliente delgado para la API REST de Paddle (server-side only). */
 
 function paddleApiKey(): string {
-  const key = process.env.PADDLE_API_KEY;
+  const key = process.env.PADDLE_API_KEY?.trim();
   if (!key) throw new Error("PADDLE_API_KEY no configurada");
   return key;
 }
 
-/** Live vs sandbox lo marca la API key (`pdl_live_` / `pdl_sdbx_`), no solo PADDLE_ENV. */
+/** Coolify/producción usan PADDLE_ENV=live; la key solo se usa si ENV no está. */
+export function getPaddleMode(): "live" | "sandbox" {
+  const env = process.env.PADDLE_ENV?.trim().toLowerCase();
+  if (env === "live" || env === "production") return "live";
+  if (env === "sandbox") return "sandbox";
+  const key = process.env.PADDLE_API_KEY?.trim() ?? "";
+  if (key.startsWith("pdl_live")) return "live";
+  return "sandbox";
+}
+
 function paddleBaseUrl(): string {
+  return getPaddleMode() === "live" ? "https://api.paddle.com" : "https://sandbox-api.paddle.com";
+}
+
+function assertPaddleKeyMatchesMode(): void {
+  const mode = getPaddleMode();
   const key = paddleApiKey();
-  const fromKey = key.startsWith("pdl_live")
-    ? "live"
-    : key.startsWith("pdl_sdbx")
-      ? "sandbox"
-      : process.env.PADDLE_ENV === "live"
-        ? "live"
-        : "sandbox";
-  return fromKey === "live" ? "https://api.paddle.com" : "https://sandbox-api.paddle.com";
+  if (mode === "live" && key.startsWith("pdl_sdbx")) {
+    throw new Error(
+      "PADDLE_KEY_ENV_MISMATCH: PADDLE_ENV es live pero PADDLE_API_KEY es de sandbox. En Coolify usa la clave live (empieza por pdl_live_)."
+    );
+  }
+  if (mode === "sandbox" && key.startsWith("pdl_live")) {
+    throw new Error(
+      "PADDLE_KEY_ENV_MISMATCH: PADDLE_ENV es sandbox pero PADDLE_API_KEY es de live. Alinea ENV y la clave."
+    );
+  }
 }
 
 export async function paddleFetch<T = unknown>(
@@ -24,10 +40,10 @@ export async function paddleFetch<T = unknown>(
   init?: RequestInit
 ): Promise<T> {
   const method = (init?.method ?? "GET").toUpperCase();
+  assertPaddleKeyMatchesMode();
   const headers: Record<string, string> = {
     Authorization: `Bearer ${paddleApiKey()}`,
     Accept: "application/json",
-    "Paddle-Version": "1",
     ...(init?.headers as Record<string, string> | undefined),
   };
   if (method !== "GET" && method !== "HEAD" && !headers["Content-Type"]) {
