@@ -10,5 +10,6 @@ export async function GET(
   const auth = await requireSuperAdmin(req);
   if (auth instanceof NextResponse) return auth;
   const { id } = await params;
-  return paddleInvoicePdfResponse(id);
+  const disposition = req.nextUrl.searchParams.get("disposition") === "inline" ? "inline" : "attachment";
+  return paddleInvoicePdfResponse(id, undefined, disposition);
 }

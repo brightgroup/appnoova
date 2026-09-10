@@ -1,38 +1,30 @@
 import { authFetch } from "@/lib/telephony-api";
 
-export async function openInvoicePdf(invoiceId: string, asAdmin = false): Promise<void> {
+export async function openInvoicePdf(
+  invoiceId: string,
+  asAdmin = false,
+  disposition: "inline" | "attachment" = "attachment"
+): Promise<void> {
   const path = asAdmin
-    ? `/api/admin/billing/invoices/${invoiceId}/pdf`
-    : `/api/billing/invoices/${invoiceId}/pdf`;
-  const res = await authFetch(path);
-  const contentType = res.headers.get("content-type") || "";
+    ? `/api/admin/billing/invoices/${invoiceId}/pdf?disposition=${disposition}`
+    : `/api/billing/invoices/${invoiceId}/pdf?disposition=${disposition}`;
 
-  if (!res.ok) {
-    const json = (await res.json().catch(() => ({}))) as { error?: string; url?: string };
-    if (json.url) {
-      window.location.assign(json.url);
-      return;
-    }
+  const tab = window.open("about:blank", "_blank", "noopener");
+
+  const res = await authFetch(path);
+  const raw = await res.text();
+  let json: { error?: string; url?: string } = {};
+  try {
+    json = JSON.parse(raw) as { error?: string; url?: string };
+  } catch {
+    json = {};
+  }
+
+  if (!res.ok || !json.url) {
+    tab?.close();
     throw new Error(json.error || `No se pudo abrir la factura (${res.status})`);
   }
 
-  if (contentType.includes("application/pdf")) {
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = objectUrl;
-    a.download = `factura-noova-${invoiceId.slice(0, 8)}.pdf`;
-    a.rel = "noopener";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 15_000);
-    return;
-  }
-
-  const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
-  if (!json.url) {
-    throw new Error(json.error || "No se pudo abrir la factura");
-  }
-  window.location.assign(json.url);
+  if (tab) tab.location.replace(json.url);
+  else window.location.assign(json.url);
 }

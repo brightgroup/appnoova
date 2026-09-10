@@ -10,5 +10,6 @@ export async function GET(
   const ctx = await requireOrgModule(req, "billing", "view");
   if (ctx instanceof NextResponse) return ctx;
   const { id } = await params;
-  return paddleInvoicePdfResponse(id, ctx.organizationId);
+  const disposition = req.nextUrl.searchParams.get("disposition") === "inline" ? "inline" : "attachment";
+  return paddleInvoicePdfResponse(id, ctx.organizationId, disposition);
 }

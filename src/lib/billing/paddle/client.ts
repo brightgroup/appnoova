@@ -6,10 +6,17 @@ function paddleApiKey(): string {
   return key;
 }
 
+/** Live vs sandbox lo marca la API key (`pdl_live_` / `pdl_sdbx_`), no solo PADDLE_ENV. */
 function paddleBaseUrl(): string {
-  return process.env.PADDLE_ENV === "live"
-    ? "https://api.paddle.com"
-    : "https://sandbox-api.paddle.com";
+  const key = paddleApiKey();
+  const fromKey = key.startsWith("pdl_live")
+    ? "live"
+    : key.startsWith("pdl_sdbx")
+      ? "sandbox"
+      : process.env.PADDLE_ENV === "live"
+        ? "live"
+        : "sandbox";
+  return fromKey === "live" ? "https://api.paddle.com" : "https://sandbox-api.paddle.com";
 }
 
 export async function paddleFetch<T = unknown>(
@@ -19,6 +26,8 @@ export async function paddleFetch<T = unknown>(
   const method = (init?.method ?? "GET").toUpperCase();
   const headers: Record<string, string> = {
     Authorization: `Bearer ${paddleApiKey()}`,
+    Accept: "application/json",
+    "Paddle-Version": "1",
     ...(init?.headers as Record<string, string> | undefined),
   };
   if (method !== "GET" && method !== "HEAD" && !headers["Content-Type"]) {

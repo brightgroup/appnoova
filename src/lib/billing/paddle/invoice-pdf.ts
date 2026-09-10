@@ -6,8 +6,6 @@ import {
   getPaddleTransaction,
 } from "@/lib/billing/paddle/client";
 
-const PDF_FETCH_MS = 20_000;
-
 function paddleErrorMessage(err: unknown): { status: number; body: { error: string } } {
   const detail = err instanceof Error ? err.message : "error desconocido";
   const api = err instanceof PaddleApiError ? err : null;
@@ -20,12 +18,12 @@ function paddleErrorMessage(err: unknown): { status: number; body: { error: stri
       body: { error: "Paddle aún está generando el PDF. Espera un minuto y reintenta." },
     };
   }
-  if (api?.status === 404 || /404/.test(detail)) {
+  if (api?.code === "invalid_url" || api?.status === 404 || /404/.test(detail)) {
     return {
-      status: 502,
+      status: 409,
       body: {
         error:
-          "Paddle no tiene un PDF para este cobro. Abre el correo de confirmación de Paddle o el portal de cliente.",
+          "Paddle no encontró este cobro en el entorno configurado (sandbox vs live). El PDF está en el correo de Paddle.",
       },
     };
   }
@@ -37,7 +35,8 @@ function paddleErrorMessage(err: unknown): { status: number; body: { error: stri
 
 export async function paddleInvoicePdfResponse(
   invoiceId: string,
-  organizationId?: string
+  organizationId?: string,
+  disposition: "inline" | "attachment" = "attachment"
 ): Promise<NextResponse> {
   const db = adminClient();
   let q = db
@@ -75,45 +74,17 @@ export async function paddleInvoicePdfResponse(
   } catch (err) {
     console.error("[billing:invoice-pdf] txn", txnId, err);
     const mapped = paddleErrorMessage(err);
-    if (err instanceof PaddleApiError && err.status === 404) {
-      return NextResponse.json(
-        { error: "Noova no encontró esa transacción en Paddle. El PDF está en el correo de confirmación de Paddle." },
-        { status: 502 }
-      );
-    }
     return NextResponse.json(mapped.body, { status: mapped.status });
   }
 
-  let paddleUrl: string;
   try {
-    paddleUrl = await getPaddleInvoicePdfUrl(txnId, "attachment");
+    const url = await getPaddleInvoicePdfUrl(txnId, disposition);
+    // Solo devolvemos la URL firmada (~1h). No retransmitimos el PDF: Coolify/Traefik
+    // corta esa respuesta y el cliente ve un 502 vacío.
+    return NextResponse.json({ url });
   } catch (err) {
     console.error("[billing:invoice-pdf] url", txnId, err);
     const mapped = paddleErrorMessage(err);
     return NextResponse.json(mapped.body, { status: mapped.status });
-  }
-
-  try {
-    const pdfRes = await fetch(paddleUrl, {
-      redirect: "follow",
-      signal: AbortSignal.timeout(PDF_FETCH_MS),
-    });
-    if (!pdfRes.ok) {
-      throw new Error(`Paddle PDF HTTP ${pdfRes.status}`);
-    }
-    const bytes = await pdfRes.arrayBuffer();
-    if (bytes.byteLength < 80) {
-      throw new Error("PDF vacío");
-    }
-    return new NextResponse(bytes, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="factura-${invoice.id.slice(0, 8)}.pdf"`,
-        "Cache-Control": "private, no-store",
-      },
-    });
-  } catch (err) {
-    console.error("[billing:invoice-pdf] proxy", txnId, err);
-    return NextResponse.json({ url: paddleUrl });
   }
 }

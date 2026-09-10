@@ -895,7 +895,7 @@ export default function FacturacionPage() {
                                         title="Ver factura Paddle"
                                         onClick={() => {
                                           setInvoicePdfMsg("");
-                                          void openInvoicePdf(inv.id).catch((e) =>
+                                          void openInvoicePdf(inv.id, false, "inline").catch((e) =>
                                             setInvoicePdfMsg(e instanceof Error ? e.message : "No se pudo abrir la factura")
                                           );
                                         }}
@@ -907,7 +907,7 @@ export default function FacturacionPage() {
                                         title="Descargar factura Paddle"
                                         onClick={() => {
                                           setInvoicePdfMsg("");
-                                          void openInvoicePdf(inv.id).catch((e) =>
+                                          void openInvoicePdf(inv.id, false, "attachment").catch((e) =>
                                             setInvoicePdfMsg(e instanceof Error ? e.message : "No se pudo abrir la factura")
                                           );
                                         }}
