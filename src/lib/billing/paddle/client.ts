@@ -73,7 +73,8 @@ export async function getPaddleInvoicePdfUrl(
   disposition: "inline" | "attachment" = "inline"
 ): Promise<string> {
   const data = await paddleFetch<{ url: string }>(
-    `/transactions/${transactionId}/invoice?disposition=${disposition}`
+    `/transactions/${transactionId}/invoice?disposition=${disposition}`,
+    { signal: AbortSignal.timeout(15_000) }
   );
   if (!data?.url) throw new Error("Paddle no devolvió URL de factura");
   return data.url;

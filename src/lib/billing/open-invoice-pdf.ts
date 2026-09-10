@@ -8,7 +8,11 @@ export async function openInvoicePdf(invoiceId: string, asAdmin = false): Promis
   const contentType = res.headers.get("content-type") || "";
 
   if (!res.ok) {
-    const json = (await res.json().catch(() => ({}))) as { error?: string };
+    const json = (await res.json().catch(() => ({}))) as { error?: string; url?: string };
+    if (json.url) {
+      window.location.assign(json.url);
+      return;
+    }
     throw new Error(json.error || `No se pudo abrir la factura (${res.status})`);
   }
 
