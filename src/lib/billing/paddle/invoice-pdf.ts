@@ -4,6 +4,7 @@ import {
   PaddleApiError,
   getPaddleInvoicePdfUrl,
   getPaddleMode,
+  resolvePaddleTransactionId,
 } from "@/lib/billing/paddle/client";
 
 function paddleErrorMessage(err: unknown): { status: number; body: { error: string } } {
@@ -17,7 +18,7 @@ function paddleErrorMessage(err: unknown): { status: number; body: { error: stri
       status: 502,
       body: {
         error:
-          "Coolify tiene PADDLE_ENV=live pero la API key es de sandbox. En Environment pon la PADDLE_API_KEY live (pdl_live_…), no la de prueba.",
+          "PADDLE_ENV y PADDLE_API_KEY no coinciden (live vs sandbox). En Coolify deben ser los dos live.",
       },
     };
   }
@@ -28,14 +29,11 @@ function paddleErrorMessage(err: unknown): { status: number; body: { error: stri
     };
   }
   if (api?.code === "invalid_url" || api?.status === 404 || /404/.test(detail)) {
-    const mode = getPaddleMode();
     return {
       status: 409,
       body: {
         error:
-          mode === "sandbox"
-            ? "Este cobro es de Paddle live y el servidor está en sandbox. En Coolify pon PADDLE_ENV=live y la API key live."
-            : "Paddle live no tiene PDF para este cobro. Revisa que PADDLE_API_KEY sea la live, o abre el PDF del correo de Paddle.",
+          "Paddle no reconoció el ID de este cobro. Suele ser un ID truncado al registrarlo a mano. El PDF sigue en el correo de Paddle.",
       },
     };
   }
@@ -71,13 +69,21 @@ export async function paddleInvoicePdfResponse(
     return NextResponse.json({ error: "El PDF de Paddle solo está disponible en facturas pagadas." }, { status: 409 });
   }
 
-  const txnId = String(invoice.paddle_transaction_id).trim();
+  const storedId = String(invoice.paddle_transaction_id).trim();
 
   try {
+    const txnId = await resolvePaddleTransactionId(storedId);
+    if (txnId !== storedId) {
+      await db
+        .from("billing_invoices")
+        .update({ paddle_transaction_id: txnId })
+        .eq("id", invoice.id);
+      console.warn("[billing:invoice-pdf] txn id corregido", storedId.length, "→", txnId.length);
+    }
     const url = await getPaddleInvoicePdfUrl(txnId, disposition);
     return NextResponse.json({ url });
   } catch (err) {
-    console.error("[billing:invoice-pdf]", getPaddleMode(), txnId, err);
+    console.error("[billing:invoice-pdf]", getPaddleMode(), storedId.length, err);
     const mapped = paddleErrorMessage(err);
     return NextResponse.json(mapped.body, { status: mapped.status });
   }

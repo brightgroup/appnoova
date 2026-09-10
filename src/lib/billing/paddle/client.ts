@@ -97,7 +97,28 @@ export interface PaddleTransaction {
 }
 
 export async function getPaddleTransaction(transactionId: string): Promise<PaddleTransaction> {
-  return paddleFetch<PaddleTransaction>(`/transactions/${transactionId}?include=customer`);
+  return paddleFetch<PaddleTransaction>(
+    `/transactions/${encodeURIComponent(transactionId)}?include=customer`
+  );
+}
+
+const TXN_ID_RE = /^txn_[a-z0-9]{26}$/i;
+
+/**
+ * El ID de Paddle es `txn_` + 26 caracteres. Si quedó truncado al registrar el
+ * cobro a mano, buscamos la transacción completed cuyo id empieza por ese prefijo.
+ */
+export async function resolvePaddleTransactionId(raw: string): Promise<string> {
+  const id = raw.trim();
+  if (TXN_ID_RE.test(id)) return id;
+
+  const listed = await paddleFetch<PaddleTransaction[]>(
+    "/transactions?status=completed&per_page=50"
+  );
+  const matches = (listed ?? []).filter((t) => typeof t?.id === "string" && (t.id.startsWith(id) || id.startsWith(t.id)));
+  if (matches.length === 1) return matches[0].id;
+
+  return id;
 }
 
 export async function getPaddleCustomer(customerId: string): Promise<PaddleCustomer> {
@@ -109,9 +130,10 @@ export async function getPaddleInvoicePdfUrl(
   transactionId: string,
   disposition: "inline" | "attachment" = "attachment"
 ): Promise<string> {
+  const id = encodeURIComponent(transactionId);
   const paths = [
-    `/transactions/${transactionId}/invoice`,
-    `/transactions/${transactionId}/invoice?disposition=${disposition}`,
+    `/transactions/${id}/invoice`,
+    `/transactions/${id}/invoice?disposition=${disposition}`,
   ];
   let lastError: unknown;
   for (const path of paths) {
