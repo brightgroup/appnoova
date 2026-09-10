@@ -89,7 +89,7 @@ async function run(req: NextRequest) {
       organization_id: organizationId,
       sent: result.sent,
       low_stock_count: lowStock.length,
-      reason: result.sent ? undefined : result.reason,
+      reason: result.sent === false ? result.reason : undefined,
     });
   }
 
