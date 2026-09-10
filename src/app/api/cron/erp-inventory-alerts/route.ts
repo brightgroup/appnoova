@@ -5,6 +5,18 @@ import { assertOrgErpEnabled } from "@/lib/org-modules";
 import { listInventoryItems } from "@/lib/erp/inventory-db";
 import { notifyLowStock } from "@/lib/email/notify-low-stock";
 
+/** Hora 0–23 en America/Bogota. No usar toLocaleString(hour) — en Node a veces trae la fecha completa y Number() da NaN. */
+function bogotaHourNow(): number {
+  const hour = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Bogota",
+    hour: "numeric",
+    hourCycle: "h23",
+  })
+    .formatToParts(new Date())
+    .find((part) => part.type === "hour")?.value;
+  return Number(hour);
+}
+
 /**
  * Resumen diario de stock mínimo por organización (modo "resumen_diario" o
  * "ambos" en erp_inventory_alert_rules). Pensado para correr por hora (no una
@@ -29,10 +41,10 @@ async function run(req: NextRequest) {
   }
 
   const db = adminClient();
-
-  const currentHour = Number(
-    new Date().toLocaleString("en-US", { timeZone: "America/Bogota", hour: "2-digit", hour12: false })
-  );
+  const currentHour = bogotaHourNow();
+  if (!Number.isInteger(currentHour) || currentHour < 0 || currentHour > 23) {
+    return NextResponse.json({ error: "hora Bogotá inválida", currentHour }, { status: 500 });
+  }
 
   const { data: rules, error } = await db
     .from("erp_inventory_alert_rules")
@@ -44,7 +56,12 @@ async function run(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const results: { organization_id: string; sent: boolean; low_stock_count: number }[] = [];
+  const results: {
+    organization_id: string;
+    sent: boolean;
+    low_stock_count: number;
+    reason?: string;
+  }[] = [];
 
   for (const rule of rules ?? []) {
     const organizationId = rule.organization_id as string;
@@ -52,26 +69,36 @@ async function run(req: NextRequest) {
     if (!gate.ok) continue;
 
     const items = await listInventoryItems(db, organizationId, {});
-    const lowStock = items.filter(i => i.stockMinimo !== null && i.existencia <= i.stockMinimo);
+    const lowStock = items.filter((i) => i.stockMinimo !== null && i.existencia <= i.stockMinimo);
     if (!lowStock.length) {
-      results.push({ organization_id: organizationId, sent: false, low_stock_count: 0 });
+      results.push({ organization_id: organizationId, sent: false, low_stock_count: 0, reason: "no_low_stock" });
       continue;
     }
 
     const result = await notifyLowStock({
       organizationId,
-      items: lowStock.map(i => ({
+      items: lowStock.map((i) => ({
         id: i.id,
         codigo: i.codigo,
         nombre: i.nombre,
         existencia: i.existencia,
-        stockMinimo: i.stockMinimo ?? 0
-      }))
+        stockMinimo: i.stockMinimo ?? 0,
+      })),
     });
-    results.push({ organization_id: organizationId, sent: result.sent, low_stock_count: lowStock.length });
+    results.push({
+      organization_id: organizationId,
+      sent: result.sent,
+      low_stock_count: lowStock.length,
+      reason: result.sent ? undefined : result.reason,
+    });
   }
 
-  return NextResponse.json({ ok: true, hour_checked: currentHour, organizations_checked: rules?.length ?? 0, results });
+  return NextResponse.json({
+    ok: true,
+    hour_checked: currentHour,
+    organizations_checked: rules?.length ?? 0,
+    results,
+  });
 }
 
 export async function POST(req: NextRequest) {

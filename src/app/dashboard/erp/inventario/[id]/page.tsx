@@ -34,6 +34,7 @@ export default function ErpInventoryItemPage() {
   const router = useRouter();
   const itemId = params.id;
   const { canWrite: canRegisterMovements } = useModuleWriteAccess("erp", "edit");
+  const { canWrite: canEditItem } = useModuleWriteAccess("erp", "edit");
   const { canWrite: canManage } = useModuleWriteAccess("erp", "manage");
 
   const [item, setItem] = useState<InventoryItem | null>(null);
@@ -158,7 +159,7 @@ export default function ErpInventoryItemPage() {
         onRefresh={() => load()}
         action={
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            {canManage && (
+            {canEditItem && (
               <button type="button" onClick={() => setEditOpen(true)} className={btnGhost}>
                 <Pencil className="w-4 h-4" /> Editar
               </button>

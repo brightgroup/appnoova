@@ -142,9 +142,13 @@ export async function notifyLowStock(ctx: LowStockNotifyContext): Promise<SendEm
     ? `Stock mínimo — ${ctx.items[0].nombre}`
     : `${ctx.items.length} productos en stock mínimo`;
 
-  return sendEmail({
+  const result = await sendEmail({
     to: emails,
     subject,
     html: buildHtml(ctx.items, organizationName)
   });
+  if (!result.sent) {
+    console.warn("[email:low-stock] no enviado", ctx.organizationId, result.reason, emails.length, "destinatarios");
+  }
+  return result;
 }

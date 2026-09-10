@@ -16,13 +16,18 @@ export async function paddleFetch<T = unknown>(
   path: string,
   init?: RequestInit
 ): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${paddleApiKey()}`,
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  if (method !== "GET" && method !== "HEAD" && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+
   const res = await fetch(`${paddleBaseUrl()}${path}`, {
     ...init,
-    headers: {
-      Authorization: `Bearer ${paddleApiKey()}`,
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
+    headers,
   });
 
   const json = await res.json();

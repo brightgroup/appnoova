@@ -46,7 +46,7 @@ const FILTERS: { id: Filter; label: string }[] = [
 export default function ErpInventarioPage() {
   const router = useRouter();
   const { canWrite: canRegisterMovements } = useModuleWriteAccess("erp", "edit");
-  const { canWrite: canCreateItem } = useModuleWriteAccess("erp", "edit");
+  const { canWrite: canEditItem } = useModuleWriteAccess("erp", "edit");
   const { canWrite: canManage } = useModuleWriteAccess("erp", "manage");
 
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -232,7 +232,7 @@ export default function ErpInventarioPage() {
                 </button>
               </>
             )}
-            {canCreateItem && (
+            {canEditItem && (
               <button type="button" onClick={() => setItemModal({})} className={btnPrimary}>
                 <Plus className="w-4 h-4" /> Nuevo producto
               </button>
@@ -259,7 +259,7 @@ export default function ErpInventarioPage() {
           <div className={registryTableEmpty}>
             {search.trim() || filter !== "all"
               ? "No hay productos con estos filtros."
-              : canCreateItem
+              : canEditItem
                 ? "Aún no hay productos. Crea uno o importa el Excel de inventario."
                 : "Aún no hay productos en el inventario."}
           </div>
@@ -324,7 +324,7 @@ export default function ErpInventarioPage() {
                         <NoovaListMenuItem onClick={() => router.push(`/dashboard/erp/inventario/${item.id}`)}>
                           Ver kardex
                         </NoovaListMenuItem>
-                        {canManage && (
+                        {canEditItem && (
                           <NoovaListMenuItem onClick={() => { setOpenMenuId(null); setItemModal({ item }); }}>
                             Editar
                           </NoovaListMenuItem>

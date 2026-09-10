@@ -28,12 +28,28 @@ export async function paddleInvoicePdfResponse(
   }
 
   try {
-    const url = await getPaddleInvoicePdfUrl(invoice.paddle_transaction_id, "inline");
-    return NextResponse.json({ url });
+    const paddleUrl = await getPaddleInvoicePdfUrl(invoice.paddle_transaction_id, "inline");
+    const pdfRes = await fetch(paddleUrl);
+    if (!pdfRes.ok || !pdfRes.body) {
+      throw new Error(`Paddle PDF HTTP ${pdfRes.status}`);
+    }
+    return new NextResponse(pdfRes.body, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="factura-${invoice.id.slice(0, 8)}.pdf"`,
+        "Cache-Control": "private, no-store",
+      },
+    });
   } catch (err) {
     console.error("[billing:invoice-pdf]", invoice.paddle_transaction_id, err);
+    const detail = err instanceof Error ? err.message : "error desconocido";
     return NextResponse.json(
-      { error: "Paddle aún no tiene el PDF listo. Reintenta en unos minutos." },
+      {
+        error:
+          detail.includes("PADDLE_API_KEY")
+            ? "Falta la API key de Paddle en el servidor."
+            : `No se pudo generar el PDF (${detail}). Si el pago es de hace minutos, reintenta.`,
+      },
       { status: 502 }
     );
   }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireErpAccess } from "@/lib/erp/api-guard";
 import { adminClient } from "@/lib/voice-agents-server";
 import { getInventoryItem, updateInventoryItem } from "@/lib/erp/inventory-db";
+import { getOrgPermissionLevel } from "@/lib/org-server";
+import { PERMISSION_LEVEL_RANK } from "@/types/rbac";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -20,7 +22,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
 
 /** Edita datos del producto y, opcionalmente, stock_minimo — no toca existencia (eso solo vía movimientos). */
 export async function PATCH(req: NextRequest, { params }: Ctx) {
-  const ctx = await requireErpAccess(req, "manage");
+  const ctx = await requireErpAccess(req, "edit");
   if (ctx instanceof NextResponse) return ctx;
 
   const { id } = await params;
@@ -42,7 +44,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     }
     patch.stockMinimo = value;
   }
-  if (typeof body.activo === "boolean") patch.activo = body.activo;
+  if (typeof body.activo === "boolean") {
+    const level = await getOrgPermissionLevel(ctx.userId, ctx.organizationId, "erp");
+    if (PERMISSION_LEVEL_RANK[level] < PERMISSION_LEVEL_RANK.manage) {
+      return NextResponse.json({ error: "No puedes desactivar o reactivar productos" }, { status: 403 });
+    }
+    patch.activo = body.activo;
+  }
 
   try {
     const item = await updateInventoryItem(db, ctx.organizationId, id, patch);
