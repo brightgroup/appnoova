@@ -1,73 +1,191 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, Car, Check, Copy, ExternalLink, HeartPulse, Home, Info, MessageSquare, Plus, X } from "lucide-react";
-import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
-import { Badge } from "@/components/ui/Badge";
-import { InfoBox } from "@/components/ui/InfoBox";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  ArrowDownWideNarrow,
+  Car,
+  ChevronLeft,
+  Filter,
+  HeartPulse,
+  Home,
+  Loader2,
+  Plus,
+  RotateCcw,
+  Search,
+  ShieldCheck
+} from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
-import { btnPrimary, btnGhost, modalInput } from "@/lib/brand-ui";
+import {
+  btnGhost, btnPrimary, btnFilterGroup, btnFilterActive, btnFilterIdle,
+  registryPage, registryToolbar, registryTable,
+  registryTableHead, registryTableHeadRow, registryTableHeadCell, registryTableCell,
+  registryTableRowClickable, registryTableCellFirst, registryTableEmpty, registryTableLoading,
+  registryListShell, inputSearch,
+  textMuted
+} from "@/lib/brand-ui";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
+import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
+import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
+import { useRegistryPagination } from "@/hooks/useRegistryPagination";
+import { ExportMenu } from "@/components/ui/ExportMenu";
+import type { ExportColumn } from "@/lib/export-table";
+import { PlateBadge } from "@/components/crm/PlateBadge";
 
-interface QuoteRequest {
+interface Cotizacion {
   id: string;
   ramo: string;
   placa: string | null;
-  vehiculo: { marca?: string; linea?: string };
-  datosRiesgo: Record<string, string | undefined>;
-  tomador: { nombre_tomador?: string; documento_tomador?: string; fecha_nacimiento_tomador?: string };
+  tomador: { nombre_tomador?: string; documento_tomador?: string };
   estado: "pendiente" | "cotizada" | "enviada_externa" | "cerrada" | "descartada";
-  resultado: { aseguradora?: string; prima?: number | null; nombre_plan?: string } | null;
-  conversationId: string | null;
+  resultado: { aseguradora?: string; prima?: number | null; prima_anual?: number | null } | null;
   leadId: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
+type RamoFiltro = "todos" | "autos" | "vida" | "hogar" | "salud";
+type SortField = "llegada" | "alfabetico";
+type SortDirection = "asc" | "desc";
+
+const RAMO_LABEL: Record<string, string> = { autos: "Auto", vida: "Vida", hogar: "Hogar", salud: "Salud" };
 const RAMO_ICON: Record<string, typeof Car> = { autos: Car, vida: HeartPulse, hogar: Home, salud: HeartPulse };
-
-/** Vida/hogar/salud ahora capturan sus campos dinámicamente (poliza_ramo_campos, ver plan "Cotizador dinámico por ramo") — el resumen solo puede asomar lo más típico de cada uno, con textos genéricos si esta cotización no tiene ese campo puntual. */
-function ramoSummary(r: QuoteRequest): string {
-  if (r.ramo === "autos") return [r.vehiculo?.marca, r.vehiculo?.linea].filter(Boolean).join(" ") || "Vehículo";
-  if (r.ramo === "vida") return `Vida · suma deseada ${r.datosRiesgo?.suma_asegurada_deseada ?? "—"}`;
-  if (r.ramo === "hogar") return `Hogar · ${r.datosRiesgo?.tipo_de_vivienda ?? "inmueble"} estrato ${r.datosRiesgo?.estrato ?? "—"}`;
-  if (r.ramo === "salud") return `Salud · ${r.datosRiesgo?.servicio_de_salud_actual ?? "sin servicio actual"}`;
-  return r.ramo;
-}
-
-interface ExternalSource {
-  id: string;
-  label: string;
-  inboundToken: string;
-}
+const RAMO_OPTIONS: Array<{ value: RamoFiltro; label: string }> = [
+  { value: "todos", label: "Todos los ramos" },
+  { value: "autos", label: "Auto" },
+  { value: "vida", label: "Vida" },
+  { value: "hogar", label: "Hogar" },
+  { value: "salud", label: "Salud" }
+];
 
 function formatCop(value: number | null | undefined): string {
-  if (value == null) return "—";
+  if (!value) return "—";
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 }
 
+function DirectionPills({ active, onSelect }: { active: SortDirection | null; onSelect: (dir: SortDirection) => void }) {
+  return (
+    <div className={btnFilterGroup}>
+      <button type="button" onClick={() => onSelect("asc")} className={active === "asc" ? btnFilterActive : btnFilterIdle}>
+        Ascendente
+      </button>
+      <button type="button" onClick={() => onSelect("desc")} className={active === "desc" ? btnFilterActive : btnFilterIdle}>
+        Descendente
+      </button>
+    </div>
+  );
+}
+
+function OrdenarPopover({
+  sortField,
+  sortDirection,
+  onChange
+}: {
+  sortField: SortField;
+  sortDirection: SortDirection;
+  onChange: (field: SortField, direction: SortDirection) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const isDefault = sortField === "llegada" && sortDirection === "desc";
+
+  return (
+    <div className="relative shrink-0">
+      <button type="button" onClick={() => setOpen(o => !o)} className={`${btnGhost} gap-1.5 relative`}>
+        <ArrowDownWideNarrow className="w-4 h-4" /> Ordenar
+        {!isDefault && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#0f7eff]" />}
+      </button>
+      {open && (
+        <>
+          <button type="button" className="fixed inset-0 z-40" aria-label="Cerrar ordenar" onClick={() => setOpen(false)} />
+          <div className={`absolute left-0 z-50 mt-2 w-72 ${registryListShell} p-4 space-y-4`}>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-white">Ordenar</p>
+              <button
+                type="button"
+                onClick={() => onChange("llegada", "desc")}
+                className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-white"
+              >
+                <RotateCcw className="w-3 h-3" /> Restablecer
+              </button>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-2">Llegada</p>
+              <DirectionPills active={sortField === "llegada" ? sortDirection : null} onSelect={dir => onChange("llegada", dir)} />
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-2">Alfabéticamente</p>
+              <DirectionPills active={sortField === "alfabetico" ? sortDirection : null} onSelect={dir => onChange("alfabetico", dir)} />
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function FiltroPopover({ ramo, onRamoChange }: { ramo: RamoFiltro; onRamoChange: (v: RamoFiltro) => void }) {
+  const [open, setOpen] = useState(false);
+  const isDefault = ramo === "todos";
+
+  return (
+    <div className="relative shrink-0">
+      <button type="button" onClick={() => setOpen(o => !o)} className={`${btnGhost} gap-1.5 relative`}>
+        <Filter className="w-4 h-4" /> Filtro
+        {!isDefault && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#0f7eff]" />}
+      </button>
+      {open && (
+        <>
+          <button type="button" className="fixed inset-0 z-40" aria-label="Cerrar filtro" onClick={() => setOpen(false)} />
+          <div className={`absolute left-0 z-50 mt-2 w-72 ${registryListShell} p-4 space-y-4`}>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-white">Filtro</p>
+              <button
+                type="button"
+                onClick={() => onRamoChange("todos")}
+                className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-white"
+              >
+                <RotateCcw className="w-3 h-3" /> Limpiar
+              </button>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1.5">Ramo</p>
+              <NoovaSelect value={ramo} onChange={v => onRamoChange(v as RamoFiltro)} options={RAMO_OPTIONS} allowEmpty={false} />
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function formatDateTime(value: string): string {
+  return new Date(value).toLocaleString("es-CO", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 /**
- * Lista de cotizaciones — entidad del CRM (no de Seguros, aunque su plantilla hoy es 100% de
- * seguros, ver plan "Módulo Cotizaciones en CRM"). Cada fila abre su propia ficha
- * (/dashboard/crm/cotizaciones/[id]), donde vive todo lo que antes se resolvía inline acá:
- * completar datos, registrar el resultado (con o sin ayuda de ORI), descargar PDF y generar link.
+ * Cotizaciones = las mismas filas de insurance_quote_requests que Solicitudes,
+ * pero ya con resultado (estado "cotizada"/"enviada_externa") — sea porque
+ * ORI la calculó en automático o porque un asesor la registró a mano. Mismo
+ * diseño de tabla que Solicitudes/Leads.
  */
-export default function CotizacionesQueuePage() {
-  const [requests, setRequests] = useState<QuoteRequest[]>([]);
+export default function CotizacionesPage() {
+  const router = useRouter();
+  const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [sources, setSources] = useState<ExternalSource[]>([]);
-  const [newSourceLabel, setNewSourceLabel] = useState("");
-  const [creatingSource, setCreatingSource] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [ramo, setRamo] = useState<RamoFiltro>("todos");
+  const [sortField, setSortField] = useState<SortField>("llegada");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const load = useCallback(async () => {
     setLoading(true);
     const headers = await getAuthHeaders();
-    const [reqRes, srcRes] = await Promise.all([
-      fetch("/api/seguros/cotizaciones", { headers }),
-      fetch("/api/seguros/fuentes-externas", { headers })
-    ]);
-    if (reqRes.ok) setRequests((await reqRes.json()).requests ?? []);
-    if (srcRes.ok) setSources((await srcRes.json()).sources ?? []);
+    const res = await fetch("/api/seguros/cotizaciones", { headers });
+    if (res.ok) {
+      const requests = ((await res.json()).requests ?? []) as Cotizacion[];
+      setCotizaciones(requests.filter(r => r.estado === "cotizada" || r.estado === "enviada_externa"));
+    }
     setLoading(false);
   }, []);
 
@@ -75,186 +193,154 @@ export default function CotizacionesQueuePage() {
     void load();
   }, [load]);
 
-  async function handleDescartar(id: string) {
-    const headers = await getAuthHeaders();
-    await fetch(`/api/seguros/cotizaciones/${id}/cerrar`, { method: "POST", headers });
-    await load();
-  }
-
-  async function handleCreateSource() {
-    if (!newSourceLabel.trim()) return;
-    setCreatingSource(true);
-    try {
-      const headers = await getAuthHeaders();
-      const res = await fetch("/api/seguros/fuentes-externas", {
-        method: "POST",
-        headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ label: newSourceLabel.trim() })
-      });
-      if (res.ok) {
-        setNewSourceLabel("");
-        await load();
+  const filtered = useMemo(() => {
+    let rows = cotizaciones;
+    if (ramo !== "todos") rows = rows.filter(r => r.ramo === ramo);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      rows = rows.filter(r =>
+        [r.tomador?.nombre_tomador, r.tomador?.documento_tomador, r.placa, RAMO_LABEL[r.ramo] ?? r.ramo, r.resultado?.aseguradora]
+          .filter(Boolean)
+          .some(v => String(v).toLowerCase().includes(q))
+      );
+    }
+    const sorted = [...rows].sort((a, b) => {
+      if (sortField === "alfabetico") {
+        return (a.tomador?.nombre_tomador ?? "").localeCompare(b.tomador?.nombre_tomador ?? "");
       }
-    } finally {
-      setCreatingSource(false);
-    }
-  }
+      return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+    });
+    if (sortDirection === "desc") sorted.reverse();
+    return sorted;
+  }, [cotizaciones, ramo, search, sortField, sortDirection]);
 
-  function webhookUrl(token: string): string {
-    if (typeof window === "undefined") return "";
-    return `${window.location.origin}/api/seguros/webhooks/cotizacion-externa/${token}`;
-  }
+  const pagination = useRegistryPagination(filtered.length, `${ramo}-${search}-${sortField}-${sortDirection}`);
+  const pageRows = pagination.pageRows(filtered);
 
-  async function copyUrl(id: string, token: string) {
-    try {
-      await navigator.clipboard.writeText(webhookUrl(token));
-      setCopiedId(id);
-      window.setTimeout(() => setCopiedId(null), 2000);
-    } catch {
-      /* ignore */
-    }
-  }
-
-  const pendientes = requests.filter(r => r.estado === "pendiente");
-  const atendidas = requests.filter(r => r.estado !== "pendiente" && r.estado !== "descartada");
+  const exportColumns = useMemo<ExportColumn<Cotizacion>[]>(
+    () => [
+      { header: "Ramo", value: r => RAMO_LABEL[r.ramo] ?? r.ramo },
+      { header: "Tomador", value: r => r.tomador?.nombre_tomador ?? "" },
+      { header: "Documento", value: r => r.tomador?.documento_tomador ?? "" },
+      { header: "Placa", value: r => r.placa ?? "" },
+      { header: "Aseguradora", value: r => r.resultado?.aseguradora ?? "" },
+      { header: "Prima", value: r => (r.resultado?.prima != null ? String(r.resultado.prima) : "") },
+      { header: "Actualizada", value: r => r.updatedAt }
+    ],
+    []
+  );
 
   return (
-    <ChannelListPage
-      title="Cotizaciones"
-      description="Lo que la IA ya calificó (auto, vida, hogar o salud) y espera que un asesor complete el resultado real."
-      loading={loading}
-      onRefresh={load}
-      refreshing={loading}
-      error={error || undefined}
-    >
-      <div className="space-y-3 mb-8">
-        {pendientes.length === 0 ? (
-          <div className="rounded-xl border border-white/[.08] bg-black/20 p-8 text-center text-sm text-gray-500">
-            No hay cotizaciones pendientes por ahora.
+    <div className={registryPage}>
+      <div className={registryToolbar}>
+        <div className="flex items-center gap-3 min-w-0">
+          <Link href="/dashboard" className="p-1.5 hover:bg-white/[.06] rounded-lg text-gray-400 shrink-0">
+            <ChevronLeft className="w-5 h-5" />
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">Cotizaciones</h1>
+            <p className={`text-xs ${textMuted} mt-0.5`}>Todas las cotizaciones con resultado — manuales o generadas por ORI</p>
           </div>
-        ) : (
-          pendientes.map(r => {
-            const RamoIcon = RAMO_ICON[r.ramo] ?? Car;
-            return (
-              <div key={r.id} className="rounded-xl border border-white/[.08] bg-black/20 p-4 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-[#2463eb]/15 flex items-center justify-center shrink-0">
-                  <RamoIcon className="w-5 h-5 text-[#6f95f2]" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-white">
-                    {ramoSummary(r)} {r.placa && <span className="text-gray-500 font-mono text-xs">{r.placa}</span>}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {r.tomador?.nombre_tomador} · {r.tomador?.documento_tomador}
-                  </p>
-                </div>
-                {r.leadId && (
-                  <a
-                    href={`/dashboard/crm/leads/${r.leadId}`}
-                    className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-white/[.06]"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" /> Ver oportunidad
-                  </a>
-                )}
-                {r.conversationId && (
-                  <a
-                    href={`/dashboard/inbox?id=${r.conversationId}`}
-                    className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-white/[.06]"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5" /> Ver chat
-                  </a>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleDescartar(r.id)}
-                  className="shrink-0 p-2 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10"
-                  title="Descartar"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-                <a href={`/dashboard/crm/cotizaciones/${r.id}`} className={`${btnPrimary} !text-xs !py-2 shrink-0 gap-1.5`}>
-                  Abrir cotización <ArrowRight className="w-3.5 h-3.5" />
-                </a>
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col p-6 min-h-0 overflow-hidden">
+        <RegistryTableLayout
+          onRefresh={() => load()}
+          refreshing={loading}
+          filters={
+            <div className="flex items-center gap-2 flex-wrap">
+              <FiltroPopover ramo={ramo} onRamoChange={setRamo} />
+              <OrdenarPopover
+                sortField={sortField}
+                sortDirection={sortDirection}
+                onChange={(f, d) => {
+                  setSortField(f);
+                  setSortDirection(d);
+                }}
+              />
+              <div className="relative flex-1 min-w-[160px] max-w-xl">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Buscar por tomador, documento, placa o aseguradora"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className={inputSearch}
+                />
               </div>
-            );
-          })
-        )}
-      </div>
-
-      {atendidas.length > 0 && (
-        <div className="mb-8">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Ya atendidas</p>
-          <div className="space-y-2">
-            {atendidas.slice(0, 10).map(r => (
-              <a
-                key={r.id}
-                href={`/dashboard/crm/cotizaciones/${r.id}`}
-                className="rounded-xl border border-white/[.06] bg-black/10 p-3 flex items-center gap-4 hover:bg-white/[.03] transition-colors"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-gray-300">
-                    {r.resultado?.nombre_plan ?? ramoSummary(r)}{" "}
-                    {r.placa && <span className="text-gray-500 font-mono">{r.placa}</span>} — {r.tomador?.nombre_tomador}
-                  </p>
-                </div>
-                <Badge variant={r.estado === "cotizada" || r.estado === "enviada_externa" ? "emerald" : "neutral"}>
-                  {r.estado === "cotizada" || r.estado === "enviada_externa"
-                    ? formatCop(r.resultado?.prima)
-                    : r.estado}
-                </Badge>
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="rounded-2xl border border-white/[.08] bg-noova-surface p-6">
-        <h3 className="text-sm font-semibold text-white mb-1">Fuentes externas</h3>
-        <InfoBox icon={Info} layout="row" variant="neutral" className="p-4 my-3">
-          <p className="text-[11px]">
-            Para sistemas que puedan enviar resultados de cotización a Noova pero no dejan consultarlos por API (ej.
-            Agentemotor) — crea una fuente, copia la URL y compártela con ese proveedor. Ese sistema hace un{" "}
-            <code className="text-gray-300">POST</code> a esa URL con el id de la cotización (el que ves en su ficha)
-            para que Noova sepa a cuál pertenece:
-          </p>
-          <pre className="text-[10px] text-gray-400 bg-black/30 rounded-lg p-2 mt-2 overflow-x-auto">
-{`{ "quote_request_id": "…", "aseguradora": "Sura", "prima": 450000,
-  "vigencia_desde": "2026-01-01", "vigencia_hasta": "2027-01-01" }`}
-          </pre>
-        </InfoBox>
-        <div className="space-y-2">
-          {sources.map(s => (
-            <div key={s.id} className="flex items-center gap-2 p-3 rounded-lg bg-black/20 border border-white/[.08]">
-              <span className="text-xs font-medium text-white w-28 shrink-0">{s.label}</span>
-              <code className="flex-1 min-w-0 text-[11px] text-gray-400 truncate">{webhookUrl(s.inboundToken)}</code>
-              <button
-                type="button"
-                onClick={() => copyUrl(s.id, s.inboundToken)}
-                className={`${btnGhost} !px-2.5 !py-1.5 !text-xs shrink-0 gap-1`}
-              >
-                {copiedId === s.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
+              <div className="flex items-center gap-2 ml-auto shrink-0">
+                <ExportMenu filename="cotizaciones" sheetName="Cotizaciones" columns={exportColumns} rows={filtered} />
+                <Link href="/dashboard/crm/cotizaciones/nueva" className={`${btnPrimary} !text-xs gap-1.5`}>
+                  <Plus className="w-3.5 h-3.5" /> Nueva cotización
+                </Link>
+              </div>
             </div>
-          ))}
-        </div>
-        <div className="flex gap-2 mt-3">
-          <input
-            type="text"
-            value={newSourceLabel}
-            onChange={e => setNewSourceLabel(e.target.value)}
-            placeholder="Ej. Agentemotor"
-            className={`${modalInput} flex-1`}
-          />
-          <button
-            type="button"
-            onClick={handleCreateSource}
-            disabled={creatingSource || !newSourceLabel.trim()}
-            className={`${btnPrimary} !text-xs gap-1.5 shrink-0`}
-          >
-            <Plus className="w-3.5 h-3.5" /> Crear
-          </button>
-        </div>
+          }
+          footer={
+            !loading && filtered.length > 0 ? (
+              <RegistryTablePagination
+                total={pagination.total}
+                rangeStart={pagination.rangeStart}
+                rangeEnd={pagination.rangeEnd}
+                pageSafe={pagination.pageSafe}
+                totalPages={pagination.totalPages}
+                pageSize={pagination.pageSize}
+                onPageChange={pagination.setPage}
+                onPageSizeChange={pagination.setPageSize}
+                label="cotizaciones"
+              />
+            ) : undefined
+          }
+        >
+          {loading ? (
+            <div className={registryTableLoading}>
+              <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando cotizaciones…
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className={registryTableEmpty}>No hay cotizaciones con estos filtros.</div>
+          ) : (
+            <table className={`${registryTable} min-w-[780px]`}>
+              <thead className={registryTableHead}>
+                <tr className={registryTableHeadRow}>
+                  <th className={registryTableHeadCell}>Ramo</th>
+                  <th className={registryTableHeadCell}>Tomador</th>
+                  <th className={registryTableHeadCell}>Documento</th>
+                  <th className={registryTableHeadCell}>Resultado</th>
+                  <th className={registryTableHeadCell}>Actualizada</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map(c => {
+                  const RamoIcon = RAMO_ICON[c.ramo] ?? ShieldCheck;
+                  return (
+                    <tr
+                      key={c.id}
+                      className={registryTableRowClickable}
+                      onClick={() => router.push(`/dashboard/crm/cotizaciones/${c.id}`)}
+                    >
+                      <td className={`${registryTableCellFirst} text-sm font-medium text-white`}>
+                        <span className="inline-flex items-center gap-2">
+                          <RamoIcon className="w-4 h-4 text-[#6f95f2]" />
+                          {RAMO_LABEL[c.ramo] ?? c.ramo}
+                          {c.placa && <PlateBadge plate={c.placa} />}
+                        </span>
+                      </td>
+                      <td className={`${registryTableCell} text-xs text-gray-300`}>{c.tomador?.nombre_tomador ?? "—"}</td>
+                      <td className={`${registryTableCell} text-xs text-gray-400 font-mono`}>{c.tomador?.documento_tomador ?? "—"}</td>
+                      <td className={`${registryTableCell} text-sm text-[#99c9ff]`}>
+                        {formatCop(c.resultado?.prima ?? c.resultado?.prima_anual)}
+                        {c.resultado?.aseguradora && <span className="text-xs text-gray-500 ml-1.5">· {c.resultado.aseguradora}</span>}
+                      </td>
+                      <td className={`${registryTableCell} text-xs text-gray-500`}>{formatDateTime(c.updatedAt)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </RegistryTableLayout>
       </div>
-    </ChannelListPage>
+    </div>
   );
 }

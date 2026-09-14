@@ -1,17 +1,16 @@
 "use client";
 
 import { Suspense, use, useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { FileEdit, Loader2, Plus, ShieldCheck, X } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { btnGhost, btnPrimary, modalInput } from "@/lib/brand-ui";
 import { CrmDetailLayout } from "@/components/crm/CrmDetailLayout";
-import { OriIcon } from "@/components/icons/OriIcon";
+import { OriAnimatedIcon } from "@/components/icons/OriAnimatedIcon";
 import { PlateBadge } from "@/components/crm/PlateBadge";
 import { RamoCampoInput, type RamoCampo } from "@/components/crm/RamoCampoInput";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
-import { OriChatPanel } from "@/components/ori/OriChatPanel";
 import type { QuoteResultPeriodicidad } from "@/lib/insurers/quote-requests-db";
-import type { QuoteResultPreview } from "@/types/ori";
 
 interface QuoteDetail {
   id: string;
@@ -68,11 +67,12 @@ function emptyDraft(): ResultadoDraft {
 }
 
 function SolicitudFichaContent({ quoteId }: { quoteId: string }) {
+  const router = useRouter();
   const [guidance, setGuidance] = useState<Guidance | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [redirecting, setRedirecting] = useState(false);
-  const [accion, setAccion] = useState<"manual" | "ori" | null>(null);
+  const [accion, setAccion] = useState<"manual" | null>(null);
   const [resultado, setResultado] = useState<ResultadoDraft>(emptyDraft());
   const [nuevaCaracteristica, setNuevaCaracteristica] = useState("");
   const [saving, setSaving] = useState(false);
@@ -136,18 +136,8 @@ function SolicitudFichaContent({ quoteId }: { quoteId: string }) {
     setResultado(r => ({ ...r, incluye: r.incluye.filter((_, idx) => idx !== i) }));
   }
 
-  function applyPreview(preview: QuoteResultPreview) {
-    setResultado(r => ({
-      ...r,
-      aseguradora: preview.aseguradora,
-      nombre_plan: preview.nombre_plan ?? r.nombre_plan,
-      descripcion: preview.descripcion ?? r.descripcion,
-      periodicidad: preview.periodicidad,
-      precio_mensual: preview.precio_mensual != null ? String(preview.precio_mensual) : r.precio_mensual,
-      precio_anual: preview.precio_anual != null ? String(preview.precio_anual) : r.precio_anual,
-      incluye: preview.incluye && preview.incluye.length > 0 ? preview.incluye : r.incluye,
-      beneficios: preview.beneficios && preview.beneficios.length > 0 ? preview.beneficios.join("\n") : r.beneficios
-    }));
+  function handleCotizarConOri() {
+    router.push(`/dashboard/ori?quote_id=${quoteId}`);
   }
 
   async function guardarResultado() {
@@ -277,13 +267,9 @@ function SolicitudFichaContent({ quoteId }: { quoteId: string }) {
                   </div>
                   <span className="text-[11px] text-gray-400">Cotización manual</span>
                 </button>
-                <button type="button" onClick={() => setAccion(accion === "ori" ? null : "ori")} className="flex flex-col items-center gap-1.5">
-                  <div
-                    className={`w-11 h-11 rounded-full flex items-center justify-center bg-gradient-to-br from-[#0f7eff] to-[#3392ff] transition-opacity ${
-                      accion === "ori" ? "opacity-100 ring-2 ring-white/30" : "opacity-90 hover:opacity-100"
-                    }`}
-                  >
-                    <OriIcon className="w-5 h-5 text-white" />
+                <button type="button" onClick={handleCotizarConOri} className="flex flex-col items-center gap-1.5">
+                  <div className="w-11 h-11 rounded-full flex items-center justify-center bg-gradient-to-br from-[#0f7eff] to-[#3392ff] opacity-90 hover:opacity-100 transition-opacity">
+                    <OriAnimatedIcon state="idle" variant="solid" className="w-5 h-5" />
                   </div>
                   <span className="text-[11px] text-gray-400">Cotizar con ORI</span>
                 </button>
@@ -291,9 +277,7 @@ function SolicitudFichaContent({ quoteId }: { quoteId: string }) {
             )}
           </div>
 
-          {accion === "ori" && <OriChatPanel quoteId={quoteId} onUseQuotePreview={applyPreview} />}
-
-          {(accion === "manual" || accion === "ori") && (
+          {accion === "manual" && (
             <div className="rounded-2xl border border-white/[.08] bg-white/[.02] p-5">
               <p className="text-sm font-semibold text-white mb-4">Resultado de la cotización</p>
               <div className="space-y-4">

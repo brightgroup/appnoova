@@ -12,10 +12,12 @@ interface OriAnimatedIconProps extends SVGProps<SVGSVGElement> {
   /** "idle" = mirada errante + parpadeo suave. "thinking" = escaneo rápido + respiración — mientras Ori genera una respuesta. */
   state?: OriIconState;
   /**
-   * "solid" = ojos rellenos (según tema, ver .ori-eye-fill en globals.css) — para usar solo donde el ícono
-   * vive sobre un fondo azul fijo propio (insignia del chat, botón "Cotizar con ORI").
-   * "hole" = ojos como hueco transparente que toma el color de lo que haya detrás — para el ícono monocromo
-   * del menú lateral, que no tiene fondo propio y cambia de blanco a negro según tema.
+   * "solid" = aro siempre azul (#0f7eff, fijo — no depende de className ni de clases de color del padre) con
+   * ojos rellenos según tema (.ori-eye-fill en globals.css) — para usar donde el ícono va suelto (dentro del
+   * chat, junto al texto de "pensando") o sobre una insignia propia; el azul del aro nunca se pierde detrás
+   * de reglas de tema claro/oscuro del contenedor.
+   * "hole" = hereda currentColor y los ojos son un hueco transparente que toma el color de lo que haya
+   * detrás — exclusivo del ícono monocromo del menú lateral, que cambia de blanco a negro según tema.
    */
   variant?: OriIconVariant;
 }
@@ -45,7 +47,10 @@ export function OriAnimatedIcon({ state = "idle", variant = "solid", ...props }:
           {eyes}
         </mask>
       )}
-      <g fill="currentColor" mask={variant === "hole" ? `url(#${maskId})` : undefined}>
+      <g
+        fill={variant === "solid" ? "#0f7eff" : "currentColor"}
+        mask={variant === "hole" ? `url(#${maskId})` : undefined}
+      >
         <path fillRule="evenodd" d={RING_PATH} />
         <rect x="10" y="94" width="17" height="40" rx="8.5" />
         <rect x="173" y="94" width="17" height="40" rx="8.5" />

@@ -203,8 +203,8 @@ export default function OriCopilotoPage() {
       {/* Header Ori */}
       <div className="relative z-10 shrink-0 flex items-center justify-between px-8 py-4">
         <div className="flex items-center gap-3">
-          <div className="nv-ori-icon w-9 h-9 rounded-xl bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shadow-lg shadow-[#0f7eff]/30">
-            <OriAnimatedIcon state="idle" variant="solid" className="w-5 h-5 text-white nv-ori-icon-glyph" />
+          <div className="nv-ori-icon w-9 h-9 rounded-full bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shadow-lg shadow-[#0f7eff]/30">
+            <OriAnimatedIcon state="idle" variant="solid" className="w-5 h-5" />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[15px] font-semibold tracking-tight text-white nv-ori-title">Ori</span>
@@ -266,10 +266,8 @@ export default function OriCopilotoPage() {
                 </div>
               ))}
               {loading && (
-                <div className="flex justify-start items-center gap-3 py-1">
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shrink-0">
-                    <OriAnimatedIcon state="thinking" variant="solid" className="w-4 h-4 text-white" />
-                  </div>
+                <div className="flex justify-start items-center gap-2.5 py-1">
+                  <OriAnimatedIcon state="thinking" variant="solid" className="w-6 h-6 shrink-0" />
                   <OriThinkingStatus />
                 </div>
               )}

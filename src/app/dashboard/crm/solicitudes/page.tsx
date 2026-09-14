@@ -11,13 +11,14 @@ import {
   HeartPulse,
   Home,
   Loader2,
+  Plus,
   RotateCcw,
   Search,
   ShieldCheck
 } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import {
-  btnGhost, btnFilterGroup, btnFilterActive, btnFilterIdle,
+  btnGhost, btnPrimary, btnFilterGroup, btnFilterActive, btnFilterIdle,
   registryPage, registryToolbar, registryTable,
   registryTableHead, registryTableHeadRow, registryTableHeadCell, registryTableCell,
   registryTableRowClickable, registryTableCellFirst, registryTableEmpty, registryTableLoading,
@@ -260,6 +261,9 @@ export default function SolicitudesPage() {
               </div>
               <div className="flex items-center gap-2 ml-auto shrink-0">
                 <ExportMenu filename="solicitudes" sheetName="Solicitudes" columns={exportColumns} rows={filtered} />
+                <Link href="/dashboard/crm/solicitudes/nueva" className={`${btnPrimary} !text-xs gap-1.5`}>
+                  <Plus className="w-3.5 h-3.5" /> Nueva solicitud
+                </Link>
               </div>
             </div>
           }

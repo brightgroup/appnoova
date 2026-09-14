@@ -203,7 +203,7 @@ export default function Dashboard() {
                   <div className={promoCard}>
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shrink-0">
-                        <OriAnimatedIcon state="idle" variant="solid" className="nv-icon-on-accent w-5 h-5 text-white" />
+                        <OriAnimatedIcon state="idle" variant="solid" className="w-5 h-5" />
                       </div>
                       <p className="nv-promo-title text-base font-bold">Pro Tip</p>
                     </div>
