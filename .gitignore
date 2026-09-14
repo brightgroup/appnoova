@@ -28,6 +28,9 @@ npm-debug.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Legal / business documents (no subir a repos compartidos)
+docs/legal/
 next-env.d.ts
 
 # Backups

@@ -405,8 +405,20 @@ pesos para reportes internos.
 - [ ] Migrar WhatsApp de Twilio → 360dialog Partner (~10–15 clientes activos pagando)
 - [x] Revisar precio WhatsApp con IA ($60 → $72,11 en `billing_unit_prices`, ya ajustado)
 - [x] Implementar wallet/créditos en base de datos (migración 041 — créditos mensuales no acumulables, medición en tiempo real, suspensión automática)
-- [ ] Conectar pasarela de pago (hoy el pago se marca manual desde /admin/billing)
-- [ ] Definir cobro en COP vs USD en pasarela de pago
+- [x] Conectar pasarela de pago (Paddle en USD desde migración 084; **Bold en USD** desde
+      migración 144 — riel principal para clientes en Colombia, ver §14)
+- [x] Definir cobro en COP vs USD en pasarela de pago (**todo se cobra en USD** — Bold, riel
+      principal, cobra en USD multidivisa y liquida en COP a la cuenta bancaria automáticamente;
+      Paddle, riel secundario, cobra y liquida directo en USD)
+- [x] Registrar la URL del webhook Bold (`/api/billing/bold/webhook`) en el Panel de
+      Comercios → Integraciones → Webhooks (14 sep 2026, ver §14)
+- [x] Activar llaves Bold **live** — la cuenta de producción de Bold ya está verificada
+      (confirmado 14 sep 2026 con un link real de $1 USD). Activo en local (`.env.local`);
+      **falta replicar en Coolify** `BOLD_ENV=live` + `BOLD_API_KEY`/`BOLD_WEBHOOK_SECRET`
+      (valores de producción) para que el deploy real cobre en real (ver §14).
+- [ ] Automatizar el link de pago Bold en la factura que genera el cron mensual (hoy el
+      cliente lo genera él mismo desde /dashboard/facturacion con el botón "Pagar con Bold";
+      falta que el cron cree el link de una vez y opcionalmente lo envíe por email/WhatsApp)
 - [ ] **Reajustar `monthly_credits` de Crecimiento y Escala.** Esencial y Básico ya se
       recalcularon a una TRM ~$3.333 (créditos/USD), pero Crecimiento (ratio ~$4.220) y
       Escala (ratio ~$4.526) siguen con el cupo calculado a la TRM de lanzamiento — les
@@ -416,10 +428,80 @@ pesos para reportes internos.
 
 ---
 
-## 14. Changelog
+## 14. Pasarelas de pago: Bold (USD, principal) y Paddle (USD, secundaria)
+
+Todos los clientes actuales están en Colombia, así que **Bold es el riel principal**
+(migración 144) y **Paddle queda como riel secundario** (migración 084) para clientes que
+paguen desde fuera de Colombia. `organization_subscriptions.billing_provider` distingue
+`'manual' | 'paddle' | 'bold'`. **Todo se cobra en USD** — el precio que ve el cliente en
+`/dashboard/facturacion` es siempre en dólares, igual que en Paddle; no se convierte a pesos
+para el cobro.
+
+**Cómo cobra Bold en USD siendo un procesador colombiano:** Bold tiene un producto
+"Link de pago multimoneda" — el link se crea con `amount.currency = "USD"`, el pagador ve y
+paga el monto en dólares con su tarjeta, y Bold se encarga de convertir y **liquidar en pesos
+colombianos a la cuenta bancaria del comercio automáticamente** (a la tasa de Bold del
+momento), sin que nosotros tengamos que calcular ni tocar la TRM para el cobro. Si la tarjeta
+del pagador no admite pagos en USD, Bold hace el fallback a COP por su cuenta (no es algo que
+controlemos) — en ese caso el webhook llega con `amount.currency = "COP"` y usamos el USD ya
+cotizado en `bold_payment_requests` como referencia contable. Ver
+`resolveChargedAmounts()` en `apply-completed-payment.ts`.
+
+**Diferencia clave con Paddle:** Bold no tiene motor de suscripciones recurrentes (no cobra
+solo a una tarjeta guardada cada mes como sí hace Paddle). El modelo es **link de pago por
+factura/periodo**: el cliente hace clic en "Pagar con Bold" en `/dashboard/facturacion`
+(banner de factura pendiente, fila de la tabla de facturas, o al elegir/cambiar de plan), se
+genera un link de pago de monto cerrado en USD (tarjeta, PSE, Nequi o Botón Bancolombia) y se
+abre en una pestaña nueva; el front hace polling corto contra `bold_payment_requests.status`
+mientras el cliente paga. El webhook de Bold (`SALE_APPROVED`) confirma el pago server-side y
+llama a `billing_record_bold_payment` (equivalente a `billing_record_paddle_payment`).
+
+**Sin cobro automático recurrente (ni con Bold ni sin tarjeta guardada):** Bold no ofrece un
+endpoint de "cobrar de nuevo con la tarjeta ya usada" para el modelo de Link de pagos/Botón de
+pagos. Su FAQ oficial lo confirma: la única forma de automatizar cobros recurrentes sería
+usando su API de Pagos en Línea (PCI DSS a cargo del comercio, capturando y almacenando
+nosotros mismos los datos de tarjeta) — no vale la pena el esfuerzo/riesgo de certificación
+PCI para esto. Por eso la plataforma sigue funcionando **sin perseguir al cliente**: el cron
+mensual (`billing_run_renewals`, migraciones 118/119) ya marca facturas vencidas y **suspende
+automáticamente** la cuenta (org + suscripción) en cuanto pasa la fecha límite, sin esperar más
+gracia. Y en cuanto llega el webhook de un pago (Bold o Paddle), `billing_record_bold_payment` /
+`billing_record_paddle_payment` **reactivan automáticamente** cualquier organización
+`suspended`. Lo único que falta (no implementado aún) es un email/WhatsApp proactivo avisando
+"tu factura está vencida" o "tu cuenta fue suspendida" antes/al momento de bloquear — hoy solo
+se notifica por email cuando el pago SÍ se registra (`notify-bold-payment.ts` /
+`notify-paddle-payment.ts`), no antes.
+
+**Piezas:**
+- `src/lib/billing/bold/client.ts` — cliente de la API Link de pagos de Bold.
+- `src/lib/billing/bold/webhook-verify.ts` — verifica `x-bold-signature` (HMAC-SHA256).
+- `src/lib/billing/bold/apply-completed-payment.ts` — resuelve el pago vía
+  `bold_payment_requests` (creada ANTES de generar el link, con `reference` = su propio id —
+  Bold solo soporta un `metadata` de un solo par clave/valor, a diferencia de Paddle).
+- `src/app/api/billing/bold/{checkout,credits/checkout,webhook,status}/route.ts`.
+- `src/components/billing/BoldCheckoutButton.tsx` — botón + hook `useBoldCheckout` con
+  polling (no hay overlay/evento de "completado" como en Paddle.js: es una redirección a
+  checkout.bold.co).
+- Migración `144_bold_billing.sql` — `billing_invoices.bold_transaction_id`,
+  `bold_payment_requests`, `bold_unmatched_events`, función `billing_record_bold_payment`.
+
+**Llaves — ¡ojo con la pestaña!** El Panel de Comercios de Bold tiene llaves *separadas por
+producto* en Integraciones → Llaves de integración: "Botón de pagos", "API datáfono" y **"API
+pagos en línea"**. El Link de pagos (`/online/link/v1`, lo que usamos) vive bajo **"API pagos
+en línea"** — las llaves de las otras dos pestañas dan `403 explicit deny` contra ese endpoint
+aunque parezcan válidas. `BOLD_ENV`, `BOLD_API_KEY`/`BOLD_WEBHOOK_SECRET` (sandbox, activas,
+verificadas 14 sep 2026 con un link de prueba real de $20 USD) y
+`BOLD_API_KEY_LIVE`/`BOLD_WEBHOOK_SECRET_LIVE` (producción, guardadas pero **Bold aún no
+verifica esa cuenta** — no activar `BOLD_ENV=live` hasta que la aprueben) — ambos pares
+tomados de la pestaña "API pagos en línea". El webhook (`/api/billing/bold/webhook`) ya está
+registrado en Panel de Comercios → Integraciones → Webhooks (eventos `SALE_APPROVED` y
+`SALE_REJECTED`); es uno solo para toda la cuenta — el payload trae `is_sandbox` para
+distinguir pruebas de ventas reales, no hace falta un webhook separado por ambiente.
+
+## 15. Changelog
 
 | Fecha | Cambio |
 |-------|--------|
 | Jun 2026 | Documento inicial. WA Fase 0 Twilio. WhatsApp IA a $60 (lanzamiento). Planes $0 / $82 / $345 / $815 USD. |
 | Jun 2026 | Sistema de consumo/facturación (migración 041): planes en BD, billetera de créditos mensual no acumulable, ledger `usage_events` con costo real vs cobro, facturas + suspensión automática, panel cliente (/dashboard/facturacion) y panel proveedor (/admin/billing). IDs de plan: explorador/esencial/crecimiento/escala. |
 | 22 ago 2026 | Corregido: la TRM de referencia ($4.200) estaba desactualizada — el sistema sincroniza la TRM oficial automáticamente (`syncOfficialTrm`, cada hora, fuente `datos.gov.co`) y ya no es un valor fijo. Actualizados créditos por plan, precios por acción y tabla de márgenes con los valores en vivo (TRM $3.048,12). Detectado: Crecimiento/Escala no se han reajustado desde el lanzamiento (pendiente en §13). |
+| 14 sep 2026 | Integrado **Bold** como riel de pago principal en USD (migración 144, link de pago multimoneda de Bold — cobra en dólares y liquida en pesos automáticamente) — botón "Pagar con Bold" en `/dashboard/facturacion` para plan/factura pendiente/recarga de créditos, vía link de pago (tarjeta, PSE, Nequi, Botón Bancolombia) y webhook `SALE_APPROVED`/`SALE_REJECTED`. Paddle queda como riel secundario, también en USD. Webhook registrado en el Panel de Comercios Bold. Detectado y corregido: las llaves debían ser las de la pestaña "API pagos en línea", no "Botón de pagos". Cuenta de producción de Bold confirmada verificada/activa — **`BOLD_ENV=live` activado**. Agregadas notificaciones proactivas por email: factura vencida (orgs protegidas), cuenta suspendida (con reactivación automática al pagar) y pago Bold rechazado (ver §14 y `notify-billing-status.ts`). |

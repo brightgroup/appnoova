@@ -3,6 +3,7 @@ import { requireSuperAdmin } from "@/lib/admin-server";
 import { adminClient } from "@/lib/voice-agents-server";
 import { suspendWhatsAppForSuspendedOrganizations } from "@/lib/whatsapp/billing-lifecycle";
 import { syncOfficialTrm } from "@/lib/billing/trm-colombia";
+import { notifyNewBillingTransitions } from "@/lib/email/notify-billing-status";
 
 /**
  * Job de facturación (ejecutar 1 vez al día por cron):
@@ -39,6 +40,7 @@ async function run(req: NextRequest) {
     console.error("[cron/billing] trm sync:", err);
   }
 
+  const runStartedAt = new Date().toISOString();
   const { data, error } = await db.rpc("billing_run_renewals");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -49,7 +51,14 @@ async function run(req: NextRequest) {
     console.error("[cron/billing] whatsapp suspend:", err);
   }
 
-  return NextResponse.json({ ok: true, result: data, whatsapp, trm });
+  let notifications: Awaited<ReturnType<typeof notifyNewBillingTransitions>> = { suspended: 0, pastDue: 0 };
+  try {
+    notifications = await notifyNewBillingTransitions(db, runStartedAt);
+  } catch (err) {
+    console.error("[cron/billing] notificaciones de mora/suspensión:", err);
+  }
+
+  return NextResponse.json({ ok: true, result: data, whatsapp, notifications, trm });
 }
 
 export async function POST(req: NextRequest) {

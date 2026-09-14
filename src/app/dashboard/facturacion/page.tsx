@@ -20,6 +20,7 @@ import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { usePricingCatalog } from "@/hooks/usePricingCatalog";
 import { PaddleCheckoutButton, usePaddleCheckout } from "@/components/billing/PaddleCheckoutButton";
+import { BoldCheckoutButton, useBoldCheckout } from "@/components/billing/BoldCheckoutButton";
 import { openInvoicePdf } from "@/lib/billing/open-invoice-pdf";
 import { CardBrandIcon } from "@/components/billing/CardBrandIcon";
 import type { PlanPromoDisplay } from "@/lib/billing/plan-promo";
@@ -189,6 +190,15 @@ export default function FacturacionPage() {
   const [buyPackageId, setBuyPackageId] = useState<string | null>(null);
   const { openCheckout: openCreditsCheckout, loading: buyingCredits, error: buyCreditsError } = usePaddleCheckout();
   const { openCheckout: openPlanCheckout, loading: payingPlan } = usePaddleCheckout();
+  const { openCheckout: openBoldPlanCheckout, loading: payingBoldPlanRaw, polling: payingBoldPlanPolling } = useBoldCheckout();
+  const payingBoldPlan = payingBoldPlanRaw || payingBoldPlanPolling;
+  const {
+    openCheckout: openBoldCreditsCheckout,
+    loading: buyingBoldCreditsRaw,
+    polling: buyingBoldCreditsPolling,
+    error: buyBoldCreditsError,
+  } = useBoldCheckout();
+  const buyingBoldCredits = buyingBoldCreditsRaw || buyingBoldCreditsPolling;
   const [data, setData]       = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
@@ -514,15 +524,28 @@ export default function FacturacionPage() {
                     <div className="shrink-0 flex items-center gap-2">
                       {sub?.billing_provider !== "paddle" && sub?.plan_id && (
                         <button
+                          onClick={() => openBoldPlanCheckout(
+                            "/api/billing/bold/checkout",
+                            { plan_id: sub.plan_id },
+                            () => void load()
+                          )}
+                          disabled={payingBoldPlan}
+                          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[var(--nv-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                        >
+                          {payingBoldPlan ? "Abriendo…" : "Pagar con Bold"}
+                        </button>
+                      )}
+                      {sub?.billing_provider !== "paddle" && sub?.plan_id && (
+                        <button
                           onClick={() => openPlanCheckout(
                             "/api/billing/paddle/checkout",
                             { plan_id: sub.plan_id },
                             () => void load()
                           )}
                           disabled={payingPlan}
-                          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[var(--nv-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                          className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-white/20 text-gray-200 hover:bg-white/10 transition-colors disabled:opacity-50"
                         >
-                          {payingPlan ? "Abriendo…" : "Pagar ahora"}
+                          {payingPlan ? "Abriendo…" : "Pagar en USD"}
                         </button>
                       )}
                       <button
@@ -876,17 +899,30 @@ export default function FacturacionPage() {
                                   {(inv.status === "pending" || inv.status === "overdue") &&
                                     sub?.billing_provider !== "paddle" &&
                                     inv.plan_id === sub?.plan_id && (
-                                      <button
-                                        onClick={() => openPlanCheckout(
-                                          "/api/billing/paddle/checkout",
-                                          { plan_id: sub!.plan_id },
-                                          () => void load()
-                                        )}
-                                        disabled={payingPlan}
-                                        className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-[var(--nv-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
-                                      >
-                                        {payingPlan ? "Abriendo…" : "Pagar"}
-                                      </button>
+                                      <>
+                                        <button
+                                          onClick={() => openBoldPlanCheckout(
+                                            "/api/billing/bold/checkout",
+                                            { plan_id: sub!.plan_id },
+                                            () => void load()
+                                          )}
+                                          disabled={payingBoldPlan}
+                                          className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-[var(--nv-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                                        >
+                                          {payingBoldPlan ? "Abriendo…" : "Pagar con Bold"}
+                                        </button>
+                                        <button
+                                          onClick={() => openPlanCheckout(
+                                            "/api/billing/paddle/checkout",
+                                            { plan_id: sub!.plan_id },
+                                            () => void load()
+                                          )}
+                                          disabled={payingPlan}
+                                          className="text-[11px] font-semibold px-2.5 py-1 rounded-md border border-white/15 hover:bg-white/10 transition-colors disabled:opacity-50"
+                                        >
+                                          {payingPlan ? "Abriendo…" : "USD"}
+                                        </button>
+                                      </>
                                   )}
                                   {inv.paddle_transaction_id && inv.status === "paid" ? (
                                     <>
@@ -1151,8 +1187,9 @@ export default function FacturacionPage() {
                   )}
 
                   {buyCreditsError && <p className="text-xs text-red-400">{buyCreditsError}</p>}
+                  {buyBoldCreditsError && <p className="text-xs text-red-400">{buyBoldCreditsError}</p>}
                   <p className="text-[11px] text-[var(--nv-text-faint)]">
-                    Se cobra a tu tarjeta al confirmar el pago.
+                    Bold: tarjeta, PSE, Nequi o Botón Bancolombia en COP. Tarjeta: pago internacional en USD.
                   </p>
                   <div className="flex justify-end gap-2 pt-2">
                     <button
@@ -1169,10 +1206,23 @@ export default function FacturacionPage() {
                           void load();
                         });
                       }}
-                      disabled={buyingCredits || !buyPackageId}
+                      disabled={buyingCredits || buyingBoldCredits || !buyPackageId}
+                      className="px-4 py-2 rounded-lg text-sm font-medium border border-white/20 text-gray-200 hover:bg-white/10 transition-colors disabled:opacity-50"
+                    >
+                      {buyingCredits ? "Abriendo…" : "Comprar en USD"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!buyPackageId) return;
+                        void openBoldCreditsCheckout("/api/billing/bold/credits/checkout", { package_id: buyPackageId }, () => {
+                          setShowBuyCredits(false);
+                          void load();
+                        });
+                      }}
+                      disabled={buyingCredits || buyingBoldCredits || !buyPackageId}
                       className={`${btnPrimary} disabled:opacity-50`}
                     >
-                      {buyingCredits ? "Abriendo…" : "Comprar ahora"}
+                      {buyingBoldCredits ? (buyingBoldCreditsPolling ? "Esperando…" : "Abriendo…") : "Comprar con Bold"}
                     </button>
                   </div>
                 </div>
@@ -1334,12 +1384,17 @@ export default function FacturacionPage() {
                             !== 'paddle') — si no, un cliente en modo manual no tiene ninguna
                             forma de pagar su plan actual desde el panel. */}
                         {p.price_usd > 0 && (!isActive || sub?.billing_provider !== "paddle") && (
-                          <div className="px-5 pb-5">
+                          <div className="px-5 pb-5 space-y-1.5">
+                            <BoldCheckoutButton
+                              planId={p.id}
+                              planName={p.name}
+                              onCheckoutCompleted={() => { void load(); setShowPlanPicker(false); }}
+                            />
                             <PaddleCheckoutButton
-                            planId={p.id}
-                            planName={p.name}
-                            onCheckoutCompleted={() => { void load(); setShowPlanPicker(false); }}
-                          />
+                              planId={p.id}
+                              planName={p.name}
+                              onCheckoutCompleted={() => { void load(); setShowPlanPicker(false); }}
+                            />
                           </div>
                         )}
                       </div>
