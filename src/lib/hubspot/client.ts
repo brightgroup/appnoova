@@ -24,7 +24,22 @@ export class HubspotApiError extends Error {
   }
 }
 
-/** Llamada autenticada genérica a la API de HubSpot. Ante una respuesta no-ok marca la conexión en error y lanza. */
+/**
+ * Un 403 "acotado": HubSpot lo devuelve cuando el actor puntual de la llamada (ej. el usuario
+ * configurado como remitente en `action.hubspot_send_message`) no tiene acceso a un recurso
+ * puntual (una bandeja/hilo concreto) — NO significa que el token de la Private App esté mal.
+ * Pasó exactamente esto con Newbody: le quitaron a un usuario el acceso a una sola bandeja (de
+ * las ~20 que escucha el trigger) y eso marcó TODA la conexión de la organización en error,
+ * cortando la creación de contactos y el saludo para las otras 19 bandejas también. La API de
+ * Conversations no manda un `category` distinto para este caso, así que se detecta por texto.
+ */
+function isScopedPermissionError(message: string): boolean {
+  return /does not have access to (the )?(inbox|conversation|thread)/i.test(message);
+}
+
+/** Llamada autenticada genérica a la API de HubSpot. Ante una respuesta no-ok marca la conexión en error y lanza —
+ * salvo que sea un 403 acotado a un actor/recurso puntual (ver `isScopedPermissionError`), donde solo se lanza
+ * para que el paso puntual falle y quede en el log de Ejecuciones, sin apagar el resto de la organización. */
 export async function hubspotFetch(
   db: SupabaseClient,
   conn: HubspotConnectionSecrets,
@@ -50,9 +65,12 @@ export async function hubspotFetch(
     } catch {
       // Respuesta no-JSON (ej. HTML de un 502) — se usa el mensaje genérico.
     }
-    // 401/403 casi siempre significa token revocado/scopes insuficientes — vale la pena marcar
-    // la conexión en error para que la UI avise, distinto de un 404/429 puntual de un solo recurso.
-    if (res.status === 401 || res.status === 403) {
+    // 401 siempre, y 403 casi siempre, significa token revocado/scopes insuficientes del propio
+    // Private App — vale la pena marcar la conexión en error para que la UI avise, distinto de un
+    // 404/429 puntual de un solo recurso. La excepción es el 403 "acotado" (ver
+    // `isScopedPermissionError`): ese es un problema de permisos de un actor sobre un recurso
+    // puntual, no del token, y no debe tumbar la conexión completa de la organización.
+    if (res.status === 401 || (res.status === 403 && !isScopedPermissionError(message))) {
       await markHubspotConnectionError(db, conn, message).catch(() => {});
     }
     throw new HubspotApiError(message, res.status);
