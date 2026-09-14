@@ -15,42 +15,79 @@ import {
   MapPin,
   Layers,
   Send,
-  Clock
+  Clock,
+  Gauge,
+  FileCheck2,
+  Globe2,
+  Bike,
+  Activity,
+  ListChecks
 } from "lucide-react";
 
-type Ramo = "autos" | "vida" | "hogar";
+type Ramo = "autos" | "vida" | "hogar" | "motos" | "soat" | "accidentes_personales";
 type IconType = React.ComponentType<{ className?: string }>;
 
 const FIELD_LABELS: Record<string, string> = {
   nombre_tomador: "Nombre completo",
   documento_tomador: "Número de documento",
   fecha_nacimiento_tomador: "Fecha de nacimiento",
+  nuevo_o_usado: "¿Nuevo o usado?",
+  uso_vehiculo: "Uso del vehículo",
+  importacion_directa: "¿Importación directa?",
+  tarjeta_propiedad: "Tarjeta de propiedad",
+  ciudad: "Ciudad",
   ocupacion: "Ocupación",
   suma_asegurada_deseada: "Suma asegurada deseada",
   fumador: "¿Fuma?",
   direccion_inmueble: "Dirección del inmueble",
   tipo_inmueble: "Tipo de inmueble",
   estrato: "Estrato",
-  valor_aproximado_inmueble: "Valor aproximado del inmueble"
+  valor_aproximado_inmueble: "Valor aproximado del inmueble",
+  vigilancia_seguridad: "¿Vigilancia o seguridad?",
+  tipo_cobertura: "Tipo de cobertura",
+  presupuesto_mensual: "Presupuesto mensual",
+  interes_ahorro: "¿Interés en fondo de ahorro?",
+  motor_ultimos_digitos: "Últimos dígitos del motor",
+  proteccion_deseada: "Protección deseada",
+  tipo_poliza: "Individual o colectiva",
+  valor_cobertura: "Valor de cobertura",
+  ya_tiene_seguro: "¿Ya tiene un seguro similar?"
 };
 
 const FIELD_ICONS: Record<string, IconType> = {
   nombre_tomador: User,
   documento_tomador: IdCard,
   fecha_nacimiento_tomador: Cake,
+  nuevo_o_usado: Gauge,
+  uso_vehiculo: Car,
+  importacion_directa: Globe2,
+  tarjeta_propiedad: FileCheck2,
+  ciudad: MapPin,
   ocupacion: Briefcase,
   suma_asegurada_deseada: Banknote,
   fumador: User,
   direccion_inmueble: MapPin,
   tipo_inmueble: Home,
   estrato: Layers,
-  valor_aproximado_inmueble: Banknote
+  valor_aproximado_inmueble: Banknote,
+  vigilancia_seguridad: ShieldCheck,
+  tipo_cobertura: ListChecks,
+  presupuesto_mensual: Banknote,
+  interes_ahorro: Banknote,
+  motor_ultimos_digitos: Gauge,
+  proteccion_deseada: ListChecks,
+  tipo_poliza: User,
+  valor_cobertura: Banknote,
+  ya_tiene_seguro: FileCheck2
 };
 
 const RAMO_CONFIG: Record<Ramo, { titulo: string; icon: IconType }> = {
   autos: { titulo: "Seguro de auto", icon: Car },
   vida: { titulo: "Seguro de vida", icon: HeartPulse },
-  hogar: { titulo: "Seguro de hogar", icon: Home }
+  hogar: { titulo: "Seguro de hogar", icon: Home },
+  motos: { titulo: "Seguro de moto", icon: Bike },
+  soat: { titulo: "SOAT", icon: Car },
+  accidentes_personales: { titulo: "Seguro de Accidentes Personales", icon: Activity }
 };
 
 interface AutoQuoteVehicle {
@@ -104,7 +141,7 @@ export function AutoQuoteCard({
   const HeaderIcon = config.icon;
 
   const vehiculoLine =
-    ramo === "autos" && result.vehiculo
+    (ramo === "autos" || ramo === "motos") && result.vehiculo
       ? [result.vehiculo.marca, result.vehiculo.linea].filter(Boolean).join(" ")
       : null;
   const headerLine = vehiculoLine || config.titulo;
@@ -121,7 +158,7 @@ export function AutoQuoteCard({
           </div>
           <div className="min-w-0">
             <p className="text-xs font-semibold text-white">{headerLine}</p>
-            {ramo === "autos" && result.vehiculo?.codigo_fasecolda && (
+            {(ramo === "autos" || ramo === "motos") && result.vehiculo?.codigo_fasecolda && (
               <p className="text-[10px] text-gray-500">Fasecolda {result.vehiculo.codigo_fasecolda}</p>
             )}
           </div>

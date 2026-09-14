@@ -15,9 +15,16 @@ export interface LifeQuoteInput {
   /** YYYY-MM-DD */
   fecha_nacimiento_tomador?: string;
   ocupacion?: string;
-  /** Suma asegurada deseada, aproximada, en COP. */
+  /** "Vida (muerte por cualquier causa)" | "Vida + Invalidez" | "Vida + Invalidez + Enfermedades Graves" | "Vida + Invalidez + Enfermedades + Renta diaria" | "No lo sé, asesórame" */
+  tipo_cobertura?: string;
+  /** Rango de valor de cobertura deseado (ver AUTO_ENUM... no, ver las 5 opciones en el prompt), no un número exacto. */
   suma_asegurada_deseada?: string;
+  /** Rango de presupuesto mensual aproximado. */
+  presupuesto_mensual?: string;
+  /** "Sí" | "No" — determina el riesgo/prima, por eso es obligatorio (igual que en el formulario de Figuro). */
   fumador?: string;
+  /** ¿Le interesa un fondo de ahorro con el seguro de vida? — opcional, cross-sell. */
+  interes_ahorro?: string;
 }
 
 export interface LifeQuoteResult {
@@ -37,11 +44,14 @@ export interface LifeQuoteOptions {
 }
 
 const REQUIRED_FIELDS = [
+  "tipo_cobertura",
+  "suma_asegurada_deseada",
+  "presupuesto_mensual",
+  "fumador",
   "nombre_tomador",
   "documento_tomador",
   "fecha_nacimiento_tomador",
-  "ocupacion",
-  "suma_asegurada_deseada"
+  "ocupacion"
 ] as const;
 
 export async function calificarSeguroVida(
@@ -62,8 +72,11 @@ export async function calificarSeguroVida(
 
   const datosRiesgo = {
     ocupacion: input.ocupacion!.trim(),
+    tipo_cobertura: input.tipo_cobertura!.trim(),
     suma_asegurada_deseada: input.suma_asegurada_deseada!.trim(),
-    fumador: input.fumador?.trim() || null
+    presupuesto_mensual: input.presupuesto_mensual!.trim(),
+    fumador: input.fumador!.trim(),
+    interes_ahorro: input.interes_ahorro?.trim() || null
   };
 
   const quoteRequest = await upsertPendingQuoteRequest(ctx.db, {

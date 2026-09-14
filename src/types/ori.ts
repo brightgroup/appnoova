@@ -47,12 +47,15 @@ export function toolTruncationCaption(call: OriToolCall): string | null {
   return `Mostrando ${mostrados} de ${total} — para el listado completo, revisa la tabla en ERP.`;
 }
 
-export type InsuranceQuoteRamo = "autos" | "vida" | "hogar";
+export type InsuranceQuoteRamo = "autos" | "vida" | "hogar" | "motos" | "soat" | "accidentes_personales";
 
 const INSURANCE_QUOTE_TOOL_RAMOS: Record<string, InsuranceQuoteRamo> = {
   cotizar_seguro_auto: "autos",
   cotizar_seguro_vida: "vida",
-  cotizar_seguro_hogar: "hogar"
+  cotizar_seguro_hogar: "hogar",
+  cotizar_seguro_moto: "motos",
+  cotizar_seguro_soat: "soat",
+  cotizar_seguro_accidentes: "accidentes_personales"
 };
 
 /** Resultado de cualquier tool de cotización de seguros (auto/vida/hogar, ver src/lib/insurers/*-quote-tool.ts) — mismo shape para ORI y agentes, distinguido por ramo. */

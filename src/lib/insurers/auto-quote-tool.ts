@@ -48,6 +48,16 @@ export interface AutoQuoteInput {
   documento_tomador?: string;
   /** YYYY-MM-DD */
   fecha_nacimiento_tomador?: string;
+  /** "Nuevo" | "Usado" */
+  nuevo_o_usado?: string;
+  /** "Particular" | "Servicio Público" | "Uber/Cabify o similares" */
+  uso_vehiculo?: string;
+  /** "No" | "Sí, es de importación directa" | "No estoy seguro" */
+  importacion_directa?: string;
+  /** "A mi nombre" | "En trámite de traspaso" | "A nombre de otra persona" */
+  tarjeta_propiedad?: string;
+  /** Ciudad donde circula el vehículo. */
+  ciudad?: string;
 }
 
 export type AutoQuoteVehicle = VehicleLookupResult;
@@ -79,6 +89,21 @@ export interface AutoQuoteOptions {
 }
 
 const REQUIRED_TOMADOR_FIELDS = ["nombre_tomador", "documento_tomador", "fecha_nacimiento_tomador"] as const;
+
+/**
+ * Preguntas de calificación de riesgo que ningún proveedor de datos por placa
+ * resuelve (marca/línea/año/valor comercial sí los trae PlacApi/Verifik, por
+ * eso no están aquí) — mismo esquema que usa Figuro para Autos, sin los
+ * campos que Noova ya puede inferir. Se piden ANTES que los datos del
+ * tomador, mismo orden que Figuro (todo el vehículo primero, la persona después).
+ */
+const REQUIRED_RIESGO_FIELDS = [
+  "nuevo_o_usado",
+  "uso_vehiculo",
+  "importacion_directa",
+  "tarjeta_propiedad",
+  "ciudad"
+] as const;
 
 /** Llama de verdad a la aseguradora conectada y devuelve la prima — usado tanto en modo autónomo como cuando el asesor solicita el precio manualmente desde la cola. */
 export async function ejecutarCotizacionReal(
@@ -186,6 +211,11 @@ export async function cotizarSeguroAuto(
     await logVehicleLookup(ctx.db, ctx.organizationId, contactKey, placa);
   }
 
+  const faltantesRiesgo = REQUIRED_RIESGO_FIELDS.filter((field) => !input[field]?.trim());
+  if (faltantesRiesgo.length > 0) {
+    return { ok: true, vehiculo, faltan_datos: faltantesRiesgo };
+  }
+
   const faltantes = REQUIRED_TOMADOR_FIELDS.filter((field) => !input[field]?.trim());
   if (faltantes.length > 0) {
     return { ok: true, vehiculo, faltan_datos: faltantes };
@@ -195,6 +225,14 @@ export async function cotizarSeguroAuto(
     nombre_tomador: input.nombre_tomador!.trim(),
     documento_tomador: input.documento_tomador!.trim(),
     fecha_nacimiento_tomador: input.fecha_nacimiento_tomador!.trim()
+  };
+
+  const datosRiesgo = {
+    nuevo_o_usado: input.nuevo_o_usado!.trim(),
+    uso_vehiculo: input.uso_vehiculo!.trim(),
+    importacion_directa: input.importacion_directa!.trim(),
+    tarjeta_propiedad: input.tarjeta_propiedad!.trim(),
+    ciudad: input.ciudad!.trim()
   };
 
   // Datos completos: siempre queda un registro en la cola, sea cual sea el
@@ -208,6 +246,7 @@ export async function cotizarSeguroAuto(
     source: options.source,
     placa,
     vehiculo: vehiculo as unknown as Record<string, unknown>,
+    datosRiesgo,
     tomador
   });
 

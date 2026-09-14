@@ -11,11 +11,13 @@ export interface HomeQuoteInput {
   nombre_tomador?: string;
   documento_tomador?: string;
   direccion_inmueble?: string;
-  /** "casa" | "apartamento" */
+  /** "Casa" | "Apartamento" | "Casa en condominio" | "Finca o casa campestre" */
   tipo_inmueble?: string;
   estrato?: string;
   /** Valor aproximado del inmueble, en COP. */
   valor_aproximado_inmueble?: string;
+  /** "Sí" | "No" — ¿el inmueble tiene vigilancia o sistemas de seguridad? */
+  vigilancia_seguridad?: string;
 }
 
 export interface HomeQuoteResult {
@@ -35,12 +37,13 @@ export interface HomeQuoteOptions {
 }
 
 const REQUIRED_FIELDS = [
-  "nombre_tomador",
-  "documento_tomador",
-  "direccion_inmueble",
   "tipo_inmueble",
+  "vigilancia_seguridad",
+  "direccion_inmueble",
   "estrato",
-  "valor_aproximado_inmueble"
+  "valor_aproximado_inmueble",
+  "nombre_tomador",
+  "documento_tomador"
 ] as const;
 
 export async function calificarSeguroHogar(
@@ -62,7 +65,8 @@ export async function calificarSeguroHogar(
     direccion_inmueble: input.direccion_inmueble!.trim(),
     tipo_inmueble: input.tipo_inmueble!.trim(),
     estrato: input.estrato!.trim(),
-    valor_aproximado_inmueble: input.valor_aproximado_inmueble!.trim()
+    valor_aproximado_inmueble: input.valor_aproximado_inmueble!.trim(),
+    vigilancia_seguridad: input.vigilancia_seguridad!.trim()
   };
 
   const quoteRequest = await upsertPendingQuoteRequest(ctx.db, {

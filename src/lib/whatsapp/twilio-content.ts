@@ -18,9 +18,13 @@ function authHeader(accountSid: string, authToken: string): string {
 
 async function twilioContentFetch<T>(
   path: string,
-  init?: RequestInit
+  init?: RequestInit,
+  overrideCreds?: { accountSid?: string | null; authToken?: string | null }
 ): Promise<T> {
-  const creds = twilioCredentials();
+  const creds =
+    overrideCreds?.accountSid && overrideCreds?.authToken
+      ? { accountSid: overrideCreds.accountSid, authToken: overrideCreds.authToken }
+      : twilioCredentials();
   if (!creds) {
     throw new Error("Twilio no configurado (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN)");
   }
@@ -84,6 +88,16 @@ export interface CreateTwilioQuickReplyInput {
   body: string;
   /** Máximo 3 — límite de WhatsApp para mensajes de sesión (sin aprobación de plantilla). */
   actions: { id: string; title: string }[];
+  /**
+   * Credenciales de la SUBCUENTA de Twilio del canal que va a enviar este
+   * Content — obligatorio pasarlas si el canal tiene subcuenta propia (ver
+   * embedded-signup-provision.ts). Un Content creado con las credenciales
+   * master y enviado luego con las de una subcuenta falla en Twilio: los
+   * recursos de Content API no se comparten entre cuenta padre y subcuentas.
+   * Si se omiten, cae a las credenciales master (TWILIO_ACCOUNT_SID/TOKEN).
+   */
+  accountSid?: string | null;
+  authToken?: string | null;
 }
 
 /**
@@ -97,19 +111,23 @@ export interface CreateTwilioQuickReplyInput {
 export async function createTwilioQuickReplyContent(
   input: CreateTwilioQuickReplyInput
 ): Promise<TwilioContentResult> {
-  const json = await twilioContentFetch<{ sid: string }>("/Content", {
-    method: "POST",
-    body: JSON.stringify({
-      friendly_name: input.friendlyName,
-      language: input.language,
-      types: {
-        "twilio/quick-reply": {
-          body: input.body,
-          actions: input.actions
+  const json = await twilioContentFetch<{ sid: string }>(
+    "/Content",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        friendly_name: input.friendlyName,
+        language: input.language,
+        types: {
+          "twilio/quick-reply": {
+            body: input.body,
+            actions: input.actions
+          }
         }
-      }
-    })
-  });
+      })
+    },
+    { accountSid: input.accountSid, authToken: input.authToken }
+  );
   return { sid: String(json.sid) };
 }
 
@@ -120,26 +138,33 @@ export interface CreateTwilioListPickerInput {
   button: string;
   /** Máximo 10 — límite de WhatsApp. */
   items: { id: string; item: string; description?: string }[];
+  /** Ver nota de credenciales en CreateTwilioQuickReplyInput — mismo requisito. */
+  accountSid?: string | null;
+  authToken?: string | null;
 }
 
 /** Crea un Content de tipo `twilio/list-picker` (lista de hasta 10 opciones) — mismas reglas que quick-reply. */
 export async function createTwilioListPickerContent(
   input: CreateTwilioListPickerInput
 ): Promise<TwilioContentResult> {
-  const json = await twilioContentFetch<{ sid: string }>("/Content", {
-    method: "POST",
-    body: JSON.stringify({
-      friendly_name: input.friendlyName,
-      language: input.language,
-      types: {
-        "twilio/list-picker": {
-          body: input.body,
-          button: input.button,
-          items: input.items
+  const json = await twilioContentFetch<{ sid: string }>(
+    "/Content",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        friendly_name: input.friendlyName,
+        language: input.language,
+        types: {
+          "twilio/list-picker": {
+            body: input.body,
+            button: input.button,
+            items: input.items
+          }
         }
-      }
-    })
-  });
+      })
+    },
+    { accountSid: input.accountSid, authToken: input.authToken }
+  );
   return { sid: String(json.sid) };
 }
 

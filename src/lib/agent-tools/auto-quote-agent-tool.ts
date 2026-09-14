@@ -20,6 +20,20 @@ export const cotizarSeguroAutoAgentTool: AgentToolDefinition = {
       type: Type.OBJECT,
       properties: {
         placa: { type: Type.STRING, description: "Placa del vehículo, sin espacios ni guiones." },
+        nuevo_o_usado: { type: Type.STRING, description: 'Uno de: "Nuevo", "Usado".' },
+        uso_vehiculo: {
+          type: Type.STRING,
+          description: 'Uno de: "Particular", "Servicio Público", "Uber/Cabify o similares".'
+        },
+        importacion_directa: {
+          type: Type.STRING,
+          description: 'Uno de: "No", "Sí, es de importación directa", "No estoy seguro".'
+        },
+        tarjeta_propiedad: {
+          type: Type.STRING,
+          description: 'Uno de: "A mi nombre", "En trámite de traspaso", "A nombre de otra persona".'
+        },
+        ciudad: { type: Type.STRING, description: "Ciudad donde circula el vehículo." },
         nombre_tomador: { type: Type.STRING, description: "Nombre completo de quien toma la póliza." },
         documento_tomador: { type: Type.STRING, description: "Número de documento de identidad del tomador." },
         fecha_nacimiento_tomador: {
@@ -34,18 +48,30 @@ export const cotizarSeguroAutoAgentTool: AgentToolDefinition = {
     return ctx.quotingRules.enabled;
   },
   buildPromptBlock(ctx) {
+    const preguntasVehiculo =
+      "Después de la placa, antes de pedir los datos del tomador, necesitas 5 datos más del vehículo — pregúntalos de a uno, con botones cuando se indique (usa la herramienta presentar_opciones_whatsapp con esas opciones EXACTAS, no las cambies): " +
+      '¿nuevo o usado? (botones "Nuevo"/"Usado"); ' +
+      '¿qué uso tiene? (botones "Particular"/"Servicio Público"/"Uber/Cabify o similares"); ' +
+      '¿es de importación directa? (botones "No"/"Sí, es de importación directa"/"No estoy seguro" — si preguntan qué significa, explica que es un vehículo traído del exterior por cuenta propia, sin pasar por un concesionario en Colombia); ' +
+      '¿la tarjeta de propiedad está a su nombre? (botones "A mi nombre"/"En trámite de traspaso"/"A nombre de otra persona"); ' +
+      "¿en qué ciudad circula? (esta sí en texto normal, no como botón — son demasiadas ciudades para una lista).";
     return ctx.quotingRules.autoQuote
-      ? "Tienes una herramienta (cotizar_seguro_auto) para cotizar seguros de auto de verdad. Pide la placa primero, y luego nombre completo, documento y fecha de nacimiento del tomador — de forma natural, no como un formulario. Si la herramienta dice que faltan datos, pide exactamente esos. Si dice que no hay aseguradora conectada o que el cotizador no está configurado del todo, comunícaselo tal cual al cliente — nunca inventes ni aproximes una prima."
-      : "Tienes una herramienta (cotizar_seguro_auto) para REUNIR los datos de una cotización de auto (no te da el precio directo — eso lo confirma un asesor). Pide la placa primero, y luego nombre completo, documento y fecha de nacimiento del tomador, de forma natural. Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo.";
+      ? `Tienes una herramienta (cotizar_seguro_auto) para cotizar seguros de auto de verdad. Pide la placa primero. ${preguntasVehiculo} Luego pide nombre completo, documento y fecha de nacimiento del tomador, de forma natural. Si la herramienta dice que faltan datos, pide exactamente esos. Si dice que no hay aseguradora conectada o que el cotizador no está configurado del todo, comunícaselo tal cual al cliente — nunca inventes ni aproximes una prima.`
+      : `Tienes una herramienta (cotizar_seguro_auto) para REUNIR los datos de una cotización de auto (no te da el precio directo — eso lo confirma un asesor). Pide la placa primero. ${preguntasVehiculo} Luego pide nombre completo, documento y fecha de nacimiento del tomador, de forma natural. Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo.`;
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
+    const str = (v: unknown) => (typeof v === "string" ? v : undefined);
     const result = await cotizarSeguroAuto(
       {
         placa: typeof args.placa === "string" ? args.placa : "",
-        nombre_tomador: typeof args.nombre_tomador === "string" ? args.nombre_tomador : undefined,
-        documento_tomador: typeof args.documento_tomador === "string" ? args.documento_tomador : undefined,
-        fecha_nacimiento_tomador:
-          typeof args.fecha_nacimiento_tomador === "string" ? args.fecha_nacimiento_tomador : undefined
+        nuevo_o_usado: str(args.nuevo_o_usado),
+        uso_vehiculo: str(args.uso_vehiculo),
+        importacion_directa: str(args.importacion_directa),
+        tarjeta_propiedad: str(args.tarjeta_propiedad),
+        ciudad: str(args.ciudad),
+        nombre_tomador: str(args.nombre_tomador),
+        documento_tomador: str(args.documento_tomador),
+        fecha_nacimiento_tomador: str(args.fecha_nacimiento_tomador)
       },
       ctx,
       {

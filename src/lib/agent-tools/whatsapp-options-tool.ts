@@ -36,7 +36,7 @@ export const presentarOpcionesWhatsAppTool: AgentToolDefinition = {
     return ctx.quotingRules.enabled;
   },
   buildPromptBlock() {
-    return "Tienes una herramienta (presentar_opciones_whatsapp) para mostrar hasta 3 opciones como botones táctiles cuando el cliente deba elegir algo corto y concreto (confirmar un dato, elegir un plan). No la uses para pedir información abierta.";
+    return "Tienes una herramienta (presentar_opciones_whatsapp) para mostrar hasta 3 opciones como botones táctiles cuando el cliente deba elegir algo corto y concreto (confirmar un dato, elegir un plan). No la uses para pedir información abierta. Úsala UNA sola vez por respuesta: nunca la llames dos veces en el mismo turno, y nunca repitas la misma pregunta en texto además de los botones (son la misma pregunta en una sola forma, no dos) — envía los botones y detente ahí, espera a que el cliente responda antes de preguntar lo siguiente.";
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
     const pregunta = typeof args.pregunta === "string" ? args.pregunta.trim() : "";
@@ -71,6 +71,11 @@ export const presentarOpcionesWhatsAppTool: AgentToolDefinition = {
       }
       return { ok: true };
     } catch (err) {
+      // Sin este log, un fallo de Twilio (ej. Content creado con credenciales
+      // que no coinciden con las de envío) queda invisible: la tool devuelve
+      // ok:false, el modelo sigue en texto plano, y nada en pantalla avisa
+      // que las tarjetas interactivas no llegaron.
+      console.error("[whatsapp-options-tool] envío falló:", err);
       return { ok: false, reason: err instanceof Error ? err.message : "No se pudo enviar las opciones." };
     }
   }

@@ -26,6 +26,9 @@ import { getOriSegurosAccess } from "@/lib/insurers/ori-seguros-access";
 import { cotizarSeguroAutoTool } from "@/lib/agent-tools/auto-quote-ori-tool";
 import { calificarSeguroVidaOriTool } from "@/lib/agent-tools/life-quote-ori-tool";
 import { calificarSeguroHogarOriTool } from "@/lib/agent-tools/home-quote-ori-tool";
+import { calificarSeguroMotoOriTool } from "@/lib/agent-tools/moto-quote-ori-tool";
+import { calificarSoatOriTool } from "@/lib/agent-tools/soat-quote-ori-tool";
+import { calificarAccidentesOriTool } from "@/lib/agent-tools/accident-quote-ori-tool";
 import {
   consultarCotizacionesPendientesTool,
   solicitarCotizacionSeguroTool,
@@ -134,6 +137,9 @@ export async function POST(req: NextRequest) {
         cotizarSeguroAutoTool,
         calificarSeguroVidaOriTool,
         calificarSeguroHogarOriTool,
+        calificarSeguroMotoOriTool,
+        calificarSoatOriTool,
+        calificarAccidentesOriTool,
         consultarCotizacionesPendientesTool,
         solicitarCotizacionSeguroTool,
         guiarCotizacionSeguroTool,

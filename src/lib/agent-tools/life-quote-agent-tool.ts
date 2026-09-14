@@ -16,6 +16,19 @@ export const calificarSeguroVidaAgentTool: AgentToolDefinition = {
     parameters: {
       type: Type.OBJECT,
       properties: {
+        tipo_cobertura: {
+          type: Type.STRING,
+          description:
+            'Uno de: "Vida (muerte por cualquier causa)", "Vida + Invalidez", "Vida + Invalidez + Enfermedades Graves", "Vida + Invalidez + Enfermedades + Renta diaria", "No lo sé, asesórame".'
+        },
+        suma_asegurada_deseada: {
+          type: Type.STRING,
+          description: 'Rango de cobertura deseado. Uno de: "Menos de 50 millones", "Entre 50 y 200 millones", "Entre 200 y 500 millones", "Más de 500 millones", "No lo sé, asesórame".'
+        },
+        presupuesto_mensual: {
+          type: Type.STRING,
+          description: 'Rango de presupuesto mensual. Uno de: "Hasta $50.000", "Hasta $150.000", "Hasta $300.000", "Más de $300.000", "No lo sé, asesórame".'
+        },
         nombre_tomador: { type: Type.STRING, description: "Nombre completo de quien toma la póliza." },
         documento_tomador: { type: Type.STRING, description: "Número de documento de identidad del tomador." },
         fecha_nacimiento_tomador: {
@@ -23,32 +36,43 @@ export const calificarSeguroVidaAgentTool: AgentToolDefinition = {
           description: "Fecha de nacimiento del tomador en formato YYYY-MM-DD."
         },
         ocupacion: { type: Type.STRING, description: "Ocupación u oficio del tomador." },
-        suma_asegurada_deseada: {
+        fumador: { type: Type.STRING, description: '¿Fuma o tiene alguna condición médica? Uno de: "Sí", "No". Determina el riesgo — siempre se pregunta, nunca se omite.' },
+        interes_ahorro: {
           type: Type.STRING,
-          description: "Suma asegurada aproximada que el cliente quiere, en pesos colombianos."
-        },
-        fumador: { type: Type.STRING, description: "Si el tomador fuma o no (opcional)." }
+          description: '¿Le interesa un fondo de ahorro con su seguro de vida? Uno de: "Sí", "No", "No lo sé, asesórame" (opcional — pregunta de cross-sell, no de calificación).'
+        }
       },
-      required: ["nombre_tomador", "documento_tomador", "fecha_nacimiento_tomador", "ocupacion", "suma_asegurada_deseada"]
+      required: [
+        "tipo_cobertura",
+        "suma_asegurada_deseada",
+        "presupuesto_mensual",
+        "fumador",
+        "nombre_tomador",
+        "documento_tomador",
+        "fecha_nacimiento_tomador",
+        "ocupacion"
+      ]
     }
   },
   isEnabled(ctx) {
     return ctx.quotingRules.enabled;
   },
   buildPromptBlock() {
-    return "Tienes una herramienta (cotizar_seguro_vida) para REUNIR los datos de una cotización de seguro de vida (no da el precio directo — eso lo confirma un asesor). Pide de forma natural, no como un formulario: nombre completo, documento, fecha de nacimiento, ocupación y la suma asegurada que le gustaría tener. Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo.";
+    return 'Tienes una herramienta (cotizar_seguro_vida) para REUNIR los datos de una cotización de seguro de vida (no da el precio directo — eso lo confirma un asesor). Pide de a uno, con botones (usa presentar_opciones_whatsapp con estas opciones EXACTAS, una pregunta por mensaje): ¿qué te gustaría proteger? (lista: "Vida (muerte por cualquier causa)", "Vida + Invalidez", "Vida + Invalidez + Enfermedades Graves", "Vida + Invalidez + Enfermedades + Renta diaria", "No lo sé, asesórame"); ¿qué valor de cobertura? (lista: "Menos de 50 millones", "Entre 50 y 200 millones", "Entre 200 y 500 millones", "Más de 500 millones", "No lo sé, asesórame"); ¿presupuesto mensual aproximado? (lista: "Hasta $50.000", "Hasta $150.000", "Hasta $300.000", "Más de $300.000", "No lo sé, asesórame"); ¿fuma o tiene alguna condición médica? (botones "Sí"/"No" — ESTA PREGUNTA ES OBLIGATORIA, nunca la saltes ni la des por hecha, siempre espera la respuesta del cliente antes de seguir). Luego pide en texto normal: nombre completo, documento, fecha de nacimiento y ocupación. Al final, de forma opcional (esta sí se puede omitir si el cliente ya quiere cerrar), pregunta con botones ("Sí"/"No"/"No lo sé, asesórame") si le interesa un fondo de ahorro con el seguro. Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo.';
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
+    const str = (v: unknown) => (typeof v === "string" ? v : undefined);
     const result = await calificarSeguroVida(
       {
-        nombre_tomador: typeof args.nombre_tomador === "string" ? args.nombre_tomador : undefined,
-        documento_tomador: typeof args.documento_tomador === "string" ? args.documento_tomador : undefined,
-        fecha_nacimiento_tomador:
-          typeof args.fecha_nacimiento_tomador === "string" ? args.fecha_nacimiento_tomador : undefined,
-        ocupacion: typeof args.ocupacion === "string" ? args.ocupacion : undefined,
-        suma_asegurada_deseada:
-          typeof args.suma_asegurada_deseada === "string" ? args.suma_asegurada_deseada : undefined,
-        fumador: typeof args.fumador === "string" ? args.fumador : undefined
+        tipo_cobertura: str(args.tipo_cobertura),
+        suma_asegurada_deseada: str(args.suma_asegurada_deseada),
+        presupuesto_mensual: str(args.presupuesto_mensual),
+        nombre_tomador: str(args.nombre_tomador),
+        documento_tomador: str(args.documento_tomador),
+        fecha_nacimiento_tomador: str(args.fecha_nacimiento_tomador),
+        ocupacion: str(args.ocupacion),
+        fumador: str(args.fumador),
+        interes_ahorro: str(args.interes_ahorro)
       },
       ctx,
       {

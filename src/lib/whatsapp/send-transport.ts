@@ -162,7 +162,9 @@ export async function sendWhatsAppInteractiveMessage(
       friendlyName: `noova-quickreply-${uniqueSuffix}`,
       language: "es",
       body,
-      actions: buttons.map(b => ({ id: b.id, title: b.title.slice(0, 20) }))
+      actions: buttons.map(b => ({ id: b.id, title: b.title.slice(0, 20) })),
+      accountSid: channel.twilio_subaccount_sid,
+      authToken: channel.twilio_subaccount_auth_token
     });
     const twilio = await sendTwilioWhatsAppTemplate({
       toE164,
@@ -190,7 +192,9 @@ export async function sendWhatsAppInteractiveMessage(
       language: "es",
       body,
       button: (listButtonLabel ?? "Ver opciones").slice(0, 20),
-      items: items.map(r => ({ id: r.id, item: r.title.slice(0, 24), description: r.description?.slice(0, 72) }))
+      items: items.map(r => ({ id: r.id, item: r.title.slice(0, 24), description: r.description?.slice(0, 72) })),
+      accountSid: channel.twilio_subaccount_sid,
+      authToken: channel.twilio_subaccount_auth_token
     });
     const twilio = await sendTwilioWhatsAppTemplate({
       toE164,

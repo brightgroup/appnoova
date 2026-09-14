@@ -2,6 +2,20 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AutoQuoteVehicle } from "@/lib/insurers/auto-quote-tool";
 import { syncQuoteToLeadMetadata, resolveOrCreateInsuranceLead } from "@/lib/crm-insurance-sync";
 
+/** Nombre legible por ramo, usado tanto en el título del lead como en el campo `ramo` sincronizado al CRM. */
+const RAMO_LABELS: Record<string, string> = {
+  autos: "Auto",
+  vida: "Vida",
+  hogar: "Hogar",
+  motos: "Moto",
+  soat: "SOAT",
+  accidentes_personales: "Accidentes Personales"
+};
+
+function ramoLabel(ramo: string): string {
+  return RAMO_LABELS[ramo] ?? ramo;
+}
+
 export type QuoteRequestEstado = "pendiente" | "cotizada" | "enviada_externa" | "cerrada" | "descartada";
 export type QuoteRequestSource = "whatsapp" | "web" | "ori" | "manual";
 
@@ -110,10 +124,9 @@ export async function upsertPendingQuoteRequest(
   let leadId = params.leadId ?? null;
   let contactId = params.contactId ?? null;
   if (!leadId && params.contactE164) {
-    const ramoLabel = ramo === "autos" ? "auto" : ramo === "vida" ? "vida" : ramo === "hogar" ? "hogar" : ramo;
     const titulo = params.placa
-      ? `Seguro de ${ramoLabel} — ${params.placa}`
-      : `Seguro de ${ramoLabel} — ${params.tomador.nombre_tomador ?? "sin nombre"}`;
+      ? `Seguro de ${ramoLabel(ramo)} — ${params.placa}`
+      : `Seguro de ${ramoLabel(ramo)} — ${params.tomador.nombre_tomador ?? "sin nombre"}`;
     const resolved = await resolveOrCreateInsuranceLead(db, params.organizationId, {
       contactE164: params.contactE164,
       nombreTomador: params.tomador.nombre_tomador,
@@ -165,7 +178,7 @@ export async function upsertPendingQuoteRequest(
   const numOrNull = (v: unknown) => (typeof v === "number" ? v : null);
   await syncQuoteToLeadMetadata(db, leadId, {
     placa: params.placa ?? null,
-    ramo: ramo === "autos" ? "Auto" : ramo === "vida" ? "Vida" : ramo === "hogar" ? "Hogar" : ramo,
+    ramo: ramoLabel(ramo),
     vehiculo_marca: strOrNull(vehiculo.marca),
     vehiculo_linea: strOrNull(vehiculo.linea),
     vehiculo_modelo: numOrNull(vehiculo.modelo),

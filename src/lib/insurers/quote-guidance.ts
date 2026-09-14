@@ -21,7 +21,14 @@ export interface QuoteGuidance {
   quote: QuoteRequestRecord | null;
 }
 
-const RAMO_LABEL: Record<string, string> = { autos: "auto", vida: "vida", hogar: "hogar" };
+const RAMO_LABEL: Record<string, string> = {
+  autos: "auto",
+  vida: "vida",
+  hogar: "hogar",
+  motos: "moto",
+  soat: "SOAT",
+  accidentes_personales: "accidentes personales"
+};
 
 export async function getQuoteGuidanceForLead(
   db: SupabaseClient,
