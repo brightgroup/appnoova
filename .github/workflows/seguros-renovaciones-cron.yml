@@ -1,0 +1,52 @@
+# S2 Renovaciones — recordatorios de póliza por WhatsApp a 30/15/5 días
+# (ver src/app/api/cron/seguros-renovaciones/route.ts). Corre cada hora en
+# punto: cada organización elige su propia hora_envio (0-23, hora de Bogotá)
+# y el endpoint solo procesa las reglas que coinciden con la hora actual.
+#
+# Mismo criterio que erp-inventory-alerts-cron.yml: la app corre en Coolify,
+# no en Vercel, así que no hay Vercel Cron disponible — GitHub Actions hace
+# de scheduler externo.
+#
+# Requisitos en GitHub → Settings → Secrets and variables → Actions (ya
+# existen, compartidos con los demás cron de este repo):
+#   APP_URL      = https://app.noova360.com (o el dominio de producción real)
+#   CRON_SECRET  = el mismo valor que la variable de entorno CRON_SECRET en Coolify
+
+name: Seguros Renovaciones Cron
+
+on:
+  schedule:
+    - cron: '0 * * * *' # cada hora en punto (UTC)
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seguros-renovaciones-cron
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ejecutar /api/cron/seguros-renovaciones
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "Faltan secrets APP_URL / CRON_SECRET." >&2
+            exit 1
+          fi
+          response=$(curl -sS -o response.json -w "%{http_code}" \
+            -H "x-cron-secret: ${CRON_SECRET}" \
+            "${APP_URL%/}/api/cron/seguros-renovaciones")
+          echo "HTTP $response"
+          cat response.json
+          echo
+          if [ "$response" -ge 300 ]; then
+            echo "El cron de renovaciones de seguros respondió con error." >&2
+            exit 1
+          fi

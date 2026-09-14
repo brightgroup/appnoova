@@ -76,7 +76,9 @@ export async function GET(req: NextRequest) {
     if (asesor) query = query.ilike("asesor_responsable", asesor);
     if (orClause) query = query.or(orClause);
 
-    const { data, error, count } = await query.order("sort_order").range(offset, offset + limit - 1);
+    const { data, error, count } = await query
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     const leads = (data ?? []).map(r => toCrmLead(r as Record<string, unknown>));
@@ -117,7 +119,7 @@ export async function GET(req: NextRequest) {
         if (!canManageAll) pageQuery = pageQuery.eq("assigned_user_id", callerUserId);
         if (asesor) pageQuery = pageQuery.ilike("asesor_responsable", asesor);
         if (orClause) pageQuery = pageQuery.or(orClause);
-        const { data, error } = await pageQuery.order("sort_order").range(0, PAGE_SIZE - 1);
+        const { data, error } = await pageQuery.order("created_at", { ascending: false }).range(0, PAGE_SIZE - 1);
         if (error) throw error;
         pages[stage.id] = (data ?? []).map(r => toCrmLead(r as Record<string, unknown>));
       })

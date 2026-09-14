@@ -11,6 +11,8 @@ export interface HandoffNotifyContext {
   contactLabel?: string | null;
   visitorMessage?: string | null;
   reason: "user_request" | "ai_escalation" | "human_only";
+  /** Si la conversación ya tiene un lead de CRM resuelto, url directa a su ficha — ver resolveLeadForConversation. */
+  leadUrl?: string | null;
 }
 
 function escapeHtml(value: string): string {
@@ -143,6 +145,13 @@ function buildHtml(ctx: HandoffNotifyContext, organizationName: string | null): 
                 <a href="${inboxUrl}" style="display:inline-block;background:#006e80;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:10px;font-family:system-ui,-apple-system,sans-serif;font-size:14px;font-weight:600">
                   Abrir en el inbox
                 </a>
+                ${
+                  ctx.leadUrl
+                    ? `<a href="${ctx.leadUrl}" style="display:inline-block;margin-left:10px;background:#0f7eff;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:10px;font-family:system-ui,-apple-system,sans-serif;font-size:14px;font-weight:600">
+                  Ver oportunidad →
+                </a>`
+                    : ""
+                }
               </p>
               <p style="margin:16px 0 0;font-family:system-ui,-apple-system,sans-serif;font-size:12px;color:#94a3b8">
                 Sin asignación automática: elige la conversación y asígnatela para responder.

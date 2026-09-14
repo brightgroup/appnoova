@@ -138,6 +138,7 @@ function LeadEditContent({ leadId }: { leadId: string }) {
       error={error}
       onSave={save}
       onDelete={remove}
+      wide
     >
       {lead && (
         <CrmLeadForm

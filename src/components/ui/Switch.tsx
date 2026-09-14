@@ -24,7 +24,7 @@ export function Switch({ checked, onChange, disabled, label, className = "" }: S
       } ${label ? "" : className}`}
     >
       <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+        className={`absolute top-0.5 h-5 w-5 rounded-full bg-black border border-white/25 shadow-sm transition-transform ${
           checked ? "left-[22px]" : "left-0.5"
         }`}
       />

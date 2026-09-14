@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { MessageCircle, Zap, Phone, Loader2, Sparkles } from "lucide-react";
+import { MessageCircle, Zap, Phone, Loader2 } from "lucide-react";
 
 import { btnPrimary, promoCard } from "@/lib/brand-ui";
+import { OriAnimatedIcon } from "@/components/icons/OriAnimatedIcon";
 import { authFetch } from "@/lib/telephony-api";
 
 interface DashboardStats {
@@ -201,8 +202,8 @@ export default function Dashboard() {
                 <div className="space-y-6">
                   <div className={promoCard}>
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-full bg-[var(--nv-accent)] flex items-center justify-center shrink-0">
-                        <Sparkles className="nv-icon-on-accent w-5 h-5 text-white" />
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shrink-0">
+                        <OriAnimatedIcon state="idle" variant="badge" className="w-5 h-5" />
                       </div>
                       <p className="nv-promo-title text-base font-bold">Pro Tip</p>
                     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Sparkles, History, FileText, Users, RefreshCw,
   Mail, Phone, Loader2, Plus, Mic, ArrowUp, Shield
@@ -13,7 +14,10 @@ import { Badge } from "@/components/ui/Badge";
 import { TEXT_LLM_MODELS, DEFAULT_TEXT_MODEL, resolveTextLlm } from "@/lib/text-agent-options";
 import { llmModelIcon } from "@/lib/llm/provider-icon";
 import { OriToolResultView } from "@/components/ori/OriToolResultView";
-import type { OriToolCall } from "@/types/ori";
+import { OriAnimatedIcon } from "@/components/icons/OriAnimatedIcon";
+import { OriThinkingStatus } from "@/components/ori/OriThinkingStatus";
+import { OriChatsPanel } from "@/components/ori/OriChatsPanel";
+import type { OriToolCall, OriConversationSummary } from "@/types/ori";
 import { useOrgPermissions } from "@/components/layout/OrgPermissionsProvider";
 import { ConnectorsQuickMenu } from "@/components/automations/ConnectorsQuickMenu";
 import { ExploreConnectorsModal } from "@/components/automations/ExploreConnectorsModal";
@@ -57,6 +61,9 @@ const QUICK_ACTIONS = [
 
 export default function OriCopilotoPage() {
   const { modules } = useOrgPermissions();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const prefillHandled = useRef(false);
   const [userName, setUserName] = useState("Usuario");
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -67,6 +74,11 @@ export default function OriCopilotoPage() {
   const [model, setModel] = useState<string>(DEFAULT_TEXT_MODEL);
   const [connectorsMenuOpen, setConnectorsMenuOpen] = useState(false);
   const [exploreOpen, setExploreOpen] = useState(false);
+  const [quoteId, setQuoteId] = useState("");
+  const [conversationId, setConversationId] = useState("");
+  const [conversations, setConversations] = useState<OriConversationSummary[]>([]);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
+  const [chatsOpen, setChatsOpen] = useState(false);
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasChat = messages.length > 0;
@@ -116,6 +128,24 @@ export default function OriCopilotoPage() {
     localStorage.setItem(ORI_MODEL_STORAGE_KEY, v);
   };
 
+  const refreshConversations = useCallback(async () => {
+    setConversationsLoading(true);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/ori/conversations", { headers });
+      const data = await res.json();
+      if (res.ok) setConversations(data.conversations ?? []);
+    } catch {
+      // el historial es secundario — si falla la lista, el chat sigue funcionando igual
+    } finally {
+      setConversationsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshConversations();
+  }, [refreshConversations]);
+
   useEffect(() => {
     if (!hasChat) return;
     const el = chatAreaRef.current;
@@ -123,7 +153,7 @@ export default function OriCopilotoPage() {
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages, loading, hasChat]);
 
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string, quoteIdOverride?: string) => {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
 
@@ -142,7 +172,9 @@ export default function OriCopilotoPage() {
         body: JSON.stringify({
           messages: nextMessages,
           company_context_id: contextId || undefined,
-          model
+          model,
+          quote_id: (quoteIdOverride ?? quoteId) || undefined,
+          conversation_id: conversationId || undefined
         })
       });
       const data = await res.json();
@@ -154,12 +186,26 @@ export default function OriCopilotoPage() {
         ...prev,
         { id: crypto.randomUUID(), role: "assistant", content: data.reply, toolCalls: data.tool_calls ?? [] }
       ]);
+      if (data.conversation_id) {
+        setConversationId(data.conversation_id);
+        refreshConversations();
+      }
     } catch {
       setError("Error de red. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, contextId, model]);
+  }, [messages, loading, contextId, model, quoteId, conversationId, refreshConversations]);
+
+  useEffect(() => {
+    if (prefillHandled.current) return;
+    const qid = searchParams.get("quote_id");
+    if (!qid) return;
+    prefillHandled.current = true;
+    setQuoteId(qid);
+    router.replace("/dashboard/ori");
+    sendMessage("Ayúdame a avanzar con esta solicitud pendiente.", qid);
+  }, [searchParams, router, sendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -172,11 +218,53 @@ export default function OriCopilotoPage() {
     setMessages([]);
     setInput("");
     setError("");
+    setQuoteId("");
+    setConversationId("");
     textareaRef.current?.focus();
   };
 
+  const loadConversation = async (id: string) => {
+    if (id === conversationId) return;
+    setError("");
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/ori/conversations/${id}`, { headers });
+      const data = await res.json();
+      if (!res.ok || !data.conversation) {
+        setError(data.error || "No se pudo cargar el chat");
+        return;
+      }
+      const conv = data.conversation;
+      setMessages(
+        conv.messages.map((m: { id: string; role: "user" | "assistant"; content: string; toolCalls: OriToolCall[] }) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          toolCalls: m.toolCalls
+        }))
+      );
+      setConversationId(conv.id);
+      setQuoteId(conv.quoteId ?? "");
+      setInput("");
+    } catch {
+      setError("Error de red. Intenta de nuevo.");
+    }
+  };
+
+  const deleteConversationFromHistory = async (id: string) => {
+    setConversations(prev => prev.filter(c => c.id !== id));
+    if (id === conversationId) startNewChat();
+    try {
+      const headers = await getAuthHeaders();
+      await fetch(`/api/ori/conversations/${id}`, { method: "DELETE", headers });
+    } catch {
+      refreshConversations();
+    }
+  };
+
   return (
-    <div className="flex-1 flex flex-col min-h-0 h-full bg-noova-main text-white relative overflow-hidden">
+    <div className="flex-1 flex flex-row min-h-0 h-full bg-noova-main">
+    <div className="flex-1 flex flex-col min-h-0 h-full text-white relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-[#0f7eff]/[.06] rounded-full blur-[100px]" />
       </div>
@@ -184,8 +272,8 @@ export default function OriCopilotoPage() {
       {/* Header Ori */}
       <div className="relative z-10 shrink-0 flex items-center justify-between px-8 py-4">
         <div className="flex items-center gap-3">
-          <div className="nv-ori-icon w-9 h-9 rounded-xl bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shadow-lg shadow-[#0f7eff]/30">
-            <Sparkles className="w-4 h-4 text-white nv-ori-icon-glyph" strokeWidth={2} />
+          <div className="nv-ori-icon w-9 h-9 rounded-full bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shadow-lg shadow-[#0f7eff]/30">
+            <OriAnimatedIcon state="idle" variant="badge" className="w-5 h-5" />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[15px] font-semibold tracking-tight text-white nv-ori-title">Ori</span>
@@ -210,9 +298,14 @@ export default function OriCopilotoPage() {
               Nueva conversación
             </button>
           )}
-          <button className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-white transition-colors">
+          <button
+            onClick={() => setChatsOpen(v => !v)}
+            className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
+              chatsOpen ? "text-[#99c9ff]" : "text-gray-500 hover:text-white"
+            }`}
+          >
             <History className="w-3.5 h-3.5" />
-            Historial
+            Chats
           </button>
         </div>
       </div>
@@ -247,14 +340,9 @@ export default function OriCopilotoPage() {
                 </div>
               ))}
               {loading && (
-                <div className="flex justify-start gap-1.5 items-center py-1">
-                  {[0, 100, 200].map(d => (
-                    <div
-                      key={d}
-                      className="w-1.5 h-1.5 rounded-full bg-[#0f7eff]/50 animate-pulse"
-                      style={{ animationDelay: `${d}ms` }}
-                    />
-                  ))}
+                <div className="flex justify-start items-center gap-2.5 py-1">
+                  <OriAnimatedIcon state="thinking" variant="solid" className="w-6 h-6 shrink-0" />
+                  <OriThinkingStatus />
                 </div>
               )}
             </div>
@@ -366,6 +454,19 @@ export default function OriCopilotoPage() {
         onConnected={() => setExploreOpen(false)}
         showAseguradoras={modules.seguros}
       />
+    </div>
+
+      {chatsOpen && (
+        <OriChatsPanel
+          conversations={conversations}
+          loading={conversationsLoading}
+          activeId={conversationId}
+          onSelect={loadConversation}
+          onNewChat={startNewChat}
+          onDelete={deleteConversationFromHistory}
+          onClose={() => setChatsOpen(false)}
+        />
+      )}
     </div>
   );
 }

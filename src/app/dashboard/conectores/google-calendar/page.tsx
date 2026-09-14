@@ -3,8 +3,9 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Calendar, CheckCircle2, ExternalLink, Info, Loader2, Unplug } from "lucide-react";
-import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
 import { InfoBox } from "@/components/ui/InfoBox";
+import { ConnectorIconTile } from "@/components/automations/ConnectorIconTile";
+import { ConnectorModalPage } from "@/components/automations/ConnectorModalPage";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { btnPrimary } from "@/lib/brand-ui";
 
@@ -125,61 +126,43 @@ function GoogleCalendarConectorContent() {
   const isHosted = connection?.connectionMode === "hosted";
 
   return (
-    <ChannelListPage
+    <ConnectorModalPage
+      icon={<ConnectorIconTile id="google-calendar" size="md" />}
       title="Google Calendar"
-      description="Conecta el calendario de tu empresa una sola vez. Tus agentes de texto y voz podrán consultar disponibilidad y crear citas automáticamente."
       loading={loading}
+      banner={banner}
     >
-      {banner && (
-        <div
-          className={`mb-4 p-3 rounded-xl text-xs border ${
-            banner.kind === "success"
-              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-              : "bg-red-500/10 border-red-500/20 text-red-400"
-          }`}
-        >
-          {banner.text}
-        </div>
-      )}
-
       {!configured ? (
-        <InfoBox icon={Info} layout="row" variant="neutral" className="p-6">
+        <InfoBox icon={Info} layout="row" variant="neutral" className="p-4">
           Este conector aún no está configurado en el servidor (faltan las credenciales OAuth de Google
           Calendar). Contacta a soporte de Noova.
         </InfoBox>
       ) : (
-        <div className="rounded-2xl border border-white/[.08] bg-noova-surface p-6">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-[#0f7eff]/15 flex items-center justify-center shrink-0">
-              <Calendar className="w-6 h-6 text-[#0f7eff]" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-sm font-semibold text-white">Google Calendar</h2>
-              {isActive ? (
-                <>
-                  <p className="text-xs text-emerald-400 flex items-center gap-1.5 mt-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    {isHosted
-                      ? `Conectado — calendario de Noova compartido con ${connection?.sharedWithEmail}`
-                      : `Conectado — ${connection?.googleEmail || "cuenta de Google"}`}
-                  </p>
-                  <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
-                    Tus agentes con &quot;Agendamiento&quot; activado ya pueden ofrecer horarios y crear citas en
-                    este calendario. Configura las reglas de cada agente en su sección de configuración.
-                  </p>
-                </>
-              ) : (
-                <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                  Sin conectar. Ningún agente puede agendar citas todavía.
-                </p>
-              )}
-              {connection?.status === "error" && connection.lastError && (
-                <p className="text-[11px] text-red-400/80 mt-2">Último error: {connection.lastError}</p>
-              )}
-            </div>
-          </div>
+        <>
+          {isActive ? (
+            <>
+              <p className="text-xs text-emerald-400 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {isHosted
+                  ? `Conectado — calendario de Noova compartido con ${connection?.sharedWithEmail}`
+                  : `Conectado — ${connection?.googleEmail || "cuenta de Google"}`}
+              </p>
+              <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+                Tus agentes con &quot;Agendamiento&quot; activado ya pueden ofrecer horarios y crear citas en
+                este calendario. Configura las reglas de cada agente en su sección de configuración.
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Conecta el calendario de tu empresa una sola vez. Tus agentes de texto y voz podrán
+              consultar disponibilidad y crear citas automáticamente.
+            </p>
+          )}
+          {connection?.status === "error" && connection.lastError && (
+            <p className="text-[11px] text-red-400/80 mt-2">Último error: {connection.lastError}</p>
+          )}
 
-          <div className="mt-5 pt-5 border-t border-white/[.08] flex gap-2">
+          <div className="mt-4 pt-4 border-t border-white/[.08] flex gap-2">
             {isActive ? (
               <button
                 onClick={handleDisconnect}
@@ -198,7 +181,7 @@ function GoogleCalendarConectorContent() {
           </div>
 
           {!isActive && (
-            <div className="mt-5 pt-5 border-t border-white/[.08]">
+            <div className="mt-4 pt-4 border-t border-white/[.08]">
               <p className="text-xs font-medium text-white">¿No quieres conectar tu cuenta de Google?</p>
               <p className="text-[11px] text-gray-500 mt-1 mb-3 leading-relaxed">
                 Te creamos un calendario y te lo compartimos a tu correo — te aparece en tu Google Calendar
@@ -223,17 +206,17 @@ function GoogleCalendarConectorContent() {
               </div>
             </div>
           )}
-        </div>
+        </>
       )}
-    </ChannelListPage>
+    </ConnectorModalPage>
   );
 }
 
 export default function GoogleCalendarConectorPage() {
   return (
     <Suspense fallback={
-      <div className="flex-1 flex items-center justify-center bg-noova-main text-gray-400 py-16">
-        <Loader2 className="w-6 h-6 animate-spin" />
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70">
+        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
       </div>
     }>
       <GoogleCalendarConectorContent />

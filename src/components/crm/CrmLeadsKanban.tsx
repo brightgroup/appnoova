@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Search } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { formatLeadValue, filterPipelineStages } from "@/lib/crm-record";
-import { inputSearch } from "@/lib/brand-ui";
+import { resolveCrmStageIcon } from "@/lib/crm-stage-icons";
 import { PlateBadge } from "@/components/crm/PlateBadge";
 import type { CrmLead, CrmPipelineStage } from "@/types/crm";
 
@@ -21,25 +21,26 @@ interface CrmLeadsKanbanProps {
   stages: CrmPipelineStage[];
   outcome: "open" | "mine";
   currentUserName: string;
+  /** Búsqueda controlada desde el toolbar compartido (misma línea que Filtro/Ordenar) — ya no tiene su propio buscador. */
+  searchQuery: string;
   onSelectLead: (id: string) => void;
   onLeadMoved: (lead: CrmLead) => void;
 }
 
-export function CrmLeadsKanban({ stages, outcome, currentUserName, onSelectLead, onLeadMoved }: CrmLeadsKanbanProps) {
+export function CrmLeadsKanban({ stages, outcome, currentUserName, searchQuery, onSelectLead, onLeadMoved }: CrmLeadsKanbanProps) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overStageId, setOverStageId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [columns, setColumns] = useState<Record<string, ColumnState>>({});
   const [summary, setSummary] = useState<Record<string, { count: number; sum: number }>>({});
-  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
 
   const pipelineStages = useMemo(() => filterPipelineStages(stages), [stages]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setSearch(searchInput.trim()), 350);
+    const timer = window.setTimeout(() => setSearch(searchQuery.trim()), 350);
     return () => window.clearTimeout(timer);
-  }, [searchInput]);
+  }, [searchQuery]);
 
   const boardParams = useCallback(
     (extra?: Record<string, string>) => {
@@ -172,23 +173,13 @@ export function CrmLeadsKanban({ stages, outcome, currentUserName, onSelectLead,
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-        <input
-          type="text"
-          placeholder="Buscar lead o contacto…"
-          value={searchInput}
-          onChange={e => setSearchInput(e.target.value)}
-          className={inputSearch}
-        />
-      </div>
-
       {loading ? (
         <div className="flex justify-center py-16 text-gray-400 text-sm">
           <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando tablero…
         </div>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4 min-h-[480px]">
+        <div className="overflow-x-auto pb-4">
+        <div className="inline-flex min-h-[480px] rounded-xl bg-white/[.02] divide-x divide-white/[.06]">
           {pipelineStages.map(stage => {
             const col = columns[stage.id];
             const stageLeads = col?.leads ?? [];
@@ -197,8 +188,8 @@ export function CrmLeadsKanban({ stages, outcome, currentUserName, onSelectLead,
             return (
               <div
                 key={stage.id}
-                className={`w-[280px] shrink-0 flex flex-col rounded-xl border transition-colors duration-200 ${
-                  isOver ? "border-[#0f7eff]/40 bg-[#0f7eff]/[.04]" : "border-white/[.08] bg-white/[.02]"
+                className={`w-[280px] shrink-0 flex flex-col transition-colors duration-200 ${
+                  isOver ? "bg-[#0f7eff]/[.06]" : ""
                 }`}
                 onDragOver={e => {
                   e.preventDefault();
@@ -216,7 +207,14 @@ export function CrmLeadsKanban({ stages, outcome, currentUserName, onSelectLead,
               >
                 <div className="px-4 py-3 border-b border-white/[.06]">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
+                    {(() => {
+                      const StageIcon = resolveCrmStageIcon(stage.icon);
+                      return (
+                        <span className="w-6 h-6 rounded-lg bg-white/[.08] flex items-center justify-center shrink-0">
+                          <StageIcon className="w-3.5 h-3.5" style={{ color: stage.color }} />
+                        </span>
+                      );
+                    })()}
                     <span className="text-sm font-semibold text-white truncate">{stage.name}</span>
                   </div>
                   <div className="flex items-baseline justify-between gap-2 mt-1">
@@ -230,7 +228,7 @@ export function CrmLeadsKanban({ stages, outcome, currentUserName, onSelectLead,
                     )}
                   </div>
                 </div>
-                <div className="flex-1 p-3 space-y-2 overflow-y-auto max-h-[calc(100vh-320px)] min-h-[120px]">
+                <div className="flex-1 p-2.5 space-y-1.5 overflow-y-auto max-h-[calc(100vh-320px)] min-h-[120px]">
                   {stageLeads.map(lead => (
                     <div
                       key={lead.id}
@@ -245,12 +243,12 @@ export function CrmLeadsKanban({ stages, outcome, currentUserName, onSelectLead,
                         setOverStageId(null);
                       }}
                       onClick={() => onSelectLead(lead.id)}
-                      className={`group cursor-grab active:cursor-grabbing rounded-lg border border-white/[.08] bg-white/[.03] px-3 py-2.5 transition-colors hover:bg-white/[.05] ${
+                      className={`group cursor-grab active:cursor-grabbing rounded-xl border border-white/[.07] bg-white/[.045] px-2.5 py-2 shadow-sm shadow-black/10 transition-all hover:border-white/[.12] hover:bg-white/[.075] hover:shadow-lg hover:shadow-black/25 hover:-translate-y-0.5 ${
                         dragId === lead.id ? "opacity-40" : ""
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-medium text-white truncate">{lead.title}</p>
+                        <p className="text-[13px] font-medium text-white truncate leading-snug">{lead.title}</p>
                         {lead.temperatura && (
                           <span
                             className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase ${
@@ -266,28 +264,28 @@ export function CrmLeadsKanban({ stages, outcome, currentUserName, onSelectLead,
                         )}
                       </div>
                       {lead.contact?.name && (
-                        <p className="text-xs text-gray-400 mt-0.5 truncate">{lead.contact.name}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5 truncate">{lead.contact.name}</p>
                       )}
                       {typeof lead.metadata?.placa === "string" && lead.metadata.placa && (
-                        <PlateBadge plate={lead.metadata.placa} className="mt-1.5" />
+                        <PlateBadge plate={lead.metadata.placa} className="mt-1" />
                       )}
                       {(lead.categoria_interes || lead.producto_interes) && (
-                        <p className="mt-2 text-[11px] leading-snug text-gray-400 line-clamp-2">
+                        <p className="mt-1 text-[11px] leading-snug text-gray-400 line-clamp-2">
                           {[lead.categoria_interes, lead.producto_interes].filter(Boolean).join(" · ")}
                         </p>
                       )}
-                      <div className="mt-2 flex items-center justify-between gap-2 text-[10px]">
+                      <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px]">
                         <span className="text-gray-500 tabular-nums">
                           {lead.dias_en_etapa != null && lead.dias_en_etapa > 0
                             ? `${lead.dias_en_etapa}d en etapa`
                             : "—"}
                         </span>
-                        <span className="text-xs font-semibold text-[#99c9ff] tabular-nums shrink-0">
+                        <span className="rounded-md bg-[#0f7eff]/[.12] px-1.5 py-0.5 text-xs font-semibold text-[#99c9ff] tabular-nums shrink-0">
                           {formatLeadValue(lead.value_amount, lead.currency)}
                         </span>
                       </div>
                       {lead.asesor_responsable && (
-                        <p className="mt-1 text-[10px] text-gray-500 truncate">
+                        <p className="mt-0.5 text-[10px] text-gray-500 truncate">
                           {lead.asesor_responsable}
                         </p>
                       )}
@@ -316,6 +314,7 @@ export function CrmLeadsKanban({ stages, outcome, currentUserName, onSelectLead,
               </div>
             );
           })}
+        </div>
         </div>
       )}
     </div>

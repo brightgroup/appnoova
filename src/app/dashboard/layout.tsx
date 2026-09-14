@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LogOut, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Bot, Building2, Loader2, Share2, Contact, Database, Plug, Workflow, Boxes, ShieldCheck } from "lucide-react";
+import { LogOut, ChevronLeft, ChevronRight, BarChart3, Radio, MessageSquare, Target, Building2, Loader2, Share2, Contact, Database, Plug, Workflow, Boxes, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { NoovaLogo } from "@/components/brand/NoovaLogo";
+import { OriAnimatedIcon } from "@/components/icons/OriAnimatedIcon";
 import { authFetch } from "@/lib/telephony-api";
 import {
   sidebarNavActive, sidebarNavIdle, sidebarPlanCard
@@ -119,6 +120,7 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
   const showTablesSection = permFlags.can_view_campaigns;
   const showErpSection = modules.erp && permFlags.can_view_erp;
   const showSegurosSection = modules.seguros && permFlags.can_view_seguros;
+  const crmNavItems = CRM_NAV.filter(item => !item.requiresModule || modules[item.requiresModule]);
 
   useEffect(() => {
     if (!checked) return;
@@ -424,7 +426,7 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
               )}
             </button>
             {sidebarOpen && expandedMenu === "crm" && (
-              <SidebarSubMenu pathname={pathname} items={CRM_NAV} />
+              <SidebarSubMenu pathname={pathname} items={crmNavItems} />
             )}
           </div>
           )}
@@ -525,14 +527,22 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
           >
             {sidebarOpen ? (
               <>
-                <Bot className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.ori}`} />
+                <OriAnimatedIcon
+                  state="idle"
+                  variant="hole"
+                  className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.ori}`}
+                />
                 <div className="flex-1 flex items-center gap-2">
                   <span>ORI</span>
                   <Badge variant="accent">Copiloto</Badge>
                 </div>
               </>
             ) : (
-              <Bot className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.ori}`} />
+              <OriAnimatedIcon
+                state="idle"
+                variant="hole"
+                className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.ori}`}
+              />
             )}
           </Link>
 
@@ -653,7 +663,6 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
             <SidebarAccountMenu
               name={profileName}
               email={profileEmail}
-              compact={!sidebarOpen}
               showBilling={permFlags.can_view_billing}
               showTeam={permFlags.can_view_team}
             />

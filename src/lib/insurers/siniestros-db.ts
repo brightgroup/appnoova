@@ -177,6 +177,59 @@ export async function updateSiniestroChecklistItem(
   return toRecord(data as SiniestroRow);
 }
 
+/**
+ * Upsert de un siniestro traído de Softseguros — no reutiliza createSiniestro porque ese deriva el
+ * estado del checklist de documentos (un concepto que Softseguros no tiene). Dedup por
+ * metadata->>'softseguros_id', igual criterio que upsertPolizaPorNumero.
+ */
+export async function upsertSiniestroDesdeSoftseguros(
+  db: SupabaseClient,
+  organizationId: string,
+  params: {
+    softsegurosId: string;
+    polizaId: string | null;
+    contactId: string | null;
+    aseguradora: string;
+    ramo: string;
+    descripcion: string | null;
+    fechaOcurrencia: string | null;
+    fechaAviso: string;
+    estado: SiniestroEstado;
+  }
+): Promise<{ created: boolean }> {
+  const { data: existing } = await db
+    .from("siniestros")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("metadata->>softseguros_id", params.softsegurosId)
+    .maybeSingle();
+
+  const payload = {
+    organization_id: organizationId,
+    poliza_id: params.polizaId,
+    contact_id: params.contactId,
+    source: "softseguros" as const,
+    aseguradora: params.aseguradora,
+    ramo: params.ramo,
+    descripcion: params.descripcion,
+    fecha_ocurrencia: params.fechaOcurrencia,
+    fecha_aviso: params.fechaAviso,
+    estado: params.estado,
+    metadata: { softseguros_id: params.softsegurosId },
+    updated_at: new Date().toISOString()
+  };
+
+  if (existing) {
+    const { error } = await db.from("siniestros").update(payload).eq("id", existing.id);
+    if (error) throw new Error(error.message);
+    return { created: false };
+  }
+
+  const { error } = await db.from("siniestros").insert(payload);
+  if (error) throw new Error(error.message);
+  return { created: true };
+}
+
 export async function updateSiniestroEstado(
   db: SupabaseClient,
   organizationId: string,

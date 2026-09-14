@@ -2,14 +2,10 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, Check, Loader2, Webhook, Mail, Shield } from "lucide-react";
+import { Search, X, Check, Loader2 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
-import { GoogleCalendarLogo } from "@/components/icons/brands/GoogleCalendarLogo";
-import { HubSpotLogo } from "@/components/icons/brands/HubSpotLogo";
+import { ConnectorIconTile } from "@/components/automations/ConnectorIconTile";
 import { Badge } from "@/components/ui/Badge";
-import { CollapsibleGroup } from "@/components/ui/CollapsibleGroup";
-import { InsurerConnectorRow } from "@/components/automations/InsurerConnectorRow";
-import { VehicleDataConnectorRow } from "@/components/automations/VehicleDataConnectorRow";
 import { btnPrimary, btnGhost, modalInput } from "@/lib/brand-ui";
 
 interface ExploreConnectorsModalProps {
@@ -63,53 +59,59 @@ export function ExploreConnectorsModal({
 
     if (showAseguradoras) {
       list.push({
-        key: "aseguradoras",
-        searchTerms: "aseguradoras la equidad seguros",
+        key: "la-equidad",
+        searchTerms: "la equidad seguros aseguradora",
         render: () => (
-          <CollapsibleGroup
-            key="aseguradoras"
-            icon={<Shield className="w-5 h-5 text-[#6f95f2]" />}
-            iconBg="bg-[#2463eb]/15"
-            name="Aseguradoras"
-            publisher="Por Noova · Seguros"
-            description="Cada corredor conecta sus propias credenciales por aseguradora."
-          >
-            <InsurerConnectorRow providerKey="la_equidad" letters="LE" name="La Equidad Seguros" />
-            <div className="border-t border-white/5">
-              <VehicleDataConnectorRow
-                providerKey="placapi"
-                letters="PK"
-                name="PlacApi (tu propia cuenta)"
-                fieldLabel="API key de PlacApi"
-                helpText="Si ya usas PlacApi por tu cuenta (fuera de Noova), pega acá tu API key para que el cotizador de autos use tu cuenta en vez de la de Noova."
-              />
-            </div>
-            <div className="border-t border-white/5">
-              <VehicleDataConnectorRow
-                providerKey="verifik"
-                letters="VK"
-                name="Verifik (tu propia cuenta)"
-                fieldLabel="Token de Verifik (JWT)"
-                helpText="Si ya usas Verifik por tu cuenta (fuera de Noova), pega acá el token de tu panel (Settings → API Key) para que el cotizador de autos use tu cuenta en vez de la de Noova."
-              />
-            </div>
-          </CollapsibleGroup>
+          <ConnectorCard
+            key="la-equidad"
+            id="la-equidad"
+            name="La Equidad Seguros"
+            description="Cotiza autos con tarifa real usando tu propio usuario de agente."
+            connected={false}
+            onConnect={() => { close(); router.push("/dashboard/conectores/la-equidad"); }}
+          />
         )
       });
       list.push({
         key: "softseguros",
-        searchTerms: "softseguros seguros cartera pólizas",
+        searchTerms: "softseguros seguros cartera pólizas siniestros crm corredor",
         render: () => (
-          <CollapsibleGroup
+          <ConnectorCard
             key="softseguros"
-            icon={<span className="text-xs font-bold text-[#6f95f2]">SS</span>}
-            iconBg="bg-[#2463eb]/15"
+            id="softseguros"
             name="Softseguros"
-            publisher="Por Noova · Seguros"
-            description="Lee tu cartera de pólizas directo desde Softseguros."
-          >
-            <InsurerConnectorRow providerKey="softseguros" letters="SS" name="Softseguros" />
-          </CollapsibleGroup>
+            description="Sincroniza pólizas y siniestros, y da a ORI acceso en vivo a tus clientes."
+            connected={false}
+            onConnect={() => { close(); router.push("/dashboard/conectores/softseguros"); }}
+          />
+        )
+      });
+      list.push({
+        key: "verifik",
+        searchTerms: "verifik placa vehiculo datos",
+        render: () => (
+          <ConnectorCard
+            key="verifik"
+            id="verifik"
+            name="Verifik"
+            description="Opcional — usa tu propia cuenta para consultar placas."
+            connected={false}
+            onConnect={() => { close(); router.push("/dashboard/conectores/verifik"); }}
+          />
+        )
+      });
+      list.push({
+        key: "placapi",
+        searchTerms: "placapi placa vehiculo datos",
+        render: () => (
+          <ConnectorCard
+            key="placapi"
+            id="placapi"
+            name="PlacApi"
+            description="Opcional — usa tu propia cuenta para consultar placas."
+            connected={false}
+            onConnect={() => { close(); router.push("/dashboard/conectores/placapi"); }}
+          />
         )
       });
     }
@@ -120,8 +122,7 @@ export function ExploreConnectorsModal({
       render: () => (
         <ConnectorCard
           key="google-calendar"
-          icon={<GoogleCalendarLogo className="w-5 h-5 text-[#4285f4]" />}
-          iconBg="bg-[#4285f4]/15"
+          id="google-calendar"
           name="Google Calendar"
           description="Agenda citas directo desde la conversación."
           connected={false}
@@ -139,8 +140,7 @@ export function ExploreConnectorsModal({
       render: () => (
         <ConnectorCard
           key="hubspot"
-          icon={<HubSpotLogo className="w-5 h-5 text-[#ff7a59]" />}
-          iconBg="bg-[#ff7a59]/15"
+          id="hubspot"
           name="HubSpot"
           description="Automatiza acciones sobre tus conversaciones."
           connected={false}
@@ -158,8 +158,7 @@ export function ExploreConnectorsModal({
       render: () => (
         <ConnectorCard
           key="gmail"
-          icon={<Mail className="w-5 h-5 text-[#ea4335]" />}
-          iconBg="bg-[#ea4335]/15"
+          id="gmail"
           name="Gmail"
           description="Lee y responde correos de tus clientes."
           comingSoon
@@ -170,14 +169,14 @@ export function ExploreConnectorsModal({
 
     list.push({
       key: "webhook",
-      searchTerms: "webhook propio n8n zapier automatización",
+      searchTerms: "webhook propio n8n zapier automatización saliente",
       render: () => (
         <ConnectorCard
           key="webhook"
-          icon={<Webhook className="w-5 h-5 text-gray-300" />}
-          iconBg="bg-white/[.08]"
+          id="webhook"
           name="Webhook propio"
-          description="Conecta cualquier sistema propio con una URL y un secreto."
+          nameBadge={<Badge variant="neutral">Saliente</Badge>}
+          description="Nosotros empujamos datos hacia una URL tuya — no es una conexión autenticada a un sistema externo, como sí lo son los conectores de arriba."
           connected={false}
           onConnect={() => openForm("")}
         />
@@ -340,18 +339,19 @@ export function ExploreConnectorsModal({
 }
 
 function ConnectorCard({
-  icon,
-  iconBg,
+  id,
   name,
+  nameBadge,
   description,
   connected,
   comingSoon,
   onConnect,
   onNotify
 }: {
-  icon: React.ReactNode;
-  iconBg: string;
+  id: string;
   name: string;
+  /** Chip pequeño junto al nombre — usado hoy para marcar "Webhook propio" como Saliente, no como conector autenticado. */
+  nameBadge?: React.ReactNode;
   description: string;
   connected?: boolean;
   comingSoon?: boolean;
@@ -360,9 +360,12 @@ function ConnectorCard({
 }) {
   return (
     <div className="rounded-xl border border-white/[.08] bg-black/20 p-4 flex items-start gap-3">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>{icon}</div>
+      <ConnectorIconTile id={id} size="lg" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold text-white">{name}</p>
+        <p className="text-sm font-bold text-white flex items-center gap-1.5">
+          {name}
+          {nameBadge}
+        </p>
         <p className="text-xs text-gray-400 leading-relaxed mt-0.5">{description}</p>
       </div>
       <div className="shrink-0 pt-0.5">

@@ -50,8 +50,20 @@ export async function POST(req: NextRequest) {
     .eq("user_id", userId)
     .maybeSingle();
 
+  // Para que el inbox pueda ofrecer "Ver oportunidad →" sin una consulta aparte.
+  const { data: lead } = await db
+    .from("crm_leads")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("contact_id", result.contactId)
+    .eq("outcome", "open")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   return NextResponse.json({
     contact: row ? toCrmContact(row) : null,
-    contact_id: result.contactId
+    contact_id: result.contactId,
+    crm_lead_id: lead?.id ?? null
   });
 }

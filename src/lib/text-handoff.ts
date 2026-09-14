@@ -5,6 +5,8 @@ import { normalizeNotifyTeamRules, type NotifyTeamRules } from "@/lib/text-notif
 import { sendWhatsAppTemplateMessage } from "@/lib/whatsapp/send-transport";
 import { getApprovedSingleVarTemplate } from "@/lib/whatsapp/notify-template";
 import { getOrgInboxTeamUserIds } from "@/lib/push/team";
+import { resolveLeadForConversation } from "@/lib/crm-lead-lookup";
+import { getAppBaseUrl } from "@/lib/telephony/app-url";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 
 /** Mensaje al visitante al pasar a cola humana (sin nombre de asesor). */
@@ -200,6 +202,14 @@ export async function escalateConversationToHuman(
     return { escalated: true, emailSent: false };
   }
 
+  // El lead frecuentemente no existe todavía (su creación es async y gateada
+  // por IA, ver crm-auto-enrich.ts) — degrada bien: sin lead, el aviso solo
+  // trae el link al inbox de siempre, nunca falla por esto.
+  const lead = input.organizationId
+    ? await resolveLeadForConversation(input.db, input.organizationId, input.conversationId)
+    : null;
+  const leadUrl = lead ? `${getAppBaseUrl()}/dashboard/crm/leads/${lead.leadId}` : null;
+
   const notifyCtx: HandoffNotifyContext = {
     organizationId: input.organizationId,
     conversationId: input.conversationId,
@@ -207,7 +217,8 @@ export async function escalateConversationToHuman(
     agentName: input.agentName ?? null,
     contactLabel,
     visitorMessage: input.visitorMessage ?? null,
-    reason: input.reason
+    reason: input.reason,
+    leadUrl
   };
 
   let emailSent = false;
@@ -220,11 +231,12 @@ export async function escalateConversationToHuman(
   }
 
   if (rule.push) {
-    // No bloquea ni depende del email.
+    // No bloquea ni depende del email. Si ya hay lead, lleva directo a la
+    // oportunidad (mobile); si no, al chat de siempre.
     void notifyPushForOrg(input.organizationId, {
       title: "Nueva conversación esperando asesor",
       body: `${contactLabel || "Visitante"} · ${channelLabel(channel)}`,
-      url: `/m/chats/${input.conversationId}`,
+      url: lead ? `/m/leads/${lead.leadId}` : `/m/chats/${input.conversationId}`,
       tag: `handoff-${input.conversationId}`
     });
   }
