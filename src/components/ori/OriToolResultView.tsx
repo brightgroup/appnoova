@@ -6,9 +6,12 @@ import {
   toolMovementRows,
   toolTruncationCaption,
   toolInsuranceQuote,
-  type OriToolCall
+  toolQuoteResultPreview,
+  type OriToolCall,
+  type QuoteResultPreview
 } from "@/types/ori";
 import { AutoQuoteCard } from "@/components/insurers/AutoQuoteCard";
+import { QuoteResultPreviewCard } from "@/components/insurers/QuoteResultPreviewCard";
 
 /**
  * Renderiza los resultados de las tools de Ori como tabla real — los números
@@ -18,11 +21,14 @@ import { AutoQuoteCard } from "@/components/insurers/AutoQuoteCard";
  */
 export function OriToolResultView({
   toolCalls,
-  onSendMessage
+  onSendMessage,
+  onUseQuotePreview
 }: {
   toolCalls: OriToolCall[];
   /** Necesario solo si alguna tool (ej. cotizar_seguro_auto) pide continuar la conversación desde su propia tarjeta. */
   onSendMessage?: (text: string) => void;
+  /** Necesario solo en la ficha de cotización — recibe la previsualización de estructurar_resultado_cotizacion para rellenar el formulario real. */
+  onUseQuotePreview?: (preview: QuoteResultPreview) => void;
 }) {
   if (!toolCalls.length) return null;
 
@@ -33,9 +39,14 @@ export function OriToolResultView({
         const movimientos = toolMovementRows(call);
         const caption = toolTruncationCaption(call);
         const quote = toolInsuranceQuote(call);
+        const quotePreview = toolQuoteResultPreview(call);
 
         if (quote && onSendMessage) {
           return <AutoQuoteCard key={i} result={quote.result} ramo={quote.ramo} onSendMessage={onSendMessage} />;
+        }
+
+        if (quotePreview && onUseQuotePreview) {
+          return <QuoteResultPreviewCard key={i} preview={quotePreview} onUse={onUseQuotePreview} />;
         }
 
         if (productos.length > 0) {

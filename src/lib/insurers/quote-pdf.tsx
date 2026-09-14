@@ -22,8 +22,18 @@ const styles = StyleSheet.create({
   },
   primaLabel: { fontSize: 11, color: "#333" },
   primaValue: { fontSize: 20, fontWeight: 700, color: "#0f7eff" },
+  checkRow: { flexDirection: "row", marginBottom: 4 },
+  checkMark: { width: 14, color: "#0f7eff", fontWeight: 700 },
+  checkText: { flex: 1 },
   footer: { position: "absolute", bottom: 30, left: 40, right: 40, fontSize: 8, color: "#999", textAlign: "center" }
 });
+
+const PERIODICIDAD_LABEL: Record<string, string> = {
+  mensual: "Mensual",
+  anual: "Anual",
+  mensual_y_anual: "Mensual y anual",
+  pago_unico: "Pago único"
+};
 
 function formatCop(value: number | null | undefined): string {
   if (value == null) return "Por confirmar";
@@ -39,7 +49,7 @@ function formatDate(value: string | null | undefined): string {
   }
 }
 
-const RAMO_LABEL: Record<string, string> = { autos: "Seguro de Auto", vida: "Seguro de Vida", hogar: "Seguro de Hogar" };
+const RAMO_LABEL: Record<string, string> = { autos: "Seguro de Auto", vida: "Seguro de Vida", hogar: "Seguro de Hogar", salud: "Seguro de Salud" };
 
 export function QuotePdfDocument({ quote, companyName }: { quote: QuoteRequestRecord; companyName: string }) {
   const vehiculo = quote.vehiculo as { marca?: string; linea?: string; modelo?: number; codigo_fasecolda?: string };
@@ -107,17 +117,66 @@ export function QuotePdfDocument({ quote, companyName }: { quote: QuoteRequestRe
             <Text style={styles.label}>Aseguradora</Text>
             <Text style={styles.value}>{quote.resultado?.aseguradora ?? "Por confirmar"}</Text>
           </View>
+          {quote.resultado?.nombre_plan && (
+            <View style={styles.row}>
+              <Text style={styles.label}>Plan</Text>
+              <Text style={styles.value}>{quote.resultado.nombre_plan}</Text>
+            </View>
+          )}
+          {quote.resultado?.periodicidad && (
+            <View style={styles.row}>
+              <Text style={styles.label}>Frecuencia de pago</Text>
+              <Text style={styles.value}>{PERIODICIDAD_LABEL[quote.resultado.periodicidad] ?? quote.resultado.periodicidad}</Text>
+            </View>
+          )}
           <View style={styles.row}>
             <Text style={styles.label}>Vigencia</Text>
             <Text style={styles.value}>
               {formatDate(quote.resultado?.vigencia_desde)} — {formatDate(quote.resultado?.vigencia_hasta)}
             </Text>
           </View>
+          {quote.resultado?.descripcion && (
+            <View style={styles.row}>
+              <Text style={styles.label}>Nota</Text>
+              <Text style={styles.value}>{quote.resultado.descripcion}</Text>
+            </View>
+          )}
           <View style={styles.primaBox}>
-            <Text style={styles.primaLabel}>Prima total</Text>
-            <Text style={styles.primaValue}>{formatCop(quote.resultado?.prima)}</Text>
+            <Text style={styles.primaLabel}>Prima {quote.resultado?.periodicidad === "anual" ? "anual" : "mensual"}</Text>
+            <Text style={styles.primaValue}>
+              {formatCop(quote.resultado?.prima ?? quote.resultado?.prima_anual)}
+            </Text>
           </View>
+          {quote.resultado?.prima_anual != null && quote.resultado?.prima != null && (
+            <Text style={{ fontSize: 9, color: "#666", marginTop: 4 }}>
+              Equivalente anual: {formatCop(quote.resultado.prima_anual)}
+            </Text>
+          )}
         </View>
+
+        {quote.resultado?.incluye && quote.resultado.incluye.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Qué incluye</Text>
+            {quote.resultado.incluye.map((item, i) => (
+              <View style={styles.checkRow} key={i}>
+                <Text style={styles.checkMark}>✓</Text>
+                <Text style={styles.checkText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {quote.resultado?.beneficios && quote.resultado.beneficios.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Beneficios adicionales</Text>
+            {quote.resultado.beneficios.map((item, i) => (
+              <View style={styles.checkRow} key={i}>
+                <Text style={styles.checkMark}>•</Text>
+                <Text style={styles.checkText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         <Text style={styles.footer}>
           Esta cotización es una referencia informativa, sujeta a la confirmación final de la aseguradora. Generada

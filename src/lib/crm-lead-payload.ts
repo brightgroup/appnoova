@@ -82,26 +82,31 @@ export function buildLeadRowFromBody(
     row.stage_entered_at = new Date().toISOString();
   }
 
-  const outcome = (row.outcome ?? body.outcome ?? "open") as CrmLeadOutcome;
-  const validationError = validateLeadPayload({
-    outcome,
-    contact_id:
-      row.contact_id !== undefined
-        ? (row.contact_id as string | null)
-        : body.contact_id
-          ? String(body.contact_id)
-          : null,
-    motivo_perdida:
-      row.motivo_perdida !== undefined
-        ? (row.motivo_perdida as CrmMotivoPerdida | null)
-        : body.motivo_perdida
-          ? parseEnum(body.motivo_perdida, MOTIVOS)
-          : null,
-    isCreate: opts.isCreate
-  });
+  // Esta validación solo aplica a la creación: acá "contact_id" solo puede
+  // salir del body porque todavía no existe una fila en la base. Para un
+  // PATCH (edición parcial — ej. arrastrar un lead a otra etapa en el
+  // Kanban, que solo manda stage_id/sort_order) no hay por qué exigir
+  // contact_id en el body — la ruta de PATCH ya valida esto por su cuenta
+  // con el contact_id real del lead existente (ver validateLeadPatch en
+  // /api/crm/leads/[id]). Validarlo también acá, sin el dato del lead
+  // existente, rechazaba cualquier PATCH que no repitiera el contact_id.
+  if (opts.isCreate) {
+    const outcome = (row.outcome ?? body.outcome ?? "open") as CrmLeadOutcome;
+    const validationError = validateLeadPayload({
+      outcome,
+      contact_id: row.contact_id !== undefined ? (row.contact_id as string | null) : null,
+      motivo_perdida:
+        row.motivo_perdida !== undefined
+          ? (row.motivo_perdida as CrmMotivoPerdida | null)
+          : body.motivo_perdida
+            ? parseEnum(body.motivo_perdida, MOTIVOS)
+            : null,
+      isCreate: opts.isCreate
+    });
 
-  if (validationError) {
-    return { row, error: validationError };
+    if (validationError) {
+      return { row, error: validationError };
+    }
   }
 
   return { row, error: null };

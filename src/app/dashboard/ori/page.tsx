@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Sparkles, History, FileText, Users, RefreshCw,
   Mail, Phone, Loader2, Plus, Mic, ArrowUp, Shield
@@ -57,6 +58,9 @@ const QUICK_ACTIONS = [
 
 export default function OriCopilotoPage() {
   const { modules } = useOrgPermissions();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const prefillHandled = useRef(false);
   const [userName, setUserName] = useState("Usuario");
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -67,6 +71,7 @@ export default function OriCopilotoPage() {
   const [model, setModel] = useState<string>(DEFAULT_TEXT_MODEL);
   const [connectorsMenuOpen, setConnectorsMenuOpen] = useState(false);
   const [exploreOpen, setExploreOpen] = useState(false);
+  const [quoteId, setQuoteId] = useState("");
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasChat = messages.length > 0;
@@ -123,7 +128,7 @@ export default function OriCopilotoPage() {
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages, loading, hasChat]);
 
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string, quoteIdOverride?: string) => {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
 
@@ -142,7 +147,8 @@ export default function OriCopilotoPage() {
         body: JSON.stringify({
           messages: nextMessages,
           company_context_id: contextId || undefined,
-          model
+          model,
+          quote_id: (quoteIdOverride ?? quoteId) || undefined
         })
       });
       const data = await res.json();
@@ -159,7 +165,17 @@ export default function OriCopilotoPage() {
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, contextId, model]);
+  }, [messages, loading, contextId, model, quoteId]);
+
+  useEffect(() => {
+    if (prefillHandled.current) return;
+    const qid = searchParams.get("quote_id");
+    if (!qid) return;
+    prefillHandled.current = true;
+    setQuoteId(qid);
+    router.replace("/dashboard/ori");
+    sendMessage("Ayúdame a avanzar con esta solicitud pendiente.", qid);
+  }, [searchParams, router, sendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -172,6 +188,7 @@ export default function OriCopilotoPage() {
     setMessages([]);
     setInput("");
     setError("");
+    setQuoteId("");
     textareaRef.current?.focus();
   };
 

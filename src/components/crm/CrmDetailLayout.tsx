@@ -74,7 +74,7 @@ export function CrmDetailLayout({
             <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando…
           </div>
         ) : (
-          <div className={wide ? "max-w-3xl" : "max-w-2xl"}>{children}</div>
+          <div className={wide ? "max-w-6xl" : "max-w-2xl"}>{children}</div>
         )}
       </div>
     </div>

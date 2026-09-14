@@ -24,8 +24,9 @@ import { providerForLlmModel } from "@/lib/billing/pricing";
 import { getOriInventoryAccess } from "@/lib/erp/ori-access-db";
 import { getOriSegurosAccess } from "@/lib/insurers/ori-seguros-access";
 import { cotizarSeguroAutoTool } from "@/lib/agent-tools/auto-quote-ori-tool";
-import { calificarSeguroVidaOriTool } from "@/lib/agent-tools/life-quote-ori-tool";
-import { calificarSeguroHogarOriTool } from "@/lib/agent-tools/home-quote-ori-tool";
+import { iniciarCotizacionSeguroOriTool, registrarDatoCotizacionOriTool } from "@/lib/agent-tools/generic-quote-ori-tools";
+import { estructurarResultadoCotizacionOriTool } from "@/lib/agent-tools/quote-result-ori-tool";
+import { getQuoteGuidanceById } from "@/lib/insurers/quote-guidance";
 import {
   consultarCotizacionesPendientesTool,
   solicitarCotizacionSeguroTool,
@@ -129,13 +130,15 @@ export async function POST(req: NextRequest) {
   // erp_ori_access; seguros: módulo seguros encendido, ver
   // src/lib/insurers/ori-seguros-access.ts) y se componen acá.
   const oriTools: OriToolDefinition[] = [];
+  let quoteContextBlock = "";
+  const quoteId = typeof body.quote_id === "string" ? body.quote_id.trim() : "";
   if (billing.organizationId) {
     if (await getOriInventoryAccess(billingDb, billing.organizationId)) oriTools.push(...ORI_TOOLS);
     if (await getOriSegurosAccess(billingDb, billing.organizationId)) {
       oriTools.push(
         cotizarSeguroAutoTool,
-        calificarSeguroVidaOriTool,
-        calificarSeguroHogarOriTool,
+        iniciarCotizacionSeguroOriTool,
+        registrarDatoCotizacionOriTool,
         consultarCotizacionesPendientesTool,
         solicitarCotizacionSeguroTool,
         guiarCotizacionSeguroTool,
@@ -143,6 +146,53 @@ export async function POST(req: NextRequest) {
         buscarClienteSoftsegurosTool,
         consultarSiniestrosSoftsegurosTool
       );
+
+      // Chat embebido en la ficha de una cotización (/dashboard/crm/cotizaciones/[id]) y
+      // salto desde ahí al copiloto de página completa (dashboard/ori/page.tsx, ?quote_id=) —
+      // ver plan "Módulo Cotizaciones en CRM". Le contamos a ORI qué ya se sabe de ESTA
+      // cotización puntual para que no repregunte, y el paso siguiente según guidance.step
+      // (mismo cálculo que la ficha usa para decidir qué botón mostrar — nunca deben
+      // desincronizarse sobre si hay o no aseguradora conectada).
+      if (quoteId) {
+        const guidance = await getQuoteGuidanceById(billingDb, billing.organizationId, quoteId);
+        if (guidance?.quote) {
+          const q = guidance.quote;
+          const campos = guidance.ramoCampos
+            .map(c => `${c.label}: ${c.value != null && c.value !== "" ? String(c.value) : "sin responder"}`)
+            .join("; ");
+          const datosConocidos = [
+            q.tomador.nombre_tomador ? `Tomador: ${q.tomador.nombre_tomador}.` : "",
+            q.tomador.documento_tomador ? `Documento: ${q.tomador.documento_tomador}.` : "",
+            q.tomador.fecha_nacimiento_tomador ? `Fecha de nacimiento: ${q.tomador.fecha_nacimiento_tomador}.` : "",
+            q.placa ? `Placa: ${q.placa}.` : "",
+            campos ? `Datos del riesgo ya capturados: ${campos}.` : ""
+          ]
+            .filter(Boolean)
+            .join(" ");
+
+          if (guidance.step === "cotizar_automatico") {
+            oriTools.push(estructurarResultadoCotizacionOriTool);
+            quoteContextBlock = [
+              `Contexto de esta conversación: el asesor abrió el chat desde una solicitud pendiente de seguro de ${q.ramo} (id ${q.id}).`,
+              datosConocidos,
+              "Esta organización SÍ tiene una aseguradora conectada que cotiza este ramo en automático. Empieza confirmándole al asesor los datos de arriba (por si falta algo o quiere corregir uno) y pregúntale si quiere que cotices automáticamente ahora con cotizar_seguro_auto, o si prefiere dictarte él mismo un resultado que ya consiguió por fuera (en ese caso usa estructurar_resultado_cotizacion). Nunca llames a cotizar_seguro_auto sin que el asesor te confirme que sí."
+            ]
+              .filter(Boolean)
+              .join(" ");
+          } else if (guidance.step === "registrar_manual") {
+            oriTools.push(estructurarResultadoCotizacionOriTool);
+            quoteContextBlock = [
+              `Contexto de esta conversación: el asesor abrió el chat desde una solicitud pendiente de seguro de ${q.ramo} (id ${q.id}). Todavía no hay ninguna aseguradora conectada para cotizar este ramo en automático.`,
+              datosConocidos,
+              `Empieza confirmándole al asesor los datos de arriba (por si falta algo o quiere corregir uno) y pregúntale si ya tiene un precio real conseguido por fuera. Cuando te lo dicte, usa estructurar_resultado_cotizacion con quote_request_id "${q.id}" — nunca inventes un precio o cobertura que el asesor no haya mencionado.`
+            ]
+              .filter(Boolean)
+              .join(" ");
+          } else if (guidance.step === "generar_pdf") {
+            quoteContextBlock = `Contexto de esta conversación: el asesor abrió el chat desde una cotización (id ${q.id}) que ya tiene resultado registrado (${q.resultado?.aseguradora ?? "aseguradora"}, ${q.resultado?.prima ? `$${q.resultado.prima.toLocaleString("es-CO")} COP` : "sin prima registrada"}). Si pregunta qué sigue, dile que puede descargar el PDF o generar el link para el cliente desde la ficha.`;
+          }
+        }
+      }
     }
   }
   const toolsEnabled = oriTools.length > 0;
@@ -152,7 +202,8 @@ export async function POST(req: NextRequest) {
 
   const systemInstruction = [
     buildOriSystemInstruction(companyContextText, platformHelp, temporal.promptBlock),
-    toolsPromptBlock
+    toolsPromptBlock,
+    quoteContextBlock
   ]
     .filter(block => block.trim().length > 0)
     .join("\n\n");

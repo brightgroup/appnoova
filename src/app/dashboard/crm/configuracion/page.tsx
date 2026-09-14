@@ -15,6 +15,7 @@ import { DEFAULT_STAGE_AI_CRITERIA } from "@/lib/crm-lead-ai-shared";
 import { CrmPropertyConfigPanel } from "@/components/crm/CrmPropertyConfigPanel";
 import { CrmTenantLabelsPanel } from "@/components/crm/CrmTenantLabelsPanel";
 import { CreateStageModal } from "@/components/crm/CreateStageModal";
+import { CrmStageIconPicker } from "@/components/crm/CrmStageIconPicker";
 import { DeleteStageModal } from "@/components/crm/DeleteStageModal";
 import type { CrmPipelineStage } from "@/types/crm";
 
@@ -75,7 +76,7 @@ export default function CrmConfigPage() {
     }
   };
 
-  const handleCreateStage = async (payload: { name: string; color: string; ai_enter_criteria: string | null }) => {
+  const handleCreateStage = async (payload: { name: string; color: string; icon: string; ai_enter_criteria: string | null }) => {
     setCreateSaving(true);
     setCreateError(null);
     const headers = await getAuthHeaders();
@@ -141,6 +142,7 @@ export default function CrmConfigPage() {
           name: s.name,
           slug: s.slug,
           color: s.color,
+          icon: s.icon ?? null,
           sort_order: i,
           ai_enter_criteria: s.ai_enter_criteria ?? null
         }))
@@ -235,6 +237,11 @@ export default function CrmConfigPage() {
                         value={stage.color}
                         onChange={e => updateStage(i, { color: e.target.value })}
                         className="w-8 h-8 rounded-lg border-0 bg-transparent cursor-pointer shrink-0"
+                      />
+                      <CrmStageIconPicker
+                        value={stage.icon}
+                        accentColor={stage.color}
+                        onChange={icon => updateStage(i, { icon })}
                       />
                       <input
                         value={stage.name}

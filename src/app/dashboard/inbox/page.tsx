@@ -9,6 +9,7 @@ import {
   ArchiveRestore,
   Bot,
   ChevronDown,
+  ExternalLink,
   FileText,
   Filter,
   Film,
@@ -90,6 +91,7 @@ function InboxPageInner() {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [templateVars, setTemplateVars] = useState<string[]>([]);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: InboxListItem } | null>(null);
+  const [crmLeadId, setCrmLeadId] = useState<string | null>(null);
   const assignRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -396,6 +398,7 @@ function InboxPageInner() {
     setAssignOpen(false);
     setSelectedTemplateId("");
     setTemplateVars([]);
+    setCrmLeadId(null);
 
     if (item.channel === "whatsapp") {
       void getAuthHeaders().then(headers =>
@@ -404,6 +407,9 @@ function InboxPageInner() {
           headers: { ...headers, "Content-Type": "application/json" },
           body: JSON.stringify({ conversation_id: item.id })
         })
+          .then(res => res.json())
+          .then(data => setCrmLeadId(data?.crm_lead_id ?? null))
+          .catch(() => {})
       );
     }
   };
@@ -775,6 +781,15 @@ function InboxPageInner() {
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2 pl-11 lg:pl-0">
+                  {crmLeadId && (
+                    <Link
+                      href={`/dashboard/crm/leads/${crmLeadId}`}
+                      className="flex items-center gap-1.5 rounded-xl border border-[#0f7eff]/20 bg-[#0f7eff]/[.08] px-3 py-2 text-xs font-medium text-[#99c9ff] transition-colors hover:bg-[#0f7eff]/[.15] lg:py-2.5 lg:text-sm"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                      <span className="hidden sm:inline">Ver oportunidad</span>
+                    </Link>
+                  )}
                   {detail?.kind === "text" && (
                     <div className="relative" ref={assignRef}>
                       <button

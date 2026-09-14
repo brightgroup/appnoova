@@ -1,9 +1,11 @@
-// Marca de La Equidad Seguros — path real tomado del favicon público de laequidadseguros.coop (2026-09-09).
+// Marca de La Equidad Seguros — path real tomado del favicon público de laequidadseguros.coop
+// (2026-09-09), color real horneado (no currentColor) para que se vea igual en cualquier lugar
+// donde se use, sin depender de que el caller pase la clase de color correcta.
 import type { SVGProps } from "react";
 
 export function LaEquidadLogo(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 41 40" fill="currentColor" {...props}>
+    <svg viewBox="0 0 41 40" fill="#008C45" {...props}>
       <title>La Equidad Seguros</title>
       <path
         fillRule="evenodd"

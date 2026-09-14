@@ -46,7 +46,8 @@ export function AgentConnectorsPanel({
   const [exploreOpen, setExploreOpen] = useState(false);
   const [editingTable, setEditingTable] = useState(false);
 
-  const hasAseguradoraConnected = connectorItems.some(i => i.group === "Aseguradoras" && i.connected);
+  const INSURER_CONNECTOR_IDS = ["la-equidad", "softseguros", "verifik", "placapi"];
+  const hasAseguradoraConnected = connectorItems.some(i => INSURER_CONNECTOR_IDS.includes(i.id) && i.connected);
   const hasAnyConnector = Boolean(dataTableId) || hasAseguradoraConnected;
   const selectedTable = dataTables.find(t => t.id === dataTableId) ?? null;
 

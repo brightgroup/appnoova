@@ -2,14 +2,9 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, Check, Loader2, Webhook, Mail } from "lucide-react";
+import { Search, X, Check, Loader2 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
-import { GoogleCalendarLogo } from "@/components/icons/brands/GoogleCalendarLogo";
-import { HubSpotLogo } from "@/components/icons/brands/HubSpotLogo";
-import { LaEquidadLogo } from "@/components/icons/brands/LaEquidadLogo";
-import { SoftsegurosLogo } from "@/components/icons/brands/SoftsegurosLogo";
-import { VerifikLogo } from "@/components/icons/brands/VerifikLogo";
-import { PlacApiLogo } from "@/components/icons/brands/PlacApiLogo";
+import { ConnectorIconTile } from "@/components/automations/ConnectorIconTile";
 import { Badge } from "@/components/ui/Badge";
 import { btnPrimary, btnGhost, modalInput } from "@/lib/brand-ui";
 
@@ -64,22 +59,12 @@ export function ExploreConnectorsModal({
 
     if (showAseguradoras) {
       list.push({
-        key: "aseguradoras-heading",
-        searchTerms: "aseguradoras la equidad softseguros verifik placapi seguros crm corredor",
-        render: () => (
-          <p key="aseguradoras-heading" className="sm:col-span-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 mt-1 first:mt-0">
-            Aseguradoras y CRM de corredor
-          </p>
-        )
-      });
-      list.push({
         key: "la-equidad",
         searchTerms: "la equidad seguros aseguradora",
         render: () => (
           <ConnectorCard
             key="la-equidad"
-            icon={<LaEquidadLogo className="w-5 h-5 text-[#008C45]" />}
-            iconBg="bg-[#008C45]/15"
+            id="la-equidad"
             name="La Equidad Seguros"
             description="Cotiza autos con tarifa real usando tu propio usuario de agente."
             connected={false}
@@ -89,14 +74,13 @@ export function ExploreConnectorsModal({
       });
       list.push({
         key: "softseguros",
-        searchTerms: "softseguros seguros cartera pólizas crm corredor",
+        searchTerms: "softseguros seguros cartera pólizas siniestros crm corredor",
         render: () => (
           <ConnectorCard
             key="softseguros"
-            icon={<SoftsegurosLogo className="w-5 h-5" />}
-            iconBg="bg-[#0a3d91]/15"
+            id="softseguros"
             name="Softseguros"
-            description="Lee tu cartera de pólizas directo desde Softseguros."
+            description="Sincroniza pólizas y siniestros, y da a ORI acceso en vivo a tus clientes."
             connected={false}
             onConnect={() => { close(); router.push("/dashboard/conectores/softseguros"); }}
           />
@@ -108,8 +92,7 @@ export function ExploreConnectorsModal({
         render: () => (
           <ConnectorCard
             key="verifik"
-            icon={<VerifikLogo className="w-5 h-5" />}
-            iconBg="bg-[#3b4ae0]/15"
+            id="verifik"
             name="Verifik"
             description="Opcional — usa tu propia cuenta para consultar placas."
             connected={false}
@@ -123,8 +106,7 @@ export function ExploreConnectorsModal({
         render: () => (
           <ConnectorCard
             key="placapi"
-            icon={<PlacApiLogo className="w-5 h-5" />}
-            iconBg="bg-emerald-500/15"
+            id="placapi"
             name="PlacApi"
             description="Opcional — usa tu propia cuenta para consultar placas."
             connected={false}
@@ -140,8 +122,7 @@ export function ExploreConnectorsModal({
       render: () => (
         <ConnectorCard
           key="google-calendar"
-          icon={<GoogleCalendarLogo className="w-5 h-5 text-[#4285f4]" />}
-          iconBg="bg-[#4285f4]/15"
+          id="google-calendar"
           name="Google Calendar"
           description="Agenda citas directo desde la conversación."
           connected={false}
@@ -159,8 +140,7 @@ export function ExploreConnectorsModal({
       render: () => (
         <ConnectorCard
           key="hubspot"
-          icon={<HubSpotLogo className="w-5 h-5 text-[#ff7a59]" />}
-          iconBg="bg-[#ff7a59]/15"
+          id="hubspot"
           name="HubSpot"
           description="Automatiza acciones sobre tus conversaciones."
           connected={false}
@@ -178,8 +158,7 @@ export function ExploreConnectorsModal({
       render: () => (
         <ConnectorCard
           key="gmail"
-          icon={<Mail className="w-5 h-5 text-[#ea4335]" />}
-          iconBg="bg-[#ea4335]/15"
+          id="gmail"
           name="Gmail"
           description="Lee y responde correos de tus clientes."
           comingSoon
@@ -194,8 +173,7 @@ export function ExploreConnectorsModal({
       render: () => (
         <ConnectorCard
           key="webhook"
-          icon={<Webhook className="w-5 h-5 text-gray-300" />}
-          iconBg="bg-white/[.08]"
+          id="webhook"
           name="Webhook propio"
           nameBadge={<Badge variant="neutral">Saliente</Badge>}
           description="Nosotros empujamos datos hacia una URL tuya — no es una conexión autenticada a un sistema externo, como sí lo son los conectores de arriba."
@@ -361,8 +339,7 @@ export function ExploreConnectorsModal({
 }
 
 function ConnectorCard({
-  icon,
-  iconBg,
+  id,
   name,
   nameBadge,
   description,
@@ -371,8 +348,7 @@ function ConnectorCard({
   onConnect,
   onNotify
 }: {
-  icon: React.ReactNode;
-  iconBg: string;
+  id: string;
   name: string;
   /** Chip pequeño junto al nombre — usado hoy para marcar "Webhook propio" como Saliente, no como conector autenticado. */
   nameBadge?: React.ReactNode;
@@ -384,7 +360,7 @@ function ConnectorCard({
 }) {
   return (
     <div className="rounded-xl border border-white/[.08] bg-black/20 p-4 flex items-start gap-3">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>{icon}</div>
+      <ConnectorIconTile id={id} size="lg" />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-bold text-white flex items-center gap-1.5">
           {name}

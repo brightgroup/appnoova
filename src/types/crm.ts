@@ -9,6 +9,8 @@ export interface CrmPipelineStage {
   is_lost: boolean;
   /** Instrucciones para que la IA decida cuándo mover un lead a esta etapa */
   ai_enter_criteria: string | null;
+  /** Nombre de ícono de la biblioteca crm-stage-icons.ts — null = sin asignar, cae a un ícono genérico. */
+  icon: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -49,17 +49,44 @@ export function toolTruncationCaption(call: OriToolCall): string | null {
 
 export type InsuranceQuoteRamo = "autos" | "vida" | "hogar";
 
+/**
+ * Solo autos sigue con tarjeta propia (AutoQuoteCard) en ORI/Mi Link/widget web
+ * — vida, hogar y salud pasaron a las tools genéricas iniciar_cotizacion_seguro/
+ * registrar_dato_cotizacion (ver src/lib/insurers/generic-quote-tool.ts), cuyo
+ * `faltan_datos` ya no es un array de strings sino de objetos {key,label,tipo,
+ * opciones} — generalizar AutoQuoteCard a ese shape es trabajo aparte (otra
+ * superficie, no WhatsApp) que quedó fuera de esta ronda a propósito.
+ */
 const INSURANCE_QUOTE_TOOL_RAMOS: Record<string, InsuranceQuoteRamo> = {
-  cotizar_seguro_auto: "autos",
-  cotizar_seguro_vida: "vida",
-  cotizar_seguro_hogar: "hogar"
+  cotizar_seguro_auto: "autos"
 };
 
-/** Resultado de cualquier tool de cotización de seguros (auto/vida/hogar, ver src/lib/insurers/*-quote-tool.ts) — mismo shape para ORI y agentes, distinguido por ramo. */
+/** Resultado de la tool de cotización de autos (ver src/lib/insurers/auto-quote-tool.ts) — único ramo con tarjeta dedicada hoy. */
 export function toolInsuranceQuote(
   call: { name: string; result: Record<string, unknown> }
 ): { ramo: InsuranceQuoteRamo; result: Record<string, unknown> } | null {
   const ramo = INSURANCE_QUOTE_TOOL_RAMOS[call.name];
   if (!ramo) return null;
   return { ramo, result: call.result };
+}
+
+export interface QuoteResultPreview {
+  quote_request_id: string;
+  ramo: string;
+  aseguradora: string;
+  nombre_plan?: string;
+  descripcion?: string;
+  periodicidad: "mensual" | "anual" | "mensual_y_anual" | "pago_unico";
+  precio_mensual?: number | null;
+  precio_anual?: number | null;
+  incluye?: string[];
+  beneficios?: string[];
+}
+
+/** Previsualización armada por estructurar_resultado_cotizacion (ver src/lib/agent-tools/quote-result-ori-tool.ts) — nunca se guarda sola, el asesor la confirma en la ficha. */
+export function toolQuoteResultPreview(call: OriToolCall): QuoteResultPreview | null {
+  if (call.name !== "estructurar_resultado_cotizacion") return null;
+  if (call.result.ok !== true) return null;
+  const preview = call.result.preview;
+  return preview && typeof preview === "object" ? (preview as QuoteResultPreview) : null;
 }

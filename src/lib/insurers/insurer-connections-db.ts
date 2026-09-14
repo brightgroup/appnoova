@@ -13,6 +13,8 @@ export interface InsurerConnectionRecord {
   providerKey: InsurerProviderKey;
   displayName: string;
   status: InsurerConnectionStatus;
+  /** Slugs de ramos_catalogo que esta aseguradora cotiza — vacío hasta que el corredor los marque. */
+  ramos: string[];
   lastError: string | null;
   lastTestedAt: string | null;
   updatedAt: string;
@@ -26,6 +28,7 @@ interface InsurerConnectionRow {
   display_name: string;
   credentials_enc: string;
   status: string;
+  ramos: string[] | null;
   last_error: string | null;
   last_tested_at: string | null;
   updated_at: string;
@@ -39,6 +42,7 @@ function toPublicRecord(row: InsurerConnectionRow): InsurerConnectionRecord {
     providerKey: row.provider_key as InsurerProviderKey,
     displayName: row.display_name,
     status: row.status as InsurerConnectionStatus,
+    ramos: row.ramos ?? [],
     lastError: row.last_error,
     lastTestedAt: row.last_tested_at,
     updatedAt: row.updated_at,
@@ -139,6 +143,24 @@ export async function upsertInsurerConnection(
     throw new Error(error?.message ?? "No se pudo guardar la conexión de la aseguradora");
   }
   return toPublicRecord(data as InsurerConnectionRow);
+}
+
+export async function updateInsurerConnectionRamos(
+  db: SupabaseClient,
+  organizationId: string,
+  providerKey: InsurerProviderKey,
+  ramos: string[]
+): Promise<InsurerConnectionRecord | null> {
+  const { data, error } = await db
+    .from("insurer_connections")
+    .update({ ramos, updated_at: new Date().toISOString() })
+    .eq("organization_id", organizationId)
+    .eq("provider_key", providerKey)
+    .select("*")
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data ? toPublicRecord(data as InsurerConnectionRow) : null;
 }
 
 export async function markInsurerConnectionResult(

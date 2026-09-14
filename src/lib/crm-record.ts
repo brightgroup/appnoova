@@ -27,6 +27,7 @@ export const DEFAULT_CRM_STAGES: Omit<CrmPipelineStage, "id" | "user_id" | "crea
     sort_order: 0,
     is_won: false,
     is_lost: false,
+    icon: "Sparkles",
     ai_enter_criteria:
       "Lead recién creado o primer mensaje del prospecto sin respuesta del asesor o IA."
   },
@@ -37,6 +38,7 @@ export const DEFAULT_CRM_STAGES: Omit<CrmPipelineStage, "id" | "user_id" | "crea
     sort_order: 1,
     is_won: false,
     is_lost: false,
+    icon: "Phone",
     ai_enter_criteria:
       "Hay diálogo activo: el asesor o la IA ya respondió y la conversación continúa."
   },
@@ -47,6 +49,7 @@ export const DEFAULT_CRM_STAGES: Omit<CrmPipelineStage, "id" | "user_id" | "crea
     sort_order: 2,
     is_won: false,
     is_lost: false,
+    icon: "FileText",
     ai_enter_criteria:
       "El cliente pidió cotización, precio o tarifa; o se envió o discutió una propuesta formal."
   },
@@ -57,6 +60,7 @@ export const DEFAULT_CRM_STAGES: Omit<CrmPipelineStage, "id" | "user_id" | "crea
     sort_order: 3,
     is_won: false,
     is_lost: false,
+    icon: "Handshake",
     ai_enter_criteria:
       "Objeciones, comparación con competencia, negociación de condiciones o cierre pendiente."
   }
@@ -205,6 +209,11 @@ export const INSURANCE_LEAD_PROPERTIES: Omit<
     group_name: "Seguros"
   },
   {
+    // `options` queda sin uso real para el render: CrmLeadForm.tsx saca este
+    // campo del loop genérico y lo pinta con un NoovaSelect propio que lista
+    // el catálogo completo de ramos_catalogo (93 ramos reales de Softseguros)
+    // con ícono estandarizado por ramo — esta definición solo sigue existiendo
+    // porque es la que activa la columna en crm_property_definitions.
     entity_type: "lead",
     field_key: "ramo",
     label: "Ramo",
@@ -399,6 +408,7 @@ export function toCrmStage(raw: Record<string, unknown>): CrmPipelineStage {
     is_won: Boolean(raw.is_won),
     is_lost: Boolean(raw.is_lost),
     ai_enter_criteria: raw.ai_enter_criteria ? String(raw.ai_enter_criteria) : null,
+    icon: raw.icon ? String(raw.icon) : null,
     created_at: String(raw.created_at ?? ""),
     updated_at: String(raw.updated_at ?? "")
   };

@@ -2,12 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plug, Plus, Webhook } from "lucide-react";
+import { Plug, Plus } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
 import { Badge } from "@/components/ui/Badge";
-import { GoogleCalendarLogo } from "@/components/icons/brands/GoogleCalendarLogo";
-import { HubSpotLogo } from "@/components/icons/brands/HubSpotLogo";
+import { ConnectorIconTile } from "@/components/automations/ConnectorIconTile";
 import { ExploreConnectorsModal } from "@/components/automations/ExploreConnectorsModal";
 import { useOrgPermissions } from "@/components/layout/OrgPermissionsProvider";
 import {
@@ -55,13 +54,20 @@ interface ConnectorRow {
   href: string;
 }
 
+const INSURERS: Array<{ id: string; name: string }> = [
+  { id: "la-equidad", name: "La Equidad Seguros" },
+  { id: "softseguros", name: "Softseguros" },
+  { id: "verifik", name: "Verifik" },
+  { id: "placapi", name: "PlacApi" }
+];
+
 export default function ConectoresPage() {
   const router = useRouter();
   const { modules } = useOrgPermissions();
   const [connections, setConnections] = useState<AutomationConnectionRecord[]>([]);
   const [calendarStatus, setCalendarStatus] = useState<CalendarConnectionStatus | null>(null);
   const [hubspotStatus, setHubspotStatus] = useState<HubspotConnectionStatus | null>(null);
-  const [laEquidadStatus, setLaEquidadStatus] = useState<InsurerConnectionStatus | null>(null);
+  const [insurerStatus, setInsurerStatus] = useState<Record<string, InsurerConnectionStatus | null>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exploreOpen, setExploreOpen] = useState(false);
@@ -69,11 +75,13 @@ export default function ConectoresPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const [connRes, calRes, hubspotRes, laEquidadRes] = await Promise.all([
+    const [connRes, calRes, hubspotRes, ...insurerResList] = await Promise.all([
       authFetch("/api/automations/connections"),
       authFetch("/api/conectores/google-calendar/status"),
       authFetch("/api/conectores/hubspot/status"),
-      modules.seguros ? authFetch("/api/seguros/conectores/la-equidad/status") : Promise.resolve(null)
+      ...INSURERS.map(insurer =>
+        modules.seguros ? authFetch(`/api/seguros/conectores/${insurer.id}/status`) : Promise.resolve(null)
+      )
     ]);
     const connJson = await connRes.json();
     if (!connRes.ok) setError(connJson.error ?? "Error al cargar conectores");
@@ -81,7 +89,13 @@ export default function ConectoresPage() {
 
     if (calRes.ok) setCalendarStatus(await calRes.json());
     if (hubspotRes.ok) setHubspotStatus(await hubspotRes.json());
-    if (laEquidadRes?.ok) setLaEquidadStatus(await laEquidadRes.json());
+
+    const nextInsurerStatus: Record<string, InsurerConnectionStatus | null> = {};
+    for (let i = 0; i < INSURERS.length; i++) {
+      const res = insurerResList[i];
+      nextInsurerStatus[INSURERS[i].id] = res?.ok ? await res.json() : null;
+    }
+    setInsurerStatus(nextInsurerStatus);
     setLoading(false);
   }, [modules.seguros]);
 
@@ -120,16 +134,14 @@ export default function ConectoresPage() {
       href: "/dashboard/conectores/hubspot"
     },
     ...(modules.seguros
-      ? [
-          {
-            id: "la-equidad",
-            kind: "insurer" as const,
-            name: "La Equidad Seguros",
-            detail: "Aseguradoras",
-            status: (laEquidadStatus?.connection?.status ?? "none") as ConnectorRow["status"],
-            href: ""
-          }
-        ]
+      ? INSURERS.map((insurer): ConnectorRow => ({
+          id: insurer.id,
+          kind: "insurer" as const,
+          name: insurer.name,
+          detail: "Aseguradoras",
+          status: (insurerStatus[insurer.id]?.connection?.status ?? "none") as ConnectorRow["status"],
+          href: `/dashboard/conectores/${insurer.id}`
+        }))
       : [])
   ];
 
@@ -171,31 +183,14 @@ export default function ConectoresPage() {
                 <tr
                   key={row.id}
                   className={registryTableRowClickable}
-                  onClick={() => (row.kind === "insurer" ? setExploreOpen(true) : router.push(row.href))}
+                  onClick={() => router.push(row.href)}
                 >
                   <td className={registryTableCellFirst}>
                     <div className="flex items-center gap-3">
-                      <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                          row.kind === "google_calendar"
-                            ? "bg-[#4285f4]/15"
-                            : row.kind === "hubspot"
-                              ? "bg-[#ff7a59]/15"
-                              : row.kind === "insurer"
-                                ? "bg-[#2463eb]/15"
-                                : "bg-white/[.08]"
-                        }`}
-                      >
-                        {row.kind === "google_calendar" ? (
-                          <GoogleCalendarLogo className="w-[18px] h-[18px] text-[#4285f4]" />
-                        ) : row.kind === "hubspot" ? (
-                          <HubSpotLogo className="w-[18px] h-[18px] text-[#ff7a59]" />
-                        ) : row.kind === "insurer" ? (
-                          <span className="text-[11px] font-bold text-[#6f95f2]">LE</span>
-                        ) : (
-                          <Webhook className="w-[18px] h-[18px] text-gray-300" />
-                        )}
-                      </div>
+                      <ConnectorIconTile
+                        id={row.kind === "google_calendar" ? "google-calendar" : row.kind === "hubspot" ? "hubspot" : row.kind === "insurer" ? row.id : "webhook"}
+                        size="md"
+                      />
                       <div className="text-sm font-medium text-white truncate">{row.name}</div>
                     </div>
                   </td>

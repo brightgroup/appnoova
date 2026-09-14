@@ -3,24 +3,27 @@
 import { useEffect, useState } from "react";
 import { X, Plus } from "lucide-react";
 import { btnGhost, btnPrimary } from "@/lib/brand-ui";
+import { CrmStageIconPicker } from "@/components/crm/CrmStageIconPicker";
 
 interface CreateStageModalProps {
   open: boolean;
   saving?: boolean;
   error?: string | null;
   onClose: () => void;
-  onCreate: (data: { name: string; color: string; ai_enter_criteria: string | null }) => void;
+  onCreate: (data: { name: string; color: string; icon: string; ai_enter_criteria: string | null }) => void;
 }
 
 export function CreateStageModal({ open, saving, error, onClose, onCreate }: CreateStageModalProps) {
   const [name, setName] = useState("");
   const [color, setColor] = useState("#0f7eff");
+  const [icon, setIcon] = useState("Circle");
   const [aiCriteria, setAiCriteria] = useState("");
 
   useEffect(() => {
     if (open) {
       setName("");
       setColor("#0f7eff");
+      setIcon("Circle");
       setAiCriteria("");
     }
   }, [open]);
@@ -55,6 +58,7 @@ export function CreateStageModal({ open, saving, error, onClose, onCreate }: Cre
                 onChange={e => setColor(e.target.value)}
                 className="w-9 h-9 rounded-lg border-0 bg-transparent cursor-pointer shrink-0"
               />
+              <CrmStageIconPicker value={icon} accentColor={color} onChange={setIcon} />
               <input
                 autoFocus
                 value={name}
@@ -83,7 +87,7 @@ export function CreateStageModal({ open, saving, error, onClose, onCreate }: Cre
           <button
             type="button"
             disabled={!name.trim() || saving}
-            onClick={() => onCreate({ name: name.trim(), color, ai_enter_criteria: aiCriteria.trim() || null })}
+            onClick={() => onCreate({ name: name.trim(), color, icon, ai_enter_criteria: aiCriteria.trim() || null })}
             className={btnPrimary}
           >
             {saving ? "Creando…" : "Crear etapa"}

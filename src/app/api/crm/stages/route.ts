@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
     sort_order: count ?? 0,
     is_won: false,
     is_lost: false,
+    icon: body.icon ? String(body.icon).trim() : null,
     ai_enter_criteria: body.ai_enter_criteria ? String(body.ai_enter_criteria).trim() : null
   });
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
@@ -78,6 +79,7 @@ export async function PUT(req: NextRequest) {
     sort_order: Number(s.sort_order ?? i),
     is_won: false,
     is_lost: false,
+    icon: s.icon ? String(s.icon).trim() : null,
     ai_enter_criteria: s.ai_enter_criteria ? String(s.ai_enter_criteria).trim() : null,
     updated_at: new Date().toISOString()
   })).filter(r => r.name);

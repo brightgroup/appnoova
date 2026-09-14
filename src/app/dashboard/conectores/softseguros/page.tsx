@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Info, KeyRound, Loader2, RefreshCw, Unplug, User } from "lucide-react";
-import { ChannelListPage } from "@/components/dashboard/ChannelListPage";
 import { InfoBox } from "@/components/ui/InfoBox";
-import { SoftsegurosLogo } from "@/components/icons/brands/SoftsegurosLogo";
+import { ConnectorIconTile } from "@/components/automations/ConnectorIconTile";
+import { ConnectorModalPage } from "@/components/automations/ConnectorModalPage";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { btnPrimary } from "@/lib/brand-ui";
 
@@ -106,105 +106,86 @@ export default function SoftsegurosConectorPage() {
   const isActive = connection?.status === "active";
 
   return (
-    <ChannelListPage
+    <ConnectorModalPage
+      icon={<ConnectorIconTile id="softseguros" size="md" />}
       title="Softseguros"
-      description="Conecta tu cuenta de Softseguros para traer pólizas y siniestros a Noova, y para que ORI pueda buscar tus clientes en vivo — solo lectura, nunca escribimos nada de vuelta."
       loading={loading}
+      banner={banner}
     >
-      {banner && (
-        <div
-          className={`mb-4 p-3 rounded-xl text-xs border ${
-            banner.kind === "success"
-              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-              : "bg-red-500/10 border-red-500/20 text-red-400"
-          }`}
-        >
-          {banner.text}
-        </div>
+      {isActive ? (
+        <p className="text-xs text-emerald-400 flex items-center gap-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5" /> Conectado
+        </p>
+      ) : (
+        <p className="text-xs text-gray-400 leading-relaxed">
+          Trae pólizas y siniestros a Noova, y deja que ORI busque tus clientes en vivo — solo
+          lectura, nunca escribimos nada de vuelta.
+        </p>
+      )}
+      {connection?.status === "error" && connection.lastError && (
+        <p className="text-[11px] text-red-400/80 mt-2">Último error: {connection.lastError}</p>
       )}
 
-      <div className="rounded-2xl border border-white/[.08] bg-noova-surface p-6">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[#0a3d91]/15 flex items-center justify-center shrink-0">
-            <SoftsegurosLogo className="w-8 h-8" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-semibold text-white">Softseguros</h2>
-            {isActive ? (
-              <p className="text-xs text-emerald-400 flex items-center gap-1.5 mt-1">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Conectado
-              </p>
-            ) : (
-              <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                Sin conectar. La cartera de Pólizas solo se puede cargar a mano o por Excel todavía.
-              </p>
-            )}
-            {connection?.status === "error" && connection.lastError && (
-              <p className="text-[11px] text-red-400/80 mt-2">Último error: {connection.lastError}</p>
-            )}
+      {isActive ? (
+        <div className="mt-4 pt-4 border-t border-white/[.08] flex items-center gap-2">
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-[#99c9ff] hover:bg-[#0f7eff]/10 border border-[#0f7eff]/20"
+          >
+            {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            Sincronizar ahora
+          </button>
+          <button
+            onClick={handleDisconnect}
+            disabled={disconnecting}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-red-400 hover:bg-red-500/10 border border-red-500/20"
+          >
+            {disconnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unplug className="w-3.5 h-3.5" />}
+            Desconectar
+          </button>
+        </div>
+      ) : (
+        <div className="mt-4 pt-4 border-t border-white/[.08]">
+          <InfoBox icon={Info} layout="row" variant="neutral" className="p-4 mb-4">
+            <p className="text-[11px] leading-relaxed">
+              Usuario y contraseña con los que entras a Softseguros. Noova los guarda cifrados
+              (AES-256-GCM) y solo los usa para leer pólizas, siniestros y clientes — nunca crea
+              ni modifica nada allá.
+            </p>
+          </InfoBox>
+          <div className="space-y-2">
+            <div className="relative">
+              <User className="w-3.5 h-3.5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder="Usuario"
+                className="w-full pl-8 pr-3 py-2 rounded-lg bg-black/20 border border-white/[.08] text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-[#0f7eff]/50"
+              />
+            </div>
+            <div className="relative">
+              <KeyRound className="w-3.5 h-3.5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Contraseña"
+                className="w-full pl-8 pr-3 py-2 rounded-lg bg-black/20 border border-white/[.08] text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-[#0f7eff]/50"
+              />
+            </div>
+            <button
+              onClick={handleConnect}
+              disabled={connecting || !username.trim() || !password.trim()}
+              className={`${btnPrimary} py-2 w-full justify-center`}
+            >
+              {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              Guardar conexión
+            </button>
           </div>
         </div>
-
-        {isActive ? (
-          <div className="mt-5 pt-5 border-t border-white/[.08] flex items-center gap-2">
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-[#99c9ff] hover:bg-[#0f7eff]/10 border border-[#0f7eff]/20"
-            >
-              {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-              Sincronizar ahora
-            </button>
-            <button
-              onClick={handleDisconnect}
-              disabled={disconnecting}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-red-400 hover:bg-red-500/10 border border-red-500/20"
-            >
-              {disconnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unplug className="w-3.5 h-3.5" />}
-              Desconectar
-            </button>
-          </div>
-        ) : (
-          <div className="mt-5 pt-5 border-t border-white/[.08]">
-            <InfoBox icon={Info} layout="row" variant="neutral" className="p-4 mb-4">
-              <p className="text-[11px] leading-relaxed">
-                Usuario y contraseña con los que entras a Softseguros. Noova los guarda cifrados
-                (AES-256-GCM) y solo los usa para leer tu cartera — nunca crea ni modifica pólizas allá.
-              </p>
-            </InfoBox>
-            <div className="space-y-2">
-              <div className="relative">
-                <User className="w-3.5 h-3.5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  placeholder="Usuario"
-                  className="w-full pl-8 pr-3 py-2 rounded-lg bg-black/20 border border-white/[.08] text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-[#0f7eff]/50"
-                />
-              </div>
-              <div className="relative">
-                <KeyRound className="w-3.5 h-3.5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="Contraseña"
-                  className="w-full pl-8 pr-3 py-2 rounded-lg bg-black/20 border border-white/[.08] text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-[#0f7eff]/50"
-                />
-              </div>
-              <button
-                onClick={handleConnect}
-                disabled={connecting || !username.trim() || !password.trim()}
-                className={`${btnPrimary} py-2 w-full justify-center`}
-              >
-                {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Guardar conexión
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </ChannelListPage>
+      )}
+    </ConnectorModalPage>
   );
 }
