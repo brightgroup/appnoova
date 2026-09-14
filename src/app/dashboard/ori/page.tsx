@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Sparkles, History, FileText, Users, RefreshCw,
@@ -59,7 +59,8 @@ const QUICK_ACTIONS = [
   }
 ];
 
-export default function OriCopilotoPage() {
+/** useSearchParams() (para el prefill ?quote_id=) exige un límite de Suspense al pre-renderizar — ver el export default más abajo. */
+function OriCopilotoPageContent() {
   const { modules } = useOrgPermissions();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -468,5 +469,13 @@ export default function OriCopilotoPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function OriCopilotoPage() {
+  return (
+    <Suspense fallback={null}>
+      <OriCopilotoPageContent />
+    </Suspense>
   );
 }
