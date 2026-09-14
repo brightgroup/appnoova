@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp, ExternalLink, Loader2, Sparkles } from "lucide-react";
+import { ArrowUp, ExternalLink, Loader2 } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { OriToolResultView } from "@/components/ori/OriToolResultView";
+import { OriAnimatedIcon } from "@/components/icons/OriAnimatedIcon";
+import { OriThinkingStatus } from "@/components/ori/OriThinkingStatus";
 import type { OriToolCall, QuoteResultPreview } from "@/types/ori";
 
 interface Message {
@@ -94,7 +96,7 @@ export function OriChatPanel({
     <div className="rounded-2xl border border-white/[.08] bg-white/[.02] flex flex-col h-full min-h-[420px]">
       <div className="px-4 py-3 border-b border-white/[.08] flex items-center gap-2">
         <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shrink-0">
-          <Sparkles className="w-3.5 h-3.5 text-white" />
+          <OriAnimatedIcon state="idle" variant="solid" className="w-4 h-4 text-white" />
         </div>
         <p className="text-sm font-semibold text-white flex-1">Estructurar con ORI</p>
         <button
@@ -127,10 +129,11 @@ export function OriChatPanel({
           </div>
         ))}
         {loading && (
-          <div className="flex gap-1.5 items-center py-1">
-            {[0, 100, 200].map(d => (
-              <div key={d} className="w-1.5 h-1.5 rounded-full bg-[#0f7eff]/50 animate-pulse" style={{ animationDelay: `${d}ms` }} />
-            ))}
+          <div className="flex items-center gap-2 py-1">
+            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shrink-0">
+              <OriAnimatedIcon state="thinking" variant="solid" className="w-3 h-3 text-white" />
+            </div>
+            <OriThinkingStatus />
           </div>
         )}
       </div>

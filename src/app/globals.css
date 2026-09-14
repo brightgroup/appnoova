@@ -2401,3 +2401,80 @@ html:not(.dark) [data-noova-dashboard] .bg-orange-500\/35 {
   background-color: rgba(0, 110, 128, 0.28) !important;
 }
 
+/* ===== Ori — ícono animado (ver OriAnimatedIcon.tsx) =====
+   Ojos rellenos ("solid") solo se usan donde el ícono vive sobre un fondo
+   azul fijo propio (insignia del chat, botón "Cotizar con ORI", indicador de
+   "pensando") — ahí el color sigue el tema igual que el resto de íconos de
+   Noova (blanco en oscuro, negro en claro), corrección explícita del usuario
+   tras ver que blanco fijo se perdía en algunos fondos claros. El ícono
+   monocromo del menú lateral usa variant="hole" en su lugar (máscara SVG,
+   ojos como hueco transparente) y no depende de esta regla. */
+.ori-eye-fill {
+  fill: #000000;
+}
+.dark .ori-eye-fill {
+  fill: #ffffff;
+}
+
+.ori-anim-idle-look {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: oriLookAround 7s ease-in-out infinite;
+}
+.ori-anim-idle-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: oriBlink 5.5s ease-in-out infinite;
+}
+.ori-anim-think-scan {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: oriScan 1.4s ease-in-out infinite;
+}
+.ori-anim-think-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: oriBlinkFast 2.8s ease-in-out infinite;
+}
+.ori-anim-think-breathe {
+  animation: oriBreathe 1.4s ease-in-out infinite;
+}
+
+@keyframes oriLookAround {
+  0%, 100% { transform: translate(0, 0); }
+  8% { transform: translate(-7px, 2px); }
+  22% { transform: translate(6px, -3px); }
+  36% { transform: translate(0, 0); }
+  58% { transform: translate(-5px, -2px); }
+  74% { transform: translate(7px, 3px); }
+  90% { transform: translate(0, 0); }
+}
+@keyframes oriBlink {
+  0%, 89%, 100% { transform: scaleY(1); }
+  92% { transform: scaleY(0.08); }
+  95% { transform: scaleY(1); }
+}
+@keyframes oriScan {
+  0%, 100% { transform: translateX(-9px); }
+  50% { transform: translateX(9px); }
+}
+@keyframes oriBreathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+@keyframes oriBlinkFast {
+  0%, 84%, 100% { transform: scaleY(1); }
+  88% { transform: scaleY(0.08); }
+  92% { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ori-anim-idle-look,
+  .ori-anim-idle-blink,
+  .ori-anim-think-scan,
+  .ori-anim-think-blink,
+  .ori-anim-think-breathe {
+    animation: none !important;
+  }
+}
+

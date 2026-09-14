@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/Badge";
 import { TEXT_LLM_MODELS, DEFAULT_TEXT_MODEL, resolveTextLlm } from "@/lib/text-agent-options";
 import { llmModelIcon } from "@/lib/llm/provider-icon";
 import { OriToolResultView } from "@/components/ori/OriToolResultView";
+import { OriAnimatedIcon } from "@/components/icons/OriAnimatedIcon";
+import { OriThinkingStatus } from "@/components/ori/OriThinkingStatus";
 import type { OriToolCall } from "@/types/ori";
 import { useOrgPermissions } from "@/components/layout/OrgPermissionsProvider";
 import { ConnectorsQuickMenu } from "@/components/automations/ConnectorsQuickMenu";
@@ -202,7 +204,7 @@ export default function OriCopilotoPage() {
       <div className="relative z-10 shrink-0 flex items-center justify-between px-8 py-4">
         <div className="flex items-center gap-3">
           <div className="nv-ori-icon w-9 h-9 rounded-xl bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shadow-lg shadow-[#0f7eff]/30">
-            <Sparkles className="w-4 h-4 text-white nv-ori-icon-glyph" strokeWidth={2} />
+            <OriAnimatedIcon state="idle" variant="solid" className="w-5 h-5 text-white nv-ori-icon-glyph" />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[15px] font-semibold tracking-tight text-white nv-ori-title">Ori</span>
@@ -264,14 +266,11 @@ export default function OriCopilotoPage() {
                 </div>
               ))}
               {loading && (
-                <div className="flex justify-start gap-1.5 items-center py-1">
-                  {[0, 100, 200].map(d => (
-                    <div
-                      key={d}
-                      className="w-1.5 h-1.5 rounded-full bg-[#0f7eff]/50 animate-pulse"
-                      style={{ animationDelay: `${d}ms` }}
-                    />
-                  ))}
+                <div className="flex justify-start items-center gap-3 py-1">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shrink-0">
+                    <OriAnimatedIcon state="thinking" variant="solid" className="w-4 h-4 text-white" />
+                  </div>
+                  <OriThinkingStatus />
                 </div>
               )}
             </div>
