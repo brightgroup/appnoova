@@ -5,6 +5,29 @@ export interface OriToolCall {
   result: Record<string, unknown>;
 }
 
+/** Fila del historial de chats de Ori (panel "Chats") — ver ori_conversations. */
+export interface OriConversationSummary {
+  id: string;
+  title: string;
+  quoteId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OriConversationMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  toolCalls: OriToolCall[];
+  createdAt: string;
+}
+
+export interface OriConversationDetail extends OriConversationSummary {
+  companyContextId: string | null;
+  model: string | null;
+  messages: OriConversationMessage[];
+}
+
 export interface OriInventoryProductRow {
   codigo: string;
   nombre: string;

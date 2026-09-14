@@ -23,6 +23,7 @@ import {
 import { providerForLlmModel } from "@/lib/billing/pricing";
 import { getOriInventoryAccess } from "@/lib/erp/ori-access-db";
 import { getOriSegurosAccess } from "@/lib/insurers/ori-seguros-access";
+import { createConversation, appendConversationMessages, deriveConversationTitle } from "@/lib/ori/ori-conversations-db";
 import { cotizarSeguroAutoTool } from "@/lib/agent-tools/auto-quote-ori-tool";
 import { iniciarCotizacionSeguroOriTool, registrarDatoCotizacionOriTool } from "@/lib/agent-tools/generic-quote-ori-tools";
 import { estructurarResultadoCotizacionOriTool } from "@/lib/agent-tools/quote-result-ori-tool";
@@ -132,6 +133,10 @@ export async function POST(req: NextRequest) {
   const oriTools: OriToolDefinition[] = [];
   let quoteContextBlock = "";
   const quoteId = typeof body.quote_id === "string" ? body.quote_id.trim() : "";
+  // Chat guardado en el panel "Chats" — el frontend manda el id una vez que existe; si llega
+  // vacío (primer mensaje de un chat nuevo) se crea acá mismo, lazy, para no dejar filas vacías
+  // en el historial por apretar "Nueva conversación" sin llegar a escribir nada.
+  let conversationId = typeof body.conversation_id === "string" ? body.conversation_id.trim() : "";
   if (billing.organizationId) {
     if (await getOriInventoryAccess(billingDb, billing.organizationId)) oriTools.push(...ORI_TOOLS);
     if (await getOriSegurosAccess(billingDb, billing.organizationId)) {
@@ -372,9 +377,29 @@ export async function POST(req: NextRequest) {
         model,
         gemini: usage
       });
+
+      try {
+        if (!conversationId) {
+          conversationId = await createConversation(billingDb, {
+            organizationId: billing.organizationId,
+            userId,
+            title: deriveConversationTitle(lastUser.content),
+            quoteId: quoteId || null,
+            companyContextId: companyContextId || null,
+            model
+          });
+        }
+        await appendConversationMessages(billingDb, [
+          { conversationId, role: "user", content: lastUser.content },
+          { conversationId, role: "assistant", content: reply, toolCalls }
+        ]);
+      } catch {
+        // El historial es una comodidad, no debe tumbar la respuesta del chat si falla el guardado.
+        conversationId = conversationId || "";
+      }
     }
 
-    return NextResponse.json({ reply, model, tool_calls: toolCalls });
+    return NextResponse.json({ reply, model, tool_calls: toolCalls, conversation_id: conversationId || null });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Error al consultar Gemini";
     return NextResponse.json({ error: msg }, { status: 500 });

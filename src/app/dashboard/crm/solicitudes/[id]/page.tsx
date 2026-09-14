@@ -269,7 +269,7 @@ function SolicitudFichaContent({ quoteId }: { quoteId: string }) {
                 </button>
                 <button type="button" onClick={handleCotizarConOri} className="flex flex-col items-center gap-1.5">
                   <div className="w-11 h-11 rounded-full flex items-center justify-center bg-gradient-to-br from-[#0f7eff] to-[#3392ff] opacity-90 hover:opacity-100 transition-opacity">
-                    <OriAnimatedIcon state="idle" variant="solid" className="w-5 h-5" />
+                    <OriAnimatedIcon state="idle" variant="badge" className="w-5 h-5" />
                   </div>
                   <span className="text-[11px] text-gray-400">Cotizar con ORI</span>
                 </button>

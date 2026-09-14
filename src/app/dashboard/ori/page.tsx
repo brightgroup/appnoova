@@ -16,7 +16,8 @@ import { llmModelIcon } from "@/lib/llm/provider-icon";
 import { OriToolResultView } from "@/components/ori/OriToolResultView";
 import { OriAnimatedIcon } from "@/components/icons/OriAnimatedIcon";
 import { OriThinkingStatus } from "@/components/ori/OriThinkingStatus";
-import type { OriToolCall } from "@/types/ori";
+import { OriChatsPanel } from "@/components/ori/OriChatsPanel";
+import type { OriToolCall, OriConversationSummary } from "@/types/ori";
 import { useOrgPermissions } from "@/components/layout/OrgPermissionsProvider";
 import { ConnectorsQuickMenu } from "@/components/automations/ConnectorsQuickMenu";
 import { ExploreConnectorsModal } from "@/components/automations/ExploreConnectorsModal";
@@ -74,6 +75,10 @@ export default function OriCopilotoPage() {
   const [connectorsMenuOpen, setConnectorsMenuOpen] = useState(false);
   const [exploreOpen, setExploreOpen] = useState(false);
   const [quoteId, setQuoteId] = useState("");
+  const [conversationId, setConversationId] = useState("");
+  const [conversations, setConversations] = useState<OriConversationSummary[]>([]);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
+  const [chatsOpen, setChatsOpen] = useState(false);
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasChat = messages.length > 0;
@@ -123,6 +128,24 @@ export default function OriCopilotoPage() {
     localStorage.setItem(ORI_MODEL_STORAGE_KEY, v);
   };
 
+  const refreshConversations = useCallback(async () => {
+    setConversationsLoading(true);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/ori/conversations", { headers });
+      const data = await res.json();
+      if (res.ok) setConversations(data.conversations ?? []);
+    } catch {
+      // el historial es secundario — si falla la lista, el chat sigue funcionando igual
+    } finally {
+      setConversationsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshConversations();
+  }, [refreshConversations]);
+
   useEffect(() => {
     if (!hasChat) return;
     const el = chatAreaRef.current;
@@ -150,7 +173,8 @@ export default function OriCopilotoPage() {
           messages: nextMessages,
           company_context_id: contextId || undefined,
           model,
-          quote_id: (quoteIdOverride ?? quoteId) || undefined
+          quote_id: (quoteIdOverride ?? quoteId) || undefined,
+          conversation_id: conversationId || undefined
         })
       });
       const data = await res.json();
@@ -162,12 +186,16 @@ export default function OriCopilotoPage() {
         ...prev,
         { id: crypto.randomUUID(), role: "assistant", content: data.reply, toolCalls: data.tool_calls ?? [] }
       ]);
+      if (data.conversation_id) {
+        setConversationId(data.conversation_id);
+        refreshConversations();
+      }
     } catch {
       setError("Error de red. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, contextId, model, quoteId]);
+  }, [messages, loading, contextId, model, quoteId, conversationId, refreshConversations]);
 
   useEffect(() => {
     if (prefillHandled.current) return;
@@ -191,11 +219,52 @@ export default function OriCopilotoPage() {
     setInput("");
     setError("");
     setQuoteId("");
+    setConversationId("");
     textareaRef.current?.focus();
   };
 
+  const loadConversation = async (id: string) => {
+    if (id === conversationId) return;
+    setError("");
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/ori/conversations/${id}`, { headers });
+      const data = await res.json();
+      if (!res.ok || !data.conversation) {
+        setError(data.error || "No se pudo cargar el chat");
+        return;
+      }
+      const conv = data.conversation;
+      setMessages(
+        conv.messages.map((m: { id: string; role: "user" | "assistant"; content: string; toolCalls: OriToolCall[] }) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          toolCalls: m.toolCalls
+        }))
+      );
+      setConversationId(conv.id);
+      setQuoteId(conv.quoteId ?? "");
+      setInput("");
+    } catch {
+      setError("Error de red. Intenta de nuevo.");
+    }
+  };
+
+  const deleteConversationFromHistory = async (id: string) => {
+    setConversations(prev => prev.filter(c => c.id !== id));
+    if (id === conversationId) startNewChat();
+    try {
+      const headers = await getAuthHeaders();
+      await fetch(`/api/ori/conversations/${id}`, { method: "DELETE", headers });
+    } catch {
+      refreshConversations();
+    }
+  };
+
   return (
-    <div className="flex-1 flex flex-col min-h-0 h-full bg-noova-main text-white relative overflow-hidden">
+    <div className="flex-1 flex flex-row min-h-0 h-full bg-noova-main">
+    <div className="flex-1 flex flex-col min-h-0 h-full text-white relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-[#0f7eff]/[.06] rounded-full blur-[100px]" />
       </div>
@@ -204,7 +273,7 @@ export default function OriCopilotoPage() {
       <div className="relative z-10 shrink-0 flex items-center justify-between px-8 py-4">
         <div className="flex items-center gap-3">
           <div className="nv-ori-icon w-9 h-9 rounded-full bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shadow-lg shadow-[#0f7eff]/30">
-            <OriAnimatedIcon state="idle" variant="solid" className="w-5 h-5" />
+            <OriAnimatedIcon state="idle" variant="badge" className="w-5 h-5" />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[15px] font-semibold tracking-tight text-white nv-ori-title">Ori</span>
@@ -229,9 +298,14 @@ export default function OriCopilotoPage() {
               Nueva conversación
             </button>
           )}
-          <button className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-white transition-colors">
+          <button
+            onClick={() => setChatsOpen(v => !v)}
+            className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
+              chatsOpen ? "text-[#99c9ff]" : "text-gray-500 hover:text-white"
+            }`}
+          >
             <History className="w-3.5 h-3.5" />
-            Historial
+            Chats
           </button>
         </div>
       </div>
@@ -380,6 +454,19 @@ export default function OriCopilotoPage() {
         onConnected={() => setExploreOpen(false)}
         showAseguradoras={modules.seguros}
       />
+    </div>
+
+      {chatsOpen && (
+        <OriChatsPanel
+          conversations={conversations}
+          loading={conversationsLoading}
+          activeId={conversationId}
+          onSelect={loadConversation}
+          onNewChat={startNewChat}
+          onDelete={deleteConversationFromHistory}
+          onClose={() => setChatsOpen(false)}
+        />
+      )}
     </div>
   );
 }
