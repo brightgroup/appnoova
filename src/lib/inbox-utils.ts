@@ -108,6 +108,18 @@ function lastTextPreview(messages: unknown): string {
   return "Archivo";
 }
 
+/**
+ * Hora del último mensaje real (no la fila completa). Usamos esto en vez de `updated_at`
+ * para ordenar/mostrar el inbox: así, abrir una conversación para leerla (lo que solo
+ * limpia `unread_count`, o incluso solo un `UPDATE` sin cambios) nunca la salta al
+ * principio de la lista si nadie escribió nada nuevo.
+ */
+function lastMessageTimestamp(messages: unknown): string | null {
+  const list = normalizeChatMessages(messages);
+  if (!list.length) return null;
+  return list[list.length - 1].created_at || null;
+}
+
 function lastVoicePreview(transcript: unknown): string {
   if (!Array.isArray(transcript) || transcript.length === 0) return "Llamada sin transcripción";
   const last = transcript[transcript.length - 1] as TranscriptEntry;
@@ -120,7 +132,8 @@ export function textRowToInboxItem(
   agentName: string
 ): InboxListItem {
   const channel = String(row.channel ?? "web_test");
-  const updatedAt = String(row.updated_at ?? row.created_at ?? "");
+  const updatedAt =
+    lastMessageTimestamp(row.messages) ?? String(row.updated_at ?? row.created_at ?? "");
   return {
     id: String(row.id),
     kind: "text",
