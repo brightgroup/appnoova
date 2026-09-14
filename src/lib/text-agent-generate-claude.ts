@@ -25,6 +25,7 @@ import type {
 } from "@/lib/text-agent-generate";
 import type { GeminiUsage } from "@/lib/billing/meter";
 import { withLlmTimeout } from "@/lib/gemini-timeout";
+import { buildInstructionReinforcementBlock } from "@/lib/agent-instruction-reinforcement";
 
 export function getAnthropicApiKey(): string {
   const key = process.env.ANTHROPIC_API_KEY?.trim();
@@ -151,7 +152,12 @@ export async function generateClaudeAgentReply(
       ? "IMPORTANTE — Agendamiento no disponible ahora mismo: el calendario está desconectado por un problema técnico. Si el usuario pide agendar una cita, discúlpate, explica que hay un inconveniente técnico y ofrece que un asesor humano lo contacte para coordinarla manualmente. NUNCA digas que la cita quedó agendada o confirmada: no tienes forma de agendarla en este momento."
       : "";
 
-  const system = [input.systemInstruction, toolsPromptBlock, schedulingUnavailableBlock]
+  const system = [
+    input.systemInstruction,
+    toolsPromptBlock,
+    schedulingUnavailableBlock,
+    buildInstructionReinforcementBlock()
+  ]
     .filter(block => block.trim().length > 0)
     .join("\n\n");
 

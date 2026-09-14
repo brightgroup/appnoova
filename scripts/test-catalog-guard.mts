@@ -319,6 +319,20 @@ section("Listado de presentaciones y productos que no están en el catálogo");
 *Comentada:* $450.000`);
   check("listado de presentaciones con precios correctos intacto", r.violations.length === 0, r.text);
 
+  // Incidente PZ Legal Group / Leyer (sept-2026, tras un failover de motor):
+  // sin la palabra que distingue a cada hermana ("Bolsillo", "Anotada"...), el
+  // modelo listó cuatro presentaciones con el MISMO precio real de la familia
+  // repetido en todas. Antes del fix, cualquier precio real de la familia
+  // validaba cualquier línea del bloque (el ámbito caía a "family" entero), así
+  // que esto pasaba intacto en vez de escalar.
+  r = guard(`*Constitución Política de Colombia*
+*Presentación 1:* $160.000
+*Presentación 2:* $160.000
+*Presentación 3:* $160.000
+*Presentación 4:* $160.000`);
+  check("presentaciones sin nombre propio no pueden compartir el mismo precio real de la familia",
+    r.needsHuman, r.text);
+
   // Un precio del prompt (envío, bono, suscripción) no autoriza el precio de un
   // producto: en la línea de ficha manda el dato de la fila.
   r = guard("*Constitución Política de Colombia Bolsillo*\n*Precio:* $50.000");

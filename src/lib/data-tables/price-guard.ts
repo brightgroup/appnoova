@@ -253,23 +253,25 @@ export function enforceCatalogAmounts(
     // se queda sin respaldo: no puede tomar prestado el del bloque anterior.
     const inherited =
       blockRows.length === 0 && blockOpensWithProductHeading(block) ? [] : carriedRows;
-    const keptLines: string[] = [];
-    // Un dato inventado contamina todo su bloque: lo que lo acompaña son datos
-    // del mismo producto fantasma (su enlace, su edición, las demás
-    // presentaciones), y dejarlos sueltos es lo que hacía llegar al cliente un
-    // enlace que no corresponde junto al aviso de que falta el dato.
-    let blockPoisoned = false;
-
-    for (const line of block.split("\n")) {
-      // El producto que nombra la propia línea manda sobre el del bloque: en
-      // un listado ("Bolsillo: $65.000") cada línea habla de una fila distinta.
+    // El producto que nombra la propia línea manda sobre el del bloque: en un
+    // listado ("Bolsillo: $65.000") cada línea habla de una fila distinta. Con
+    // una familia de hermanas, la línea manda si dice cuál es. Si no lo dice,
+    // el ámbito es la familia entera: sirve para reconocer un precio que sí
+    // existe, pero no para corregir — corregir exige una fila única, y sin
+    // ella la línea se cae en vez de salir con el precio de otra presentación.
+    //
+    // Este cálculo se hace para todo el bloque ANTES de decidir qué se cae y
+    // qué se queda, porque una línea sola no basta para ver el patrón: dos
+    // presentaciones distintas ("Anotado" y "Comentado") que ninguna dice cuál
+    // es, ambas cayendo en el ámbito de familia, con el MISMO precio real de
+    // esa familia repetido en las dos, es la firma de un precio inventado que
+    // el modelo copió en vez de dar el de cada una — no dos precios que
+    // legítimamente coinciden.
+    const lines = block.split("\n");
+    const lineInfos = lines.map(line => {
       const lineRows = rowsReferredIn(line, rows, nameCol, strongCols);
-      // Con una familia de hermanas, la línea manda si dice cuál es ("Bolsillo:
-      // $65.000"). Si no lo dice, el ámbito es la familia entera: sirve para
-      // reconocer un precio que sí existe, pero no para corregir — corregir
-      // exige una fila única, y sin ella la línea se cae en vez de salir con el
-      // precio de otra presentación.
       const sibling = rowForLineInFamily(line, family, nameCol);
+      const isFamilyFallback = lineRows.length === 0 && !sibling && named.ambiguous;
       const scope =
         lineRows.length > 0
           ? lineRows
@@ -298,11 +300,45 @@ export function enforceCatalogAmounts(
       // pasar el precio de otro producto solo porque el prompt lo mencionaba en
       // otro contexto — así salió una Constitución de bolsillo a $25.000.
       const isFichaPrice = Boolean(row && col) && isProductPriceLine(line, lineAmounts);
+      const allowSums = TOTAL_LINE_RE.test(line);
+
+      return { line, scope, scopeAmounts, lineAmounts, row, col, isFichaPrice, allowSums, isFamilyFallback };
+    });
+
+    // Cuántas líneas distintas del bloque, sin poder decir cuál presentación
+    // es cada una, comparten el mismo precio real de la familia.
+    const familyAmountLineCounts = new Map<number, number>();
+    for (const info of lineInfos) {
+      if (!info.isFamilyFallback) continue;
+      const uniqueRealAmounts = new Set(
+        info.lineAmounts
+          .map(parseAmount)
+          .filter((v): v is number => v !== null && info.scopeAmounts.has(v))
+      );
+      for (const value of uniqueRealAmounts) {
+        familyAmountLineCounts.set(value, (familyAmountLineCounts.get(value) ?? 0) + 1);
+      }
+    }
+    const duplicatedFamilyAmounts = new Set(
+      [...familyAmountLineCounts.entries()].filter(([, count]) => count >= 2).map(([value]) => value)
+    );
+
+    const keptLines: string[] = [];
+    // Un dato inventado contamina todo su bloque: lo que lo acompaña son datos
+    // del mismo producto fantasma (su enlace, su edición, las demás
+    // presentaciones), y dejarlos sueltos es lo que hacía llegar al cliente un
+    // enlace que no corresponde junto al aviso de que falta el dato.
+    let blockPoisoned = false;
+
+    for (const { line, scopeAmounts, lineAmounts, row, col, isFichaPrice, allowSums, isFamilyFallback } of lineInfos) {
+      // Un precio de la familia solo sirve para reconocer UNA presentación. Si
+      // ya se repitió en otra línea de la misma familia sin que ninguna diga
+      // cuál es cuál, dejó de ser un reconocimiento válido para esta línea.
       const isKnown = (v: number) =>
-        scopeAmounts.has(v) || (!isFichaPrice && promptAmounts.has(v));
+        !(isFamilyFallback && duplicatedFamilyAmounts.has(v)) &&
+        (scopeAmounts.has(v) || (!isFichaPrice && promptAmounts.has(v)));
       const sumPool = [...new Set([...scopeAmounts, ...promptAmounts, ...verifiedInReply])];
 
-      const allowSums = TOTAL_LINE_RE.test(line);
       const offenders = lineAmounts.filter(raw => {
         const value = parseAmount(raw);
         if (value === null || isKnown(value)) return false;

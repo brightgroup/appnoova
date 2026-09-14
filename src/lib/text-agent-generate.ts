@@ -17,6 +17,7 @@ import {
 import type { CalendarConnectionRecord } from "@/lib/google-calendar/connections-db";
 import { resolveEngineChain, type LlmEngine } from "@/lib/llm/engines";
 import { isEngineOpen, recordEngineFailure, recordEngineSuccess } from "@/lib/llm/breaker";
+import { buildInstructionReinforcementBlock } from "@/lib/agent-instruction-reinforcement";
 
 export interface TextAgentChatMessage {
   role: "user" | "assistant";
@@ -160,7 +161,12 @@ async function generateGeminiAgentReply(
       ? "IMPORTANTE — Agendamiento no disponible ahora mismo: el calendario está desconectado por un problema técnico. Si el usuario pide agendar una cita, discúlpate, explica que hay un inconveniente técnico y ofrece que un asesor humano lo contacte para coordinarla manualmente. NUNCA digas que la cita quedó agendada o confirmada: no tienes forma de agendarla en este momento."
       : "";
 
-  const systemInstruction = [input.systemInstruction, toolsPromptBlock, schedulingUnavailableBlock]
+  const systemInstruction = [
+    input.systemInstruction,
+    toolsPromptBlock,
+    schedulingUnavailableBlock,
+    buildInstructionReinforcementBlock()
+  ]
     .filter(block => block.trim().length > 0)
     .join("\n\n");
 
