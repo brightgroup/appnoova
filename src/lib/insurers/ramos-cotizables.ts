@@ -14,9 +14,12 @@
  */
 export const RAMOS_COTIZABLES = {
   autos: { catalogoSlug: "autos-vehiculos", label: "Autos" },
+  motos: { catalogoSlug: "motos", label: "Motos" },
   vida: { catalogoSlug: "vida", label: "Vida" },
   hogar: { catalogoSlug: "hogar", label: "Hogar" },
-  salud: { catalogoSlug: "salud", label: "Salud" }
+  salud: { catalogoSlug: "salud", label: "Salud" },
+  soat: { catalogoSlug: "soat", label: "SOAT" },
+  accidentes_personales: { catalogoSlug: "accidentes-personales", label: "Accidentes Personales" }
 } as const;
 
 export type RamoCotizable = keyof typeof RAMOS_COTIZABLES;

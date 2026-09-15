@@ -18,6 +18,7 @@ import {
   type LaEquidadPerson
 } from "@/lib/insurers/la-equidad";
 import { upsertPendingQuoteRequest, markQuoteRequestQuoted, type QuoteRequestSource } from "@/lib/insurers/quote-requests-db";
+import type { RamoCampoDef } from "@/lib/insurers/ramo-campos-defaults";
 
 /**
  * Lógica de negocio COMPARTIDA del cotizador de autos (Fase 2.2, rediseñada
@@ -96,14 +97,18 @@ const REQUIRED_TOMADOR_FIELDS = ["nombre_tomador", "documento_tomador", "fecha_n
  * eso no están aquí) — mismo esquema que usa Figuro para Autos, sin los
  * campos que Noova ya puede inferir. Se piden ANTES que los datos del
  * tomador, mismo orden que Figuro (todo el vehículo primero, la persona después).
+ *
+ * El SET de campos es fijo en código (autos conserva su flujo con
+ * Verifik/PlacApi) — lo que la organización puede configurar es el texto,
+ * las opciones y si cada uno es obligatorio (`requeridoCotizacion`, ver
+ * ramo-campos-defaults.ts), no agregar/quitar campos nuevos.
  */
-const REQUIRED_RIESGO_FIELDS = [
-  "nuevo_o_usado",
-  "uso_vehiculo",
-  "importacion_directa",
-  "tarjeta_propiedad",
-  "ciudad"
-] as const;
+const ALL_RIESGO_FIELD_KEYS = ["nuevo_o_usado", "uso_vehiculo", "importacion_directa", "tarjeta_propiedad", "ciudad"] as const;
+
+/** Campos de riesgo que de verdad bloquean la cotización — los que la config no marcó como opcionales. */
+function requiredRiesgoFields(campos: RamoCampoDef[]): typeof ALL_RIESGO_FIELD_KEYS[number][] {
+  return ALL_RIESGO_FIELD_KEYS.filter(key => campos.find(c => c.fieldKey === key)?.requeridoCotizacion !== false);
+}
 
 /** Llama de verdad a la aseguradora conectada y devuelve la prima — usado tanto en modo autónomo como cuando el asesor solicita el precio manualmente desde la cola. */
 export async function ejecutarCotizacionReal(
@@ -171,7 +176,8 @@ export async function ejecutarCotizacionReal(
 export async function cotizarSeguroAuto(
   input: AutoQuoteInput,
   ctx: { db: SupabaseClient; organizationId: string },
-  options: AutoQuoteOptions
+  options: AutoQuoteOptions,
+  campos: RamoCampoDef[]
 ): Promise<AutoQuoteResult> {
   const placa = input.placa?.trim();
   if (!placa) return { ok: false, reason: "Falta la placa del vehículo." };
@@ -211,7 +217,7 @@ export async function cotizarSeguroAuto(
     await logVehicleLookup(ctx.db, ctx.organizationId, contactKey, placa);
   }
 
-  const faltantesRiesgo = REQUIRED_RIESGO_FIELDS.filter((field) => !input[field]?.trim());
+  const faltantesRiesgo = requiredRiesgoFields(campos).filter((field) => !input[field]?.trim());
   if (faltantesRiesgo.length > 0) {
     return { ok: true, vehiculo, faltan_datos: faltantesRiesgo };
   }

@@ -5,6 +5,7 @@ import type { SchedulingRules, OrgBusinessHours } from "@/lib/scheduling/rules";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import type { CalendarConnectionRecord } from "@/lib/google-calendar/connections-db";
 import type { QuotingRules } from "@/lib/insurers/quoting-rules";
+import type { RamoCampoDef } from "@/lib/insurers/ramo-campos-defaults";
 
 /**
  * Registro genérico de "tools" para agentes IA (texto y, a futuro, voz).
@@ -24,6 +25,14 @@ export interface AgentToolRulesContext {
   calendarConnection?: CalendarConnectionRecord | null;
   /** Interruptor propio del agente para el cotizador de seguros — ver src/lib/insurers/quoting-rules.ts. */
   quotingRules: QuotingRules;
+  /**
+   * Campos de cotización configurados por la organización, por ramo (clave =
+   * "autos", "motos", etc. — ver ramos-cotizables.ts) — precargados una sola
+   * vez por turno (igual que calendarConnection) porque buildPromptBlock es
+   * síncrono y no tiene `db`. Vacío `{}` cuando quotingRules.enabled es false
+   * o no se precargó (ej. canal sin seguros).
+   */
+  ramoCampos: Record<string, RamoCampoDef[]>;
 }
 
 /** Contexto de ejecución de una tool (una vez el modelo decide invocarla). */

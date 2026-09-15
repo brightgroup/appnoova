@@ -10,6 +10,7 @@ import {
   VEHICLE_LOOKUP_MAX_PER_WINDOW
 } from "@/lib/insurers/vehicle-lookup-rate-limit";
 import { upsertPendingQuoteRequest, type QuoteRequestSource } from "@/lib/insurers/quote-requests-db";
+import type { RamoCampoDef } from "@/lib/insurers/ramo-campos-defaults";
 
 /**
  * Calificación de seguro de Motos — mismo patrón de datos de vehículo por
@@ -53,13 +54,19 @@ export interface MotoQuoteOptions {
   contactE164?: string | null;
 }
 
-const REQUIRED_RIESGO_FIELDS = ["nuevo_o_usado", "uso_vehiculo", "importacion_directa", "ciudad"] as const;
+const ALL_RIESGO_FIELD_KEYS = ["nuevo_o_usado", "uso_vehiculo", "importacion_directa", "ciudad"] as const;
 const REQUIRED_TOMADOR_FIELDS = ["nombre_tomador", "documento_tomador", "fecha_nacimiento_tomador"] as const;
+
+/** Campos de riesgo que de verdad bloquean la cotización — los que la config no marcó como opcionales. */
+function requiredRiesgoFields(campos: RamoCampoDef[]): typeof ALL_RIESGO_FIELD_KEYS[number][] {
+  return ALL_RIESGO_FIELD_KEYS.filter(key => campos.find(c => c.fieldKey === key)?.requeridoCotizacion !== false);
+}
 
 export async function calificarSeguroMoto(
   input: MotoQuoteInput,
   ctx: { db: SupabaseClient; organizationId: string },
-  options: MotoQuoteOptions
+  options: MotoQuoteOptions,
+  campos: RamoCampoDef[]
 ): Promise<MotoQuoteResult> {
   const placa = input.placa?.trim();
   if (!placa) return { ok: false, reason: "Falta la placa de la moto." };
@@ -92,7 +99,7 @@ export async function calificarSeguroMoto(
     await logVehicleLookup(ctx.db, ctx.organizationId, contactKey, placa);
   }
 
-  const faltantesRiesgo = REQUIRED_RIESGO_FIELDS.filter(field => !input[field]?.trim());
+  const faltantesRiesgo = requiredRiesgoFields(campos).filter(field => !input[field]?.trim());
   if (faltantesRiesgo.length > 0) {
     return { ok: true, vehiculo, faltan_datos: faltantesRiesgo };
   }

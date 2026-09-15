@@ -5,6 +5,7 @@ import { withGeminiTimeout } from "@/lib/gemini-timeout";
 import { normalizeNotifyTeamRules, type NotifyTeamRules } from "@/lib/text-notify-rules";
 import { normalizeSchedulingRules, normalizeOrgBusinessHours, type SchedulingRules, type OrgBusinessHours } from "@/lib/scheduling/rules";
 import { normalizeQuotingRules, type QuotingRules } from "@/lib/insurers/quoting-rules";
+import type { RamoCampoDef } from "@/lib/insurers/ramo-campos-defaults";
 import { ALL_TEXT_AGENT_TOOLS } from "@/lib/agent-tools/all-text-tools";
 import {
   resolveEnabledTools,
@@ -35,9 +36,11 @@ export interface GenerateTextAgentReplyInput {
   businessHours?: OrgBusinessHours | unknown;
   calendarConnection?: CalendarConnectionRecord | null;
   quotingRules?: QuotingRules | unknown;
+  /** Precargado por process-inbound.ts/microsite chat route con getAllRamoCampoDefinitionsParaCotizar — ver registry.ts. */
+  ramoCampos?: Record<string, RamoCampoDef[]>;
   toolContext: Omit<
     AgentToolContext,
-    "notifyRules" | "schedulingRules" | "businessHours" | "calendarConnection" | "quotingRules"
+    "notifyRules" | "schedulingRules" | "businessHours" | "calendarConnection" | "quotingRules" | "ramoCampos"
   >;
 }
 
@@ -146,7 +149,8 @@ async function generateGeminiAgentReply(
     schedulingRules: normalizeSchedulingRules(input.schedulingRules),
     businessHours: normalizeOrgBusinessHours(input.businessHours),
     calendarConnection: input.calendarConnection ?? null,
-    quotingRules: normalizeQuotingRules(input.quotingRules)
+    quotingRules: normalizeQuotingRules(input.quotingRules),
+    ramoCampos: input.ramoCampos ?? {}
   };
 
   const enabledTools = resolveEnabledTools(ALL_TEXT_AGENT_TOOLS, rulesCtx);

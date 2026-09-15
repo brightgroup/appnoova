@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { upsertPendingQuoteRequest, type QuoteRequestSource } from "@/lib/insurers/quote-requests-db";
+import type { RamoCampoDef } from "@/lib/insurers/ramo-campos-defaults";
 
 /**
  * Calificación de seguro de hogar (sin conector de aseguradora todavía) —
@@ -36,7 +37,7 @@ export interface HomeQuoteOptions {
   contactE164?: string | null;
 }
 
-const REQUIRED_FIELDS = [
+const ALL_FIELD_KEYS = [
   "tipo_inmueble",
   "vigilancia_seguridad",
   "direccion_inmueble",
@@ -46,12 +47,18 @@ const REQUIRED_FIELDS = [
   "documento_tomador"
 ] as const;
 
+/** Campos que de verdad bloquean la cotización — los que la config no marcó como opcionales. */
+function requiredFields(campos: RamoCampoDef[]): typeof ALL_FIELD_KEYS[number][] {
+  return ALL_FIELD_KEYS.filter(key => campos.find(c => c.fieldKey === key)?.requeridoCotizacion !== false);
+}
+
 export async function calificarSeguroHogar(
   input: HomeQuoteInput,
   ctx: { db: SupabaseClient; organizationId: string },
-  options: HomeQuoteOptions
+  options: HomeQuoteOptions,
+  campos: RamoCampoDef[]
 ): Promise<HomeQuoteResult> {
-  const faltantes = REQUIRED_FIELDS.filter(field => !input[field]?.trim());
+  const faltantes = requiredFields(campos).filter(field => !input[field]?.trim());
   if (faltantes.length > 0) {
     return { ok: true, faltan_datos: faltantes };
   }

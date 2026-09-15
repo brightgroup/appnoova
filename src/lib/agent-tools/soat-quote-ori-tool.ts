@@ -1,6 +1,7 @@
 import { Type } from "@google/genai";
 import type { OriToolDefinition, OriToolContext, OriToolResult } from "@/lib/agent-tools/ori-tools";
 import { calificarSoat } from "@/lib/insurers/soat-quote-tool";
+import { getRamoCampoDefinitionsParaCotizar } from "@/lib/insurers/quote-guidance";
 
 /** Tool de ORI: reúne los datos de un SOAT — siempre cola humana. */
 export const calificarSoatOriTool: OriToolDefinition = {
@@ -29,6 +30,7 @@ export const calificarSoatOriTool: OriToolDefinition = {
     "Tienes una herramienta (cotizar_seguro_soat) para reunir los datos de un SOAT. Pide placa, últimos 4 dígitos del motor, ciudad, nombre completo, documento y fecha de nacimiento, de forma natural. No da el precio directo — cuando confirme que los datos quedaron completos, dile al usuario que un asesor confirmará el precio.",
   async execute(args: Record<string, unknown>, ctx: OriToolContext): Promise<OriToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const campos = await getRamoCampoDefinitionsParaCotizar(ctx.db, ctx.organizationId, "soat");
     const result = await calificarSoat(
       {
         placa: str(args.placa),
@@ -39,7 +41,8 @@ export const calificarSoatOriTool: OriToolDefinition = {
         fecha_nacimiento_tomador: str(args.fecha_nacimiento_tomador)
       },
       ctx,
-      { source: "ori" }
+      { source: "ori" },
+      campos
     );
     return { ...result };
   }

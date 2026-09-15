@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { upsertPendingQuoteRequest, type QuoteRequestSource } from "@/lib/insurers/quote-requests-db";
+import type { RamoCampoDef } from "@/lib/insurers/ramo-campos-defaults";
 
 /**
  * Calificación de seguro de vida (sin conector de aseguradora todavía) — a
@@ -43,7 +44,7 @@ export interface LifeQuoteOptions {
   contactE164?: string | null;
 }
 
-const REQUIRED_FIELDS = [
+const ALL_FIELD_KEYS = [
   "tipo_cobertura",
   "suma_asegurada_deseada",
   "presupuesto_mensual",
@@ -51,15 +52,22 @@ const REQUIRED_FIELDS = [
   "nombre_tomador",
   "documento_tomador",
   "fecha_nacimiento_tomador",
-  "ocupacion"
+  "ocupacion",
+  "interes_ahorro"
 ] as const;
+
+/** Campos que de verdad bloquean la cotización — los que la config no marcó como opcionales (interes_ahorro es opcional por defecto, ver ramo-campos-defaults.ts). */
+function requiredFields(campos: RamoCampoDef[]): typeof ALL_FIELD_KEYS[number][] {
+  return ALL_FIELD_KEYS.filter(key => campos.find(c => c.fieldKey === key)?.requeridoCotizacion !== false);
+}
 
 export async function calificarSeguroVida(
   input: LifeQuoteInput,
   ctx: { db: SupabaseClient; organizationId: string },
-  options: LifeQuoteOptions
+  options: LifeQuoteOptions,
+  campos: RamoCampoDef[]
 ): Promise<LifeQuoteResult> {
-  const faltantes = REQUIRED_FIELDS.filter(field => !input[field]?.trim());
+  const faltantes = requiredFields(campos).filter(field => !input[field]?.trim());
   if (faltantes.length > 0) {
     return { ok: true, faltan_datos: faltantes };
   }

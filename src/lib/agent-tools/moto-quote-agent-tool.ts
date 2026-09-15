@@ -1,6 +1,7 @@
 import { Type } from "@google/genai";
 import type { AgentToolDefinition, AgentToolContext, AgentToolResult } from "@/lib/agent-tools/registry";
 import { calificarSeguroMoto } from "@/lib/insurers/moto-quote-tool";
+import { resolveCampos, buildCamposPromptBlock, presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
 
 /** Tool de calificación de seguro de motos para agentes que hablan con el CLIENTE FINAL — mismo patrón de vehículo que auto-quote-agent-tool.ts, sin cotización real. */
 export const calificarSeguroMotoAgentTool: AgentToolDefinition = {
@@ -36,11 +37,13 @@ export const calificarSeguroMotoAgentTool: AgentToolDefinition = {
   isEnabled(ctx) {
     return ctx.quotingRules.enabled;
   },
-  buildPromptBlock() {
-    return 'Tienes una herramienta (cotizar_seguro_moto) para REUNIR los datos de una cotización de moto (no da el precio directo — eso lo confirma un asesor). Pide la placa primero — con eso ya traes marca, línea y año automáticamente. Luego, con botones (usa presentar_opciones_whatsapp con estas opciones EXACTAS): ¿nueva o usada? ("Nuevo"/"Usado"); ¿qué uso tiene? ("Particular"/"Servicio Público"/"Uber/Cabify o similares"); ¿es de importación directa? ("No"/"Sí, es de importación directa"/"No estoy seguro"). La ciudad, en texto normal. Luego pide nombre completo, documento y fecha de nacimiento del tomador. Si la herramienta dice que faltan datos, pide exactamente esos. Cuando confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes un precio tú mismo.';
+  buildPromptBlock(ctx) {
+    const campos = resolveCampos(ctx, "motos");
+    return `Tienes una herramienta (cotizar_seguro_moto) para REUNIR los datos de una cotización de moto (no da el precio directo — eso lo confirma un asesor). Pide la placa primero — con eso ya traes marca, línea y año automáticamente. ${buildCamposPromptBlock(campos)} Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes un precio tú mismo.`;
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const campos = resolveCampos(ctx, "motos");
     const result = await calificarSeguroMoto(
       {
         placa: typeof args.placa === "string" ? args.placa : "",
@@ -57,8 +60,13 @@ export const calificarSeguroMotoAgentTool: AgentToolDefinition = {
         source: ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp",
         conversationId: ctx.conversationId,
         contactE164: ctx.contactE164
-      }
+      },
+      campos
     );
+    if (result.ok && result.faltan_datos && result.faltan_datos.length > 0) {
+      const campo = campos.find(c => c.fieldKey === result.faltan_datos![0]);
+      if (campo) return { ...result, ...(await presentGuidedQuestion(ctx, campo)) };
+    }
     return { ...result };
   }
 };

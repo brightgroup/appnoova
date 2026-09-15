@@ -60,6 +60,9 @@ import {
 import { providerForLlmModel } from "@/lib/billing/pricing";
 import { getActiveCalendarConnection } from "@/lib/google-calendar/connections-db";
 import { getOrgBusinessHours } from "@/lib/scheduling/business-hours-db";
+import { normalizeQuotingRules } from "@/lib/insurers/quoting-rules";
+import { getAllRamoCampoDefinitionsParaCotizar } from "@/lib/insurers/quote-guidance";
+import { getRamosOfrecidosLabels, mergeRamosOfrecidosContext } from "@/lib/insurers/ramos-ofrecidos-context";
 import { resolveTextAgentForChannel } from "@/lib/text-agent-resolve";
 import type { TwilioWhatsAppMediaItem } from "@/lib/whatsapp/twilio-media";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
@@ -744,7 +747,8 @@ async function processTwilioWhatsAppInboundLocked(
     dataTableContext.text || null,
     { tableLinked: Boolean(agent.data_table_id) }
   );
-  const mergedPrompt = mergeCompanyContext(promptWithCatalog, companyContextText);
+  const ramosOfrecidos = orgId ? await getRamosOfrecidosLabels(db, orgId) : [];
+  const mergedPrompt = mergeRamosOfrecidosContext(mergeCompanyContext(promptWithCatalog, companyContextText), ramosOfrecidos);
   const temporal = buildColombiaTemporalContext();
   const systemInstruction = `${temporal.promptBlock}\n\n${mergedPrompt}`;
   // Solo las instrucciones, SIN la tabla del catálogo: es lo que el guardián
@@ -756,6 +760,8 @@ async function processTwilioWhatsAppInboundLocked(
   try {
     const calendarConnection = orgId ? await getActiveCalendarConnection(db, orgId) : null;
     const businessHours = orgId ? await getOrgBusinessHours(db, orgId) : undefined;
+    const ramoCampos =
+      orgId && normalizeQuotingRules(agent.quoting_rules).enabled ? await getAllRamoCampoDefinitionsParaCotizar(db, orgId) : {};
     const generated = await generateTextAgentReply({
       model,
       systemInstruction,
@@ -770,6 +776,7 @@ async function processTwilioWhatsAppInboundLocked(
       businessHours,
       calendarConnection,
       quotingRules: agent.quoting_rules,
+      ramoCampos,
       toolContext: {
         db,
         organizationId: orgId,
@@ -818,9 +825,13 @@ async function processTwilioWhatsAppInboundLocked(
         JSON.stringify(generated.toolResults)
       );
     }
-    alreadyDeliveredInteractive = generated.toolResults.some(
-      tr => tr.name === "presentar_opciones_whatsapp" && (tr.result as { ok?: boolean })?.ok === true
-    );
+    // `pregunta_enviada: true` cubre las tools de cotización que mandaron botones/lista
+    // como efecto secundario (ver guided-questions.ts) — mismo problema que
+    // `presentar_opciones_whatsapp`, sin importar el nombre de la tool.
+    alreadyDeliveredInteractive = generated.toolResults.some(tr => {
+      const result = tr.result as { ok?: boolean; pregunta_enviada?: boolean };
+      return (tr.name === "presentar_opciones_whatsapp" && result?.ok === true) || result?.pregunta_enviada === true;
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error IA";
     console.error("[whatsapp/inbound] generación de respuesta falló tras reintento, escalando a humano:", msg);

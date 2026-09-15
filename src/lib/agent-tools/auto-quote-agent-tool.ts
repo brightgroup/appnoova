@@ -1,6 +1,7 @@
 import { Type } from "@google/genai";
 import type { AgentToolDefinition, AgentToolContext, AgentToolResult } from "@/lib/agent-tools/registry";
 import { cotizarSeguroAuto } from "@/lib/insurers/auto-quote-tool";
+import { resolveCampos, buildCamposPromptBlock, presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
 
 /**
  * Tool de cotización de autos para agentes que hablan con el CLIENTE FINAL
@@ -48,19 +49,15 @@ export const cotizarSeguroAutoAgentTool: AgentToolDefinition = {
     return ctx.quotingRules.enabled;
   },
   buildPromptBlock(ctx) {
-    const preguntasVehiculo =
-      "Después de la placa, antes de pedir los datos del tomador, necesitas 5 datos más del vehículo — pregúntalos de a uno, con botones cuando se indique (usa la herramienta presentar_opciones_whatsapp con esas opciones EXACTAS, no las cambies): " +
-      '¿nuevo o usado? (botones "Nuevo"/"Usado"); ' +
-      '¿qué uso tiene? (botones "Particular"/"Servicio Público"/"Uber/Cabify o similares"); ' +
-      '¿es de importación directa? (botones "No"/"Sí, es de importación directa"/"No estoy seguro" — si preguntan qué significa, explica que es un vehículo traído del exterior por cuenta propia, sin pasar por un concesionario en Colombia); ' +
-      '¿la tarjeta de propiedad está a su nombre? (botones "A mi nombre"/"En trámite de traspaso"/"A nombre de otra persona"); ' +
-      "¿en qué ciudad circula? (esta sí en texto normal, no como botón — son demasiadas ciudades para una lista).";
+    const campos = resolveCampos(ctx, "autos");
+    const preguntasVehiculo = `Después de la placa, antes de pedir los datos del tomador. ${buildCamposPromptBlock(campos)}`;
     return ctx.quotingRules.autoQuote
-      ? `Tienes una herramienta (cotizar_seguro_auto) para cotizar seguros de auto de verdad. Pide la placa primero. ${preguntasVehiculo} Luego pide nombre completo, documento y fecha de nacimiento del tomador, de forma natural. Si la herramienta dice que faltan datos, pide exactamente esos. Si dice que no hay aseguradora conectada o que el cotizador no está configurado del todo, comunícaselo tal cual al cliente — nunca inventes ni aproximes una prima.`
-      : `Tienes una herramienta (cotizar_seguro_auto) para REUNIR los datos de una cotización de auto (no te da el precio directo — eso lo confirma un asesor). Pide la placa primero. ${preguntasVehiculo} Luego pide nombre completo, documento y fecha de nacimiento del tomador, de forma natural. Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo.`;
+      ? `Tienes una herramienta (cotizar_seguro_auto) para cotizar seguros de auto de verdad. Pide la placa primero. ${preguntasVehiculo} Si la herramienta dice que faltan datos, pide exactamente esos. Si dice que no hay aseguradora conectada o que el cotizador no está configurado del todo, comunícaselo tal cual al cliente — nunca inventes ni aproximes una prima.`
+      : `Tienes una herramienta (cotizar_seguro_auto) para REUNIR los datos de una cotización de auto (no te da el precio directo — eso lo confirma un asesor). Pide la placa primero. ${preguntasVehiculo} Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo.`;
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const campos = resolveCampos(ctx, "autos");
     const result = await cotizarSeguroAuto(
       {
         placa: typeof args.placa === "string" ? args.placa : "",
@@ -79,8 +76,13 @@ export const cotizarSeguroAutoAgentTool: AgentToolDefinition = {
         source: ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp",
         conversationId: ctx.conversationId,
         contactE164: ctx.contactE164
-      }
+      },
+      campos
     );
+    if (result.ok && result.faltan_datos && result.faltan_datos.length > 0) {
+      const campo = campos.find(c => c.fieldKey === result.faltan_datos![0]);
+      if (campo) return { ...result, ...(await presentGuidedQuestion(ctx, campo)) };
+    }
     return { ...result };
   }
 };

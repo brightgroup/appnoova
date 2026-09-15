@@ -1,6 +1,7 @@
 import { Type } from "@google/genai";
 import type { AgentToolDefinition, AgentToolContext, AgentToolResult } from "@/lib/agent-tools/registry";
 import { calificarSeguroVida } from "@/lib/insurers/life-quote-tool";
+import { resolveCampos, buildCamposPromptBlock, presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
 
 /**
  * Tool de calificación de seguro de vida para agentes que hablan con el
@@ -57,11 +58,13 @@ export const calificarSeguroVidaAgentTool: AgentToolDefinition = {
   isEnabled(ctx) {
     return ctx.quotingRules.enabled;
   },
-  buildPromptBlock() {
-    return 'Tienes una herramienta (cotizar_seguro_vida) para REUNIR los datos de una cotización de seguro de vida (no da el precio directo — eso lo confirma un asesor). Pide de a uno, con botones (usa presentar_opciones_whatsapp con estas opciones EXACTAS, una pregunta por mensaje): ¿qué te gustaría proteger? (lista: "Vida (muerte por cualquier causa)", "Vida + Invalidez", "Vida + Invalidez + Enfermedades Graves", "Vida + Invalidez + Enfermedades + Renta diaria", "No lo sé, asesórame"); ¿qué valor de cobertura? (lista: "Menos de 50 millones", "Entre 50 y 200 millones", "Entre 200 y 500 millones", "Más de 500 millones", "No lo sé, asesórame"); ¿presupuesto mensual aproximado? (lista: "Hasta $50.000", "Hasta $150.000", "Hasta $300.000", "Más de $300.000", "No lo sé, asesórame"); ¿fuma o tiene alguna condición médica? (botones "Sí"/"No" — ESTA PREGUNTA ES OBLIGATORIA, nunca la saltes ni la des por hecha, siempre espera la respuesta del cliente antes de seguir). Luego pide en texto normal: nombre completo, documento, fecha de nacimiento y ocupación. Al final, de forma opcional (esta sí se puede omitir si el cliente ya quiere cerrar), pregunta con botones ("Sí"/"No"/"No lo sé, asesórame") si le interesa un fondo de ahorro con el seguro. Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo.';
+  buildPromptBlock(ctx) {
+    const campos = resolveCampos(ctx, "vida");
+    return `Tienes una herramienta (cotizar_seguro_vida) para REUNIR los datos de una cotización de seguro de vida (no da el precio directo — eso lo confirma un asesor). ${buildCamposPromptBlock(campos)} Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo.`;
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const campos = resolveCampos(ctx, "vida");
     const result = await calificarSeguroVida(
       {
         tipo_cobertura: str(args.tipo_cobertura),
@@ -79,8 +82,13 @@ export const calificarSeguroVidaAgentTool: AgentToolDefinition = {
         source: ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp",
         conversationId: ctx.conversationId,
         contactE164: ctx.contactE164
-      }
+      },
+      campos
     );
+    if (result.ok && result.faltan_datos && result.faltan_datos.length > 0) {
+      const campo = campos.find(c => c.fieldKey === result.faltan_datos![0]);
+      if (campo) return { ...result, ...(await presentGuidedQuestion(ctx, campo)) };
+    }
     return { ...result };
   }
 };

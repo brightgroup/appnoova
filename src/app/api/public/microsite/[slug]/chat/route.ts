@@ -36,6 +36,9 @@ import { notifyPushForOrg } from "@/lib/push/send";
 import { resolveOrgActiveWhatsAppChannel } from "@/lib/text-notify-team";
 import { getActiveCalendarConnection } from "@/lib/google-calendar/connections-db";
 import { getOrgBusinessHours } from "@/lib/scheduling/business-hours-db";
+import { normalizeQuotingRules } from "@/lib/insurers/quoting-rules";
+import { getAllRamoCampoDefinitionsParaCotizar } from "@/lib/insurers/quote-guidance";
+import { getRamosOfrecidosLabels, mergeRamosOfrecidosContext } from "@/lib/insurers/ramos-ofrecidos-context";
 
 const PUBLIC_BILLING_FALLBACK =
   "¡Gracias por tu mensaje! En este momento no puedo responder automáticamente, pero un asesor te contactará muy pronto.";
@@ -278,8 +281,9 @@ export async function POST(
     dataTableContext.text || null,
     { tableLinked: Boolean(agent.data_table_id) }
   );
+  const ramosOfrecidos = billing.organizationId ? await getRamosOfrecidosLabels(db, billing.organizationId) : [];
   const temporal = buildColombiaTemporalContext();
-  const systemInstruction = `${temporal.promptBlock}\n\n${mergeCompanyContext(promptWithCatalog, companyContextText)}`;
+  const systemInstruction = `${temporal.promptBlock}\n\n${mergeRamosOfrecidosContext(mergeCompanyContext(promptWithCatalog, companyContextText), ramosOfrecidos)}`;
   // Solo las instrucciones, SIN la tabla del catálogo: es lo que el guardián
   // toma como "importes y enlaces que el negocio autoriza". Si se le pasara el
   // prompt completo, la propia tabla incrustada daría por bueno cualquier
@@ -295,6 +299,10 @@ export async function POST(
   const businessHours = billing.organizationId
     ? await getOrgBusinessHours(db, billing.organizationId)
     : undefined;
+  const ramoCampos =
+    billing.organizationId && normalizeQuotingRules(agent.quoting_rules).enabled
+      ? await getAllRamoCampoDefinitionsParaCotizar(db, billing.organizationId)
+      : {};
 
   try {
     const generated = await generateTextAgentReply({
@@ -311,6 +319,7 @@ export async function POST(
       businessHours,
       calendarConnection,
       quotingRules: agent.quoting_rules,
+      ramoCampos,
       toolContext: {
         db,
         organizationId: billing.organizationId,

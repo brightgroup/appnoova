@@ -5,24 +5,23 @@ import {
   getQuoteRequestById,
   type QuoteRequestRecord
 } from "@/lib/insurers/quote-requests-db";
+import { listCamposPorRamo } from "@/lib/insurers/poliza-ramo-campos-db";
 import { listInsurerConnectionsForOrg } from "@/lib/insurers/insurer-connections-db";
-import { listCamposPorRamo, type PolizaCampoFieldType } from "@/lib/insurers/poliza-ramo-campos-db";
 import { RAMOS_COTIZABLES, ramoCotizableFromCatalogoSlug, type RamoCotizable } from "@/lib/insurers/ramos-cotizables";
+import { DEFAULT_CAMPOS_POR_RAMO, type RamoCampoDef } from "@/lib/insurers/ramo-campos-defaults";
 
-export interface QuoteRamoCampo {
-  fieldKey: string;
-  label: string;
-  fieldType: PolizaCampoFieldType;
-  options: string[];
+export interface QuoteRamoCampo extends RamoCampoDef {
   value: unknown;
 }
 
-/** Definiciones de poliza_ramo_campos para un ramo cotizable — usado tanto para mostrar/editar en el panel como para que los tools genéricos sepan qué preguntar. */
-export async function getRamoCampoDefinitions(
-  db: SupabaseClient,
-  organizationId: string,
-  ramo: string
-): Promise<Array<{ fieldKey: string; label: string; fieldType: PolizaCampoFieldType; options: string[] }>> {
+/**
+ * Definiciones de campo de un ramo cotizable — usado tanto para mostrar/editar
+ * en el panel de configuración como para que los tools de cotización sepan qué
+ * preguntar. Si la organización no ha guardado nada para este ramo, devuelve
+ * los valores por defecto (`ramo-campos-defaults.ts`) tal cual — la IA nunca
+ * se queda sin qué preguntar solo porque nadie abrió la configuración todavía.
+ */
+export async function getRamoCampoDefinitions(db: SupabaseClient, organizationId: string, ramo: string): Promise<RamoCampoDef[]> {
   const ramoCotizable = (Object.keys(RAMOS_COTIZABLES) as RamoCotizable[]).includes(ramo as RamoCotizable)
     ? (ramo as RamoCotizable)
     : null;
@@ -33,10 +32,44 @@ export async function getRamoCampoDefinitions(
     .select("id")
     .eq("slug", RAMOS_COTIZABLES[ramoCotizable].catalogoSlug)
     .maybeSingle();
-  if (!catalogo) return [];
+  if (!catalogo) return DEFAULT_CAMPOS_POR_RAMO[ramoCotizable] ?? [];
 
   const campos = await listCamposPorRamo(db, organizationId, catalogo.id as string);
-  return campos.map(c => ({ fieldKey: c.fieldKey, label: c.label, fieldType: c.fieldType, options: c.options }));
+  if (campos.length === 0) return DEFAULT_CAMPOS_POR_RAMO[ramoCotizable] ?? [];
+
+  return campos.map(c => ({
+    fieldKey: c.fieldKey,
+    label: c.label,
+    pregunta: c.pregunta ?? c.label,
+    ayuda: c.ayuda ?? undefined,
+    fieldType: c.fieldType,
+    options: c.options,
+    sortOrder: c.sortOrder,
+    presentacion: c.presentacion,
+    aplicaCotizacion: c.aplicaCotizacion,
+    requeridoCotizacion: c.requeridoCotizacion
+  }));
+}
+
+/** Solo los campos que la IA debe preguntar durante la cotización (`aplicaCotizacion`) — filtra los campos informativos que un corredor haya agregado para otros fines (metadata de póliza, no de calificación). */
+export async function getRamoCampoDefinitionsParaCotizar(db: SupabaseClient, organizationId: string, ramo: string): Promise<RamoCampoDef[]> {
+  const todos = await getRamoCampoDefinitions(db, organizationId, ramo);
+  return todos.filter(c => c.aplicaCotizacion !== false);
+}
+
+/**
+ * Precarga `ramoCampos` para TODOS los ramos con tool activa hoy en WhatsApp
+ * (los que tienen defaults en ramo-campos-defaults.ts) de una sola vez — para
+ * `AgentToolRulesContext.ramoCampos` (registry.ts), cargado junto a
+ * `quotingRules`/`calendarConnection` antes de generar la respuesta, porque
+ * `buildPromptBlock` es síncrono y no tiene `db`. Se llama solo cuando
+ * `quotingRules.enabled`, igual que `calendarConnection` solo se carga si hay
+ * `orgId` — evita queries de sobra cuando el agente no cotiza.
+ */
+export async function getAllRamoCampoDefinitionsParaCotizar(db: SupabaseClient, organizationId: string): Promise<Record<string, RamoCampoDef[]>> {
+  const ramos = Object.keys(DEFAULT_CAMPOS_POR_RAMO);
+  const entries = await Promise.all(ramos.map(async ramo => [ramo, await getRamoCampoDefinitionsParaCotizar(db, organizationId, ramo)] as const));
+  return Object.fromEntries(entries);
 }
 
 /** Campos extra que el corredor configuró para este ramo (poliza_ramo_campos) con el valor ya respondido en datosRiesgo, si lo hay — para que el asesor vea de un vistazo qué preguntó su propio checklist, no solo lo que la IA pidió por defecto. */

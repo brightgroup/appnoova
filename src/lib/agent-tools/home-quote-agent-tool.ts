@@ -1,6 +1,7 @@
 import { Type } from "@google/genai";
 import type { AgentToolDefinition, AgentToolContext, AgentToolResult } from "@/lib/agent-tools/registry";
 import { calificarSeguroHogar } from "@/lib/insurers/home-quote-tool";
+import { resolveCampos, buildCamposPromptBlock, presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
 
 /**
  * Tool de calificación de seguro de hogar para agentes que hablan con el
@@ -46,11 +47,13 @@ export const calificarSeguroHogarAgentTool: AgentToolDefinition = {
   isEnabled(ctx) {
     return ctx.quotingRules.enabled;
   },
-  buildPromptBlock() {
-    return 'Tienes una herramienta (cotizar_seguro_hogar) para REUNIR los datos de una cotización de seguro de hogar (no da el precio directo — eso lo confirma un asesor). Pide primero, con botones (usa presentar_opciones_whatsapp con estas opciones EXACTAS): tipo de inmueble (lista: "Casa", "Apartamento", "Casa en condominio", "Finca o casa campestre") y si tiene vigilancia o sistemas de seguridad (botones "Sí"/"No"). Para el estrato, usa una lista con "Estrato 1" a "Estrato 6". Luego pide en texto normal: nombre completo, documento, dirección del inmueble y valor aproximado. Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo.';
+  buildPromptBlock(ctx) {
+    const campos = resolveCampos(ctx, "hogar");
+    return `Tienes una herramienta (cotizar_seguro_hogar) para REUNIR los datos de una cotización de seguro de hogar (no da el precio directo — eso lo confirma un asesor). ${buildCamposPromptBlock(campos)} Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo.`;
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const campos = resolveCampos(ctx, "hogar");
     const result = await calificarSeguroHogar(
       {
         tipo_inmueble: str(args.tipo_inmueble),
@@ -66,8 +69,13 @@ export const calificarSeguroHogarAgentTool: AgentToolDefinition = {
         source: ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp",
         conversationId: ctx.conversationId,
         contactE164: ctx.contactE164
-      }
+      },
+      campos
     );
+    if (result.ok && result.faltan_datos && result.faltan_datos.length > 0) {
+      const campo = campos.find(c => c.fieldKey === result.faltan_datos![0]);
+      if (campo) return { ...result, ...(await presentGuidedQuestion(ctx, campo)) };
+    }
     return { ...result };
   }
 };

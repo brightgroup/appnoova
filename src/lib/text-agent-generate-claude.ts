@@ -139,7 +139,8 @@ export async function generateClaudeAgentReply(
     schedulingRules: normalizeSchedulingRules(input.schedulingRules) as SchedulingRules,
     businessHours: normalizeOrgBusinessHours(input.businessHours) as OrgBusinessHours,
     calendarConnection: input.calendarConnection ?? null,
-    quotingRules: normalizeQuotingRules(input.quotingRules)
+    quotingRules: normalizeQuotingRules(input.quotingRules),
+    ramoCampos: input.ramoCampos ?? {}
   };
 
   const enabledTools = resolveEnabledTools(ALL_TEXT_AGENT_TOOLS, rulesCtx);

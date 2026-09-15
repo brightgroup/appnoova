@@ -1,6 +1,7 @@
 import { Type } from "@google/genai";
 import type { OriToolDefinition, OriToolContext, OriToolResult } from "@/lib/agent-tools/ori-tools";
 import { calificarSeguroMoto } from "@/lib/insurers/moto-quote-tool";
+import { getRamoCampoDefinitionsParaCotizar } from "@/lib/insurers/quote-guidance";
 
 /** Tool de ORI: reúne los datos de un seguro de moto — siempre cola humana, no hay conector de aseguradora para motos todavía. */
 export const calificarSeguroMotoOriTool: OriToolDefinition = {
@@ -31,6 +32,7 @@ export const calificarSeguroMotoOriTool: OriToolDefinition = {
     "Tienes una herramienta (cotizar_seguro_moto) para reunir los datos de un seguro de moto. Empieza pidiendo la placa; con eso ya traes los datos del vehículo. Luego pide nuevo o usado, uso, importación directa, ciudad, nombre, documento y fecha de nacimiento del tomador, de forma natural. No da el precio directo — cuando confirme que los datos quedaron completos, dile al usuario que un asesor confirmará el precio.",
   async execute(args: Record<string, unknown>, ctx: OriToolContext): Promise<OriToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const campos = await getRamoCampoDefinitionsParaCotizar(ctx.db, ctx.organizationId, "motos");
     const result = await calificarSeguroMoto(
       {
         placa: typeof args.placa === "string" ? args.placa : "",
@@ -43,7 +45,8 @@ export const calificarSeguroMotoOriTool: OriToolDefinition = {
         fecha_nacimiento_tomador: str(args.fecha_nacimiento_tomador)
       },
       ctx,
-      { source: "ori" }
+      { source: "ori" },
+      campos
     );
     return { ...result };
   }

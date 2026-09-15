@@ -1,6 +1,7 @@
 import { Type } from "@google/genai";
 import type { OriToolDefinition, OriToolContext, OriToolResult } from "@/lib/agent-tools/ori-tools";
 import { calificarAccidentesPersonales } from "@/lib/insurers/accident-quote-tool";
+import { getRamoCampoDefinitionsParaCotizar } from "@/lib/insurers/quote-guidance";
 
 /** Tool de ORI: reúne los datos de un seguro de Accidentes Personales — siempre cola humana. */
 export const calificarAccidentesOriTool: OriToolDefinition = {
@@ -38,6 +39,7 @@ export const calificarAccidentesOriTool: OriToolDefinition = {
     "Tienes una herramienta (cotizar_seguro_accidentes) para reunir los datos de un seguro de Accidentes Personales. Pide qué quiere proteger, individual o colectiva, valor de cobertura, si ya tiene un seguro similar, nombre, documento y fecha de nacimiento, de forma natural. No da el precio directo — cuando confirme que los datos quedaron completos, dile al usuario que un asesor confirmará el precio.",
   async execute(args: Record<string, unknown>, ctx: OriToolContext): Promise<OriToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const campos = await getRamoCampoDefinitionsParaCotizar(ctx.db, ctx.organizationId, "accidentes_personales");
     const result = await calificarAccidentesPersonales(
       {
         proteccion_deseada: str(args.proteccion_deseada),
@@ -49,7 +51,8 @@ export const calificarAccidentesOriTool: OriToolDefinition = {
         fecha_nacimiento_tomador: str(args.fecha_nacimiento_tomador)
       },
       ctx,
-      { source: "ori" }
+      { source: "ori" },
+      campos
     );
     return { ...result };
   }

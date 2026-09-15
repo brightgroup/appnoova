@@ -1,6 +1,7 @@
 import { Type } from "@google/genai";
 import type { AgentToolDefinition, AgentToolContext, AgentToolResult } from "@/lib/agent-tools/registry";
 import { calificarSoat } from "@/lib/insurers/soat-quote-tool";
+import { resolveCampos, buildCamposPromptBlock, presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
 
 /** Tool de calificación de SOAT para agentes que hablan con el CLIENTE FINAL — mismo patrón que life/home-quote-agent-tool.ts. */
 export const calificarSoatAgentTool: AgentToolDefinition = {
@@ -28,11 +29,13 @@ export const calificarSoatAgentTool: AgentToolDefinition = {
   isEnabled(ctx) {
     return ctx.quotingRules.enabled;
   },
-  buildPromptBlock() {
-    return "Tienes una herramienta (cotizar_seguro_soat) para REUNIR los datos de un SOAT (no da el precio directo — eso lo confirma un asesor). Es el ramo más simple: pide en texto normal, de a uno, la placa, los últimos 4 dígitos del número de motor y la ciudad donde circula (no hay botones aquí, son datos abiertos). Luego pide nombre completo, documento y fecha de nacimiento del tomador. Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes un precio tú mismo.";
+  buildPromptBlock(ctx) {
+    const campos = resolveCampos(ctx, "soat");
+    return `Tienes una herramienta (cotizar_seguro_soat) para REUNIR los datos de un SOAT (no da el precio directo — eso lo confirma un asesor). Es el ramo más simple, son puros datos abiertos. ${buildCamposPromptBlock(campos)} Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes un precio tú mismo.`;
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const campos = resolveCampos(ctx, "soat");
     const result = await calificarSoat(
       {
         placa: str(args.placa),
@@ -47,8 +50,13 @@ export const calificarSoatAgentTool: AgentToolDefinition = {
         source: ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp",
         conversationId: ctx.conversationId,
         contactE164: ctx.contactE164
-      }
+      },
+      campos
     );
+    if (result.ok && result.faltan_datos && result.faltan_datos.length > 0) {
+      const campo = campos.find(c => c.fieldKey === result.faltan_datos![0]);
+      if (campo) return { ...result, ...(await presentGuidedQuestion(ctx, campo)) };
+    }
     return { ...result };
   }
 };

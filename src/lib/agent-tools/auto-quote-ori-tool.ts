@@ -1,6 +1,7 @@
 import { Type } from "@google/genai";
 import type { OriToolDefinition, OriToolContext, OriToolResult } from "@/lib/agent-tools/ori-tools";
 import { cotizarSeguroAuto } from "@/lib/insurers/auto-quote-tool";
+import { getRamoCampoDefinitionsParaCotizar } from "@/lib/insurers/quote-guidance";
 
 /** Tool de ORI: cotiza un seguro de auto real (Verifik + aseguradora conectada) — nunca precios inventados. */
 export const cotizarSeguroAutoTool: OriToolDefinition = {
@@ -41,6 +42,7 @@ export const cotizarSeguroAutoTool: OriToolDefinition = {
     "Tienes una herramienta (cotizar_seguro_auto) para cotizar seguros de auto de verdad. Empieza pidiendo la placa; con eso ya puedes traer los datos del vehículo. Luego necesitas 5 datos más del vehículo: nuevo o usado, uso (particular/servicio público/Uber-Cabify), si es de importación directa, a nombre de quién está la tarjeta de propiedad, y la ciudad donde circula. Para el precio final necesitas además nombre completo, documento y fecha de nacimiento del tomador — pídelos de forma natural, uno o varios a la vez, no como un formulario robótico. Si la herramienta responde que faltan datos, pregunta exactamente por esos. Si responde que no hay aseguradora conectada o que el cotizador aún no está configurado del todo, comunícaselo tal cual al usuario — nunca inventes ni aproximes una prima.",
   async execute(args: Record<string, unknown>, ctx: OriToolContext): Promise<OriToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const campos = await getRamoCampoDefinitionsParaCotizar(ctx.db, ctx.organizationId, "autos");
     const result = await cotizarSeguroAuto(
       {
         placa: typeof args.placa === "string" ? args.placa : "",
@@ -57,7 +59,8 @@ export const cotizarSeguroAutoTool: OriToolDefinition = {
       // ORI es el copiloto del propio corredor — si él mismo pide la cotización
       // acá, la autonomía completa no tiene el riesgo que sí tiene de cara al
       // cliente final, así que siempre cotiza directo.
-      { autoQuote: true, source: "ori" }
+      { autoQuote: true, source: "ori" },
+      campos
     );
     return { ...result };
   }

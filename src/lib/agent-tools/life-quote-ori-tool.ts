@@ -1,6 +1,7 @@
 import { Type } from "@google/genai";
 import type { OriToolDefinition, OriToolContext, OriToolResult } from "@/lib/agent-tools/ori-tools";
 import { calificarSeguroVida } from "@/lib/insurers/life-quote-tool";
+import { getRamoCampoDefinitionsParaCotizar } from "@/lib/insurers/quote-guidance";
 
 /** Tool de ORI: reúne los datos de un seguro de vida — siempre cola humana, no hay conector de aseguradora para vida todavía. */
 export const calificarSeguroVidaOriTool: OriToolDefinition = {
@@ -41,6 +42,7 @@ export const calificarSeguroVidaOriTool: OriToolDefinition = {
     "Tienes una herramienta (cotizar_seguro_vida) para reunir los datos de una cotización de seguro de vida. Pide qué quiere proteger, valor de cobertura deseado, presupuesto mensual, si fuma o tiene alguna condición médica (obligatorio), nombre completo, documento, fecha de nacimiento y ocupación, de forma natural. No da el precio directo — cuando confirme que los datos quedaron completos, dile al usuario que un asesor confirmará el precio.",
   async execute(args: Record<string, unknown>, ctx: OriToolContext): Promise<OriToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const campos = await getRamoCampoDefinitionsParaCotizar(ctx.db, ctx.organizationId, "vida");
     const result = await calificarSeguroVida(
       {
         tipo_cobertura: str(args.tipo_cobertura),
@@ -54,7 +56,8 @@ export const calificarSeguroVidaOriTool: OriToolDefinition = {
         interes_ahorro: str(args.interes_ahorro)
       },
       ctx,
-      { source: "ori" }
+      { source: "ori" },
+      campos
     );
     return { ...result };
   }

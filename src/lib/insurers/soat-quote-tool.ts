@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { upsertPendingQuoteRequest, type QuoteRequestSource } from "@/lib/insurers/quote-requests-db";
+import type { RamoCampoDef } from "@/lib/insurers/ramo-campos-defaults";
 
 /**
  * Calificación de SOAT (sin conector de aseguradora todavía) — el esquema más
@@ -37,21 +38,20 @@ export interface SoatQuoteOptions {
   contactE164?: string | null;
 }
 
-const REQUIRED_FIELDS = [
-  "placa",
-  "motor_ultimos_digitos",
-  "ciudad",
-  "nombre_tomador",
-  "documento_tomador",
-  "fecha_nacimiento_tomador"
-] as const;
+const ALL_FIELD_KEYS = ["placa", "motor_ultimos_digitos", "ciudad", "nombre_tomador", "documento_tomador", "fecha_nacimiento_tomador"] as const;
+
+/** Campos que de verdad bloquean la cotización — los que la config no marcó como opcionales. */
+function requiredFields(campos: RamoCampoDef[]): typeof ALL_FIELD_KEYS[number][] {
+  return ALL_FIELD_KEYS.filter(key => campos.find(c => c.fieldKey === key)?.requeridoCotizacion !== false);
+}
 
 export async function calificarSoat(
   input: SoatQuoteInput,
   ctx: { db: SupabaseClient; organizationId: string },
-  options: SoatQuoteOptions
+  options: SoatQuoteOptions,
+  campos: RamoCampoDef[]
 ): Promise<SoatQuoteResult> {
-  const faltantes = REQUIRED_FIELDS.filter(field => !input[field]?.trim());
+  const faltantes = requiredFields(campos).filter(field => !input[field]?.trim());
   if (faltantes.length > 0) {
     return { ok: true, faltan_datos: faltantes };
   }

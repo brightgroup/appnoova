@@ -18,6 +18,7 @@ import { providerForLlmModel } from "@/lib/billing/pricing";
 import { resolveOrgActiveWhatsAppChannel } from "@/lib/text-notify-team";
 import { getActiveCalendarConnection } from "@/lib/google-calendar/connections-db";
 import { getOrgBusinessHours } from "@/lib/scheduling/business-hours-db";
+import { getRamosOfrecidosLabels, mergeRamosOfrecidosContext } from "@/lib/insurers/ramos-ofrecidos-context";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -123,7 +124,8 @@ export async function POST(req: NextRequest) {
     dataTableContext.text || null,
     { tableLinked: Boolean(agent.data_table_id) }
   );
-  const mergedPrompt = mergeCompanyContext(promptWithCatalog, companyContextText);
+  const ramosOfrecidos = billing.organizationId ? await getRamosOfrecidosLabels(db, billing.organizationId) : [];
+  const mergedPrompt = mergeRamosOfrecidosContext(mergeCompanyContext(promptWithCatalog, companyContextText), ramosOfrecidos);
   const temporal = buildColombiaTemporalContext();
   const systemInstruction = `${temporal.promptBlock}\n\n${mergedPrompt}`;
   // Solo las instrucciones, SIN la tabla del catálogo: es lo que el guardián

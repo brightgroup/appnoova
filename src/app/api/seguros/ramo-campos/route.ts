@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSegurosAccess } from "@/lib/insurers/api-guard";
 import { adminClient } from "@/lib/voice-agents-server";
-import { createCampo, listCamposPorRamo, listTodosLosCampos, type PolizaCampoFieldType } from "@/lib/insurers/poliza-ramo-campos-db";
+import {
+  createCampo,
+  listCamposPorRamo,
+  listTodosLosCampos,
+  type PolizaCampoFieldType,
+  type PolizaCampoPresentacion
+} from "@/lib/insurers/poliza-ramo-campos-db";
 
 const VALID_TYPES: PolizaCampoFieldType[] = ["text", "number", "date", "select", "boolean"];
+const VALID_PRESENTACIONES: PolizaCampoPresentacion[] = ["auto", "botones", "lista", "texto"];
 
 /** GET ?ramo_id= (campos de un solo ramo) o sin parámetro (todos los campos de la org, para armar columnas dinámicas). */
 export async function GET(req: NextRequest) {
@@ -31,6 +38,9 @@ export async function POST(req: NextRequest) {
   if (!ramoId) return NextResponse.json({ error: "Falta el ramo" }, { status: 400 });
   if (!label) return NextResponse.json({ error: "Falta el nombre del campo" }, { status: 400 });
   if (!VALID_TYPES.includes(fieldType)) return NextResponse.json({ error: "Tipo de campo inválido" }, { status: 400 });
+  if (body.presentacion !== undefined && !VALID_PRESENTACIONES.includes(body.presentacion)) {
+    return NextResponse.json({ error: "Presentación inválida" }, { status: 400 });
+  }
 
   const db = adminClient();
   try {
@@ -38,7 +48,12 @@ export async function POST(req: NextRequest) {
       ramoId,
       label,
       fieldType,
-      options: Array.isArray(body.options) ? body.options.map(String) : []
+      options: Array.isArray(body.options) ? body.options.map(String) : [],
+      pregunta: typeof body.pregunta === "string" ? body.pregunta : undefined,
+      ayuda: typeof body.ayuda === "string" ? body.ayuda : undefined,
+      presentacion: body.presentacion,
+      aplicaCotizacion: typeof body.aplica_cotizacion === "boolean" ? body.aplica_cotizacion : undefined,
+      requeridoCotizacion: typeof body.requerido_cotizacion === "boolean" ? body.requerido_cotizacion : undefined
     });
     return NextResponse.json({ campo });
   } catch (err) {

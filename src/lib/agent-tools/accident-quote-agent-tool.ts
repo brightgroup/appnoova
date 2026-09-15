@@ -1,6 +1,7 @@
 import { Type } from "@google/genai";
 import type { AgentToolDefinition, AgentToolContext, AgentToolResult } from "@/lib/agent-tools/registry";
 import { calificarAccidentesPersonales } from "@/lib/insurers/accident-quote-tool";
+import { resolveCampos, buildCamposPromptBlock, presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
 
 /** Tool de calificación de Accidentes Personales para agentes que hablan con el CLIENTE FINAL. */
 export const calificarAccidentesAgentTool: AgentToolDefinition = {
@@ -45,11 +46,13 @@ export const calificarAccidentesAgentTool: AgentToolDefinition = {
   isEnabled(ctx) {
     return ctx.quotingRules.enabled;
   },
-  buildPromptBlock() {
-    return 'Tienes una herramienta (cotizar_seguro_accidentes) para REUNIR los datos de un seguro de Accidentes Personales (no da el precio directo — eso lo confirma un asesor). Este ramo es prácticamente todo con botones (usa presentar_opciones_whatsapp con estas opciones EXACTAS): ¿qué le gustaría proteger? (lista: "Muerte accidental", "Invalidez por accidente o enfermedad", "Renta diaria si me incapacito por cualquier causa", "Todas las anteriores", "No lo sé, asesórenme"); ¿para usted o una póliza colectiva? (botones "Para mí (individual)"/"Póliza colectiva"); ¿qué valor de cobertura? (lista: "10 millones", "Entre 10 y 20 millones", "Entre 20 y 50 millones", "Entre 50 y 100 millones", "Más de 100 millones", "No lo sé, asesórenme"); ¿ya tiene un seguro similar? (botones "Sí"/"No"). Luego pide en texto normal: nombre completo, documento y fecha de nacimiento del tomador. Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes un precio tú mismo.';
+  buildPromptBlock(ctx) {
+    const campos = resolveCampos(ctx, "accidentes_personales");
+    return `Tienes una herramienta (cotizar_seguro_accidentes) para REUNIR los datos de un seguro de Accidentes Personales (no da el precio directo — eso lo confirma un asesor). ${buildCamposPromptBlock(campos)} Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes un precio tú mismo.`;
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const campos = resolveCampos(ctx, "accidentes_personales");
     const result = await calificarAccidentesPersonales(
       {
         proteccion_deseada: str(args.proteccion_deseada),
@@ -65,8 +68,13 @@ export const calificarAccidentesAgentTool: AgentToolDefinition = {
         source: ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp",
         conversationId: ctx.conversationId,
         contactE164: ctx.contactE164
-      }
+      },
+      campos
     );
+    if (result.ok && result.faltan_datos && result.faltan_datos.length > 0) {
+      const campo = campos.find(c => c.fieldKey === result.faltan_datos![0]);
+      if (campo) return { ...result, ...(await presentGuidedQuestion(ctx, campo)) };
+    }
     return { ...result };
   }
 };
