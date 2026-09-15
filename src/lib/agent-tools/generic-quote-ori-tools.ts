@@ -49,22 +49,25 @@ export const registrarDatoCotizacionOriTool: OriToolDefinition = {
   name: "registrar_dato_cotizacion",
   declaration: {
     name: "registrar_dato_cotizacion",
-    description: "Guarda respuestas nuevas sobre una cotización ya iniciada (vida, hogar o salud) por su quote_request_id.",
+    description: "Guarda respuestas nuevas sobre una cotización ya iniciada (vida, hogar o salud) de un lead.",
     parameters: {
       type: Type.OBJECT,
       properties: {
-        quote_request_id: { type: Type.STRING, description: "Id de la cotización." },
+        lead_id: { type: Type.STRING, description: "Id del lead/oportunidad del CRM — el mismo que le pasaste a iniciar_cotizacion_seguro." },
+        ramo: { type: Type.STRING, description: "El mismo ramo que usaste en iniciar_cotizacion_seguro." },
         campos: { type: Type.OBJECT, description: "Clave/valor de los datos nuevos." }
       },
-      required: ["quote_request_id", "campos"]
+      required: ["lead_id", "ramo", "campos"]
     }
   },
   promptBlock:
-    "Tienes una herramienta (registrar_dato_cotizacion) para guardar datos nuevos de una cotización de vida/hogar/salud ya iniciada, por su quote_request_id.",
+    "Tienes una herramienta (registrar_dato_cotizacion) para guardar datos nuevos de una cotización de vida/hogar/salud ya iniciada — pásale lead_id y ramo (no hace falta guardar ningún id de cotización entre mensajes).",
   async execute(args: Record<string, unknown>, ctx: OriToolContext): Promise<OriToolResult> {
-    const quoteRequestId = typeof args.quote_request_id === "string" ? args.quote_request_id : "";
-    if (!quoteRequestId) return { ok: false, reason: "Falta el quote_request_id." };
-    const result = await registrarDatoCotizacion(ctx.db, ctx.organizationId, quoteRequestId, campoStringOnly(args));
+    const leadId = typeof args.lead_id === "string" ? args.lead_id : "";
+    const ramo = typeof args.ramo === "string" ? args.ramo : "";
+    if (!leadId) return { ok: false, reason: "Falta el lead_id." };
+    if (!ramo) return { ok: false, reason: "Falta el ramo." };
+    const result = await registrarDatoCotizacion(ctx.db, ctx.organizationId, { ramo, leadId, campos: campoStringOnly(args) }, { source: "ori", leadId });
     return { ...result };
   }
 };

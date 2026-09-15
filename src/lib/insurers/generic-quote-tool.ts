@@ -2,7 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   upsertPendingQuoteRequest,
   updateQuoteRequestDatos,
-  getQuoteRequestById,
+  findPendingQuoteRequestByConversation,
+  findPendingQuoteRequestByLead,
   type QuoteRequestSource,
   type QuoteRequestTomador
 } from "@/lib/insurers/quote-requests-db";
@@ -149,18 +150,56 @@ export async function iniciarCotizacionSeguro(
   return buildResult(db, organizationId, quote.id, ramo, quote.tomador, quote.datosRiesgo);
 }
 
-/** Guarda respuestas nuevas sobre una cotización ya iniciada y devuelve qué sigue faltando. */
+/**
+ * Guarda respuestas nuevas sobre la cotización "pendiente" de este ramo en
+ * esta conversación y devuelve qué sigue faltando.
+ *
+ * Deliberadamente NO recibe `quote_request_id` — cada mensaje entrante de
+ * WhatsApp es un turno nuevo de `generateTextAgentReply` que solo ve el
+ * texto final persistido de turnos anteriores (`text_agent_conversations.messages`),
+ * nunca las llamadas a tools intermedias — un id que solo vivió en la
+ * respuesta de `iniciar_cotizacion_seguro` en un turno previo ya no existe
+ * para el modelo en el turno siguiente. Se resuelve el registro igual que
+ * `iniciar_cotizacion_seguro` (por organización + conversación/lead + ramo),
+ * así el modelo nunca tiene que recordar nada entre mensajes. `leadId` es
+ * para las tools de ORI (guiar una cotización sin conversación de WhatsApp
+ * de por medio, ver generic-quote-ori-tools.ts) — mismo problema, mismo fix.
+ */
 export async function registrarDatoCotizacion(
   db: SupabaseClient,
   organizationId: string,
-  quoteRequestId: string,
-  campos: Record<string, string>
+  input: { ramo: string; conversationId?: string | null; leadId?: string | null; campos: Record<string, string> },
+  opts: IniciarCotizacionOptions
 ): Promise<GenericQuoteResult> {
-  const existing = await getQuoteRequestById(db, organizationId, quoteRequestId);
-  if (!existing) return { ok: false, reason: "No encontré esa cotización — vuelve a iniciarla con iniciar_cotizacion_seguro." };
+  const ramo = input.ramo?.trim().toLowerCase();
+  const { tomador, datosRiesgo } = splitCampos(input.campos);
 
-  const { tomador, datosRiesgo } = splitCampos(campos);
-  const updated = await updateQuoteRequestDatos(db, organizationId, quoteRequestId, { tomador, datosRiesgo });
+  const existing = input.conversationId
+    ? await findPendingQuoteRequestByConversation(db, organizationId, input.conversationId, ramo)
+    : input.leadId
+      ? await findPendingQuoteRequestByLead(db, organizationId, input.leadId, ramo)
+      : null;
+
+  if (!existing) {
+    // No debería pasar en el flujo normal (el modelo siempre arranca con
+    // iniciar_cotizacion_seguro), pero si pasa, no dejamos la respuesta del
+    // cliente en el limbo — se crea la cotización con este primer dato en
+    // vez de devolver un error que el cliente no puede resolver.
+    const quote = await upsertPendingQuoteRequest(db, {
+      organizationId,
+      conversationId: input.conversationId,
+      contactId: opts.contactId,
+      leadId: opts.leadId,
+      contactE164: opts.contactE164,
+      source: opts.source,
+      ramo,
+      tomador,
+      datosRiesgo
+    });
+    return buildResult(db, organizationId, quote.id, ramo, quote.tomador, quote.datosRiesgo);
+  }
+
+  const updated = await updateQuoteRequestDatos(db, organizationId, existing.id, { tomador, datosRiesgo });
   if (!updated) return { ok: false, reason: "No se pudo guardar la respuesta." };
 
   return buildResult(db, organizationId, updated.id, updated.ramo, updated.tomador, updated.datosRiesgo);

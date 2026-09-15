@@ -252,6 +252,51 @@ export async function findPendingQuoteRequestByPlaca(
   return toRecord(rows[0]);
 }
 
+/**
+ * Cotización "pendiente" de este ramo dentro de esta conversación — mismo
+ * criterio de deduplicación que usa `upsertPendingQuoteRequest` (org +
+ * conversation_id + ramo + estado). La usa el motor genérico
+ * (generic-quote-tool.ts) para que `registrar_dato_cotizacion` no dependa de
+ * que el modelo recuerde el `quote_request_id` de un turno de WhatsApp
+ * anterior — solo el texto final de cada turno queda en el historial que el
+ * modelo vuelve a ver, nunca las llamadas a tools intermedias, así que un
+ * ID que solo vivió en la respuesta de una tool se pierde entre mensajes.
+ */
+export async function findPendingQuoteRequestByConversation(
+  db: SupabaseClient,
+  organizationId: string,
+  conversationId: string,
+  ramo: string
+): Promise<QuoteRequestRecord | null> {
+  const { data } = await db
+    .from("insurance_quote_requests")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("conversation_id", conversationId)
+    .eq("ramo", ramo)
+    .eq("estado", "pendiente")
+    .maybeSingle();
+  return data ? toRecord(data as QuoteRequestRow) : null;
+}
+
+/** Igual que `findPendingQuoteRequestByConversation`, pero para las tools genéricas de ORI (escopadas por lead, no por conversación de WhatsApp). */
+export async function findPendingQuoteRequestByLead(
+  db: SupabaseClient,
+  organizationId: string,
+  leadId: string,
+  ramo: string
+): Promise<QuoteRequestRecord | null> {
+  const { data } = await db
+    .from("insurance_quote_requests")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("lead_id", leadId)
+    .eq("ramo", ramo)
+    .eq("estado", "pendiente")
+    .maybeSingle();
+  return data ? toRecord(data as QuoteRequestRow) : null;
+}
+
 /** Cotización más reciente ligada a un lead — usada por la tool de ORI `guiar_cotizacion_seguro` (solo recibe el lead, no distingue ramo). */
 export async function getLatestQuoteRequestForLead(
   db: SupabaseClient,

@@ -105,13 +105,13 @@ export const registrarDatoCotizacionAgentTool: AgentToolDefinition = {
     parameters: {
       type: Type.OBJECT,
       properties: {
-        quote_request_id: { type: Type.STRING, description: "Id de la cotización, devuelto por iniciar_cotizacion_seguro." },
+        ramo: { type: Type.STRING, description: `El mismo ramo que le pasaste a iniciar_cotizacion_seguro. Uno de: ${RAMOS_MOTOR_GENERICO.join(", ")}.` },
         campos: {
           type: Type.OBJECT,
           description: "Clave/valor de los datos que el cliente acaba de responder, ej. {\"estrato\": \"3\"}."
         }
       },
-      required: ["quote_request_id", "campos"]
+      required: ["ramo", "campos"]
     }
   },
   isEnabled(ctx) {
@@ -119,16 +119,25 @@ export const registrarDatoCotizacionAgentTool: AgentToolDefinition = {
   },
   buildPromptBlock() {
     return (
-      "Tienes una herramienta (registrar_dato_cotizacion) para guardar cada dato que el cliente responda sobre una cotización ya iniciada — pásale el quote_request_id y los campos nuevos. " +
+      "Tienes una herramienta (registrar_dato_cotizacion) para guardar cada dato que el cliente responda sobre una cotización ya iniciada — pásale el mismo ramo que usaste en iniciar_cotizacion_seguro y los campos nuevos (no hace falta guardar ningún id entre mensajes). " +
       "Si el resultado trae `pregunta_enviada: true`, la siguiente pregunta YA se le envió al cliente (con botones o lista) — no la repitas en tu texto. " +
       "Si trae `pregunta_enviada: false`, escríbela tú mismo en texto normal usando `siguiente_pregunta`. " +
       "Cuando confirme que ya está completo, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo."
     );
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
-    const quoteRequestId = typeof args.quote_request_id === "string" ? args.quote_request_id : "";
-    if (!quoteRequestId) return { ok: false, reason: "Falta el quote_request_id." };
-    const result = await registrarDatoCotizacion(ctx.db, ctx.organizationId, quoteRequestId, campoStringOnly(args));
+    const ramo = typeof args.ramo === "string" ? args.ramo : "";
+    if (!ramo) return { ok: false, reason: "Falta el ramo." };
+    const result = await registrarDatoCotizacion(
+      ctx.db,
+      ctx.organizationId,
+      { ramo, conversationId: ctx.conversationId, campos: campoStringOnly(args) },
+      {
+        source: ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp",
+        conversationId: ctx.conversationId,
+        contactE164: ctx.contactE164
+      }
+    );
     return presentNextPending(ctx, result);
   }
 };
