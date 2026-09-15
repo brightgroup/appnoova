@@ -30,7 +30,7 @@ import { calificarSeguroHogarOriTool } from "@/lib/agent-tools/home-quote-ori-to
 import { calificarSeguroMotoOriTool } from "@/lib/agent-tools/moto-quote-ori-tool";
 import { calificarSoatOriTool } from "@/lib/agent-tools/soat-quote-ori-tool";
 import { calificarAccidentesOriTool } from "@/lib/agent-tools/accident-quote-ori-tool";
-import { iniciarCotizacionSeguroOriTool, registrarDatoCotizacionOriTool } from "@/lib/agent-tools/generic-quote-ori-tools";
+import { cotizarSeguroOriTool } from "@/lib/agent-tools/generic-quote-ori-tools";
 import { estructurarResultadoCotizacionOriTool } from "@/lib/agent-tools/quote-result-ori-tool";
 import { getQuoteGuidanceById } from "@/lib/insurers/quote-guidance";
 import {
@@ -152,8 +152,7 @@ export async function POST(req: NextRequest) {
         calificarSeguroMotoOriTool,
         calificarSoatOriTool,
         calificarAccidentesOriTool,
-        iniciarCotizacionSeguroOriTool,
-        registrarDatoCotizacionOriTool,
+        cotizarSeguroOriTool,
         consultarCotizacionesPendientesTool,
         solicitarCotizacionSeguroTool,
         guiarCotizacionSeguroTool,

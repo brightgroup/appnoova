@@ -13,11 +13,25 @@ import { RAMOS_COTIZABLES, RAMOS_MOTOR_GENERICO, type RamoCotizable } from "@/li
 /**
  * Motor de calificación GENÉRICO para ramos sin conector de aseguradora ni
  * lookup propio (todo lo que no sea autos/motos, que consultan Verifik/
- * PlacApi por placa — ver auto-quote-tool.ts/moto-quote-tool.ts). Dos tools
- * que leen qué preguntar desde `poliza_ramo_campos` (con fallback a
- * ramo-campos-defaults.ts) — el mismo esquema editable que ya usa la ficha
- * del lead (SeguroQuotePanel.tsx) y la UI de Configuración → Preguntas que
- * hace la IA, así la IA y el asesor humano nunca piden datos distintos.
+ * PlacApi por placa — ver auto-quote-tool.ts/moto-quote-tool.ts). Una sola
+ * tool (`cotizarSeguroGenerico`) que lee qué preguntar desde
+ * `poliza_ramo_campos` (con fallback a ramo-campos-defaults.ts) — el mismo
+ * esquema editable que ya usa la ficha del lead (SeguroQuotePanel.tsx) y la
+ * UI de Configuración → Preguntas que hace la IA, así la IA y el asesor
+ * humano nunca piden datos distintos.
+ *
+ * DISEÑO 2026-09-15 (v2, reemplaza el de dos tools `iniciar_cotizacion_seguro`
+ * + `registrar_dato_cotizacion`): esas dos tools resultaron NO ser confiables
+ * en producción — el modelo las llamaba una sola vez, recibía la lista de
+ * preguntas y después seguía la conversación de memoria sin volver a guardar
+ * nada (confirmado con pruebas en vivo, ver docs/HANDOFF-CAMPOS-COTIZACION-CONFIGURABLES.md).
+ * Ahora hay UNA sola tool que el modelo debe llamar en cada turno con TODOS
+ * los campos que ya conoce de la conversación (no solo el más nuevo) —
+ * exactamente el mismo patrón que ya funciona bien en los 6 ramos con tool
+ * dedicada (auto-quote-tool.ts y hermanos: schema fijo, el modelo reenvía
+ * todo lo que sabe en cada llamada). `updateQuoteRequestDatos` igual hace
+ * merge con lo que ya había en DB como red de seguridad, por si el modelo
+ * omite algún campo viejo en una llamada puntual.
  *
  * Agregar un ramo nuevo a este motor es solo: 1) agregarlo a
  * RAMOS_COTIZABLES + RAMOS_MOTOR_GENERICO, 2) sus defaults en
@@ -110,7 +124,7 @@ async function buildResult(
   };
 }
 
-export interface IniciarCotizacionOptions {
+export interface CotizarSeguroOptions {
   source: QuoteRequestSource;
   conversationId?: string | null;
   contactId?: string | null;
@@ -118,12 +132,25 @@ export interface IniciarCotizacionOptions {
   contactE164?: string | null;
 }
 
-/** Crea (o reutiliza, dentro de la misma conversación) la solicitud de cotización de un ramo y devuelve qué falta por preguntar. */
-export async function iniciarCotizacionSeguro(
+/**
+ * Única tool del motor genérico: el modelo la llama en CADA turno de la
+ * conversación con el ramo y TODOS los campos que ya conoce hasta ahora (no
+ * solo el más nuevo) — mismo contrato que `cotizarSeguroAuto`/
+ * `calificarSeguroHogar` y hermanos. Encuentra (o crea, si es la primera
+ * llamada) la solicitud "pendiente" de este ramo dentro de esta
+ * conversación/lead — por organización + conversación/lead + ramo, nunca por
+ * un id que el modelo tendría que recordar entre mensajes de WhatsApp (cada
+ * mensaje entrante es un turno nuevo de `generateTextAgentReply` que solo ve
+ * el texto final persistido de turnos anteriores, nunca las llamadas a tools
+ * intermedias — ver `text_agent_conversations.messages`). `leadId` es para
+ * las tools de ORI (guiar una cotización sin conversación de WhatsApp de por
+ * medio, ver generic-quote-ori-tools.ts).
+ */
+export async function cotizarSeguroGenerico(
   db: SupabaseClient,
   organizationId: string,
-  input: { ramo: string; campos?: Record<string, string> },
-  opts: IniciarCotizacionOptions
+  input: { ramo: string; conversationId?: string | null; leadId?: string | null; campos: Record<string, string> },
+  opts: CotizarSeguroOptions
 ): Promise<GenericQuoteResult> {
   const ramo = input.ramo?.trim().toLowerCase();
   if (!RAMOS_MOTOR_GENERICO.includes(ramo as RamoCotizable)) {
@@ -135,72 +162,29 @@ export async function iniciarCotizacionSeguro(
 
   const { tomador, datosRiesgo } = splitCampos(input.campos ?? {});
 
-  const quote = await upsertPendingQuoteRequest(db, {
-    organizationId,
-    conversationId: opts.conversationId,
-    contactId: opts.contactId,
-    leadId: opts.leadId,
-    contactE164: opts.contactE164,
-    source: opts.source,
-    ramo,
-    tomador,
-    datosRiesgo
-  });
-
-  return buildResult(db, organizationId, quote.id, ramo, quote.tomador, quote.datosRiesgo);
-}
-
-/**
- * Guarda respuestas nuevas sobre la cotización "pendiente" de este ramo en
- * esta conversación y devuelve qué sigue faltando.
- *
- * Deliberadamente NO recibe `quote_request_id` — cada mensaje entrante de
- * WhatsApp es un turno nuevo de `generateTextAgentReply` que solo ve el
- * texto final persistido de turnos anteriores (`text_agent_conversations.messages`),
- * nunca las llamadas a tools intermedias — un id que solo vivió en la
- * respuesta de `iniciar_cotizacion_seguro` en un turno previo ya no existe
- * para el modelo en el turno siguiente. Se resuelve el registro igual que
- * `iniciar_cotizacion_seguro` (por organización + conversación/lead + ramo),
- * así el modelo nunca tiene que recordar nada entre mensajes. `leadId` es
- * para las tools de ORI (guiar una cotización sin conversación de WhatsApp
- * de por medio, ver generic-quote-ori-tools.ts) — mismo problema, mismo fix.
- */
-export async function registrarDatoCotizacion(
-  db: SupabaseClient,
-  organizationId: string,
-  input: { ramo: string; conversationId?: string | null; leadId?: string | null; campos: Record<string, string> },
-  opts: IniciarCotizacionOptions
-): Promise<GenericQuoteResult> {
-  const ramo = input.ramo?.trim().toLowerCase();
-  const { tomador, datosRiesgo } = splitCampos(input.campos);
-
   const existing = input.conversationId
     ? await findPendingQuoteRequestByConversation(db, organizationId, input.conversationId, ramo)
     : input.leadId
       ? await findPendingQuoteRequestByLead(db, organizationId, input.leadId, ramo)
       : null;
 
-  if (!existing) {
-    // No debería pasar en el flujo normal (el modelo siempre arranca con
-    // iniciar_cotizacion_seguro), pero si pasa, no dejamos la respuesta del
-    // cliente en el limbo — se crea la cotización con este primer dato en
-    // vez de devolver un error que el cliente no puede resolver.
-    const quote = await upsertPendingQuoteRequest(db, {
-      organizationId,
-      conversationId: input.conversationId,
-      contactId: opts.contactId,
-      leadId: opts.leadId,
-      contactE164: opts.contactE164,
-      source: opts.source,
-      ramo,
-      tomador,
-      datosRiesgo
-    });
-    return buildResult(db, organizationId, quote.id, ramo, quote.tomador, quote.datosRiesgo);
-  }
+  // Merge con lo que ya había en DB (no un reemplazo ciego) — red de
+  // seguridad por si el modelo omite algún campo viejo en una llamada
+  // puntual, aunque el prompt le pida reenviar todo lo que sabe cada vez.
+  const quote = existing
+    ? await updateQuoteRequestDatos(db, organizationId, existing.id, { tomador, datosRiesgo })
+    : await upsertPendingQuoteRequest(db, {
+        organizationId,
+        conversationId: input.conversationId,
+        contactId: opts.contactId,
+        leadId: input.leadId,
+        contactE164: opts.contactE164,
+        source: opts.source,
+        ramo,
+        tomador,
+        datosRiesgo
+      });
 
-  const updated = await updateQuoteRequestDatos(db, organizationId, existing.id, { tomador, datosRiesgo });
-  if (!updated) return { ok: false, reason: "No se pudo guardar la respuesta." };
-
-  return buildResult(db, organizationId, updated.id, updated.ramo, updated.tomador, updated.datosRiesgo);
+  if (!quote) return { ok: false, reason: "No se pudo guardar la cotización." };
+  return buildResult(db, organizationId, quote.id, ramo, quote.tomador, quote.datosRiesgo);
 }

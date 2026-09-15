@@ -256,11 +256,11 @@ export async function findPendingQuoteRequestByPlaca(
  * Cotización "pendiente" de este ramo dentro de esta conversación — mismo
  * criterio de deduplicación que usa `upsertPendingQuoteRequest` (org +
  * conversation_id + ramo + estado). La usa el motor genérico
- * (generic-quote-tool.ts) para que `registrar_dato_cotizacion` no dependa de
- * que el modelo recuerde el `quote_request_id` de un turno de WhatsApp
- * anterior — solo el texto final de cada turno queda en el historial que el
- * modelo vuelve a ver, nunca las llamadas a tools intermedias, así que un
- * ID que solo vivió en la respuesta de una tool se pierde entre mensajes.
+ * (generic-quote-tool.ts) para que `cotizar_seguro` no dependa de que el
+ * modelo recuerde el `quote_request_id` de un turno de WhatsApp anterior —
+ * solo el texto final de cada turno queda en el historial que el modelo
+ * vuelve a ver, nunca las llamadas a tools intermedias, así que un ID que
+ * solo vivió en la respuesta de una tool se pierde entre mensajes.
  */
 export async function findPendingQuoteRequestByConversation(
   db: SupabaseClient,
@@ -329,7 +329,7 @@ export async function listQuoteRequestsForLead(
   return ((data as QuoteRequestRow[] | null) ?? []).map(toRecord);
 }
 
-/** Crea una cotización vacía para un ramo específico de un lead — usada por "+ Nueva cotización" en el panel y por el tool genérico iniciar_cotizacion_seguro. */
+/** Crea una cotización vacía para un ramo específico de un lead — usada por "+ Nueva cotización" en el panel. */
 export async function createQuoteRequestForLead(
   db: SupabaseClient,
   organizationId: string,

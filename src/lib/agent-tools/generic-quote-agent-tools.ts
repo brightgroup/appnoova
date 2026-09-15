@@ -1,6 +1,6 @@
 import { Type } from "@google/genai";
 import type { AgentToolDefinition, AgentToolContext, AgentToolResult } from "@/lib/agent-tools/registry";
-import { iniciarCotizacionSeguro, registrarDatoCotizacion, type GenericQuoteResult, type PendingFieldInfo } from "@/lib/insurers/generic-quote-tool";
+import { cotizarSeguroGenerico, type GenericQuoteResult, type PendingFieldInfo } from "@/lib/insurers/generic-quote-tool";
 import { RAMOS_COTIZABLES, RAMOS_MOTOR_GENERICO } from "@/lib/insurers/ramos-cotizables";
 import { presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
 import type { PolizaCampoFieldType, PolizaCampoPresentacion } from "@/lib/insurers/poliza-ramo-campos-db";
@@ -43,73 +43,36 @@ async function presentNextPending(ctx: AgentToolContext, result: GenericQuoteRes
 }
 
 /**
- * Tools genéricas de calificación para agentes que hablan con el CLIENTE
- * FINAL — un solo par de tools que lee qué preguntar desde poliza_ramo_campos
- * (con fallback a ramo-campos-defaults.ts) para cualquier ramo sin lookup
- * propio. Autos y motos siguen con su propia tool porque consultan
- * Verifik/PlacApi por placa; los ramos con esquema documentado (vida, hogar,
- * SOAT, accidentes personales) también tienen tool propia por ya estar en
- * producción — estas dos cubren todo lo demás (ver RAMOS_MOTOR_GENERICO).
+ * Tool ÚNICA de calificación para agentes que hablan con el CLIENTE FINAL —
+ * cubre cualquier ramo sin lookup propio, leyendo qué preguntar desde
+ * poliza_ramo_campos (con fallback a ramo-campos-defaults.ts). Autos y motos
+ * siguen con su propia tool porque consultan Verifik/PlacApi por placa; los
+ * ramos con esquema documentado que ya estaban en producción (vida, hogar,
+ * SOAT, accidentes personales) también tienen tool propia — esta cubre todo
+ * lo demás (ver RAMOS_MOTOR_GENERICO).
+ *
+ * DISEÑO 2026-09-15 (v2): antes eran dos tools (`iniciar_cotizacion_seguro` +
+ * `registrar_dato_cotizacion`, guardado incremental) — resultó no ser
+ * confiable: el modelo las llamaba una sola vez y seguía la conversación de
+ * memoria sin volver a guardar nada (ver docs/HANDOFF-CAMPOS-COTIZACION-CONFIGURABLES.md
+ * para la evidencia). Ahora es UNA sola tool que el modelo debe llamar en
+ * cada turno con TODOS los campos que ya conoce — mismo patrón que ya
+ * funciona bien en los 6 ramos con tool dedicada (auto-quote-agent-tool.ts y
+ * hermanos: schema fijo, el modelo reenvía todo lo que sabe en cada llamada).
  */
-export const iniciarCotizacionSeguroAgentTool: AgentToolDefinition = {
-  name: "iniciar_cotizacion_seguro",
+export const cotizarSeguroAgentTool: AgentToolDefinition = {
+  name: "cotizar_seguro",
   declaration: {
-    name: "iniciar_cotizacion_seguro",
-    description: `Arranca (o continúa, si ya existe en esta conversación) la cotización de un seguro de ${RAMOS_GENERICOS_LABEL} para el cliente — nunca para autos, motos, vida, hogar, SOAT o accidentes personales, que tienen su propia herramienta. Úsala en cuanto sepas qué ramo quiere el cliente. Devuelve la lista exacta de datos que todavía faltan (con su tipo y, si aplica, sus opciones) — pregúntalos con registrar_dato_cotizacion a medida que el cliente responda.`,
+    name: "cotizar_seguro",
+    description: `Reúne los datos para cotizar un seguro de ${RAMOS_GENERICOS_LABEL} para el cliente (no da el precio directo — lo confirma un asesor) — nunca para autos, motos, vida, hogar, SOAT o accidentes personales, que tienen su propia herramienta. Llama esta herramienta en CADA turno de la conversación, apenas el cliente diga qué ramo quiere o responda cualquier dato — pasando el ramo y TODOS los campos que ya conoces de esta cotización hasta ahora (no solo el más reciente, también los que ya habías enviado en llamadas anteriores). Devuelve la lista exacta de datos que todavía faltan (con su tipo y, si aplica, sus opciones). Nunca inventes un dato que el cliente no te haya dado.`,
     parameters: {
       type: Type.OBJECT,
       properties: {
         ramo: { type: Type.STRING, description: `Ramo a cotizar. Uno de: ${RAMOS_MOTOR_GENERICO.join(", ")}.` },
         campos: {
           type: Type.OBJECT,
-          description: "Datos que el cliente ya haya dado en la conversación (opcional) — clave/valor, ej. {\"nombre_tomador\": \"Ana Pérez\"}."
-        }
-      },
-      required: ["ramo"]
-    }
-  },
-  isEnabled(ctx) {
-    return ctx.quotingRules.enabled;
-  },
-  buildPromptBlock() {
-    return (
-      `Tienes una herramienta (iniciar_cotizacion_seguro) para arrancar la cotización de un seguro de ${RAMOS_GENERICOS_LABEL} — pásale el ramo apenas lo sepas. ` +
-      "Te devuelve exactamente qué dato falta a continuación (con su pregunta y, si aplica, sus opciones) — pregúntalo con registrar_dato_cotizacion en cuanto el cliente responda. " +
-      "Si el resultado trae `pregunta_enviada: true`, esa pregunta YA se le envió al cliente (con botones o lista) — no la repitas en tu texto, solo espera la respuesta. " +
-      "Si trae `pregunta_enviada: false`, escríbela tú mismo en texto normal usando el valor de `siguiente_pregunta`. Nunca inventes un dato que el cliente no te haya dado. " +
-      "IMPORTANTE: cada vez que el cliente responda CUALQUIER dato de la cotización (así sea una respuesta corta como un botón, un número o un nombre), tu ÚNICO paso siguiente es llamar registrar_dato_cotizacion con ese dato — nunca redactes tú mismo la siguiente pregunta sin haber llamado la herramienta primero, ni asumas que ya quedó guardado. " +
-      "Cuando confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo."
-    );
-  },
-  async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
-    const ramo = typeof args.ramo === "string" ? args.ramo : "";
-    const result = await iniciarCotizacionSeguro(
-      ctx.db,
-      ctx.organizationId,
-      { ramo, campos: campoStringOnly(args) },
-      {
-        source: ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp",
-        conversationId: ctx.conversationId,
-        contactE164: ctx.contactE164
-      }
-    );
-    return presentNextPending(ctx, result);
-  }
-};
-
-export const registrarDatoCotizacionAgentTool: AgentToolDefinition = {
-  name: "registrar_dato_cotizacion",
-  declaration: {
-    name: "registrar_dato_cotizacion",
-    description:
-      "Guarda una o más respuestas del cliente para una cotización ya iniciada con iniciar_cotizacion_seguro. Devuelve qué sigue faltando, o confirma que los datos quedaron completos.",
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        ramo: { type: Type.STRING, description: `El mismo ramo que le pasaste a iniciar_cotizacion_seguro. Uno de: ${RAMOS_MOTOR_GENERICO.join(", ")}.` },
-        campos: {
-          type: Type.OBJECT,
-          description: "Clave/valor de los datos que el cliente acaba de responder, ej. {\"estrato\": \"3\"}."
+          description:
+            "TODOS los datos que el cliente ya te ha dado en esta cotización hasta ahora — clave/valor, ej. {\"nombre_tomador\": \"Ana Pérez\", \"estrato\": \"3\"}. Incluye los que ya habías enviado antes, no solo el más nuevo; si no lo incluyes aquí, no queda guardado."
         }
       },
       required: ["ramo", "campos"]
@@ -120,17 +83,17 @@ export const registrarDatoCotizacionAgentTool: AgentToolDefinition = {
   },
   buildPromptBlock() {
     return (
-      "Tienes una herramienta (registrar_dato_cotizacion) para guardar cada dato que el cliente responda sobre una cotización ya iniciada — pásale el mismo ramo que usaste en iniciar_cotizacion_seguro y los campos nuevos (no hace falta guardar ningún id entre mensajes). " +
-      "REGLA SIN EXCEPCIÓN: nunca redactes tú la siguiente pregunta de la cotización sin haber llamado ANTES registrar_dato_cotizacion con la respuesta que el cliente acaba de dar — aunque sea un solo dato corto (un botón, un número, un nombre). Si no llamas la herramienta, ese dato NO queda guardado. " +
-      "Si el resultado trae `pregunta_enviada: true`, la siguiente pregunta YA se le envió al cliente (con botones o lista) — no la repitas en tu texto. " +
-      "Si trae `pregunta_enviada: false`, escríbela tú mismo en texto normal usando `siguiente_pregunta`. " +
-      "Cuando confirme que ya está completo, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo."
+      `Tienes una herramienta (cotizar_seguro) para reunir los datos de una cotización de ${RAMOS_GENERICOS_LABEL} — no da el precio directo, eso lo confirma un asesor. ` +
+      "Apenas sepas qué ramo quiere el cliente, llámala con el ramo (y los campos que ya tengas, aunque sea ninguno todavía). Te devuelve exactamente qué dato falta a continuación (con su pregunta y, si aplica, sus opciones). " +
+      "REGLA SIN EXCEPCIÓN: cada vez que el cliente responda CUALQUIER dato — así sea corto, un botón, un número, un nombre — vuelve a llamar cotizar_seguro ANTES de escribir tu próximo mensaje, pasando en `campos` TODOS los datos que ya conoces de esta cotización hasta ahora, no solo el nuevo. Si un dato no va dentro de `campos` en esa llamada, no queda guardado, sin importar lo que le hayas dicho al cliente. Nunca redactes tú la siguiente pregunta sin haber llamado la herramienta primero. " +
+      "Si el resultado trae `pregunta_enviada: true`, esa pregunta YA se le envió al cliente (con botones o lista) — no la repitas en tu texto, solo espera la respuesta. Si trae `pregunta_enviada: false`, escríbela tú mismo en texto normal usando `siguiente_pregunta`. " +
+      "Cuando confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo."
     );
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
     const ramo = typeof args.ramo === "string" ? args.ramo : "";
     if (!ramo) return { ok: false, reason: "Falta el ramo." };
-    const result = await registrarDatoCotizacion(
+    const result = await cotizarSeguroGenerico(
       ctx.db,
       ctx.organizationId,
       { ramo, conversationId: ctx.conversationId, campos: campoStringOnly(args) },

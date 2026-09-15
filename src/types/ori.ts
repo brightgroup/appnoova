@@ -74,8 +74,8 @@ export type InsuranceQuoteRamo = "autos" | "vida" | "hogar" | "motos" | "soat" |
 
 /**
  * Solo autos sigue con tarjeta propia (AutoQuoteCard) en ORI/Mi Link/widget web
- * — vida, hogar y salud pasaron a las tools genéricas iniciar_cotizacion_seguro/
- * registrar_dato_cotizacion (ver src/lib/insurers/generic-quote-tool.ts), cuyo
+ * — vida, hogar y salud pasaron a la tool genérica cotizar_seguro
+ * (ver src/lib/insurers/generic-quote-tool.ts), cuyo
  * `faltan_datos` ya no es un array de strings sino de objetos {key,label,tipo,
  * opciones} — generalizar AutoQuoteCard a ese shape es trabajo aparte (otra
  * superficie, no WhatsApp) que quedó fuera de esta ronda a propósito.

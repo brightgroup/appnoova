@@ -45,7 +45,7 @@ export const RAMOS_COTIZABLES = {
   transporte: { catalogoSlug: "transporte", label: "Transporte de Mercancías" }
 } as const;
 
-/** Ramos que corren sobre el motor genérico (iniciar_cotizacion_seguro/registrar_dato_cotizacion) en vez de una tool dedicada — todo lo que no necesita una integración propia (placa/Verifik como autos y motos). */
+/** Ramos que corren sobre el motor genérico (tool cotizar_seguro) en vez de una tool dedicada — todo lo que no necesita una integración propia (placa/Verifik como autos y motos). */
 export const RAMOS_MOTOR_GENERICO: RamoCotizable[] = [
   "salud",
   "mascotas",
