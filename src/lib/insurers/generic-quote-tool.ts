@@ -9,6 +9,7 @@ import {
 } from "@/lib/insurers/quote-requests-db";
 import { getRamoCampoDefinitionsParaCotizar } from "@/lib/insurers/quote-guidance";
 import { RAMOS_COTIZABLES, RAMOS_MOTOR_GENERICO, type RamoCotizable } from "@/lib/insurers/ramos-cotizables";
+import type { RamoCampoDef } from "@/lib/insurers/ramo-campos-defaults";
 
 /**
  * Motor de calificación GENÉRICO para ramos sin conector de aseguradora ni
@@ -72,6 +73,29 @@ function resolveFieldKey(key: string, validKeys: readonly string[]): string {
     return nk === normKey || nk.startsWith(normKey) || normKey.startsWith(nk);
   });
   return candidates.length === 1 ? candidates[0] : key;
+}
+
+/**
+ * Segunda red de seguridad, para cuando ni la clave ni su valor se parecen a
+ * nada — confirmado en vivo (ramo dental): el modelo mandó "tipo_plan":
+ * "individual" y luego "tipo_poliza": "Individual" para responder la
+ * pregunta de `para_quien` (opciones "Solo para mí"/"Para mí y mi familia"),
+ * ninguna de las dos ni remotamente parecida al fieldKey real — `resolveFieldKey`
+ * no tiene nada que emparejar ahí. Esta busca por el VALOR: si el valor que
+ * mandó coincide (como substring, ignorando mayúsculas/acentos) con alguna
+ * opción de un campo del ramo, se reasigna a ESE campo — inequívoco solo
+ * cuando coincide con las opciones de un único campo.
+ */
+function resolveFieldKeyByValue(value: string, camposRamo: RamoCampoDef[]): string | null {
+  const normValue = normalizeForCompare(value);
+  if (!normValue) return null;
+  const candidates = camposRamo.filter(c =>
+    c.options.some(o => {
+      const normOpcion = normalizeForCompare(o);
+      return normOpcion === normValue || normOpcion.includes(normValue) || normValue.includes(normOpcion);
+    })
+  );
+  return candidates.length === 1 ? candidates[0].fieldKey : null;
 }
 
 function splitCampos(campos: Record<string, string>): { tomador: Partial<QuoteRequestTomador>; datosRiesgo: Record<string, unknown> } {
@@ -191,7 +215,9 @@ export async function cotizarSeguroGenerico(
   const validKeys = [...(TOMADOR_KEYS as readonly string[]), ...camposRamo.map(c => c.fieldKey)];
   const camposNormalizados: Record<string, string> = {};
   for (const [key, value] of Object.entries(input.campos ?? {})) {
-    camposNormalizados[resolveFieldKey(key, validKeys)] = value;
+    const porClave = resolveFieldKey(key, validKeys);
+    const keyFinal = validKeys.includes(porClave) ? porClave : resolveFieldKeyByValue(value, camposRamo) ?? porClave;
+    camposNormalizados[keyFinal] = value;
   }
   const { tomador, datosRiesgo } = splitCampos(camposNormalizados);
 
