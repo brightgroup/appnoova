@@ -26,8 +26,9 @@ import {
 } from "lucide-react";
 
 import type { MicrositeQuickAction } from "@/types/microsite";
-import { toolInsuranceQuote } from "@/types/ori";
+import { toolInsuranceQuote, toolPendingQuestion } from "@/types/ori";
 import { AutoQuoteCard } from "@/components/insurers/AutoQuoteCard";
+import { QuestionChips } from "@/components/insurers/QuestionChips";
 
 interface Message {
   id: string;
@@ -663,8 +664,14 @@ export default function AgenteClientesClient() {
                     </div>
                     {msg.toolCalls?.map((call, ci) => {
                       const quote = toolInsuranceQuote(call);
-                      return quote ? (
-                        <AutoQuoteCard key={ci} result={quote.result} ramo={quote.ramo} onSendMessage={sendMessage} />
+                      if (quote) {
+                        return <AutoQuoteCard key={ci} result={quote.result} ramo={quote.ramo} onSendMessage={sendMessage} />;
+                      }
+                      // Solo en el último mensaje: si ya llegó una respuesta nueva del
+                      // cliente (chip o texto), esta ya no es la última fila del array.
+                      const pending = i === messages.length - 1 ? toolPendingQuestion(call) : null;
+                      return pending ? (
+                        <QuestionChips key={ci} opciones={pending.opciones} onSendMessage={sendMessage} classPrefix="ac" />
                       ) : null;
                     })}
                   </div>

@@ -8,8 +8,9 @@ import { resolveMicrositeIcon } from "@/lib/microsite-icons";
 import { loadWidgetChat, saveWidgetChat, type WidgetMessage } from "@/lib/widget-storage";
 import { playWidgetMessageSound } from "@/lib/widget-sound";
 import { WidgetMessageAvatar } from "./WidgetMessageAvatar";
-import { toolInsuranceQuote } from "@/types/ori";
+import { toolInsuranceQuote, toolPendingQuestion } from "@/types/ori";
 import { AutoQuoteCard } from "@/components/insurers/AutoQuoteCard";
+import { QuestionChips } from "@/components/insurers/QuestionChips";
 
 type TabId = "home" | "chat";
 
@@ -264,7 +265,7 @@ export default function WebChatWidget({ config, previewMode = false }: WebChatWi
               {messages.length === 0 && !loading && (
                 <p className="nw-empty">Escribe un mensaje para comenzar.</p>
               )}
-              {messages.map(msg => (
+              {messages.map((msg, i) => (
                 <div
                   key={msg.id}
                   className={`nw-msg-row nw-msg-appear ${
@@ -292,8 +293,12 @@ export default function WebChatWidget({ config, previewMode = false }: WebChatWi
                     </div>
                     {msg.toolCalls?.map((call, ci) => {
                       const quote = toolInsuranceQuote(call);
-                      return quote ? (
-                        <AutoQuoteCard key={ci} result={quote.result} ramo={quote.ramo} onSendMessage={sendMessage} />
+                      if (quote) {
+                        return <AutoQuoteCard key={ci} result={quote.result} ramo={quote.ramo} onSendMessage={sendMessage} />;
+                      }
+                      const pending = i === messages.length - 1 ? toolPendingQuestion(call) : null;
+                      return pending ? (
+                        <QuestionChips key={ci} opciones={pending.opciones} onSendMessage={sendMessage} classPrefix="nw" />
                       ) : null;
                     })}
                   </div>

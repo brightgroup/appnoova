@@ -369,6 +369,53 @@ body {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
+/* Chips de pregunta guiada (ver QuestionChips.tsx) */
+.nw-chip-field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.nw-chip-field--scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  mask-image: linear-gradient(to right, transparent 0, black 12px, black calc(100% - 24px), transparent 100%);
+}
+
+.nw-chip {
+  appearance: none;
+  flex: 0 0 auto;
+  border: 1.5px solid var(--nw-accent);
+  background: #fff;
+  color: var(--nw-accent);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.nw-chip:hover:not(:disabled) {
+  background: var(--nw-button, var(--nw-accent));
+  color: #fff;
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--nw-button) 25%, transparent);
+}
+
+.nw-chip:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.nw-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .nw-typing-bubble {
   padding: 10px 14px;
 }

@@ -98,6 +98,24 @@ export function toolInsuranceQuote(
   return { ramo, result: call.result };
 }
 
+/**
+ * Pregunta guiada pendiente (ver `presentGuidedQuestion` en guided-questions.ts)
+ * — a diferencia de `toolInsuranceQuote`, no depende del nombre de la tool: los
+ * 6 ramos con tool dedicada Y la tool genérica `cotizar_seguro` mezclan
+ * `campo_key`/`campo_opciones` en su resultado por igual, así que esto
+ * funciona para cualquier ramo. Solo aparece para campos de selección única
+ * con opciones reales (nunca multiselect, ver guided-questions.ts).
+ */
+export function toolPendingQuestion(
+  call: { name: string; result: Record<string, unknown> }
+): { campoKey: string; opciones: string[] } | null {
+  const campoKey = call.result.campo_key;
+  const opciones = call.result.campo_opciones;
+  if (typeof campoKey !== "string" || !Array.isArray(opciones) || opciones.length === 0) return null;
+  const soloTexto = opciones.filter((o): o is string => typeof o === "string");
+  return soloTexto.length > 0 ? { campoKey, opciones: soloTexto } : null;
+}
+
 export interface QuoteResultPreview {
   quote_request_id: string;
   ramo: string;

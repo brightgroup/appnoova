@@ -656,6 +656,53 @@ html:has(.agente-clientes-root) body {
   color: var(--ac-accent);
 }
 
+/* Chips de pregunta guiada (ver QuestionChips.tsx) */
+.ac-chip-field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.ac-chip-field--scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  mask-image: linear-gradient(to right, transparent 0, black 12px, black calc(100% - 24px), transparent 100%);
+}
+
+.ac-chip {
+  appearance: none;
+  flex: 0 0 auto;
+  border: 1.5px solid var(--ac-accent);
+  background: #fff;
+  color: var(--ac-accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0.5rem 0.9rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.ac-chip:hover:not(:disabled) {
+  background: var(--ac-button, var(--ac-accent));
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(15, 126, 255, 0.25);
+}
+
+.ac-chip:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.ac-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* Messages — estilo minimal (GPT / Claude / Gemini) */
 .ac-messages {
   display: flex;

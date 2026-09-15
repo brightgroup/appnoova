@@ -18,6 +18,17 @@ import { sendWhatsAppInteractiveMessage } from "@/lib/whatsapp/send-transport";
 export interface GuidedQuestionResult {
   pregunta_enviada: boolean;
   siguiente_pregunta: string;
+  /**
+   * Clave y opciones del campo pendiente — presentes siempre que el campo
+   * tenga opciones reales de selección única (no multiselect, WhatsApp no lo
+   * soporta nativo). WhatsApp los ignora (ya mandó botones/lista reales por
+   * su cuenta); el chat web (Mi Link/widget, ver AgenteClientesClient.tsx y
+   * WebChatWidget.tsx) los usa para renderizar chips clicables — ahí no hay
+   * límite de WhatsApp, así que no hace falta la distinción botones/lista,
+   * un solo componente se acomoda solo al número de opciones.
+   */
+  campo_key?: string;
+  campo_opciones?: string[];
 }
 
 function resolvePresentacion(campo: RamoCampoDef): "botones" | "lista" | "texto" {
@@ -46,8 +57,13 @@ export async function presentGuidedQuestion(ctx: AgentToolContext, campo: RamoCa
   const siguiente_pregunta =
     campo.fieldType === "multiselect" && campo.options.length > 0 ? `${base} (elige todas las que apliquen: ${campo.options.join(", ")})` : base;
 
+  // Selección única con opciones reales — el chat web las renderiza como
+  // chips clicables sin importar si WhatsApp terminó mandando botones o
+  // texto (ver comentario del campo en GuidedQuestionResult).
+  const campoOpciones = campo.fieldType !== "multiselect" && campo.options.length > 0 ? campo.options : undefined;
+
   if (presentacion === "texto" || !ctx.outboundWhatsAppChannel || !ctx.contactE164) {
-    return { pregunta_enviada: false, siguiente_pregunta };
+    return { pregunta_enviada: false, siguiente_pregunta, campo_key: campo.fieldKey, campo_opciones: campoOpciones };
   }
 
   // Ya se mandó este mismo botón/lista en una ronda anterior de ESTE turno
@@ -55,7 +71,7 @@ export async function presentGuidedQuestion(ctx: AgentToolContext, campo: RamoCa
   // redactar el texto final) — no volver a mandarlo, solo confirmar que ya
   // salió. Confirmado como causa real de botones duplicados en pruebas en vivo.
   if (ctx.sentGuidedQuestions?.has(campo.fieldKey)) {
-    return { pregunta_enviada: true, siguiente_pregunta };
+    return { pregunta_enviada: true, siguiente_pregunta, campo_key: campo.fieldKey, campo_opciones: campoOpciones };
   }
 
   try {
@@ -77,13 +93,13 @@ export async function presentGuidedQuestion(ctx: AgentToolContext, campo: RamoCa
       });
     }
     ctx.sentGuidedQuestions?.add(campo.fieldKey);
-    return { pregunta_enviada: true, siguiente_pregunta };
+    return { pregunta_enviada: true, siguiente_pregunta, campo_key: campo.fieldKey, campo_opciones: campoOpciones };
   } catch (err) {
     // Igual que whatsapp-options-tool.ts: si el envío falla, no lo escondemos
     // — el modelo se entera por pregunta_enviada:false y la hace en texto, en
     // vez de quedarse mudo esperando una respuesta que nunca llegó.
     console.error("[guided-questions] envío de botones/lista falló:", err);
-    return { pregunta_enviada: false, siguiente_pregunta };
+    return { pregunta_enviada: false, siguiente_pregunta, campo_key: campo.fieldKey, campo_opciones: campoOpciones };
   }
 }
 
