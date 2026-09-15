@@ -1,0 +1,188 @@
+<title>Tarjetas de Ramos</title>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.462.0/dist/umd/lucide.js"></script>
+<style>
+  /* ── tokens calcados de globals.css (:root = claro, .dark = oscuro) ── */
+  :root{
+    --bg-main:#f5f8fa; --bg-surface:#ffffff; --bg-control:#eeeeee;
+    --text:#2d3748; --text-muted:#4a5568; --text-faint:#64748b;
+    --border:rgba(51,71,91,.12); --border-strong:rgba(51,71,91,.18);
+    --hover:rgba(51,71,91,.04); --hover-strong:rgba(51,71,91,.07);
+    --accent:#111111; --accent-hover:#333333; --accent-muted:rgba(0,0,0,.06); --accent-muted-strong:rgba(0,0,0,.1);
+    --sw-off:#e2e2e2;
+    color-scheme:light;
+  }
+  .dark{
+    --bg-main:#161616; --bg-surface:#1e1e1e; --bg-control:rgba(255,255,255,.06);
+    --text:#f5f5f5; --text-muted:#d4d4d8; --text-faint:#a3a3a3;
+    --border:rgba(255,255,255,.08); --border-strong:rgba(255,255,255,.12);
+    --hover:rgba(255,255,255,.04); --hover-strong:rgba(255,255,255,.08);
+    --accent:#0f7eff; --accent-hover:#3392ff; --accent-muted:rgba(15,126,255,.14); --accent-muted-strong:rgba(15,126,255,.2);
+    --sw-off:rgba(255,255,255,.12);
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg-main); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Roboto",sans-serif;
+    padding:28px 20px 60px; transition:background .15s,color .15s;
+  }
+  .wrap{max-width:960px;margin:0 auto;}
+
+  .topbar{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:22px;}
+  .eyebrow{font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); margin:0 0 8px;}
+  h1{font-size:21px; font-weight:800; margin:0 0 6px; letter-spacing:-.01em;}
+  .lede{font-size:13px; color:var(--text-muted); margin:0; max-width:60ch; line-height:1.5;}
+
+  .theme-toggle{
+    display:inline-flex; align-items:center; gap:6px; padding:4px; border-radius:10px;
+    background:var(--bg-surface); border:1px solid var(--border); flex-shrink:0;
+  }
+  .theme-btn{
+    appearance:none; border:none; cursor:pointer; font:inherit; font-size:12px; font-weight:600;
+    padding:6px 12px; border-radius:7px; color:var(--text-muted); background:transparent;
+  }
+  .theme-btn.active{background:var(--accent); color:#fff;}
+
+  .variant-bar{display:flex; gap:6px; padding:4px; margin:4px 0 4px; background:var(--bg-surface); border:1px solid var(--border); border-radius:12px; width:fit-content;}
+  .variant-btn{appearance:none; border:none; cursor:pointer; font:inherit; padding:8px 14px; border-radius:9px; font-size:12.5px; font-weight:600; color:var(--text-muted); background:transparent; white-space:nowrap;}
+  .variant-btn.active{background:var(--accent); color:#fff;}
+  .variant-desc{font-size:12px; color:var(--text-faint); margin:10px 0 22px; max-width:62ch; line-height:1.5;}
+
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  @media (max-width:600px){ .grid{grid-template-columns:1fr;} }
+
+  .badge{width:36px; height:36px; border-radius:999px; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:var(--c); color:#fff;}
+  .badge svg{width:21px; height:21px; stroke-width:2.25; stroke-linecap:round; stroke-linejoin:round;}
+
+  .label{flex:1; min-width:0; font-size:13.5px; font-weight:500; text-transform:lowercase;}
+  .label::first-letter{text-transform:uppercase;}
+
+  .sw{width:32px; height:18px; border-radius:999px; background:var(--sw-off); position:relative; flex-shrink:0; cursor:pointer;}
+  .sw.on{background:var(--accent);}
+  .sw::after{content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:999px; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.25); transition:left .15s;}
+  .sw.on::after{left:16px;}
+
+  /* ── variante 1 — lista limpia, 3 columnas, casi sin borde ── */
+  .grid.v1{display:grid; grid-template-columns:repeat(3, 1fr); gap:2px 18px;}
+  @media (max-width:820px){ .grid.v1{grid-template-columns:repeat(2, 1fr);} }
+  @media (max-width:520px){ .grid.v1{grid-template-columns:1fr;} }
+  .v1 .card{display:flex; align-items:center; gap:10px; padding:11px 8px; border-bottom:1px solid var(--border); border-radius:8px;}
+  .v1 .card:hover{background:var(--hover); border-bottom-color:transparent;}
+
+  /* ── variante 2 — tarjeta suave, sin borde ── */
+  .v2{gap:8px;}
+  .v2 .card{display:flex; align-items:center; gap:13px; padding:14px 16px; border-radius:14px; background:var(--bg-control); transition:background .15s;}
+  .v2 .card:hover{background:var(--hover-strong);}
+
+  /* ── variante 3 — borde sutil, acento cuando está activo ── */
+  .v3{gap:10px;}
+  .v3 .card{display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:transparent; transition:background .15s,border-color .15s;}
+  .v3 .card.active{background:var(--accent-muted); border-color:var(--accent-muted-strong);}
+  .v3 .card:not(.active) .badge{opacity:.55; filter:saturate(.75);}
+  .v3 .card:not(.active) .label{color:var(--text-faint);}
+
+  footer{margin-top:32px; padding-top:20px; border-top:1px solid var(--border);}
+  footer h2{font-size:13px; font-weight:700; margin:0 0 10px;}
+  .issues{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;}
+  .issues li{display:flex; gap:9px; font-size:12.5px; color:var(--text-muted); line-height:1.45;}
+  .issues li b{color:var(--text);}
+  .tag{flex-shrink:0; font-size:10px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; padding:2px 7px; border-radius:5px; height:fit-content; background:var(--accent-muted); color:var(--accent-hover);}
+</style>
+
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <p class="eyebrow">Seguros · Configuración</p>
+      <h1>Ramos ofrecidos — 3 propuestas de tarjeta</h1>
+      <p class="lede">Mismo ícono ya aprobado (círculo sólido) y el switch con el bug de conejo negro-sobre-negro ya corregido (bolita blanca). Prueba las 3 en claro y oscuro — la app soporta ambos.</p>
+    </div>
+    <div class="theme-toggle" id="themeToggle">
+      <button class="theme-btn active" data-t="light">Claro</button>
+      <button class="theme-btn" data-t="dark">Oscuro</button>
+    </div>
+  </div>
+
+  <div class="variant-bar" id="variantBar">
+    <button class="variant-btn active" data-v="v1">Lista limpia</button>
+    <button class="variant-btn" data-v="v2">Tarjeta suave</button>
+    <button class="variant-btn" data-v="v3">Acento si está activo</button>
+  </div>
+  <p class="variant-desc" id="variantDesc"></p>
+
+  <div class="grid v1" id="grid"></div>
+
+  <footer>
+    <h2>De un vistazo</h2>
+    <ul class="issues">
+      <li><span class="tag">1</span><span><b>Lista limpia</b> — sin caja ni borde por ítem, solo una línea divisoria fina. Menos "ruido" repetido en 100 filas, se siente como un ajuste del sistema (iOS/macOS).</span></li>
+      <li><span class="tag">2</span><span><b>Tarjeta suave</b> — sin borde, fondo tenue tipo botón, más aire interno. Más "premium", pero ocupa más alto por fila.</span></li>
+      <li><span class="tag">3</span><span><b>Acento si está activo</b> — igual a hoy, pero el ramo que ya ofreces se resalta con un tinte de color; los apagados se atenúan. Ayuda a ubicar de un vistazo qué ofreces entre 100 filas.</span></li>
+    </ul>
+  </footer>
+</div>
+
+<script>
+  const RAMOS = [
+    { label:"autos / vehículos", color:"#3b82f6", icon:"car", on:true },
+    { label:"soat", color:"#0ea5e9", icon:"car", on:true },
+    { label:"vida", color:"#ef4444", icon:"heart", on:true },
+    { label:"asistencia médica", color:"#ec4899", icon:"stethoscope", on:false },
+    { label:"hogar", color:"#f59e0b", icon:"home", on:true },
+    { label:"incendio y líneas aliadas", color:"#f97316", icon:"flame", on:false },
+    { label:"arl", color:"#eab308", icon:"hard-hat", on:false },
+    { label:"pyme", color:"#8b5cf6", icon:"briefcase", on:false },
+    { label:"cumplimiento", color:"#22c55e", icon:"file-check", on:false },
+    { label:"responsabilidad civil", color:"#14b8a6", icon:"shield-check", on:false },
+    { label:"transporte", color:"#6366f1", icon:"truck", on:false },
+    { label:"viajes y turismo", color:"#06b6d4", icon:"plane", on:true },
+    { label:"mascotas", color:"#84cc16", icon:"paw-print", on:false },
+    { label:"bancos e instituciones financieras (bbb)", color:"#10b981", icon:"landmark", on:false }
+  ];
+
+  const grid = document.getElementById("grid");
+  let variant = "v1";
+
+  const DESCS = {
+    v1: "3 columnas (2 en pantallas medianas, 1 en celular) — casi sin borde, solo una línea muy fina abajo de cada fila que desaparece al pasar el mouse. Aprovecha el ancho sin sentirse una caja.",
+    v2: "Tarjeta con fondo tenue (sin borde), más espacio interno — se siente más suave y \"premium\".",
+    v3: "Borde fino como hoy, pero el ramo activo se resalta con un tinte de color; los apagados se atenúan para que resalten los que sí ofreces."
+  };
+
+  function render(){
+    grid.className = "grid " + variant;
+    grid.innerHTML = RAMOS.map((r, i) => `
+      <div class="card ${r.on ? 'active' : ''}">
+        <span class="badge" style="--c:${r.color}"><i data-lucide="${r.icon}"></i></span>
+        <span class="label">${r.label}</span>
+        <span class="sw ${r.on ? 'on' : ''}" data-i="${i}"></span>
+      </div>
+    `).join("");
+    lucide.createIcons();
+    document.getElementById("variantDesc").textContent = DESCS[variant];
+  }
+
+  document.getElementById("variantBar").addEventListener("click", e => {
+    const btn = e.target.closest(".variant-btn");
+    if (!btn) return;
+    variant = btn.dataset.v;
+    document.querySelectorAll(".variant-btn").forEach(b => b.classList.toggle("active", b === btn));
+    render();
+  });
+
+  document.getElementById("themeToggle").addEventListener("click", e => {
+    const btn = e.target.closest(".theme-btn");
+    if (!btn) return;
+    document.documentElement.classList.toggle("dark", btn.dataset.t === "dark");
+    document.querySelectorAll(".theme-btn").forEach(b => b.classList.toggle("active", b === btn));
+  });
+
+  grid.addEventListener("click", e => {
+    const sw = e.target.closest(".sw");
+    if (!sw) return;
+    const i = +sw.dataset.i;
+    RAMOS[i].on = !RAMOS[i].on;
+    render();
+  });
+
+  render();
+</script>

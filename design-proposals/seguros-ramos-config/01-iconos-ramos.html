@@ -1,0 +1,205 @@
+<title>Iconos de Ramos</title>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.462.0/dist/umd/lucide.js"></script>
+<style>
+  :root{
+    --bg:#161616;
+    --surface:#1e1e1e;
+    --surface2:#232323;
+    --border:rgba(255,255,255,.08);
+    --border-strong:rgba(255,255,255,.14);
+    --text:#ffffff;
+    --text-muted:#9ca3af;
+    --text-faint:#6b7280;
+    --accent:#0f7eff;
+    --accent-hover:#3392ff;
+    color-scheme: dark;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Roboto",sans-serif;
+    padding:28px 20px 60px;
+  }
+  .wrap{max-width:920px;margin:0 auto;}
+
+  header{margin-bottom:22px;}
+  .eyebrow{
+    font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--accent-hover); margin:0 0 8px;
+  }
+  h1{font-size:22px; font-weight:800; margin:0 0 6px; letter-spacing:-.01em;}
+  .lede{font-size:13px; color:var(--text-muted); margin:0; max-width:60ch; line-height:1.5;}
+
+  /* ── selector de variante ── */
+  .variant-bar{
+    display:flex; gap:6px; padding:4px; margin:22px 0 6px;
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    width:fit-content;
+  }
+  .variant-btn{
+    appearance:none; border:none; cursor:pointer; font:inherit;
+    padding:8px 14px; border-radius:9px; font-size:12.5px; font-weight:600;
+    color:var(--text-muted); background:transparent; transition:background .15s,color .15s;
+    white-space:nowrap;
+  }
+  .variant-btn.active{background:var(--accent); color:#fff;}
+  .variant-btn:not(.active):hover{color:var(--text); background:var(--border);}
+
+  .variant-desc{font-size:12px; color:var(--text-faint); margin:0 0 26px; min-height:16px;}
+
+  /* ── grid de ramos (calca la pantalla real) ── */
+  .fix-toggle{
+    display:flex; align-items:center; gap:8px; margin:0 0 16px;
+    font-size:12px; color:var(--text-muted);
+  }
+  .fix-toggle input{accent-color:var(--accent); width:14px; height:14px;}
+
+  .grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:10px;
+  }
+  @media (max-width:600px){ .grid{grid-template-columns:1fr;} }
+
+  .card{
+    display:flex; align-items:center; gap:12px;
+    padding:12px 14px; border-radius:12px;
+    background:rgba(255,255,255,.02); border:1px solid var(--border);
+  }
+  .card .label{
+    flex:1; min-width:0; font-size:13px; color:#e5e7eb; font-weight:500;
+    text-transform:lowercase;
+  }
+  .card .label.truncate{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .card .label.wrap{white-space:normal; line-height:1.3;}
+
+  .sw{
+    width:32px; height:18px; border-radius:999px; background:rgba(255,255,255,.12);
+    position:relative; flex-shrink:0;
+  }
+  .sw.on{background:var(--accent);}
+  .sw::after{
+    content:""; position:absolute; top:2px; left:2px; width:14px; height:14px;
+    border-radius:999px; background:#fff; transition:left .15s;
+  }
+  .sw.on::after{left:16px;}
+
+  .badge{
+    width:36px; height:36px; border-radius:999px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    background:color-mix(in srgb, var(--c) 15%, transparent);
+    color:var(--c);
+  }
+  .badge svg{width:17px; height:17px; stroke-width:2.1;}
+
+  /* variante B — sólido plano, sin sombras ni degradados (ref. HubSpot) */
+  .grid.b .badge{
+    width:38px; height:38px; border-radius:999px;
+    background:var(--c);
+    color:#fff;
+  }
+  .grid.b .badge svg{width:22px; height:22px; stroke-width:2.25; stroke-linecap:round; stroke-linejoin:round;}
+
+  footer{margin-top:34px; padding-top:22px; border-top:1px solid var(--border);}
+  footer h2{font-size:13px; font-weight:700; margin:0 0 10px;}
+  .issues{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;}
+  .issues li{
+    display:flex; gap:9px; font-size:12.5px; color:var(--text-muted); line-height:1.45;
+  }
+  .issues li b{color:#e5e7eb;}
+  .tag{
+    flex-shrink:0; font-size:10px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
+    padding:2px 7px; border-radius:5px; height:fit-content;
+  }
+  .tag.icon{background:rgba(15,126,255,.15); color:var(--accent-hover);}
+  .tag.bug{background:rgba(239,68,68,.15); color:#f87171;}
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Seguros · Configuración</p>
+    <h1>Iconos de ramos — versión sólida</h1>
+    <p class="lede">Mismo componente (badge + nombre + switch) que ya existe en <code>/dashboard/seguros/configuracion</code>, con los íconos reales de Lucide que ya usa la pantalla. Cambia de pestaña para probar cada estilo sobre la lista completa.</p>
+  </header>
+
+  <div class="variant-bar" id="variantBar">
+    <button class="variant-btn" data-v="a">Actual</button>
+    <button class="variant-btn active" data-v="b">Sólido plano</button>
+  </div>
+  <p class="variant-desc" id="variantDesc">Círculo sólido del color del ramo, poco padding (el ícono ocupa casi todo el círculo), trazo más grueso y redondeado.</p>
+
+  <label class="fix-toggle">
+    <input type="checkbox" id="fixTrunc">
+    Arreglar nombres largos (dejar de cortar con "…")
+  </label>
+
+  <div class="grid b" id="grid"></div>
+
+  <footer>
+    <h2>Cosas para ajustar, además del ícono</h2>
+    <ul class="issues">
+      <li><span class="tag bug">Bug</span><span><b>Nombres largos se cortan.</b> "Bancos e instituciones financieras (BBB)" queda como "bancos e instituciones financieras (bb…" — activa el check de arriba para ver el nombre completo en 2 líneas.</span></li>
+      <li><span class="tag icon">Extra</span><span><b>¿Agrupar por categoría?</b> (Vehículos, Salud, Hogar, Cumplimiento…) en vez de una sola lista alfabética de 100 filas — lo puedo mockear aparte si te interesa.</span></li>
+    </ul>
+  </footer>
+</div>
+
+<script>
+  const RAMOS = [
+    { slug:"autos-vehiculos", label:"Autos / Vehículos", color:"#3b82f6", icon:"car" },
+    { slug:"soat", label:"SOAT", color:"#0ea5e9", icon:"car" },
+    { slug:"vida", label:"Vida", color:"#ef4444", icon:"heart" },
+    { slug:"asistencia-medica", label:"Asistencia médica", color:"#ec4899", icon:"stethoscope" },
+    { slug:"hogar", label:"Hogar", color:"#f59e0b", icon:"home" },
+    { slug:"incendio", label:"Incendio y líneas aliadas", color:"#f97316", icon:"flame" },
+    { slug:"arl", label:"ARL", color:"#eab308", icon:"hard-hat" },
+    { slug:"pyme", label:"Pyme", color:"#8b5cf6", icon:"briefcase" },
+    { slug:"cumplimiento", label:"Cumplimiento", color:"#22c55e", icon:"file-check" },
+    { slug:"rc", label:"Responsabilidad civil", color:"#14b8a6", icon:"shield-check" },
+    { slug:"transporte", label:"Transporte", color:"#6366f1", icon:"truck" },
+    { slug:"viajes", label:"Viajes y turismo", color:"#06b6d4", icon:"plane" },
+    { slug:"mascotas", label:"Mascotas", color:"#84cc16", icon:"paw-print" },
+    { slug:"exequias", label:"Exequias", color:"#a855f7", icon:"umbrella" },
+    { slug:"educativo", label:"Educativo", color:"#f472b6", icon:"graduation-cap" },
+    { slug:"dinero", label:"Dinero y valores", color:"#10b981", icon:"coins" },
+    { slug:"juridica", label:"Jurídica", color:"#78716c", icon:"file-text" },
+    { slug:"bancos", label:"Bancos e instituciones financieras (BBB)", color:"#10b981", icon:"landmark" }
+  ];
+
+  const grid = document.getElementById("grid");
+  let fixTrunc = false;
+  let active = "b";
+
+  function render(){
+    grid.innerHTML = RAMOS.map((r, i) => `
+      <div class="card">
+        <span class="badge" style="--c:${r.color}"><i data-lucide="${r.icon}"></i></span>
+        <span class="label ${fixTrunc ? 'wrap' : 'truncate'}">${r.label}</span>
+        <span class="sw ${i % 4 === 0 ? 'on' : ''}"></span>
+      </div>
+    `).join("");
+    lucide.createIcons();
+  }
+
+  const DESCS = {
+    a: "Círculo con el color del ramo al 15% de opacidad — el que ya está en producción.",
+    b: "Círculo sólido del color del ramo, poco padding (el ícono ocupa casi todo el círculo), trazo más grueso y redondeado."
+  };
+
+  document.getElementById("variantBar").addEventListener("click", e => {
+    const btn = e.target.closest(".variant-btn");
+    if (!btn) return;
+    active = btn.dataset.v;
+    document.querySelectorAll(".variant-btn").forEach(b => b.classList.toggle("active", b === btn));
+    grid.className = "grid " + active;
+    document.getElementById("variantDesc").textContent = DESCS[active];
+  });
+
+  document.getElementById("fixTrunc").addEventListener("change", e => {
+    fixTrunc = e.target.checked;
+    render();
+    grid.className = "grid " + active;
+  });
+
+  render();
+</script>

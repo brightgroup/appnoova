@@ -55,8 +55,8 @@ function PreguntasIASection({ ramos }: { ramos: RamoOption[] }) {
         Qué le pregunta la IA al cliente para cotizar cada ramo por WhatsApp — el texto, las opciones (botones/lista) y si son obligatorias.
       </p>
 
-      <div className="grid md:grid-cols-[220px_1fr] gap-0 rounded-2xl border border-white/[.08] overflow-hidden min-h-[420px]">
-        <div className="border-b md:border-b-0 md:border-r border-white/[.08] p-2.5 md:max-h-[560px] md:overflow-y-auto">
+      <div className="grid md:grid-cols-[260px_1fr] gap-6">
+        <div className="md:max-h-[640px] md:overflow-y-auto md:pr-3 md:border-r md:border-white/[.08]">
           <div className="relative mb-2">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
             <input
@@ -77,16 +77,16 @@ function PreguntasIASection({ ramos }: { ramos: RamoOption[] }) {
                 key={r.key}
                 onClick={() => setRamoKey(r.key)}
                 className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-left transition-colors ${
-                  isActive ? "bg-[#0f7eff]/[.14] text-white font-medium" : "text-gray-300 hover:bg-white/[.05] hover:text-white"
+                  isActive ? "bg-[#0f7eff]/[.14] text-gray-900 dark:text-white font-medium" : "text-gray-300 hover:bg-white/[.05] hover:text-white"
                 }`}
               >
                 <span
-                  className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: `${color}22`, color }}
+                  className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: color, color: "#fff" }}
                 >
-                  <Icon className="w-3.5 h-3.5" />
+                  <Icon className="w-4 h-4" strokeWidth={2.25} />
                 </span>
-                <span className="truncate flex-1">{r.label}</span>
+                <span className="truncate flex-1 lowercase first-letter:uppercase">{r.label}</span>
                 {!!count && (
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isActive ? "bg-white/[.15] text-[#3392ff]" : "bg-white/[.06] text-gray-500"}`}>
                     {count}
@@ -98,8 +98,8 @@ function PreguntasIASection({ ramos }: { ramos: RamoOption[] }) {
           {filtered.length === 0 && <p className="text-xs text-gray-500 text-center py-6">Sin resultados.</p>}
         </div>
 
-        <div className="p-5">
-          <h3 className="text-sm font-semibold text-white mb-3">{activeLabel}</h3>
+        <div>
+          <h3 className="text-sm font-semibold text-white mb-3 lowercase first-letter:uppercase">{activeLabel}</h3>
           {!ramoCatalogo ? (
             <p className="text-sm text-gray-500">Este ramo todavía no existe en el catálogo — recarga la página en un momento.</p>
           ) : (
@@ -196,67 +196,65 @@ export default function SegurosConfiguracionPage() {
       </div>
 
       <div className={registryContent}>
-        <div className="max-w-4xl mx-auto">
-          {activeTab === "ofrecidos" && (
-            <>
-              <div className="relative mb-5">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Buscar ramo…"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className={inputSearch}
-                />
-              </div>
-
-              {loading ? (
-                <div className="flex justify-center py-16 text-gray-400 text-sm">
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando ramos…
-                </div>
-              ) : (
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {filteredRamos.map(ramo => {
-                    const { icon: Icon, color } = resolveRamoIcon(ramo.slug);
-                    const checked = ofrecidos.has(ramo.slug);
-                    return (
-                      <div
-                        key={ramo.id}
-                        className="flex items-center gap-3 rounded-xl border border-white/[.08] bg-white/[.02] px-4 py-3"
-                      >
-                        <span
-                          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-                          style={{ backgroundColor: `${color}22`, color }}
-                        >
-                          <Icon className="w-4 h-4" />
-                        </span>
-                        <span className="text-sm text-gray-200 flex-1 truncate">{ramo.nombre}</span>
-                        {savingSlug === ramo.slug ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-gray-500 shrink-0" />
-                        ) : (
-                          <Switch checked={checked} onChange={v => toggleRamo(ramo.slug, v)} />
-                        )}
-                      </div>
-                    );
-                  })}
-                  {filteredRamos.length === 0 && (
-                    <p className="sm:col-span-2 text-center text-sm text-gray-500 py-10">
-                      Ningún ramo coincide con &quot;{search}&quot;.
-                    </p>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-
-          {activeTab === "preguntas" && (loading ? (
-            <div className="flex justify-center py-16 text-gray-400 text-sm">
-              <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando ramos…
+        {activeTab === "ofrecidos" && (
+          <div className="max-w-4xl mx-auto">
+            <div className="relative mb-5">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Buscar ramo…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className={inputSearch}
+              />
             </div>
-          ) : (
-            <PreguntasIASection ramos={ramos} />
-          ))}
-        </div>
+
+            {loading ? (
+              <div className="flex justify-center py-16 text-gray-400 text-sm">
+                <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando ramos…
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-[18px] gap-y-0.5">
+                {filteredRamos.map(ramo => {
+                  const { icon: Icon, color } = resolveRamoIcon(ramo.slug);
+                  const checked = ofrecidos.has(ramo.slug);
+                  return (
+                    <div
+                      key={ramo.id}
+                      className="flex items-center gap-2.5 px-2 py-2.5 rounded-lg border-b border-white/[.08] hover:bg-white/[.04] hover:border-transparent transition-colors"
+                    >
+                      <span
+                        className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: color, color: "#fff" }}
+                      >
+                        <Icon className="w-5 h-5" strokeWidth={2.25} />
+                      </span>
+                      <span className="text-sm text-gray-200 flex-1 min-w-0 lowercase first-letter:uppercase">{ramo.nombre}</span>
+                      {savingSlug === ramo.slug ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-gray-500 shrink-0" />
+                      ) : (
+                        <Switch checked={checked} onChange={v => toggleRamo(ramo.slug, v)} />
+                      )}
+                    </div>
+                  );
+                })}
+                {filteredRamos.length === 0 && (
+                  <p className="sm:col-span-2 lg:col-span-3 text-center text-sm text-gray-500 py-10">
+                    Ningún ramo coincide con &quot;{search}&quot;.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "preguntas" && (loading ? (
+          <div className="flex justify-center py-16 text-gray-400 text-sm">
+            <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando ramos…
+          </div>
+        ) : (
+          <PreguntasIASection ramos={ramos} />
+        ))}
       </div>
     </div>
   );

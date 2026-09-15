@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Propuestas UI · Configuración de seguros (ramos)</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, sans-serif;
+      background: #09090b;
+      color: #f4f4f5;
+      padding: 40px 32px 64px;
+    }
+    h1 { font-size: 28px; letter-spacing: -0.03em; margin: 0 0 8px; }
+    .lead { color: #a1a1aa; max-width: 640px; line-height: 1.5; margin-bottom: 32px; font-size: 15px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    a.card {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      background: #121214;
+      border-radius: 16px;
+      padding: 22px;
+      border: 1px solid rgba(255,255,255,0.06);
+      transition: background 0.15s;
+    }
+    a.card:hover { background: #18181b; }
+    .tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #6ee7b7;
+      background: rgba(16,185,129,0.14);
+      padding: 3px 8px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+    }
+    a.card h2 { font-size: 18px; margin: 0 0 8px; }
+    a.card p { margin: 0; color: #a1a1aa; font-size: 13.5px; line-height: 1.5; }
+    ul { margin: 14px 0 0; padding-left: 18px; color: #d4d4d8; font-size: 13px; line-height: 1.55; }
+    .note {
+      margin-top: 28px;
+      font-size: 12px;
+      color: #71717a;
+    }
+    code { background: rgba(255,255,255,.08); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Propuestas de diseño — Configuración de seguros (ramos)</h1>
+  <p class="lead">
+    Mockups usados para acordar la apariencia de <code>/dashboard/seguros/configuracion</code> antes de tocar código.
+    Las dos quedaron <strong>aprobadas y ya implementadas</strong> en la app (septiembre 2026).
+  </p>
+  <div class="grid">
+    <a class="card" href="01-iconos-ramos.html">
+      <span class="tag">Aprobado ✓</span>
+      <h2>Ícono de ramo — círculo sólido</h2>
+      <p>Círculo con el color del ramo al 100% (no tinte), ícono blanco, sin sombra ni degradado, poco padding — inspirado en el ícono de HubSpot.</p>
+      <ul>
+        <li>Nombre del ramo en minúscula con primera letra en mayúscula</li>
+        <li>Reemplaza el círculo tenue (color al 15% de opacidad) que había antes</li>
+        <li>Aplicado en <code>ramo-icons.ts</code> + <code>configuracion/page.tsx</code></li>
+      </ul>
+    </a>
+    <a class="card" href="02-tarjetas-ramos.html">
+      <span class="tag">Aprobado ✓ (variante "Lista limpia")</span>
+      <h2>Tarjetas de "Ramos ofrecidos"</h2>
+      <p>De 3 variantes probadas en claro/oscuro, ganó "Lista limpia": grid de 3 columnas, casi sin borde (solo línea fina bajo cada fila), resalte al pasar el mouse.</p>
+      <ul>
+        <li>Reemplaza la tarjeta con caja/borde completo por fila</li>
+        <li>3 columnas en escritorio, 2 en tablet, 1 en celular</li>
+        <li>De paso quedó documentado el bug del switch negro-sobre-negro en tema claro (ya corregido en <code>Switch.tsx</code>)</li>
+      </ul>
+    </a>
+  </div>
+  <p class="note">Solo mockups HTML · no modifican la app de producción · abrir cada archivo directo en el navegador.</p>
+</body>
+</html>
