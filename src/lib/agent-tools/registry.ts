@@ -48,6 +48,16 @@ export interface AgentToolContext extends AgentToolRulesContext {
   outboundWhatsAppChannel?: WhatsAppChannelRecord | null;
   /** Teléfono E.164 del cliente en la conversación — solo presente en canal WhatsApp. */
   contactE164?: string | null;
+  /**
+   * Field keys de preguntas guiadas (botones/lista) ya enviadas por WhatsApp
+   * en ESTE turno de `generateTextAgentReply` — mismo Set compartido por
+   * referencia entre las hasta 3 rondas de function-calling de un turno (ver
+   * *-generate.ts/-openai.ts/-claude.ts). Evita mandar el mismo botón dos
+   * veces cuando el modelo llama la tool de cotización más de una vez en el
+   * mismo turno (causa raíz confirmada de los botones duplicados vistos en
+   * pruebas en vivo) — ver `presentGuidedQuestion` en guided-questions.ts.
+   */
+  sentGuidedQuestions?: Set<string>;
 }
 
 export interface AgentToolResult {

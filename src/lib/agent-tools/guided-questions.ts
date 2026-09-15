@@ -50,6 +50,14 @@ export async function presentGuidedQuestion(ctx: AgentToolContext, campo: RamoCa
     return { pregunta_enviada: false, siguiente_pregunta };
   }
 
+  // Ya se mandó este mismo botón/lista en una ronda anterior de ESTE turno
+  // (el modelo puede llamar la tool de cotización más de una vez antes de
+  // redactar el texto final) — no volver a mandarlo, solo confirmar que ya
+  // salió. Confirmado como causa real de botones duplicados en pruebas en vivo.
+  if (ctx.sentGuidedQuestions?.has(campo.fieldKey)) {
+    return { pregunta_enviada: true, siguiente_pregunta };
+  }
+
   try {
     if (presentacion === "botones") {
       await sendWhatsAppInteractiveMessage({
@@ -68,6 +76,7 @@ export async function presentGuidedQuestion(ctx: AgentToolContext, campo: RamoCa
         db: ctx.db
       });
     }
+    ctx.sentGuidedQuestions?.add(campo.fieldKey);
     return { pregunta_enviada: true, siguiente_pregunta };
   } catch (err) {
     // Igual que whatsapp-options-tool.ts: si el envío falla, no lo escondemos

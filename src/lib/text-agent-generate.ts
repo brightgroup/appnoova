@@ -204,6 +204,11 @@ async function generateGeminiAgentReply(
     )
   );
 
+  // Compartido por referencia entre las hasta 3 rondas de este turno — evita
+  // mandar el mismo botón/lista de WhatsApp dos veces si el modelo llama la
+  // tool de cotización más de una vez antes del texto final (ver registry.ts).
+  const sentGuidedQuestions = new Set<string>();
+
   let rounds = 0;
   while (toolsEnabled && response.functionCalls?.length && rounds < 3) {
     rounds += 1;
@@ -226,7 +231,8 @@ async function generateGeminiAgentReply(
       const name = call.name ?? "";
       const result = await executeAgentTool(enabledTools, name, args, {
         ...input.toolContext,
-        ...rulesCtx
+        ...rulesCtx,
+        sentGuidedQuestions
       });
       toolResults.push({ name, result });
       functionResponseParts.push({

@@ -182,6 +182,11 @@ export async function generateClaudeAgentReply(
   );
   usage = addUsage(usage, readClaudeUsage(response));
 
+  // Compartido por referencia entre las hasta 3 rondas de este turno — evita
+  // mandar el mismo botón/lista de WhatsApp dos veces si el modelo llama la
+  // tool de cotización más de una vez antes del texto final (ver registry.ts).
+  const sentGuidedQuestions = new Set<string>();
+
   let rounds = 0;
   while (toolsEnabled && response.stop_reason === "tool_use" && rounds < 3) {
     rounds += 1;
@@ -196,7 +201,8 @@ export async function generateClaudeAgentReply(
       const args = (call.input ?? {}) as Record<string, unknown>;
       const result = await executeAgentTool(enabledTools, call.name, args, {
         ...input.toolContext,
-        ...rulesCtx
+        ...rulesCtx,
+        sentGuidedQuestions
       });
       toolResults.push({ name: call.name, result });
       toolResultBlocks.push({

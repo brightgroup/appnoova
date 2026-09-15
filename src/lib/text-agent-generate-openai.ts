@@ -130,6 +130,11 @@ export async function generateOpenAiAgentReply(
   usage = addUsage(usage, readOpenAiUsage(response));
   let choice = response.choices[0];
 
+  // Compartido por referencia entre las hasta 3 rondas de este turno — evita
+  // mandar el mismo botón/lista de WhatsApp dos veces si el modelo llama la
+  // tool de cotización más de una vez antes del texto final (ver registry.ts).
+  const sentGuidedQuestions = new Set<string>();
+
   let rounds = 0;
   while (
     toolsEnabled &&
@@ -145,7 +150,8 @@ export async function generateOpenAiAgentReply(
       const args = safeJsonParse(call.function.arguments);
       const result = await executeAgentTool(enabledTools, call.function.name, args, {
         ...input.toolContext,
-        ...rulesCtx
+        ...rulesCtx,
+        sentGuidedQuestions
       });
       toolResults.push({ name: call.function.name, result });
       messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
