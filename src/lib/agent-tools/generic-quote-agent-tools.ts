@@ -77,6 +77,7 @@ export const iniciarCotizacionSeguroAgentTool: AgentToolDefinition = {
       "Te devuelve exactamente qué dato falta a continuación (con su pregunta y, si aplica, sus opciones) — pregúntalo con registrar_dato_cotizacion en cuanto el cliente responda. " +
       "Si el resultado trae `pregunta_enviada: true`, esa pregunta YA se le envió al cliente (con botones o lista) — no la repitas en tu texto, solo espera la respuesta. " +
       "Si trae `pregunta_enviada: false`, escríbela tú mismo en texto normal usando el valor de `siguiente_pregunta`. Nunca inventes un dato que el cliente no te haya dado. " +
+      "IMPORTANTE: cada vez que el cliente responda CUALQUIER dato de la cotización (así sea una respuesta corta como un botón, un número o un nombre), tu ÚNICO paso siguiente es llamar registrar_dato_cotizacion con ese dato — nunca redactes tú mismo la siguiente pregunta sin haber llamado la herramienta primero, ni asumas que ya quedó guardado. " +
       "Cuando confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo."
     );
   },
@@ -120,6 +121,7 @@ export const registrarDatoCotizacionAgentTool: AgentToolDefinition = {
   buildPromptBlock() {
     return (
       "Tienes una herramienta (registrar_dato_cotizacion) para guardar cada dato que el cliente responda sobre una cotización ya iniciada — pásale el mismo ramo que usaste en iniciar_cotizacion_seguro y los campos nuevos (no hace falta guardar ningún id entre mensajes). " +
+      "REGLA SIN EXCEPCIÓN: nunca redactes tú la siguiente pregunta de la cotización sin haber llamado ANTES registrar_dato_cotizacion con la respuesta que el cliente acaba de dar — aunque sea un solo dato corto (un botón, un número, un nombre). Si no llamas la herramienta, ese dato NO queda guardado. " +
       "Si el resultado trae `pregunta_enviada: true`, la siguiente pregunta YA se le envió al cliente (con botones o lista) — no la repitas en tu texto. " +
       "Si trae `pregunta_enviada: false`, escríbela tú mismo en texto normal usando `siguiente_pregunta`. " +
       "Cuando confirme que ya está completo, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo."

@@ -1,227 +1,84 @@
-# Handoff: campos de cotización configurables + botones deterministas
+# Handoff — campos de cotización configurables (actualizado 2026-09-15, sesión nocturna)
 
-Documento para que **otro agente (Opus, modo Plan) arranque desde cero** sin el chat anterior.
+Este documento reemplaza al original de la misma ruta. El plan original (botones deterministas + campos configurables para los 6 ramos activos) **se completó, se desplegó y se probó en vivo con éxito**. Esta sesión además:
 
-- Repo: `/Users/johngarcia/appnoova`
-- Plan interno de Cursor (si existe): `campos_cotizacion_configurables` / `.cursor/plans/campos_cotizacion_configurables_cdeb498a.plan.md`
-- Fecha del handoff: 14 de septiembre de 2026
-- Chat origen: conversación de prueba WhatsApp “seguro autos” (Lucia / Resguarda)
+1. Extrajo los 26 formularios reales de Figuro (competidor) y los convirtió en defaults para 20 ramos nuevos.
+2. Conectó el motor genérico (`iniciar_cotizacion_seguro`/`registrar_dato_cotizacion`, ya existía pero nunca se había registrado) para esos 20 ramos.
+3. Encontró y arregló 3 bugs reales durante la verificación (dos ya corregidos y desplegados, uno **pendiente**, ver abajo).
 
----
-
-## Tu rol
-
-Trabajas en **Noova**: Next.js (App Router) + Supabase, TypeScript. Código y comentarios en español. Plataforma CRM/automatización con módulo de **seguros** para corredores colombianos.
-
-Hay agentes de IA (“agentes de texto”) que atienden al **cliente final** por WhatsApp (Twilio) y chat web embebido, más un asistente interno **ORI**.
-
-**Arranca en modo Plan.** No implementes hasta que el usuario apruebe. Verifica cada afirmación técnica de este archivo (fueron comprobadas en otra sesión; el código puede haber cambiado).
+**Repo:** `/Users/johngarcia/appnoova` — todo commiteado y pusheado a `main`, 4 commits: `e039d9a`, `95f993d`, `5a0ca02`, `7d920a6`.
 
 ---
 
-## Cómo llegamos acá
+## Lo que quedó funcionando y verificado en producción (WhatsApp real, cuenta "Noova 360 Oficial", noova360.com)
 
-El usuario estaba probando cotización **ramo por ramo** por WhatsApp y reportó dos problemas:
+- **UI de configuración** (`/dashboard/seguros/configuracion` → pestaña "Preguntas que hace la IA"): layout de lista + panel (Opción A que aprobaste), 26 ramos con buscador, filas de campo compactas y expandibles, tipo de campo "Multiselección" nuevo (para "elige todas las que apliquen", ej. naturaleza del riesgo en transporte de mercancías).
+- **Autos** (ramo con tool dedicada): probado end-to-end por WhatsApp antes de esta sesión nocturna — placa, botones sin duplicar pregunta, edición de una pregunta desde la UI y persistencia confirmada.
+- **Mascotas** (ramo del motor genérico, recién conectado): probado en vivo esta noche —
+  - `iniciar_cotizacion_seguro` arranca bien, pide datos del tomador.
+  - Los datos del tomador (nombre, documento, fecha de nacimiento, ocupación) **sí se guardan correctamente** entre turnos (confirmado en `insurance_quote_requests.tomador`).
+  - Al llegar a "¿Qué tipo de mascota tienes?" (2 opciones) salieron **botones reales de WhatsApp** ("Perro"/"Gato"), sin texto duplicado antes — exactamente el objetivo del proyecto.
+- **Ramos ofrecidos**: BICICLETA, PLAN DENTAL, CIBERRIESGOS, SEPELIO ya aparecen en el catálogo (migración 146 aplicada).
 
-1. **La IA le contaba al cliente los errores técnicos** (“hubo un problema al conectar”, “inconveniente técnico”). Al cliente final no le importa si cotiza la IA o un asesor: debe decir que un asesor le confirmará el precio.
-2. **Los botones interactivos de WhatsApp no aparecían.** Las preguntas de opción cerrada salían como listas en texto plano.
+## 🔴 Bug pendiente — el más importante para revisar primero
 
-Después, un cliente le preguntó **cómo cambiar uno de esos formularios**. El usuario quiere que sea **configurable en la UI del módulo de seguros**, por organización, y que los botones salgan bien (no solo texto). También mencionó que un cliente **que no sea corredor** podría querer lo mismo: dejar la puerta abierta a reutilizar el mecanismo.
+**Los datos del RAMO (no del tomador) no se están guardando en el motor genérico.** En la prueba de Mascotas: después de los botones "Perro"/"Gato", el modelo siguió la conversación de forma coherente (preguntó nombre, edad, raza de la mascota, en el orden correcto) pero **dejó de llamar `registrar_dato_cotizacion`** — improvisó las preguntas por su cuenta en vez de usar la tool. Resultado: `insurance_quote_requests.datos_riesgo` quedó vacío (`{}`) aunque la conversación "se veía" completa.
 
----
-
-## Lo que ya se hizo (y su estado)
-
-### Problema 1 — cambios locales, sin commit ni deploy confirmado
-
-Hay trabajo local (revisa `git status` y el diff **antes de tocar nada**; confirma con el usuario si ya se desplegó) que introduce `technical: true` en resultados de tools:
-
-- Fallo de backend → no se le explica al cliente; se encola cotización parcial y se dice que un asesor confirmará el precio.
-- Error de negocio (ej. placa no encontrada) → sí se le dice al cliente, en lenguaje natural.
-
-Archivos involucrados (pueden diferir del working tree actual):
-
-- `src/lib/insurers/auto-quote-tool.ts`
-- `src/lib/insurers/moto-quote-tool.ts`
-- `src/lib/insurers/vehicle-data-provider.ts` (`isVehicleLookupTechnicalError`)
-- `src/lib/agent-tools/registry.ts` (catch genérico no filtra el mensaje crudo al modelo)
-- `src/lib/agent-tools/auto-quote-agent-tool.ts`
-- `src/lib/agent-prompt-generator.ts`
-
-Cuando el fallo es técnico, el patrón deseado es `{ ok: true, pendiente: true, technical: true }` (no filtrar `reason` al cliente).
-
-### Problema 2 — diagnóstico con evidencia + mitigación a medias
-
-Se reprodujo el turno exacto contra la API (mismo prompt ~22k chars, mismas 8 tools, mismo mensaje del cliente), 5 corridas por motor:
-
-| Motor | Llamó `presentar_opciones_whatsapp` |
-|---|---|
-| GPT-4o mini | **0/5** (volvía a `cotizar_seguro_auto` o escribía “**Botones**: Nuevo / Usado” en texto) |
-| Gemini 2.5 Flash | **5/5** |
-
-No era un bug de Twilio/plantillas: era el modelo interpretando una instrucción en prosa dentro de un prompt enorme.
-
-**Mitigación aplicada en producción (DB):** el agente **Lucia** (`text_agents.id = 98d77d5f-0669-471c-8c85-cb42e0f76f9f`, org `bd23473f-a2dd-436b-9f4a-5814bb24b1ec`) pasó de `gpt-4o-mini` a `gemini-2.5-flash`. GPT queda de failover automático.
-
-**Prueba en vivo con Gemini:** los botones **sí salieron**, pero apareció un bug nuevo: **pregunta duplicada**. “¿Es de importación directa?” primero en texto plano (sin botones); el cliente dijo “No se”; la IA **volvió a preguntar lo mismo** ya con botones. Causa de raíz: **usar botones vive en un párrafo que la IA interpreta cada turno, no en el código.**
-
-### Hallazgos secundarios (no son bugs de Noova)
-
-- Un mensaje de prueba por automatización de navegador falló con **Twilio 21617** (cuerpo > 1600 caracteres) porque WhatsApp Web duplicó el texto ~15 veces.
-- Automatizar el composer de WhatsApp Web (Lexical) **no es confiable** con las tools de browser. Para pruebas en vivo, **pídele al usuario que escriba él**.
-
----
-
-## Arquitectura actual (verificar en código)
-
-### Media solución ya construida, desconectada de WhatsApp
-
-- **`poliza_ramo_campos`** — `supabase/migrations/137_poliza_ramo_campos.sql`: campos por `(organization_id, ramo_id)`: `field_key`, `label`, `field_type` (`text|number|date|select|boolean`), `options` jsonb, `sort_order`.
-  - UI: `/dashboard/seguros/polizas/campos` → `src/components/seguros/PolizaRamoCamposPanel.tsx`
-  - DB helper: `src/lib/insurers/poliza-ramo-campos-db.ts`
-  - API: `/api/seguros/ramo-campos`
-- **`src/lib/insurers/generic-quote-tool.ts`**: lee `getRamoCampoDefinitions()` y devuelve `faltan_datos: [{key, label, tipo, opciones}]`. Solo `vida`, `hogar`, `salud`.
-- **`src/lib/agent-tools/generic-quote-agent-tools.ts`**: `iniciar_cotizacion_seguro` y `registrar_dato_cotizacion`. **No están en** `src/lib/agent-tools/all-text-tools.ts` → WhatsApp no las usa (ORI sí, en parte).
-- WhatsApp usa las **6 tools hard-codeadas** en `all-text-tools.ts`: auto, vida, hogar, moto, soat, accidentes + `presentar_opciones_whatsapp` + `radicar_siniestro`.
-
-### Dónde viven hoy las preguntas
-
-Strings en español dentro de `buildPromptBlock()` de cada tool. Ejemplo (`src/lib/agent-tools/auto-quote-agent-tool.ts`): pide placa, luego 5 datos de a uno, “con botones… usa `presentar_opciones_whatsapp` con esas opciones EXACTAS”.
-
-Los 5 campos de riesgo de autos también están en `REQUIRED_RIESGO_FIELDS` en `src/lib/insurers/auto-quote-tool.ts`.
-
-### Restricciones que condicionan el diseño
-
-1. **`buildPromptBlock(ctx)` es síncrono y `AgentToolRulesContext` no tiene `db`** (`src/lib/agent-tools/registry.ts`). Precargar config aguas arriba, como `calendarConnection`. Puntos de carga: `src/lib/whatsapp/process-inbound.ts` (~quotingRules) y `src/app/api/public/microsite/[slug]/chat/route.ts`.
-2. **`ramos_catalogo` no tiene MOTOS** (`134_ramos_catalogo.sql`: sí `autos-vehiculos`, `soat`, `accidentes-personales`).
-3. **`RAMOS_COTIZABLES`** (`src/lib/insurers/ramos-cotizables.ts`) solo `autos`, `vida`, `hogar`, `salud`. `getRamoCampoDefinitions()` devuelve `[]` para el resto.
-4. **`alreadyDeliveredInteractive`** en `process-inbound.ts` (~821) solo mira el **nombre** `presentar_opciones_whatsapp`. Otra tool que envíe interactivo no suprime el texto duplicado.
-5. **Límites WhatsApp** (`whatsapp-options-tool.ts`): máx. 3 botones o 10 filas; títulos `slice(0, 20)` / `slice(0, 24)`. Caso real: “A nombre de otra persona” → “A nombre de otra per”. La UI debe advertirlo.
-6. **Solo autos tiene cotización automática** (La Equidad, `la-equidad.ts`), incompleta (sin `Detail`/Fasecolda). El resto es cola humana (`insurance_quote_requests`). Los 5 campos de riesgo de autos son **informativos para el asesor**, no van a la aseguradora hoy.
-
-### Interruptor actual del agente
-
-`quoting_rules` en `text_agents`: `{ enabled, autoQuote, insurer_connection_ids }`. UI: tab Conectores en configuración del agente (`AgentConnectorsPanel`). **No hay** editor de preguntas/botones.
-
----
-
-## Decisiones del usuario (no volver a preguntar)
-
-1. **Alcance: todos los ramos, incluido autos.** Autos conserva en código placa + Verifik/PlacApi; las 5 preguntas de riesgo salen de la config.
-2. **Determinismo: híbrido, con dos guardas.** Palabras del usuario: *“no quiero que mande un listado grande solo porque le dijimos que siempre use, es mejor híbrido pero que no repita las mismas preguntas.”*
-   - El **código** fuerza el interactivo en campos de cotización.
-   - Nunca lista gigante “porque sí”.
-   - Nunca repetir la misma pregunta en texto + botones.
-   - La IA **sigue** pudiendo usar `presentar_opciones_whatsapp` para decisiones sueltas (plan, confirmar).
-
----
-
-## Plan a ejecutar (cuando el usuario lo apruebe)
-
-### 1. Migración
-
-Nueva migración (verifica el número siguiente; puede existir `144_bold_billing.sql` u otras sin commit). Propuesta `145_ramo_campos_cotizacion.sql`:
-
-```sql
-alter table public.poliza_ramo_campos
-  add column if not exists pregunta              text,
-  add column if not exists ayuda                 text,
-  add column if not exists presentacion          text not null default 'auto'
-    check (presentacion in ('auto','botones','lista','texto')),
-  add column if not exists aplica_cotizacion     boolean not null default true,
-  add column if not exists requerido_cotizacion  boolean not null default true;
-
-insert into public.ramos_catalogo (nombre, slug) values ('MOTOS', 'motos')
-  on conflict (slug) do nothing;
+Confirmado en DB — quote id `6b547013-d97a-4327-9268-940999982e4b` (org Resguarda, conversación real, puedes borrarla si quieres limpiar la cuenta de prueba):
+```
+tomador: { nombre_tomador, documento_tomador, fecha_nacimiento_tomador, ocupacion }  ✅ completo
+datos_riesgo: {}  ❌ vacío — "Perro", "Firulais", "3 años", "Criollo" nunca se guardaron
 ```
 
-- `pregunta`: lo que dice la IA (si null, usa `label`).
-- `ayuda`: “¿qué significa?” (ej. importación directa).
+**Por qué pasa (hipótesis, no 100% confirmada — no tengo logs de Coolify en local):** es el mismo problema de fondo del handoff original — el modelo no llama la tool de forma confiable en cada turno, ahora en `registrar_dato_cotizacion` en vez de en `presentar_opciones_whatsapp`. El motor genérico le pide al modelo "llama la tool en cuanto el cliente responda" en prosa (ver `generic-quote-agent-tools.ts` → `buildPromptBlock`), a diferencia de los 6 ramos con tool dedicada, donde el modelo reenvía TODOS los datos conocidos como argumentos de una sola tool cada turno (no depende de que "recuerde" seguir llamando una tool incremental).
 
-### 2. Defaults en código + override en DB
+**Ya until ahora arreglé** (y esto SÍ quedó bien, confirmado): que `registrar_dato_cotizacion` perdiera el `quote_request_id` entre turnos (commit `7d920a6`) — ese bug sí estaba 100% en el código, ya no depende de que el modelo recuerde un id. Lo que queda es un problema de **confiabilidad del modelo**, no de plomería.
 
-Nuevo `src/lib/insurers/ramo-campos-defaults.ts`: traducción 1:1 de los `buildPromptBlock` actuales de los 6 ramos. **Léelos, no los reinventes.**
+**Sugerencias para la próxima sesión** (no las implementé, requieren pruebas iterativas que no me dio tiempo de hacer bien esta noche):
+1. Reforzar el prompt de `registrar_dato_cotizacion` — decirle explícitamente "SIEMPRE llama esta tool con la respuesta del cliente antes de escribir tu próximo mensaje, incluso si la pregunta es simple como el nombre o la edad".
+2. Considerar rediseñar el motor genérico para que funcione como los 6 ramos dedicados: una sola tool que reciba TODOS los campos conocidos de la conversación como argumentos cada turno (en vez de "arrancar" + "registrar incrementalmente") — más robusto porque no depende de que el modelo decida llamar la tool en cada mensaje, a costa de un schema de function-calling menos flexible (mismo trade-off que ya documenté para los 6 ramos fijos).
+3. Probar con más turnos/ramos para ver si el patrón se repite siempre después del primer campo con botones, o es aleatorio.
+4. Sí tengo logs de servidor en Coolify (no accesibles desde aquí) — revisarlos mostraría si la tool realmente no se llamó, o se llamó y falló silenciosamente.
 
-`getRamoCampoDefinitions()`: si la org tiene filas para el ramo, esas; si no, defaults. Ampliar `RAMOS_COTIZABLES` con `motos`, `soat`, `accidentes_personales` y sus `catalogoSlug`.
+## Otros hallazgos de esta sesión (ya arreglados y desplegados)
 
-### 3. Helper determinista (ramo-agnóstico)
+1. **Campos con clave desconocida rompían los 6 ramos dedicados** (commit `5a0ca02`): la org de prueba tenía filas viejas en `poliza_ramo_campos` para Hogar (18 campos, de una sesión anterior al 12 de sept) con claves que no coinciden con el esquema fijo de `home-quote-tool.ts`. `resolveCampos()` ahora filtra a solo las claves que la tool puede recibir de verdad. **Quedan 18 filas de Hogar en la DB para la org de prueba que ya no afectan nada pero son ruido en la UI admin** — si algún día migras Hogar al motor genérico, esas filas (con el desglose "Valores a asegurar" completo) se vuelven útiles automáticamente; si no, puedes borrarlas cuando quieras.
+2. **Posible envío duplicado de botones bajo respuesta lenta**: una sola vez, en la prueba de Mascotas, los botones "Perro"/"Gato" llegaron dos veces seguidas. No se repitió en los turnos siguientes. Hipótesis más probable: reintento de webhook de Twilio por una respuesta lenta (no exclusivo de mi código nuevo — le pasaría a cualquier tool que tarde). No alcancé a confirmarlo con logs de Twilio/Coolify.
 
-Nuevo `src/lib/agent-tools/guided-questions.ts`:
+## Documento de Figuro — recuperado, no perdido
 
-- `presentacion: 'auto'` + 2–3 opciones → botones; 4–10 → lista; **>10, `'texto'`, o sin opciones → no envía**, pregunta en texto.
-- Solo WhatsApp (`outboundWhatsAppChannel` + `contactE164`).
-- Resultado de tools de cotización: `siguiente_pregunta` + `pregunta_enviada: true` si envió.
+La sesión que se cerró al cambiar de plan (Pro→Team) sí completó trabajo real: quedó guardado directo en Supabase (`poliza_ramo_campos`, filas del 12 de sept para Hogar y Salud en 2 organizaciones de prueba) en vez de en un documento. Ya lo usé para verificar mis propios defaults contra ese trabajo previo.
 
-### 4. Suprimir texto duplicado
+## Decisiones tomadas explícitamente por ti en esta sesión (no volver a preguntar)
 
-Extender `alreadyDeliveredInteractive` para `pregunta_enviada === true` **además** del nombre de tool actual.
+- Opción de layout **A — Lista + panel** (no acordeón).
+- Crear ramos configurables por el corredor: **buena idea**, ya es posible sin código nuevo vía el motor genérico.
+- Implementar los 20 ramos nuevos completos, incluyendo mascotas/multiselección/adjuntos: **sí, hazlo todo**.
+- Adjuntos de archivo (ej. "sube tu contrato" en Cumplimiento): **no se modeló** — se omitió el campo de la definición default; el asesor humano lo pide después por el mismo chat. No hace falta infraestructura nueva.
+- Autonomía total para commit/push/pruebas sin esperar confirmación mientras dormías.
 
-### 5. Prompts desde config
+## Archivos clave nuevos/tocados esta sesión
 
-`buildPromptBlock` de los 6 ramos se genera desde `ctx.ramoCampos`. **No** le pidas a la IA que decida usar botones. Dile: pregunta de a uno; **si `pregunta_enviada: true`, no escribas la pregunta**.
-
-Agregar `ramoCampos` a `AgentToolRulesContext` y precargarlo junto a `quotingRules`.
-
-Autos: `REQUIRED_RIESGO_FIELDS` config-driven. **No tocar** lookup de placa.
-
-### 6. UI
-
-Extender `PolizaRamoCamposPanel` (pregunta, ayuda, presentación, requerido). Montar sección **“Preguntas que hace la IA”** en `/dashboard/seguros/configuracion` (donde ya se eligen ramos ofrecidos). Defaults pre-cargados; se materializan al primer guardado. Vista previa botones/lista/texto + warning de 20 caracteres.
-
-Extender `/api/seguros/ramo-campos` con las columnas nuevas.
-
-### Fuera de alcance
-
-- Form builder genérico para agentes que no son de seguros (el helper sí se escribe reutilizable).
-- Mapeo Detail/Fasecolda → La Equidad.
-- Agentes de voz.
-
-### Verificación (el usuario lo pidió explícito)
-
-Levantar local (puerto **8000**, revisa `package.json` y terminales). Mostrar la UI de config con autos pre-cargado. Cambiar una pregunta. Reprobar WhatsApp: botones a la primera, **sin** pregunta duplicada. El usuario escribe los mensajes.
-
----
+```
+supabase/migrations/145_ramo_campos_cotizacion.sql
+supabase/migrations/146_ramos_catalogo_multiselect.sql
+src/lib/insurers/ramo-campos-defaults.ts        (defaults de los 26 ramos)
+src/lib/insurers/ramos-cotizables.ts            (RAMOS_COTIZABLES + RAMOS_MOTOR_GENERICO)
+src/lib/insurers/generic-quote-tool.ts          (motor genérico + fix de cross-turn id)
+src/lib/insurers/quote-requests-db.ts           (findPendingQuoteRequestByConversation/ByLead)
+src/lib/agent-tools/generic-quote-agent-tools.ts
+src/lib/agent-tools/generic-quote-ori-tools.ts
+src/lib/agent-tools/guided-questions.ts         (determinismo botones/lista + filtro de esquema fijo)
+src/lib/agent-tools/all-text-tools.ts           (registro del motor genérico)
+src/components/seguros/PolizaRamoCamposPanel.tsx (filas expandibles + multiselección)
+src/app/dashboard/seguros/configuracion/page.tsx (layout lista + panel, 26 ramos)
+```
 
 ## Datos para depurar
 
 | Qué | Valor |
 |---|---|
-| Agente Lucia | `98d77d5f-0669-471c-8c85-cb42e0f76f9f` |
-| Organización | `bd23473f-a2dd-436b-9f4a-5814bb24b1ec` |
-| Modelo actual | `gemini-2.5-flash` |
-| WhatsApp negocio | `+573214021250` |
-| Canal | `553c32ef-3f7a-4627-81a1-719e34ead4ed` (Twilio, subcuenta) |
-| Números de prueba | `+573003105733`, `+573152501481` |
-
-Conversaciones: `text_agent_conversations.messages` jsonb, `metadata.whatsapp_contact_e164`. **`updated_at` lo tocan jobs de CRM** — no sirve como “llegó un mensaje nuevo”.
-
-Credenciales: `.env.local`. Logs de Coolify **no** están en local; depurar con Supabase + API Twilio.
-
----
-
-## Archivos clave (mapa rápido)
-
-```
-src/lib/agent-tools/all-text-tools.ts
-src/lib/agent-tools/registry.ts
-src/lib/agent-tools/whatsapp-options-tool.ts
-src/lib/agent-tools/auto-quote-agent-tool.ts
-src/lib/agent-tools/moto-quote-agent-tool.ts
-src/lib/agent-tools/life-quote-agent-tool.ts
-src/lib/agent-tools/home-quote-agent-tool.ts
-src/lib/agent-tools/soat-quote-agent-tool.ts
-src/lib/agent-tools/accident-quote-agent-tool.ts
-src/lib/agent-tools/generic-quote-agent-tools.ts
-src/lib/insurers/generic-quote-tool.ts
-src/lib/insurers/quote-guidance.ts
-src/lib/insurers/ramos-cotizables.ts
-src/lib/insurers/auto-quote-tool.ts
-src/lib/insurers/quoting-rules.ts
-src/lib/whatsapp/process-inbound.ts
-src/lib/whatsapp/twilio-content.ts
-src/app/dashboard/seguros/configuracion/page.tsx
-src/app/dashboard/seguros/polizas/campos/
-src/components/seguros/PolizaRamoCamposPanel.tsx
-supabase/migrations/137_poliza_ramo_campos.sql
-supabase/migrations/134_ramos_catalogo.sql
-```
+| Org de prueba | Resguarda — `bd23473f-a2dd-436b-9f4a-5814bb24b1ec` |
+| WhatsApp probado esta noche | "Noova 360 Oficial" (noova360.com) — cuenta de empresa real, NO Lucia/Resguarda |
+| Quote de prueba (Mascotas, incompleta) | `6b547013-d97a-4327-9268-940999982e4b` |
+| Migraciones nuevas | 145, 146 (ya aplicadas en dev) |
