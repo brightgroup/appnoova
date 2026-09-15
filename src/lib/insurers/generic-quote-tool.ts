@@ -47,6 +47,33 @@ const TOMADOR_REQUERIDOS: Array<{ key: (typeof TOMADOR_KEYS)[number]; label: str
   { key: "ocupacion", label: "Ocupación del tomador", pregunta: "¿Cuál es la ocupación del tomador?" }
 ];
 
+function normalizeForCompare(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Red de seguridad contra el modelo mandando una clave parecida pero no
+ * idéntica a la que le devolvimos en `faltan_datos` (ej. "plan_cobertura" en
+ * vez de "plan_cobertura_sepelio") — confirmado en pruebas en vivo que el
+ * prompt por sí solo no lo evita siempre. Si la clave ya es válida tal cual,
+ * no se toca; si no, busca la única clave real del ramo que comparte prefijo
+ * (ignorando mayúsculas/acentos/guiones) — solo la reasigna cuando el match
+ * es inequívoco, para no mezclar por accidente dos campos distintos.
+ */
+function resolveFieldKey(key: string, validKeys: readonly string[]): string {
+  if (validKeys.includes(key)) return key;
+  const normKey = normalizeForCompare(key);
+  const candidates = validKeys.filter(k => {
+    const nk = normalizeForCompare(k);
+    return nk === normKey || nk.startsWith(normKey) || normKey.startsWith(nk);
+  });
+  return candidates.length === 1 ? candidates[0] : key;
+}
+
 function splitCampos(campos: Record<string, string>): { tomador: Partial<QuoteRequestTomador>; datosRiesgo: Record<string, unknown> } {
   const tomador: Partial<QuoteRequestTomador> = {};
   const datosRiesgo: Record<string, unknown> = {};
@@ -160,7 +187,13 @@ export async function cotizarSeguroGenerico(
     };
   }
 
-  const { tomador, datosRiesgo } = splitCampos(input.campos ?? {});
+  const camposRamo = await getRamoCampoDefinitionsParaCotizar(db, organizationId, ramo);
+  const validKeys = [...(TOMADOR_KEYS as readonly string[]), ...camposRamo.map(c => c.fieldKey)];
+  const camposNormalizados: Record<string, string> = {};
+  for (const [key, value] of Object.entries(input.campos ?? {})) {
+    camposNormalizados[resolveFieldKey(key, validKeys)] = value;
+  }
+  const { tomador, datosRiesgo } = splitCampos(camposNormalizados);
 
   const existing = input.conversationId
     ? await findPendingQuoteRequestByConversation(db, organizationId, input.conversationId, ramo)
