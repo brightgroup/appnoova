@@ -19,6 +19,7 @@ Este documento reemplaza al original de la misma ruta. El plan original (botones
   - Los datos del tomador (nombre, documento, fecha de nacimiento, ocupación) **sí se guardan correctamente** entre turnos (confirmado en `insurance_quote_requests.tomador`).
   - Al llegar a "¿Qué tipo de mascota tienes?" (2 opciones) salieron **botones reales de WhatsApp** ("Perro"/"Gato"), sin texto duplicado antes — exactamente el objetivo del proyecto.
 - **Ramos ofrecidos**: BICICLETA, PLAN DENTAL, CIBERRIESGOS, SEPELIO ya aparecen en el catálogo (migración 146 aplicada).
+- **Motos** (ramo dedicado, recién agregado a `ramos_catalogo` en esta sesión — migración 145): probado en vivo — el bot reconoce el ramo y pide la placa correctamente. No completé el lookup real (necesita una placa válida de verdad vía Verifik/PlacApi que no tenía a mano), pero confirma que el routing y el catálogo nuevo funcionan.
 
 ## 🔴 Bug pendiente — CONFIRMADO, el más importante para revisar primero
 
@@ -65,7 +66,7 @@ Fusionar `iniciar_cotizacion_seguro` + `registrar_dato_cotizacion` en **una sola
 
 Existe un microsite de prueba `testlucia` (org Resguarda, agente Lucia, `quoting_rules.enabled: true`) — probablemente configurado por mí antes del corte de contexto de esta sesión. Local: `http://localhost:62832/c/testlucia`. Probé el flujo completo del widget de chat público: arranca bien, pide tomador, responde de forma coherente — y reproduce el mismo bug de persistencia del motor genérico (quote `02bcac17-9517-419f-9512-8b3569849196`, ramo mascotas: solo `nombre_tomador` guardado, una sola escritura). Es exactamente lo esperado, mismo motor genérico por debajo — no es un bug nuevo del canal web, solo confirma que el problema no es específico de WhatsApp.
 
-**Nota menor, no crítica:** esa fila quedó con `source: "whatsapp"` en vez de `"web"` a pesar de venir del microsite — la lógica en `generic-quote-agent-tools.ts` (`ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp"`) parece no estar recibiendo el valor de canal esperado en esta ruta. Cosmético (solo afecta el campo `source`, no el bug de datos), no lo investigué más a fondo esta noche.
+**Nota menor, no crítica, ya diagnosticada del todo:** esa fila quedó con `source: "whatsapp"` en vez de `"web"` a pesar de venir del microsite. Causa raíz confirmada: `/c/[slug]` (Mi Link) manda `channel: "web_widget"` (`src/lib/widget-channel.ts`), pero el chequeo `ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp"` — repetido en los 8 tools de cotización, incluidos los 6 ramos dedicados — nunca contempló ese valor. Es un bug preexistente (no algo que se rompió esta noche) y puramente cosmético (no afecta que los datos se guarden). Dejé una tarea aparte anotada para arreglarlo sin mezclarlo con este cambio.
 
 ## Documento de Figuro — recuperado, no perdido
 
