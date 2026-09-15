@@ -78,10 +78,26 @@ export async function presentGuidedQuestion(ctx: AgentToolContext, campo: RamoCa
   }
 }
 
-/** `ctx.ramoCampos[ramo]` con fallback a los defaults — por si no se precargó (ej. quotingRules deshabilitado) o quedó vacío. */
-export function resolveCampos(ctx: AgentToolRulesContext, ramo: RamoCotizable): RamoCampoDef[] {
+/**
+ * `ctx.ramoCampos[ramo]` con fallback a los defaults — por si no se precargó
+ * (ej. quotingRules deshabilitado) o quedó vacío.
+ *
+ * `camposFijos`, cuando se da, filtra a solo esas claves — los 6 ramos con
+ * tool dedicada (autos/motos/vida/hogar/soat/accidentes) tienen un esquema
+ * FIJO en el function-calling de Gemini (los parámetros del tool no cambian
+ * dinámicamente): la config puede reescribir la pregunta/opciones de esos
+ * campos, pero un campo que un corredor agregue con una clave nueva no tiene
+ * dónde guardarse — sin este filtro, `buildCamposPromptBlock` le pediría al
+ * modelo preguntar algo que la tool no puede recibir. El motor genérico
+ * (guided-questions vía generic-quote-agent-tools.ts) no tiene este límite,
+ * ahí sí se puede agregar cualquier campo nuevo.
+ */
+export function resolveCampos(ctx: AgentToolRulesContext, ramo: RamoCotizable, camposFijos?: readonly string[]): RamoCampoDef[] {
   const cargados = ctx.ramoCampos[ramo];
-  return cargados && cargados.length > 0 ? cargados : DEFAULT_CAMPOS_POR_RAMO[ramo] ?? [];
+  const campos = cargados && cargados.length > 0 ? cargados : DEFAULT_CAMPOS_POR_RAMO[ramo] ?? [];
+  if (!camposFijos) return campos;
+  const permitidas = new Set<string>(camposFijos);
+  return campos.filter(c => permitidas.has(c.fieldKey));
 }
 
 /**

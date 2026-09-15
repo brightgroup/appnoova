@@ -1,6 +1,6 @@
 import { Type } from "@google/genai";
 import type { AgentToolDefinition, AgentToolContext, AgentToolResult } from "@/lib/agent-tools/registry";
-import { calificarSeguroMoto } from "@/lib/insurers/moto-quote-tool";
+import { calificarSeguroMoto, ALL_CAMPO_KEYS } from "@/lib/insurers/moto-quote-tool";
 import { resolveCampos, buildCamposPromptBlock, presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
 
 /** Tool de calificación de seguro de motos para agentes que hablan con el CLIENTE FINAL — mismo patrón de vehículo que auto-quote-agent-tool.ts, sin cotización real. */
@@ -38,12 +38,12 @@ export const calificarSeguroMotoAgentTool: AgentToolDefinition = {
     return ctx.quotingRules.enabled;
   },
   buildPromptBlock(ctx) {
-    const campos = resolveCampos(ctx, "motos");
+    const campos = resolveCampos(ctx, "motos", ALL_CAMPO_KEYS);
     return `Tienes una herramienta (cotizar_seguro_moto) para REUNIR los datos de una cotización de moto (no da el precio directo — eso lo confirma un asesor). Pide la placa primero — con eso ya traes marca, línea y año automáticamente. ${buildCamposPromptBlock(campos)} Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes un precio tú mismo.`;
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
-    const campos = resolveCampos(ctx, "motos");
+    const campos = resolveCampos(ctx, "motos", ALL_CAMPO_KEYS);
     const result = await calificarSeguroMoto(
       {
         placa: typeof args.placa === "string" ? args.placa : "",

@@ -1,6 +1,6 @@
 import { Type } from "@google/genai";
 import type { AgentToolDefinition, AgentToolContext, AgentToolResult } from "@/lib/agent-tools/registry";
-import { cotizarSeguroAuto } from "@/lib/insurers/auto-quote-tool";
+import { cotizarSeguroAuto, ALL_CAMPO_KEYS } from "@/lib/insurers/auto-quote-tool";
 import { resolveCampos, buildCamposPromptBlock, presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
 
 /**
@@ -49,7 +49,7 @@ export const cotizarSeguroAutoAgentTool: AgentToolDefinition = {
     return ctx.quotingRules.enabled;
   },
   buildPromptBlock(ctx) {
-    const campos = resolveCampos(ctx, "autos");
+    const campos = resolveCampos(ctx, "autos", ALL_CAMPO_KEYS);
     const preguntasVehiculo = `Después de la placa, antes de pedir los datos del tomador. ${buildCamposPromptBlock(campos)}`;
     return ctx.quotingRules.autoQuote
       ? `Tienes una herramienta (cotizar_seguro_auto) para cotizar seguros de auto de verdad. Pide la placa primero. ${preguntasVehiculo} Si la herramienta dice que faltan datos, pide exactamente esos. Si dice que no hay aseguradora conectada o que el cotizador no está configurado del todo, comunícaselo tal cual al cliente — nunca inventes ni aproximes una prima.`
@@ -57,7 +57,7 @@ export const cotizarSeguroAutoAgentTool: AgentToolDefinition = {
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
-    const campos = resolveCampos(ctx, "autos");
+    const campos = resolveCampos(ctx, "autos", ALL_CAMPO_KEYS);
     const result = await cotizarSeguroAuto(
       {
         placa: typeof args.placa === "string" ? args.placa : "",

@@ -1,6 +1,6 @@
 import { Type } from "@google/genai";
 import type { AgentToolDefinition, AgentToolContext, AgentToolResult } from "@/lib/agent-tools/registry";
-import { calificarSeguroVida } from "@/lib/insurers/life-quote-tool";
+import { calificarSeguroVida, ALL_FIELD_KEYS } from "@/lib/insurers/life-quote-tool";
 import { resolveCampos, buildCamposPromptBlock, presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
 
 /**
@@ -59,12 +59,12 @@ export const calificarSeguroVidaAgentTool: AgentToolDefinition = {
     return ctx.quotingRules.enabled;
   },
   buildPromptBlock(ctx) {
-    const campos = resolveCampos(ctx, "vida");
+    const campos = resolveCampos(ctx, "vida", ALL_FIELD_KEYS);
     return `Tienes una herramienta (cotizar_seguro_vida) para REUNIR los datos de una cotización de seguro de vida (no da el precio directo — eso lo confirma un asesor). ${buildCamposPromptBlock(campos)} Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo.`;
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
-    const campos = resolveCampos(ctx, "vida");
+    const campos = resolveCampos(ctx, "vida", ALL_FIELD_KEYS);
     const result = await calificarSeguroVida(
       {
         tipo_cobertura: str(args.tipo_cobertura),

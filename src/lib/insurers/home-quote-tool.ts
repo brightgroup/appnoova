@@ -37,7 +37,7 @@ export interface HomeQuoteOptions {
   contactE164?: string | null;
 }
 
-const ALL_FIELD_KEYS = [
+export const ALL_FIELD_KEYS = [
   "tipo_inmueble",
   "vigilancia_seguridad",
   "direccion_inmueble",

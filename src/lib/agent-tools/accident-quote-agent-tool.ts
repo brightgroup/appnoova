@@ -1,6 +1,6 @@
 import { Type } from "@google/genai";
 import type { AgentToolDefinition, AgentToolContext, AgentToolResult } from "@/lib/agent-tools/registry";
-import { calificarAccidentesPersonales } from "@/lib/insurers/accident-quote-tool";
+import { calificarAccidentesPersonales, ALL_FIELD_KEYS } from "@/lib/insurers/accident-quote-tool";
 import { resolveCampos, buildCamposPromptBlock, presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
 
 /** Tool de calificación de Accidentes Personales para agentes que hablan con el CLIENTE FINAL. */
@@ -47,12 +47,12 @@ export const calificarAccidentesAgentTool: AgentToolDefinition = {
     return ctx.quotingRules.enabled;
   },
   buildPromptBlock(ctx) {
-    const campos = resolveCampos(ctx, "accidentes_personales");
+    const campos = resolveCampos(ctx, "accidentes_personales", ALL_FIELD_KEYS);
     return `Tienes una herramienta (cotizar_seguro_accidentes) para REUNIR los datos de un seguro de Accidentes Personales (no da el precio directo — eso lo confirma un asesor). ${buildCamposPromptBlock(campos)} Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes un precio tú mismo.`;
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
-    const campos = resolveCampos(ctx, "accidentes_personales");
+    const campos = resolveCampos(ctx, "accidentes_personales", ALL_FIELD_KEYS);
     const result = await calificarAccidentesPersonales(
       {
         proteccion_deseada: str(args.proteccion_deseada),

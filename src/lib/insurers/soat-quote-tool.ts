@@ -38,7 +38,7 @@ export interface SoatQuoteOptions {
   contactE164?: string | null;
 }
 
-const ALL_FIELD_KEYS = ["placa", "motor_ultimos_digitos", "ciudad", "nombre_tomador", "documento_tomador", "fecha_nacimiento_tomador"] as const;
+export const ALL_FIELD_KEYS = ["placa", "motor_ultimos_digitos", "ciudad", "nombre_tomador", "documento_tomador", "fecha_nacimiento_tomador"] as const;
 
 /** Campos que de verdad bloquean la cotización — los que la config no marcó como opcionales. */
 function requiredFields(campos: RamoCampoDef[]): typeof ALL_FIELD_KEYS[number][] {

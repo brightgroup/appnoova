@@ -44,7 +44,7 @@ export interface LifeQuoteOptions {
   contactE164?: string | null;
 }
 
-const ALL_FIELD_KEYS = [
+export const ALL_FIELD_KEYS = [
   "tipo_cobertura",
   "suma_asegurada_deseada",
   "presupuesto_mensual",

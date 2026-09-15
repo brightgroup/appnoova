@@ -1,6 +1,6 @@
 import { Type } from "@google/genai";
 import type { AgentToolDefinition, AgentToolContext, AgentToolResult } from "@/lib/agent-tools/registry";
-import { calificarSoat } from "@/lib/insurers/soat-quote-tool";
+import { calificarSoat, ALL_FIELD_KEYS } from "@/lib/insurers/soat-quote-tool";
 import { resolveCampos, buildCamposPromptBlock, presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
 
 /** Tool de calificación de SOAT para agentes que hablan con el CLIENTE FINAL — mismo patrón que life/home-quote-agent-tool.ts. */
@@ -30,12 +30,12 @@ export const calificarSoatAgentTool: AgentToolDefinition = {
     return ctx.quotingRules.enabled;
   },
   buildPromptBlock(ctx) {
-    const campos = resolveCampos(ctx, "soat");
+    const campos = resolveCampos(ctx, "soat", ALL_FIELD_KEYS);
     return `Tienes una herramienta (cotizar_seguro_soat) para REUNIR los datos de un SOAT (no da el precio directo — eso lo confirma un asesor). Es el ramo más simple, son puros datos abiertos. ${buildCamposPromptBlock(campos)} Cuando la herramienta confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes un precio tú mismo.`;
   },
   async execute(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolResult> {
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
-    const campos = resolveCampos(ctx, "soat");
+    const campos = resolveCampos(ctx, "soat", ALL_FIELD_KEYS);
     const result = await calificarSoat(
       {
         placa: str(args.placa),

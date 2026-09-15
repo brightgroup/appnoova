@@ -40,7 +40,7 @@ export interface AccidentQuoteOptions {
   contactE164?: string | null;
 }
 
-const ALL_FIELD_KEYS = [
+export const ALL_FIELD_KEYS = [
   "proteccion_deseada",
   "tipo_poliza",
   "valor_cobertura",

@@ -110,6 +110,9 @@ function requiredRiesgoFields(campos: RamoCampoDef[]): typeof ALL_RIESGO_FIELD_K
   return ALL_RIESGO_FIELD_KEYS.filter(key => campos.find(c => c.fieldKey === key)?.requeridoCotizacion !== false);
 }
 
+/** Todas las claves que la tool de verdad puede recibir (function-calling de Gemini tiene un esquema fijo) — usado para ignorar campos que un corredor haya agregado con una clave que esta tool no sabe dónde guardar. */
+export const ALL_CAMPO_KEYS = [...ALL_RIESGO_FIELD_KEYS, ...REQUIRED_TOMADOR_FIELDS] as const;
+
 /** Llama de verdad a la aseguradora conectada y devuelve la prima — usado tanto en modo autónomo como cuando el asesor solicita el precio manualmente desde la cola. */
 export async function ejecutarCotizacionReal(
   ctx: { db: SupabaseClient; organizationId: string },
