@@ -33,7 +33,7 @@ export const cotizarSeguroOriTool: OriToolDefinition = {
         ramo: { type: Type.STRING, description: `Ramo a cotizar. Uno de: ${RAMOS_MOTOR_GENERICO.join(", ")}.` },
         campos: {
           type: Type.OBJECT,
-          description: "TODOS los datos ya conocidos de esta cotización, clave/valor — incluye los que ya habías enviado antes, no solo el más nuevo."
+          description: "TODOS los datos ya conocidos de esta cotización, clave/valor — incluye los que ya habías enviado antes, no solo el más nuevo. Cada clave debe ser EXACTAMENTE el `key` que te devolvió `faltan_datos` para ese dato — nunca la abrevies ni la cambies."
         }
       },
       required: ["lead_id", "ramo", "campos"]

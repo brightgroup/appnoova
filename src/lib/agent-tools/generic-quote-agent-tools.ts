@@ -72,7 +72,7 @@ export const cotizarSeguroAgentTool: AgentToolDefinition = {
         campos: {
           type: Type.OBJECT,
           description:
-            "TODOS los datos que el cliente ya te ha dado en esta cotización hasta ahora — clave/valor, ej. {\"nombre_tomador\": \"Ana Pérez\", \"estrato\": \"3\"}. Incluye los que ya habías enviado antes, no solo el más nuevo; si no lo incluyes aquí, no queda guardado."
+            "TODOS los datos que el cliente ya te ha dado en esta cotización hasta ahora — clave/valor, ej. {\"nombre_tomador\": \"Ana Pérez\", \"estrato\": \"3\"}. Incluye los que ya habías enviado antes, no solo el más nuevo; si no lo incluyes aquí, no queda guardado. Cada clave debe ser EXACTAMENTE el `key` que la herramienta te devolvió en `faltan_datos` para ese dato — nunca inventes, abrevies ni cambies el nombre de una clave; si usas una clave distinta a la que te dieron, esa respuesta no se reconoce como guardada aunque el dato sí llegue al servidor."
         }
       },
       required: ["ramo", "campos"]
@@ -86,6 +86,7 @@ export const cotizarSeguroAgentTool: AgentToolDefinition = {
       `Tienes una herramienta (cotizar_seguro) para reunir los datos de una cotización de ${RAMOS_GENERICOS_LABEL} — no da el precio directo, eso lo confirma un asesor. ` +
       "Apenas sepas qué ramo quiere el cliente, llámala con el ramo (y los campos que ya tengas, aunque sea ninguno todavía). Te devuelve exactamente qué dato falta a continuación (con su pregunta y, si aplica, sus opciones). " +
       "REGLA SIN EXCEPCIÓN: cada vez que el cliente responda CUALQUIER dato — así sea corto, un botón, un número, un nombre — vuelve a llamar cotizar_seguro ANTES de escribir tu próximo mensaje, pasando en `campos` TODOS los datos que ya conoces de esta cotización hasta ahora, no solo el nuevo. Si un dato no va dentro de `campos` en esa llamada, no queda guardado, sin importar lo que le hayas dicho al cliente. Nunca redactes tú la siguiente pregunta sin haber llamado la herramienta primero. " +
+      "OTRA REGLA SIN EXCEPCIÓN sobre las claves de `campos`: usa EXACTAMENTE el `key` que la herramienta te devolvió en `faltan_datos` para cada dato — cópialo tal cual, nunca lo abrevies ni le cambies el nombre. Si la última respuesta del resultado seguía pidiendo un dato que sientes que ya diste, es casi siempre porque lo mandaste con una clave distinta a la exacta — revisa el `key` de `faltan_datos` y vuelve a intentarlo con esa clave literal, en vez de disculparte con el cliente. " +
       "Si el resultado trae `pregunta_enviada: true`, esa pregunta YA se le envió al cliente (con botones o lista) — no la repitas en tu texto, solo espera la respuesta. Si trae `pregunta_enviada: false`, escríbela tú mismo en texto normal usando `siguiente_pregunta`. " +
       "Cuando confirme que los datos quedaron completos, dile al cliente que un asesor le va a confirmar el precio en breve — nunca inventes ni aproximes una prima tú mismo."
     );
