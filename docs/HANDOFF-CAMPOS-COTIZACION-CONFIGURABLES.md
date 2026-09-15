@@ -20,25 +20,41 @@ Este documento reemplaza al original de la misma ruta. El plan original (botones
   - Al llegar a "¿Qué tipo de mascota tienes?" (2 opciones) salieron **botones reales de WhatsApp** ("Perro"/"Gato"), sin texto duplicado antes — exactamente el objetivo del proyecto.
 - **Ramos ofrecidos**: BICICLETA, PLAN DENTAL, CIBERRIESGOS, SEPELIO ya aparecen en el catálogo (migración 146 aplicada).
 
-## 🔴 Bug pendiente — el más importante para revisar primero
+## 🔴 Bug pendiente — CONFIRMADO, el más importante para revisar primero
 
-**Los datos del RAMO (no del tomador) no se están guardando en el motor genérico.** En la prueba de Mascotas: después de los botones "Perro"/"Gato", el modelo siguió la conversación de forma coherente (preguntó nombre, edad, raza de la mascota, en el orden correcto) pero **dejó de llamar `registrar_dato_cotizacion`** — improvisó las preguntas por su cuenta en vez de usar la tool. Resultado: `insurance_quote_requests.datos_riesgo` quedó vacío (`{}`) aunque la conversación "se veía" completa.
+**El motor genérico (los 20 ramos nuevos) no guarda de forma confiable los datos que el cliente responde por WhatsApp — ni siquiera los del tomador.** No es un problema de plomería (eso ya se arregló, ver abajo) sino de que el modelo deja de llamar la tool de guardado después de la primera vez.
 
-Confirmado en DB — quote id `6b547013-d97a-4327-9268-940999982e4b` (org Resguarda, conversación real, puedes borrarla si quieres limpiar la cuenta de prueba):
+### Evidencia — dos pruebas en vivo, mismo patrón
+
+**Prueba 1 (Mascotas, antes del intento de fix), quote `6b547013-d97a-4327-9268-940999982e4b`:**
 ```
 tomador: { nombre_tomador, documento_tomador, fecha_nacimiento_tomador, ocupacion }  ✅ completo
 datos_riesgo: {}  ❌ vacío — "Perro", "Firulais", "3 años", "Criollo" nunca se guardaron
 ```
 
-**Por qué pasa (hipótesis, no 100% confirmada — no tengo logs de Coolify en local):** es el mismo problema de fondo del handoff original — el modelo no llama la tool de forma confiable en cada turno, ahora en `registrar_dato_cotizacion` en vez de en `presentar_opciones_whatsapp`. El motor genérico le pide al modelo "llama la tool en cuanto el cliente responda" en prosa (ver `generic-quote-agent-tools.ts` → `buildPromptBlock`), a diferencia de los 6 ramos con tool dedicada, donde el modelo reenvía TODOS los datos conocidos como argumentos de una sola tool cada turno (no depende de que "recuerde" seguir llamando una tool incremental).
+**Intento de fix (commit `f1c23ec`):** reforcé el prompt de `registrar_dato_cotizacion` para exigir explícitamente "llama esta tool antes de redactar cualquier pregunta siguiente, incluso para un dato corto". Desplegado y **re-probado en vivo** (Bicicleta, conversación nueva y limpia).
 
-**Ya until ahora arreglé** (y esto SÍ quedó bien, confirmado): que `registrar_dato_cotizacion` perdiera el `quote_request_id` entre turnos (commit `7d920a6`) — ese bug sí estaba 100% en el código, ya no depende de que el modelo recuerde un id. Lo que queda es un problema de **confiabilidad del modelo**, no de plomería.
+**Prueba 2 (Bicicleta, DESPUÉS del fix), quote `39c1ec21-260d-474c-b439-96ba74f20b50`:**
+```
+tomador: { nombre_tomador: "Juan Pérez" }   ⚠️ solo el nombre
+datos_riesgo: {}                             ❌ vacío
+created_at ≈ updated_at (mismo instante)     ⚠️ la fila SOLO se escribió UNA VEZ en toda la conversación
+```
+La conversación real fue: nombre ✅ (única vez que se guardó) → documento (respondido, no guardado) → fecha de nacimiento (respondido, no guardado) → marca de bicicleta (respondido, no guardado) → modelo (preguntado). El bot preguntó cada campo en el orden correcto — pero **sin volver a llamar ninguna tool después de la primera vez**. El refuerzo del prompt no fue suficiente.
 
-**Sugerencias para la próxima sesión** (no las implementé, requieren pruebas iterativas que no me dio tiempo de hacer bien esta noche):
-1. Reforzar el prompt de `registrar_dato_cotizacion` — decirle explícitamente "SIEMPRE llama esta tool con la respuesta del cliente antes de escribir tu próximo mensaje, incluso si la pregunta es simple como el nombre o la edad".
-2. Considerar rediseñar el motor genérico para que funcione como los 6 ramos dedicados: una sola tool que reciba TODOS los campos conocidos de la conversación como argumentos cada turno (en vez de "arrancar" + "registrar incrementalmente") — más robusto porque no depende de que el modelo decida llamar la tool en cada mensaje, a costa de un schema de function-calling menos flexible (mismo trade-off que ya documenté para los 6 ramos fijos).
-3. Probar con más turnos/ramos para ver si el patrón se repite siempre después del primer campo con botones, o es aleatorio.
-4. Sí tengo logs de servidor en Coolify (no accesibles desde aquí) — revisarlos mostraría si la tool realmente no se llamó, o se llamó y falló silenciosamente.
+### Diagnóstico real (ya no es hipótesis)
+
+El modelo llama la tool **una sola vez**, recibe la lista completa y ordenada de `faltan_datos`, y a partir de ahí **conversa de memoria** repitiendo esa lista pregunta por pregunta — sin sentir la necesidad de volver a invocar ninguna tool para persistir cada respuesta. Ningún texto de prompt adicional lo obliga de forma confiable a hacerlo en cada turno; es un problema estructural del diseño de dos tools (`iniciar_cotizacion_seguro` + `registrar_dato_cotizacion` incremental), no de la redacción del prompt.
+
+**Por qué los 6 ramos dedicados (autos, motos, vida, hogar, SOAT, accidentes) SÍ funcionan (confirmado en producción):** cada uno tiene una función con parámetros fijos y nombrados por campo (no un objeto libre `campos`) y su prompt script completo, específico del ramo, instruye literalmente el guion pregunta-por-pregunta con la tool de por medio. El motor genérico usa lenguaje más abstracto/meta ("llama esta tool para lo que sepas") precisamente porque tiene que servir a 20 ramos distintos con un solo esquema — y ese nivel de abstracción parece ser justo lo que el modelo no sigue de forma confiable turno a turno.
+
+### La solución real (no la implementé esta noche — necesita tu visto bueno)
+
+Fusionar `iniciar_cotizacion_seguro` + `registrar_dato_cotizacion` en **una sola tool** que el modelo llame en cada turno con **TODOS los campos que ya conoce de la conversación** (acumulados, no incrementales) — replicando exactamente el patrón que ya funciona en los 6 ramos dedicados, en vez de depender de que el modelo decida "guardar" cada respuesta suelta. Es un cambio de diseño real en `generic-quote-tool.ts`/`generic-quote-agent-tools.ts`, no un ajuste de una línea, y quería que lo vieras antes de tocar la arquitectura mientras dormías. Alternativas más chicas (bajar a Claude/GPT para estas tools en vez de Gemini, forzar tool-calling obligatorio si el proveedor lo soporta) valen la pena explorar primero, son más baratas que el rediseño completo.
+
+**Importante para el estado actual:** esto significa que, aunque la UI de configuración y los botones deterministas SÍ funcionan bien para los 20 ramos nuevos, **la persistencia real de los datos de cotización por WhatsApp no es confiable todavía para ninguno de los 20 ramos genéricos** — solo para los 6 ramos con tool dedicada (que no se tocaron y siguen sólidos).
+
+**Ya arreglado esta noche** (esto sí quedó bien, confirmado, no relacionado con el bug de arriba): que `registrar_dato_cotizacion` perdiera el `quote_request_id` entre turnos de WhatsApp (commit `7d920a6`) — ese era un bug real de plomería, ya resuelto. También confirmé (leyendo `quote-requests-db.ts`) que `upsertPendingQuoteRequest` SOBRESCRIBE `tomador`/`datos_riesgo` completos en cada llamada (no hace merge) — inofensivo mientras el modelo solo lo llame una vez al inicio, pero sería otro riesgo latente si alguna vez se le ocurre re-llamar `iniciar_cotizacion_seguro` a mitad de conversación con datos parciales.
 
 ## Otros hallazgos de esta sesión (ya arreglados y desplegados)
 
