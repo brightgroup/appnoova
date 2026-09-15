@@ -2,7 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   resolveVehicleDataProvider,
   isVehicleProviderApiError,
-  isVehicleLookupTechnicalError,
   type VehicleLookupResult
 } from "@/lib/insurers/vehicle-data-provider";
 import {
@@ -40,8 +39,6 @@ export type MotoQuoteVehicle = VehicleLookupResult;
 export interface MotoQuoteResult {
   ok: boolean;
   reason?: string;
-  /** true = `reason` describe un fallo técnico de backend, nunca explicable al cliente tal cual — ver AutoQuoteResult.technical en auto-quote-tool.ts. */
-  technical?: boolean;
   vehiculo?: MotoQuoteVehicle;
   faltan_datos?: string[];
   pendiente?: boolean;
@@ -74,32 +71,13 @@ export async function calificarSeguroMoto(
     return { ok: true, faltan_datos: ["documento_tomador"] };
   }
 
-  // Ver auto-quote-tool.ts (nota 2026-09-14): si un fallo TÉCNICO corta el
-  // flujo antes de completar los datos, se guarda lo que ya se tiene en vez
-  // de perderlo.
-  const datosParciales = {
-    nombre_tomador: input.nombre_tomador?.trim() || undefined,
-    documento_tomador: input.documento_tomador?.trim() || undefined,
-    fecha_nacimiento_tomador: input.fecha_nacimiento_tomador?.trim() || undefined
-  };
-  const queuePartial = () =>
-    upsertPendingQuoteRequest(ctx.db, {
-      organizationId: ctx.organizationId,
-      conversationId: options.conversationId,
-      contactId: options.contactId,
-      leadId: options.leadId,
-      contactE164: options.contactE164,
-      source: options.source,
-      ramo: "motos",
-      placa,
-      tomador: datosParciales
-    });
-
   if (!provider.usingOwnAccount && contactKey) {
     const recentLookups = await countRecentVehicleLookups(ctx.db, ctx.organizationId, contactKey);
     if (recentLookups >= VEHICLE_LOOKUP_MAX_PER_WINDOW) {
-      const quoteRequest = await queuePartial();
-      return { ok: true, pendiente: true, technical: true, quote_request_id: quoteRequest.id };
+      return {
+        ok: false,
+        reason: "Ya consultamos varios vehículos para este contacto hoy. Un asesor humano puede continuar la cotización manualmente."
+      };
     }
   }
 
@@ -107,12 +85,8 @@ export async function calificarSeguroMoto(
   try {
     vehiculo = await provider.lookup(placa, input.documento_tomador);
   } catch (err) {
-    if (!isVehicleLookupTechnicalError(err)) {
-      const reason = isVehicleProviderApiError(err) ? err.message : "No se pudo consultar la moto por placa.";
-      return { ok: false, reason };
-    }
-    const quoteRequest = await queuePartial();
-    return { ok: true, pendiente: true, technical: true, quote_request_id: quoteRequest.id };
+    const reason = isVehicleProviderApiError(err) ? err.message : "No se pudo consultar la moto por placa.";
+    return { ok: false, reason };
   }
   if (!provider.usingOwnAccount && contactKey) {
     await logVehicleLookup(ctx.db, ctx.organizationId, contactKey, placa);
