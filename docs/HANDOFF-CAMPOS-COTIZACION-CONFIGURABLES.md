@@ -8,7 +8,35 @@ Este documento reemplaza al original de la misma ruta. El plan original (botones
 
 A la mañana siguiente, con la aprobación del usuario, se implementó el fix real (fusionar el motor genérico en una sola tool, igual que los 6 ramos dedicados) y **se verificó en vivo con éxito** — ver sección "✅ Bug crítico — RESUELTO" abajo.
 
-**Repo:** `/Users/johngarcia/appnoova` — todo commiteado y pusheado a `main`. Commits de la sesión nocturna: `e039d9a`, `95f993d`, `5a0ca02`, `7d920a6`, `f1c23ec`, `db7d21c`, `9a5572b`. Commits del fix de la mañana: `e2936ac`, `105dd78`, `36fbae7`.
+**Repo:** `/Users/johngarcia/appnoova` — todo commiteado y pusheado a `main`. Commits de la sesión nocturna: `e039d9a`, `95f993d`, `5a0ca02`, `7d920a6`, `f1c23ec`, `db7d21c`, `9a5572b`. Commits del fix de la mañana: `e2936ac`, `105dd78`, `36fbae7`, `3cb2663`, `4a8f9d0`.
+
+---
+
+## Ronda de verificación adicional (mañana, 2 ramos más + ORI) — resumen
+
+Con el motor genérico ya fusionado, se probaron 2 ramos más nunca antes usados (viajes_turismo por WhatsApp, dental por el link) para reforzar la confianza, y se simuló el flujo de un asesor usando ORI para cotizar un auto. Resultado: **2 bugs reales encontrados y arreglados**, **1 hallazgo de comportamiento del modelo documentado sin arreglar** (no es código, es el modelo improvisando), y **1 bloqueo operativo externo** (no es código).
+
+### ✅ Arreglado: botones/lista duplicados (commit `4a8f9d0`)
+
+Confirmado en vivo (viajes_turismo): la pregunta "¿Qué tipo de asistencia de viaje buscas?" llegó dos veces seguidas con los mismos botones. Causa real: el loop de function-calling permite hasta 3 rondas por turno, y el modelo puede llamar `cotizar_seguro` más de una vez en el mismo turno — cada llamada disparaba su propio envío de botones/lista por WhatsApp, sin ningún control de duplicados. Fix: `sentGuidedQuestions` (`Set<string>` por fieldKey), creado una vez por turno y compartido por referencia entre todas las rondas/llamadas de los 3 motores (Gemini/OpenAI/Claude) — `presentGuidedQuestion` ahora lo consulta antes de mandar un botón o lista. **Reprobado en vivo tras el fix** (ramo exequias, campo "¿Para quién es el seguro?"): salió una sola vez. Esto también resuelve la sospecha "posible duplicado" que había quedado sin confirmar en la sección de anoche.
+
+### ✅ Arreglado: cotizaciones de Mi Link etiquetadas como WhatsApp (commit `3cb2663`)
+
+Bug cosmético preexistente (no introducido en esta sesión): las cotizaciones iniciadas desde `/c/[slug]` (Mi Link) quedaban con `source: "whatsapp"` en vez de `"web"` — el chequeo en los 8 tools de cotización no contemplaba el canal `"web_widget"` que usa esa página. Fix: nuevo helper `resolveQuoteSource()` en `widget-channel.ts`, usado en los 8 puntos en vez de repetir la condición inline.
+
+### 🟡 Documentado, sin arreglar: el modelo a veces improvisa fuera del guion
+
+Dos variantes del mismo problema de fondo (el modelo del motor genérico no siempre sigue el guion campo-por-campo al pie de la letra), encontradas en las pruebas de viajes_turismo y dental:
+
+- **Preguntas combinadas**: el bot preguntó "¿Cuáles son las fechas de inicio y fin de tu viaje?" en una sola pregunta (en vez de las dos preguntas separadas que define la config), y guardó la respuesta bajo una clave inventada ("fechas_viaje") que no coincidía con ninguna de las dos claves reales (`fecha_inicio_viaje`/`fecha_fin_viaje`) — mi normalización de claves (commit `36fbae7`) solo cubre variantes 1-a-1, no una respuesta que debía partirse en dos campos. Tuve que responder los campos por separado para completarla.
+- **Declaración de "completo" prematura (el más serio)**: en el ramo dental, el bot le dijo a la clienta "ya tengo todos tus datos, un asesor te contactará" **sin haber preguntado el segundo campo del ramo** (tipo de cobertura) — guardó una clave irrelevante ("tipo_plan": "individual", sin relación con nada real) y nunca llamó de nuevo la tool para ese campo. Solo se corrigió cuando "el cliente" (yo, en la prueba) lo cuestionó explícitamente — un cliente real probablemente no lo habría notado, dejando una cotización incompleta marcada como lista para el asesor.
+- También se observó, en ambos ramos, al menos una pregunta "bonus" no definida en la config (ej. "¿cuál es tu presupuesto mensual?" en sepelio, "¿cuántas personas incluir?" en exequias) — el modelo la inventa y la guarda con una clave propia; inofensivo (dato extra, no bloquea nada) pero confirma que el modelo no se ciñe estrictamente a `faltan_datos`.
+
+**Por qué no lo arreglé esta madrugada:** ya van dos rondas de "parche de código" esta sesión (fusión de tools + normalización de claves) que resolvieron el bug catastrófico (datos_riesgo vacío) y uno secundario (claves parecidas). Este es un tercer nivel, más sutil — el modelo ignorando su propio resultado de `faltan_datos`/`completo` al redactar el texto final — que probablemente necesite una verificación EXPLÍCITA en código (no confiar en que el texto del modelo refleje el estado real) antes de marcar una cotización como "completa" de cara al cliente, en vez de otro ajuste de prompt o de normalización. Vale la pena diseñarlo con calma en vez de parchar más esta noche.
+
+### ⛔ Bloqueado por infraestructura, no por código: PlacApi sin saldo (HTTP 402)
+
+Al simular el flujo de ORI cotizando un auto (placa real `RIL102`, documento real `1014200417`, ambos dados por el usuario), la consulta a PlacApi falló de forma **consistente y reproducible** con `HTTP 402` (Payment Required) — probado dos veces. La tabla `insurer_connections` está vacía para todas las organizaciones, así que esto pasa por la cuenta **compartida** de Noova, no por una conexión propia de ningún corredor. El manejo de errores del código funcionó exactamente como debía (nunca inventó un vehículo ni un precio, avisó claro al asesor) — el bloqueo es 100% externo: la cuenta de PlacApi necesita recarga/revisión, algo que no puedo resolver yo. Hasta que se resuelva, **ningún ramo con lookup real de placa (autos, motos) puede completar una cotización con datos reales del vehículo** — ni por WhatsApp, ni por ORI, ni por el link.
 
 ---
 
