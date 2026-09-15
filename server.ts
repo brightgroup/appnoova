@@ -29,7 +29,10 @@ function clearStaleDevCache(): void {
 
 const dev = process.env.NODE_ENV !== "production";
 if (dev) clearStaleDevCache();
-const hostname = process.env.HOSTNAME || "0.0.0.0";
+// Nota: no usar process.env.HOSTNAME acá — Docker lo define automáticamente
+// al ID del contenedor, lo que haría bindear solo esa interfaz en vez de
+// todas (rompe healthchecks y cualquier acceso por localhost/127.0.0.1).
+const hostname = "0.0.0.0";
 const port = parseInt(process.env.PORT || "8000", 10);
 
 const app = next({ dev, hostname, port });
