@@ -16,15 +16,11 @@ interface RamoOption {
   slug: string;
 }
 
-/** Ramos con tool de cotización activa hoy en WhatsApp (ver ramo-campos-defaults.ts) — el resto del catálogo (93 ramos) no tiene preguntas de IA que configurar. */
-const RAMOS_IA: { key: RamoCotizable; label: string }[] = [
-  { key: "autos", label: "Autos" },
-  { key: "motos", label: "Motos" },
-  { key: "vida", label: "Vida" },
-  { key: "hogar", label: "Hogar" },
-  { key: "soat", label: "SOAT" },
-  { key: "accidentes_personales", label: "Accidentes Personales" }
-];
+/** Todos los ramos con tool de cotización activa hoy en WhatsApp (dedicada o motor genérico, ver RAMOS_MOTOR_GENERICO) — el resto del catálogo (93 ramos) no tiene preguntas de IA que configurar. */
+const RAMOS_IA: { key: RamoCotizable; label: string }[] = (Object.keys(RAMOS_COTIZABLES) as RamoCotizable[]).map(key => ({
+  key,
+  label: RAMOS_COTIZABLES[key].label
+}));
 
 type TabId = "ofrecidos" | "preguntas";
 const TABS: { id: TabId; label: string; icon: typeof ListChecks }[] = [
@@ -34,7 +30,24 @@ const TABS: { id: TabId; label: string; icon: typeof ListChecks }[] = [
 
 function PreguntasIASection({ ramos }: { ramos: RamoOption[] }) {
   const [ramoKey, setRamoKey] = useState<RamoCotizable>(RAMOS_IA[0].key);
+  const [search, setSearch] = useState("");
+  const [countsByRamoId, setCountsByRamoId] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    (async () => {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/seguros/ramo-campos", { headers });
+      if (!res.ok) return;
+      const campos = ((await res.json()).campos ?? []) as { ramoId: string }[];
+      const counts: Record<string, number> = {};
+      for (const c of campos) counts[c.ramoId] = (counts[c.ramoId] ?? 0) + 1;
+      setCountsByRamoId(counts);
+    })();
+  }, []);
+
+  const filtered = RAMOS_IA.filter(r => r.label.toLowerCase().includes(search.trim().toLowerCase()));
   const ramoCatalogo = ramos.find(r => r.slug === RAMOS_COTIZABLES[ramoKey].catalogoSlug);
+  const activeLabel = RAMOS_IA.find(r => r.key === ramoKey)?.label ?? "";
 
   return (
     <div>
@@ -42,26 +55,58 @@ function PreguntasIASection({ ramos }: { ramos: RamoOption[] }) {
         Qué le pregunta la IA al cliente para cotizar cada ramo por WhatsApp — el texto, las opciones (botones/lista) y si son obligatorias.
       </p>
 
-      <div className="border-b border-white/[.08] flex gap-1 overflow-x-auto mb-5">
-        {RAMOS_IA.map(r => {
-          const isActive = ramoKey === r.key;
-          return (
-            <button
-              key={r.key}
-              onClick={() => setRamoKey(r.key)}
-              className={`px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${isActive ? tabActive : tabIdle}`}
-            >
-              {r.label}
-            </button>
-          );
-        })}
-      </div>
+      <div className="grid md:grid-cols-[220px_1fr] gap-0 rounded-2xl border border-white/[.08] overflow-hidden min-h-[420px]">
+        <div className="border-b md:border-b-0 md:border-r border-white/[.08] p-2.5 md:max-h-[560px] md:overflow-y-auto">
+          <div className="relative mb-2">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Buscar ramo…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full rounded-lg border border-white/[.08] bg-white/[.03] pl-8 pr-2.5 py-1.5 text-xs text-gray-200 placeholder:text-gray-500 focus:outline-none focus:border-[#0f7eff]/40"
+            />
+          </div>
+          {filtered.map(r => {
+            const catalogo = ramos.find(x => x.slug === RAMOS_COTIZABLES[r.key].catalogoSlug);
+            const { icon: Icon, color } = resolveRamoIcon(RAMOS_COTIZABLES[r.key].catalogoSlug);
+            const isActive = ramoKey === r.key;
+            const count = catalogo ? countsByRamoId[catalogo.id] : undefined;
+            return (
+              <button
+                key={r.key}
+                onClick={() => setRamoKey(r.key)}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-left transition-colors ${
+                  isActive ? "bg-[#0f7eff]/[.14] text-white font-medium" : "text-gray-300 hover:bg-white/[.05] hover:text-white"
+                }`}
+              >
+                <span
+                  className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: `${color}22`, color }}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                </span>
+                <span className="truncate flex-1">{r.label}</span>
+                {!!count && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${isActive ? "bg-white/[.15] text-[#3392ff]" : "bg-white/[.06] text-gray-500"}`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          {filtered.length === 0 && <p className="text-xs text-gray-500 text-center py-6">Sin resultados.</p>}
+        </div>
 
-      {!ramoCatalogo ? (
-        <p className="text-sm text-gray-500">Este ramo todavía no existe en el catálogo — recarga la página en un momento.</p>
-      ) : (
-        <PolizaRamoCamposPanel ramoId={ramoCatalogo.id} ramo={ramoKey} />
-      )}
+        <div className="p-5">
+          <h3 className="text-sm font-semibold text-white mb-3">{activeLabel}</h3>
+          {!ramoCatalogo ? (
+            <p className="text-sm text-gray-500">Este ramo todavía no existe en el catálogo — recarga la página en un momento.</p>
+          ) : (
+            <PolizaRamoCamposPanel ramoId={ramoCatalogo.id} ramo={ramoKey} />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

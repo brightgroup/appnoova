@@ -6,33 +6,30 @@ import {
   type QuoteRequestSource,
   type QuoteRequestTomador
 } from "@/lib/insurers/quote-requests-db";
-import { getRamoCampoDefinitions } from "@/lib/insurers/quote-guidance";
-import { RAMOS_COTIZABLES, type RamoCotizable } from "@/lib/insurers/ramos-cotizables";
+import { getRamoCampoDefinitionsParaCotizar } from "@/lib/insurers/quote-guidance";
+import { RAMOS_COTIZABLES, RAMOS_MOTOR_GENERICO, type RamoCotizable } from "@/lib/insurers/ramos-cotizables";
 
 /**
- * Motor de calificación GENÉRICO para ramos sin conector de aseguradora
- * (todo lo que no sea autos, que tiene su propio flujo con placa/Verifik/
- * PlacApi — ver auto-quote-tool.ts). Reemplaza el patrón "un tool hardcodeado
- * por ramo" (life-quote-tool.ts, home-quote-tool.ts) por dos tools que leen
- * qué preguntar desde `poliza_ramo_campos` — el mismo esquema editable que ya
- * usa la ficha del lead (SeguroQuotePanel.tsx), así la IA y el asesor humano
- * nunca piden datos distintos.
+ * Motor de calificación GENÉRICO para ramos sin conector de aseguradora ni
+ * lookup propio (todo lo que no sea autos/motos, que consultan Verifik/
+ * PlacApi por placa — ver auto-quote-tool.ts/moto-quote-tool.ts). Dos tools
+ * que leen qué preguntar desde `poliza_ramo_campos` (con fallback a
+ * ramo-campos-defaults.ts) — el mismo esquema editable que ya usa la ficha
+ * del lead (SeguroQuotePanel.tsx) y la UI de Configuración → Preguntas que
+ * hace la IA, así la IA y el asesor humano nunca piden datos distintos.
  *
- * Piloto: vida, hogar y salud (los tres ramos con esquema documentado y
- * seedeado — ver plan "Cotizador dinámico por ramo"). Agregar un ramo nuevo a
- * este motor es solo: 1) agregarlo a RAMOS_COTIZABLES, 2) seedear sus
- * poliza_ramo_campos — nunca tocar este archivo.
+ * Agregar un ramo nuevo a este motor es solo: 1) agregarlo a
+ * RAMOS_COTIZABLES + RAMOS_MOTOR_GENERICO, 2) sus defaults en
+ * ramo-campos-defaults.ts — nunca tocar este archivo.
  */
-
-const RAMOS_GENERICOS_SOPORTADOS: RamoCotizable[] = ["vida", "hogar", "salud"];
 
 /** Datos personales comunes a casi todos los ramos (ver artefacto "Cotizador Conversacional") — van a `tomador`, no a `datos_riesgo`, porque son insumo compartido entre ramos, no específico de uno. */
 const TOMADOR_KEYS = ["nombre_tomador", "documento_tomador", "fecha_nacimiento_tomador", "ocupacion", "ciudad"] as const;
-const TOMADOR_REQUERIDOS: Array<{ key: (typeof TOMADOR_KEYS)[number]; label: string }> = [
-  { key: "nombre_tomador", label: "Nombre completo del tomador" },
-  { key: "documento_tomador", label: "Número de documento del tomador" },
-  { key: "fecha_nacimiento_tomador", label: "Fecha de nacimiento del tomador (YYYY-MM-DD)" },
-  { key: "ocupacion", label: "Ocupación del tomador" }
+const TOMADOR_REQUERIDOS: Array<{ key: (typeof TOMADOR_KEYS)[number]; label: string; pregunta: string }> = [
+  { key: "nombre_tomador", label: "Nombre completo del tomador", pregunta: "¿Cuál es el nombre completo de quien toma la póliza?" },
+  { key: "documento_tomador", label: "Número de documento del tomador", pregunta: "¿Cuál es el número de documento de identidad del tomador?" },
+  { key: "fecha_nacimiento_tomador", label: "Fecha de nacimiento del tomador", pregunta: "¿Cuál es la fecha de nacimiento del tomador? (YYYY-MM-DD)" },
+  { key: "ocupacion", label: "Ocupación del tomador", pregunta: "¿Cuál es la ocupación del tomador?" }
 ];
 
 function splitCampos(campos: Record<string, string>): { tomador: Partial<QuoteRequestTomador>; datosRiesgo: Record<string, unknown> } {
@@ -53,6 +50,11 @@ export interface PendingFieldInfo {
   label: string;
   tipo: string;
   opciones?: string[];
+  /** Lo que la IA debe decirle al cliente para pedir el dato — si falta (campos de tomador fijos), se usa `label`. */
+  pregunta?: string;
+  ayuda?: string;
+  presentacion?: "auto" | "botones" | "lista" | "texto";
+  requeridoCotizacion?: boolean;
 }
 
 export interface GenericQuoteResult {
@@ -75,14 +77,26 @@ async function buildResult(
   const faltantes: PendingFieldInfo[] = TOMADOR_REQUERIDOS.filter(f => !tomador[f.key]?.toString().trim()).map(f => ({
     key: f.key,
     label: f.label,
-    tipo: "text"
+    tipo: "text",
+    pregunta: f.pregunta,
+    requeridoCotizacion: true
   }));
 
-  const camposRamo = await getRamoCampoDefinitions(db, organizationId, ramo);
+  const camposRamo = await getRamoCampoDefinitionsParaCotizar(db, organizationId, ramo);
   for (const campo of camposRamo) {
     const value = datosRiesgo[campo.fieldKey];
-    if (value == null || value === "") {
-      faltantes.push({ key: campo.fieldKey, label: campo.label, tipo: campo.fieldType, opciones: campo.options.length ? campo.options : undefined });
+    const requerido = campo.requeridoCotizacion !== false;
+    if ((value == null || value === "") && requerido) {
+      faltantes.push({
+        key: campo.fieldKey,
+        label: campo.label,
+        tipo: campo.fieldType,
+        opciones: campo.options.length ? campo.options : undefined,
+        pregunta: campo.pregunta,
+        ayuda: campo.ayuda,
+        presentacion: campo.presentacion,
+        requeridoCotizacion: true
+      });
     }
   }
 
@@ -111,10 +125,10 @@ export async function iniciarCotizacionSeguro(
   opts: IniciarCotizacionOptions
 ): Promise<GenericQuoteResult> {
   const ramo = input.ramo?.trim().toLowerCase();
-  if (!RAMOS_GENERICOS_SOPORTADOS.includes(ramo as RamoCotizable)) {
+  if (!RAMOS_MOTOR_GENERICO.includes(ramo as RamoCotizable)) {
     return {
       ok: false,
-      reason: `Ramo "${input.ramo}" no soportado todavía por este cotizador. Ramos disponibles: ${RAMOS_GENERICOS_SOPORTADOS.map(r => RAMOS_COTIZABLES[r].label).join(", ")} (autos usa su propia herramienta, cotizar_seguro_auto).`
+      reason: `Ramo "${input.ramo}" no soportado todavía por este cotizador. Ramos disponibles: ${RAMOS_MOTOR_GENERICO.map(r => RAMOS_COTIZABLES[r].label).join(", ")} (autos usa su propia herramienta, cotizar_seguro_auto).`
     };
   }
 

@@ -9,7 +9,7 @@ import {
   type PolizaCampoPresentacion
 } from "@/lib/insurers/poliza-ramo-campos-db";
 
-const VALID_TYPES: PolizaCampoFieldType[] = ["text", "number", "date", "select", "boolean"];
+const VALID_TYPES: PolizaCampoFieldType[] = ["text", "number", "date", "select", "boolean", "multiselect"];
 const VALID_PRESENTACIONES: PolizaCampoPresentacion[] = ["auto", "botones", "lista", "texto"];
 
 /** GET ?ramo_id= (campos de un solo ramo) o sin parámetro (todos los campos de la org, para armar columnas dinámicas). */

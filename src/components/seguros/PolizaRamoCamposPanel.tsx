@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Plus, Trash2, Sparkles, MessageSquareText, Rows3, Type as TypeIcon } from "lucide-react";
+import { Loader2, Plus, Trash2, Sparkles, MessageSquareText, Rows3, Type as TypeIcon, ChevronRight } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { btnGhost, btnPrimary, accentFocus, accentText, accentBorderMedium, accentBgSubtle, registryTableEmpty } from "@/lib/brand-ui";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
@@ -13,9 +13,12 @@ const FIELD_TYPES: { value: PolizaCampoFieldType; label: string }[] = [
   { value: "text", label: "Texto" },
   { value: "number", label: "Número" },
   { value: "date", label: "Fecha" },
-  { value: "select", label: "Lista" },
+  { value: "select", label: "Lista (una opción)" },
+  { value: "multiselect", label: "Lista (varias opciones)" },
   { value: "boolean", label: "Sí/No" }
 ];
+
+const FIELD_TYPES_WITH_OPTIONS: PolizaCampoFieldType[] = ["select", "multiselect"];
 
 const PRESENTACIONES: { value: PolizaCampoPresentacion; label: string }[] = [
   { value: "auto", label: "Automática" },
@@ -25,7 +28,8 @@ const PRESENTACIONES: { value: PolizaCampoPresentacion; label: string }[] = [
 ];
 
 /** Misma regla que guided-questions.ts (resolvePresentacion) — para que la vista previa nunca diga algo distinto de lo que de verdad va a mandar la IA por WhatsApp. */
-function presentacionEfectiva(campo: Pick<PolizaRamoCampoRecord, "presentacion" | "options">): Exclude<PolizaCampoPresentacion, "auto"> {
+function presentacionEfectiva(campo: Pick<PolizaRamoCampoRecord, "presentacion" | "options" | "fieldType">): Exclude<PolizaCampoPresentacion, "auto"> {
+  if (campo.fieldType === "multiselect") return "texto";
   if (campo.presentacion !== "auto") return campo.presentacion;
   const n = campo.options.length;
   if (n >= 2 && n <= 3) return "botones";
@@ -38,7 +42,8 @@ function PresentacionPreview({ campo }: { campo: PolizaRamoCampoRecord }) {
   if (efectiva === "texto") {
     return (
       <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
-        <TypeIcon className="w-3 h-3" /> Pregunta abierta en texto
+        <TypeIcon className="w-3 h-3" />
+        {campo.fieldType === "multiselect" ? "Texto — el cliente elige varias, dichas en la pregunta" : "Pregunta abierta en texto"}
       </span>
     );
   }
@@ -72,86 +77,123 @@ function PresentacionPreview({ campo }: { campo: PolizaRamoCampoRecord }) {
   );
 }
 
+function PresentacionPill({ campo }: { campo: Pick<PolizaRamoCampoRecord, "presentacion" | "options" | "fieldType"> }) {
+  const efectiva = presentacionEfectiva(campo);
+  if (efectiva === "texto") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10.5px] px-2 py-0.5 rounded-full border border-white/[.10] text-gray-400 bg-white/[.03] shrink-0">
+        <TypeIcon className="w-3 h-3" /> Texto
+      </span>
+    );
+  }
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10.5px] px-2 py-0.5 rounded-full border ${accentBorderMedium} ${accentText} ${accentBgSubtle} shrink-0`}>
+      {efectiva === "botones" ? <MessageSquareText className="w-3 h-3" /> : <Rows3 className="w-3 h-3" />}
+      {efectiva === "botones" ? "Botones" : "Lista"}
+    </span>
+  );
+}
+
 interface CampoRowProps {
   campo: PolizaRamoCampoRecord;
+  defaultOpen: boolean;
   onPatch: (id: string, patch: Record<string, unknown>) => void;
   onRemove: (id: string) => void;
   saving: boolean;
 }
 
-function CampoRow({ campo, onPatch, onRemove, saving }: CampoRowProps) {
+/** Fila compacta y expandible — con pocos ramos cabía mostrar todo abierto, pero deja de ser cómodo apenas un ramo tiene más de 4-5 campos. */
+function CampoRow({ campo, defaultOpen, onPatch, onRemove, saving }: CampoRowProps) {
   const [pregunta, setPregunta] = useState(campo.pregunta ?? "");
   const [ayuda, setAyuda] = useState(campo.ayuda ?? "");
   const [optionsText, setOptionsText] = useState(campo.options.join(", "));
 
   return (
-    <li className="px-4 py-4 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
+    <details className="group" open={defaultOpen}>
+      <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-white/[.02]">
+        <ChevronRight className="w-3.5 h-3.5 text-gray-500 shrink-0 transition-transform group-open:rotate-90" />
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-white truncate">{campo.label}</p>
-          <p className="text-[11px] text-gray-500 font-mono">{campo.fieldKey} · {campo.fieldType}</p>
+          <p className="text-xs text-gray-500 truncate">{campo.pregunta ?? campo.label}</p>
         </div>
-        <button type="button" onClick={() => onRemove(campo.id)} disabled={saving} className={btnGhost}>
+        <PresentacionPill campo={campo} />
+        <span className="text-[10.5px] px-2 py-0.5 rounded-full border border-white/[.10] text-gray-400 bg-white/[.03] shrink-0">
+          {campo.requeridoCotizacion ? "Obligatorio" : "Opcional"}
+        </span>
+        <button
+          type="button"
+          onClick={e => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRemove(campo.id);
+          }}
+          disabled={saving}
+          className={btnGhost}
+        >
           <Trash2 className="w-4 h-4" />
         </button>
-      </div>
+      </summary>
 
-      <div>
-        <label className="text-[11px] text-gray-500 mb-1 block">Pregunta que hace la IA</label>
-        <input
-          value={pregunta}
-          onChange={e => setPregunta(e.target.value)}
-          onBlur={() => pregunta !== (campo.pregunta ?? "") && onPatch(campo.id, { pregunta: pregunta.trim() || null })}
-          placeholder={campo.label}
-          className={`w-full rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-sm ${accentFocus}`}
-        />
-      </div>
+      <div className="px-4 pb-4 pt-1 space-y-3 border-t border-white/[.06]">
+        <p className="text-[11px] text-gray-500 font-mono pt-3">{campo.fieldKey} · {campo.fieldType}</p>
 
-      {campo.fieldType === "select" && (
         <div>
-          <label className="text-[11px] text-gray-500 mb-1 block">Opciones (separadas por coma)</label>
+          <label className="text-[11px] text-gray-500 mb-1 block">Pregunta que hace la IA</label>
           <input
-            value={optionsText}
-            onChange={e => setOptionsText(e.target.value)}
-            onBlur={() => {
-              const next = optionsText.split(",").map(s => s.trim()).filter(Boolean);
-              if (next.join(",") !== campo.options.join(",")) onPatch(campo.id, { options: next });
-            }}
+            value={pregunta}
+            onChange={e => setPregunta(e.target.value)}
+            onBlur={() => pregunta !== (campo.pregunta ?? "") && onPatch(campo.id, { pregunta: pregunta.trim() || null })}
+            placeholder={campo.label}
             className={`w-full rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-sm ${accentFocus}`}
           />
         </div>
-      )}
 
-      <div>
-        <label className="text-[11px] text-gray-500 mb-1 block">Ayuda si el cliente pregunta qué significa (opcional)</label>
-        <input
-          value={ayuda}
-          onChange={e => setAyuda(e.target.value)}
-          onBlur={() => ayuda !== (campo.ayuda ?? "") && onPatch(campo.id, { ayuda: ayuda.trim() || null })}
-          className={`w-full rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-sm ${accentFocus}`}
-        />
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-gray-500">Presentación</span>
-          <div className="w-36">
-            <NoovaSelect
-              value={campo.presentacion}
-              onChange={v => onPatch(campo.id, { presentacion: v })}
-              allowEmpty={false}
-              options={PRESENTACIONES}
+        {FIELD_TYPES_WITH_OPTIONS.includes(campo.fieldType) && (
+          <div>
+            <label className="text-[11px] text-gray-500 mb-1 block">Opciones (separadas por coma)</label>
+            <input
+              value={optionsText}
+              onChange={e => setOptionsText(e.target.value)}
+              onBlur={() => {
+                const next = optionsText.split(",").map(s => s.trim()).filter(Boolean);
+                if (next.join(",") !== campo.options.join(",")) onPatch(campo.id, { options: next });
+              }}
+              className={`w-full rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-sm ${accentFocus}`}
             />
           </div>
-        </div>
-        <label className="flex items-center gap-2 text-[11px] text-gray-400">
-          <Switch checked={campo.requeridoCotizacion} onChange={v => onPatch(campo.id, { requerido_cotizacion: v })} />
-          Obligatorio para cotizar
-        </label>
-      </div>
+        )}
 
-      <PresentacionPreview campo={campo} />
-    </li>
+        <div>
+          <label className="text-[11px] text-gray-500 mb-1 block">Ayuda si el cliente pregunta qué significa (opcional)</label>
+          <input
+            value={ayuda}
+            onChange={e => setAyuda(e.target.value)}
+            onBlur={() => ayuda !== (campo.ayuda ?? "") && onPatch(campo.id, { ayuda: ayuda.trim() || null })}
+            className={`w-full rounded-lg border border-white/[.10] bg-white/[.04] px-3 py-1.5 text-sm ${accentFocus}`}
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-gray-500">Presentación</span>
+            <div className="w-36">
+              <NoovaSelect
+                value={campo.presentacion}
+                onChange={v => onPatch(campo.id, { presentacion: v })}
+                allowEmpty={false}
+                options={PRESENTACIONES}
+              />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-[11px] text-gray-400">
+            <Switch checked={campo.requeridoCotizacion} onChange={v => onPatch(campo.id, { requerido_cotizacion: v })} />
+            Obligatorio para cotizar
+          </label>
+        </div>
+
+        <PresentacionPreview campo={campo} />
+      </div>
+    </details>
   );
 }
 
@@ -191,7 +233,7 @@ export function PolizaRamoCamposPanel({ ramoId, ramo }: PolizaRamoCamposPanelPro
         ramo_id: ramoId,
         label: label.trim(),
         field_type: fieldType,
-        options: fieldType === "select" ? options.split(",").map(s => s.trim()).filter(Boolean) : []
+        options: FIELD_TYPES_WITH_OPTIONS.includes(fieldType) ? options.split(",").map(s => s.trim()).filter(Boolean) : []
       })
     });
     if (res.ok) {
@@ -267,11 +309,16 @@ export function PolizaRamoCamposPanel({ ramoId, ramo }: PolizaRamoCamposPanelPro
           )}
         </div>
       ) : (
-        <ul className="divide-y divide-white/[.06] rounded-xl border border-white/[.08]">
-          {campos.map(c => (
-            <CampoRow key={c.id} campo={c} onPatch={patchCampo} onRemove={removeCampo} saving={saving} />
-          ))}
-        </ul>
+        <div>
+          <p className="text-xs text-gray-500 mb-2">
+            {campos.length} {campos.length === 1 ? "campo" : "campos"} · {campos.filter(c => c.requeridoCotizacion).length} obligatorios para cotizar
+          </p>
+          <div className="divide-y divide-white/[.06] rounded-xl border border-white/[.08] overflow-hidden">
+            {campos.map(c => (
+              <CampoRow key={c.id} campo={c} defaultOpen={false} onPatch={patchCampo} onRemove={removeCampo} saving={saving} />
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="rounded-xl border border-white/[.08] bg-white/[.02] p-4 space-y-3">
@@ -295,7 +342,7 @@ export function PolizaRamoCamposPanel({ ramoId, ramo }: PolizaRamoCamposPanelPro
               options={FIELD_TYPES.map(t => ({ value: t.value, label: t.label }))}
             />
           </div>
-          {fieldType === "select" && (
+          {FIELD_TYPES_WITH_OPTIONS.includes(fieldType) && (
             <div>
               <label className="text-xs text-gray-400 mb-1 block">Opciones (separadas por coma)</label>
               <input

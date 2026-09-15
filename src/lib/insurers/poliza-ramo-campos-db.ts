@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type PolizaCampoFieldType = "text" | "number" | "date" | "select" | "boolean";
+/** multiselect = "elige todas las que apliquen" — siempre se presenta en texto (guided-questions.ts), WhatsApp no tiene botones/lista de selección múltiple. */
+export type PolizaCampoFieldType = "text" | "number" | "date" | "select" | "boolean" | "multiselect";
 export type PolizaCampoPresentacion = "auto" | "botones" | "lista" | "texto";
 
 export interface PolizaRamoCampoRecord {
@@ -62,6 +63,8 @@ function toRecord(row: PolizaRamoCampoRow): PolizaRamoCampoRecord {
     updatedAt: row.updated_at
   };
 }
+
+const FIELD_TYPES_WITH_OPTIONS: PolizaCampoFieldType[] = ["select", "multiselect"];
 
 function slugifyFieldKey(label: string): string {
   return label
@@ -128,7 +131,7 @@ export async function createCampo(db: SupabaseClient, organizationId: string, in
       field_key: input.fieldKey ?? slugifyFieldKey(input.label),
       label: input.label,
       field_type: input.fieldType,
-      options: input.fieldType === "select" ? input.options ?? [] : [],
+      options: FIELD_TYPES_WITH_OPTIONS.includes(input.fieldType) ? input.options ?? [] : [],
       sort_order: input.sortOrder ?? count ?? 0,
       pregunta: input.pregunta ?? null,
       ayuda: input.ayuda ?? null,
@@ -155,7 +158,7 @@ export async function createCamposBulk(db: SupabaseClient, organizationId: strin
         field_key: input.fieldKey ?? slugifyFieldKey(input.label),
         label: input.label,
         field_type: input.fieldType,
-        options: input.fieldType === "select" ? input.options ?? [] : [],
+        options: FIELD_TYPES_WITH_OPTIONS.includes(input.fieldType) ? input.options ?? [] : [],
         sort_order: input.sortOrder ?? 0,
         pregunta: input.pregunta ?? null,
         ayuda: input.ayuda ?? null,

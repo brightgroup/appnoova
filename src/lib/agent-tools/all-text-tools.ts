@@ -9,6 +9,7 @@ import { calificarSoatAgentTool } from "@/lib/agent-tools/soat-quote-agent-tool"
 import { calificarAccidentesAgentTool } from "@/lib/agent-tools/accident-quote-agent-tool";
 import { presentarOpcionesWhatsAppTool } from "@/lib/agent-tools/whatsapp-options-tool";
 import { radicarSiniestroAgentTool } from "@/lib/agent-tools/siniestro-agent-tool";
+import { iniciarCotizacionSeguroAgentTool, registrarDatoCotizacionAgentTool } from "@/lib/agent-tools/generic-quote-agent-tools";
 
 /** Todas las tools disponibles para agentes de texto (Gemini `generateContent`). */
 export const ALL_TEXT_AGENT_TOOLS: AgentToolDefinition[] = [
@@ -20,6 +21,11 @@ export const ALL_TEXT_AGENT_TOOLS: AgentToolDefinition[] = [
   calificarSeguroMotoAgentTool,
   calificarSoatAgentTool,
   calificarAccidentesAgentTool,
+  // Motor genérico (ver RAMOS_MOTOR_GENERICO en ramos-cotizables.ts) — todos
+  // los ramos sin lookup propio ni tool dedicada (mascotas, viaje, salud,
+  // ARL, pyme, etc.), extraídos de Figuro.
+  iniciarCotizacionSeguroAgentTool,
+  registrarDatoCotizacionAgentTool,
   presentarOpcionesWhatsAppTool,
   radicarSiniestroAgentTool
 ];

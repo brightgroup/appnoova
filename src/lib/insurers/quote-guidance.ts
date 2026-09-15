@@ -14,30 +14,8 @@ export interface QuoteRamoCampo extends RamoCampoDef {
   value: unknown;
 }
 
-/**
- * Definiciones de campo de un ramo cotizable — usado tanto para mostrar/editar
- * en el panel de configuración como para que los tools de cotización sepan qué
- * preguntar. Si la organización no ha guardado nada para este ramo, devuelve
- * los valores por defecto (`ramo-campos-defaults.ts`) tal cual — la IA nunca
- * se queda sin qué preguntar solo porque nadie abrió la configuración todavía.
- */
-export async function getRamoCampoDefinitions(db: SupabaseClient, organizationId: string, ramo: string): Promise<RamoCampoDef[]> {
-  const ramoCotizable = (Object.keys(RAMOS_COTIZABLES) as RamoCotizable[]).includes(ramo as RamoCotizable)
-    ? (ramo as RamoCotizable)
-    : null;
-  if (!ramoCotizable) return [];
-
-  const { data: catalogo } = await db
-    .from("ramos_catalogo")
-    .select("id")
-    .eq("slug", RAMOS_COTIZABLES[ramoCotizable].catalogoSlug)
-    .maybeSingle();
-  if (!catalogo) return DEFAULT_CAMPOS_POR_RAMO[ramoCotizable] ?? [];
-
-  const campos = await listCamposPorRamo(db, organizationId, catalogo.id as string);
-  if (campos.length === 0) return DEFAULT_CAMPOS_POR_RAMO[ramoCotizable] ?? [];
-
-  return campos.map(c => ({
+function toRamoCampoDef(c: Awaited<ReturnType<typeof listCamposPorRamo>>[number]): RamoCampoDef {
+  return {
     fieldKey: c.fieldKey,
     label: c.label,
     pregunta: c.pregunta ?? c.label,
@@ -48,7 +26,55 @@ export async function getRamoCampoDefinitions(db: SupabaseClient, organizationId
     presentacion: c.presentacion,
     aplicaCotizacion: c.aplicaCotizacion,
     requeridoCotizacion: c.requeridoCotizacion
-  }));
+  };
+}
+
+/**
+ * Definiciones de campo de un ramo cotizable — usado tanto para mostrar/editar
+ * en el panel de configuración como para que los tools de cotización sepan qué
+ * preguntar. Combina por `field_key` los defaults de código
+ * (`ramo-campos-defaults.ts`) con lo que la organización haya guardado en
+ * `poliza_ramo_campos`: un default con fila propia queda SOBREESCRITO por esa
+ * fila (edición); un default sin fila propia se mantiene tal cual (nunca
+ * desaparece solo porque el corredor agregó OTRO campo); y una fila que no
+ * coincide con ningún default es un campo nuevo, se agrega al final.
+ *
+ * Antes esto era todo-o-nada: en cuanto la organización guardaba una sola
+ * fila, todos los defaults dejaban de aparecer (autos, por ejemplo, se
+ * quedaba pidiendo "nuevo o usado" sin texto/opciones porque el campo ya no
+ * estaba en la lista) — aunque el motor de cotización seguía exigiéndolos
+ * igual, por eso `nuevo_o_usado`/etc. siguen siendo obligatorios en código
+ * (auto-quote-tool.ts) sin importar qué haya en esta tabla.
+ */
+export async function getRamoCampoDefinitions(db: SupabaseClient, organizationId: string, ramo: string): Promise<RamoCampoDef[]> {
+  const ramoCotizable = (Object.keys(RAMOS_COTIZABLES) as RamoCotizable[]).includes(ramo as RamoCotizable)
+    ? (ramo as RamoCotizable)
+    : null;
+  if (!ramoCotizable) return [];
+
+  const defaults = DEFAULT_CAMPOS_POR_RAMO[ramoCotizable] ?? [];
+
+  const { data: catalogo } = await db
+    .from("ramos_catalogo")
+    .select("id")
+    .eq("slug", RAMOS_COTIZABLES[ramoCotizable].catalogoSlug)
+    .maybeSingle();
+  if (!catalogo) return defaults;
+
+  const filas = await listCamposPorRamo(db, organizationId, catalogo.id as string);
+  if (filas.length === 0) return defaults;
+
+  const filasPorKey = new Map(filas.map(f => [f.fieldKey, f]));
+  const combinados: RamoCampoDef[] = defaults.map(d => {
+    const propia = filasPorKey.get(d.fieldKey);
+    if (!propia) return d;
+    filasPorKey.delete(d.fieldKey);
+    return toRamoCampoDef(propia);
+  });
+  // Lo que queda en filasPorKey son campos nuevos del corredor, sin default en código.
+  for (const extra of filasPorKey.values()) combinados.push(toRamoCampoDef(extra));
+
+  return combinados.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 /** Solo los campos que la IA debe preguntar durante la cotización (`aplicaCotizacion`) — filtra los campos informativos que un corredor haya agregado para otros fines (metadata de póliza, no de calificación). */

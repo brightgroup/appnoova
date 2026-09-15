@@ -5,7 +5,7 @@ import { deleteCampo, updateCampo, type PolizaCampoFieldType, type PolizaCampoPr
 
 type Ctx = { params: Promise<{ id: string }> };
 
-const VALID_TYPES: PolizaCampoFieldType[] = ["text", "number", "date", "select", "boolean"];
+const VALID_TYPES: PolizaCampoFieldType[] = ["text", "number", "date", "select", "boolean", "multiselect"];
 const VALID_PRESENTACIONES: PolizaCampoPresentacion[] = ["auto", "botones", "lista", "texto"];
 
 export async function PATCH(req: NextRequest, routeCtx: Ctx) {

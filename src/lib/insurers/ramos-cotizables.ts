@@ -19,8 +19,55 @@ export const RAMOS_COTIZABLES = {
   hogar: { catalogoSlug: "hogar", label: "Hogar" },
   salud: { catalogoSlug: "salud", label: "Salud" },
   soat: { catalogoSlug: "soat", label: "SOAT" },
-  accidentes_personales: { catalogoSlug: "accidentes-personales", label: "Accidentes Personales" }
+  accidentes_personales: { catalogoSlug: "accidentes-personales", label: "Accidentes Personales" },
+  // A partir de acá: ramos sin tool dedicada — corren sobre el motor genérico
+  // (generic-quote-tool.ts/generic-quote-agent-tools.ts), extraídos 1:1 de los
+  // formularios reales de Figuro (competidor) porque son corredores y ya
+  // tienen resuelto qué preguntar por ramo. Ver ramo-campos-defaults.ts.
+  mascotas: { catalogoSlug: "mascotas", label: "Mascotas" },
+  viajes_turismo: { catalogoSlug: "viajes-turismo", label: "Viajes/Turismo" },
+  bicicleta: { catalogoSlug: "bicicleta", label: "Bicicleta" },
+  educativo: { catalogoSlug: "educativo", label: "Educativo" },
+  exequias: { catalogoSlug: "exequias", label: "Exequias" },
+  sepelio: { catalogoSlug: "sepelio", label: "Sepelio" },
+  dental: { catalogoSlug: "dental", label: "Plan Dental" },
+  arl: { catalogoSlug: "arl", label: "ARL" },
+  arrendamiento: { catalogoSlug: "arrendamiento", label: "Arrendamiento" },
+  asistencia_medica: { catalogoSlug: "asistencia-medica", label: "Asistencia Médica (Empresas)" },
+  colectivo: { catalogoSlug: "colectivo", label: "Colectivas y Beneficios Corporativos" },
+  medicos: { catalogoSlug: "medicos", label: "Complicaciones Quirúrgicas" },
+  copropiedades: { catalogoSlug: "copropiedades", label: "Copropiedades" },
+  cumplimiento: { catalogoSlug: "cumplimiento", label: "Cumplimiento" },
+  pyme: { catalogoSlug: "pyme", label: "Pymes" },
+  renta_pensional: { catalogoSlug: "renta-pensional", label: "Pensiones Voluntarias" },
+  ciberriesgos: { catalogoSlug: "ciberriesgos", label: "Ciberriesgos (Empresas)" },
+  rc_profesionales_medicos: { catalogoSlug: "rc-profesionales-medicos", label: "RC Médicos & Profesionales" },
+  transporte: { catalogoSlug: "transporte", label: "Transporte de Mercancías" }
 } as const;
+
+/** Ramos que corren sobre el motor genérico (iniciar_cotizacion_seguro/registrar_dato_cotizacion) en vez de una tool dedicada — todo lo que no necesita una integración propia (placa/Verifik como autos y motos). */
+export const RAMOS_MOTOR_GENERICO: RamoCotizable[] = [
+  "salud",
+  "mascotas",
+  "viajes_turismo",
+  "bicicleta",
+  "educativo",
+  "exequias",
+  "sepelio",
+  "dental",
+  "arl",
+  "arrendamiento",
+  "asistencia_medica",
+  "colectivo",
+  "medicos",
+  "copropiedades",
+  "cumplimiento",
+  "pyme",
+  "renta_pensional",
+  "ciberriesgos",
+  "rc_profesionales_medicos",
+  "transporte"
+];
 
 export type RamoCotizable = keyof typeof RAMOS_COTIZABLES;
 

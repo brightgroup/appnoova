@@ -21,6 +21,10 @@ export interface GuidedQuestionResult {
 }
 
 function resolvePresentacion(campo: RamoCampoDef): "botones" | "lista" | "texto" {
+  // WhatsApp no tiene botones/lista de selección múltiple — "elige todas las
+  // que apliquen" siempre va en texto, con las opciones dichas en la pregunta
+  // misma (ver buildCamposPromptBlock).
+  if (campo.fieldType === "multiselect") return "texto";
   if (campo.presentacion !== "auto") return campo.presentacion;
   const n = campo.options.length;
   if (n >= 2 && n <= 3) return "botones";
@@ -35,8 +39,12 @@ function resolvePresentacion(campo: RamoCampoDef): "botones" | "lista" | "texto"
  * antes de devolver el resultado de la tool de cotización correspondiente.
  */
 export async function presentGuidedQuestion(ctx: AgentToolContext, campo: RamoCampoDef): Promise<GuidedQuestionResult> {
-  const siguiente_pregunta = campo.pregunta || campo.label;
   const presentacion = resolvePresentacion(campo);
+  const base = campo.pregunta || campo.label;
+  // multiselect siempre es texto (ver resolvePresentacion) — sin botones/lista,
+  // el cliente necesita ver las opciones en la propia pregunta.
+  const siguiente_pregunta =
+    campo.fieldType === "multiselect" && campo.options.length > 0 ? `${base} (elige todas las que apliquen: ${campo.options.join(", ")})` : base;
 
   if (presentacion === "texto" || !ctx.outboundWhatsAppChannel || !ctx.contactE164) {
     return { pregunta_enviada: false, siguiente_pregunta };
@@ -87,7 +95,13 @@ export function buildCamposPromptBlock(campos: RamoCampoDef[]): string {
   const requeridos = campos.filter(c => c.requeridoCotizacion !== false);
   const opcionales = campos.filter(c => c.requeridoCotizacion === false);
 
-  const describe = (c: RamoCampoDef) => (c.ayuda ? `${c.pregunta} (si el cliente pregunta qué significa: ${c.ayuda})` : c.pregunta);
+  const describe = (c: RamoCampoDef) => {
+    // multiselect nunca sale en botones/lista (WhatsApp no soporta selección
+    // múltiple) — hay que decir las opciones en la propia pregunta para que el
+    // cliente sepa qué puede elegir.
+    const base = c.fieldType === "multiselect" && c.options.length > 0 ? `${c.pregunta} (elige todas las que apliquen: ${c.options.join(", ")})` : c.pregunta;
+    return c.ayuda ? `${base} (si el cliente pregunta qué significa: ${c.ayuda})` : base;
+  };
 
   const opcionalTxt = opcionales.length
     ? ` Al final, de forma opcional (esta parte sí se puede omitir si el cliente ya quiere cerrar): ${opcionales.map(describe).join("; ")}.`
