@@ -136,3 +136,18 @@ export async function resolveVehicleDataProvider(
 export function isVehicleProviderApiError(err: unknown): err is VerifikApiError | PlacApiError {
   return err instanceof VerifikApiError || err instanceof PlacApiError;
 }
+
+/**
+ * Distingue un fallo TÉCNICO (Verifik/PlacApi caídos, credenciales
+ * inválidas, timeout, falta la API key) de uno de NEGOCIO (PlacApi no
+ * encontró el vehículo con esa placa/documento — status 2xx, solo que sin
+ * `data`). Solo el segundo es corregible por el cliente (ej. revisar la
+ * placa); el primero nunca debe explicársele tal cual — ver nota 2026-09-14
+ * en auto-quote-tool.ts sobre no exponer errores de conexión/backend al
+ * cliente final (que un asesor humano confirme el precio detrás de escenas
+ * es indistinguible, para el cliente, de que lo haga la IA).
+ */
+export function isVehicleLookupTechnicalError(err: unknown): boolean {
+  if (!isVehicleProviderApiError(err)) return true;
+  return err.status < 200 || err.status >= 300;
+}

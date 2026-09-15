@@ -3,6 +3,7 @@ import { getInsurerCredentials } from "@/lib/insurers/insurer-connections-db";
 import {
   resolveVehicleDataProvider,
   isVehicleProviderApiError,
+  isVehicleLookupTechnicalError,
   type VehicleLookupResult
 } from "@/lib/insurers/vehicle-data-provider";
 import {
@@ -65,6 +66,18 @@ export type AutoQuoteVehicle = VehicleLookupResult;
 export interface AutoQuoteResult {
   ok: boolean;
   reason?: string;
+  /**
+   * true cuando `reason` describe un fallo de BACKEND (proveedor de datos del
+   * vehículo caído, aseguradora no conectada/mal configurada, error de su
+   * API) — nunca corregible por el cliente. El agente de texto tiene
+   * instrucción explícita de NUNCA explicarle este tipo de motivo al
+   * cliente final (ver agent-prompt-generator.ts): para él es indistinguible
+   * que cotice la IA o un asesor humano por detrás, así que basta con decir
+   * que ya tiene sus datos y que un asesor le confirma el precio en breve.
+   * Ausente o `false` = el motivo SÍ es accionable por el cliente (ej. no
+   * encontró el vehículo con esa placa, faltan datos) y sí debe explicarse.
+   */
+  technical?: boolean;
   vehiculo?: AutoQuoteVehicle;
   /** Nombres de campos de `AutoQuoteInput` que todavía hacen falta para poder cotizar. */
   faltan_datos?: string[];
@@ -112,11 +125,15 @@ export async function ejecutarCotizacionReal(
   tomador: Required<Pick<AutoQuoteInput, "nombre_tomador" | "documento_tomador" | "fecha_nacimiento_tomador">>
 ): Promise<
   | { ok: true; aseguradora: string; prima: number | null; vigencia_desde: string | null; vigencia_hasta: string | null }
-  | { ok: false; reason: string }
+  | { ok: false; reason: string; technical: true }
 > {
   const connection = await getInsurerCredentials<LaEquidadCredentials>(ctx.db, ctx.organizationId, "la_equidad");
   if (!connection) {
-    return { ok: false, reason: "No hay ninguna aseguradora conectada todavía. Conéctala en Conectores → Aseguradoras." };
+    return {
+      ok: false,
+      technical: true,
+      reason: "No hay ninguna aseguradora conectada todavía. Conéctala en Conectores → Aseguradoras."
+    };
   }
 
   const branch = process.env.LA_EQUIDAD_AUTOS_BRANCH?.trim();
@@ -124,6 +141,7 @@ export async function ejecutarCotizacionReal(
   if (!branch || !planCode) {
     return {
       ok: false,
+      technical: true,
       reason:
         "El cotizador de autos de La Equidad todavía no está configurado del todo (faltan branch/plan_code del producto de autos) — se descubren con credenciales reales vía GET /quote-template."
     };
@@ -164,7 +182,7 @@ export async function ejecutarCotizacionReal(
     };
   } catch (err) {
     const reason = err instanceof LaEquidadApiError ? err.message : "No se pudo cotizar con La Equidad.";
-    return { ok: false, reason };
+    return { ok: false, technical: true, reason };
   }
 }
 
@@ -186,17 +204,35 @@ export async function cotizarSeguroAuto(
     return { ok: true, faltan_datos: ["documento_tomador"] };
   }
 
+  // Datos parciales para dejar ALGO en la cola del asesor cuando un fallo
+  // técnico (no del cliente) corta el flujo antes de completar los datos —
+  // 2026-09-14: antes, un fallo técnico en este punto devolvía ok:false sin
+  // guardar nada, perdiendo la placa/documento que el cliente ya había dado.
+  const datosParciales = {
+    nombre_tomador: input.nombre_tomador?.trim() || undefined,
+    documento_tomador: input.documento_tomador?.trim() || undefined,
+    fecha_nacimiento_tomador: input.fecha_nacimiento_tomador?.trim() || undefined
+  };
+  const queuePartial = () =>
+    upsertPendingQuoteRequest(ctx.db, {
+      organizationId: ctx.organizationId,
+      conversationId: options.conversationId,
+      contactId: options.contactId,
+      leadId: options.leadId,
+      contactE164: options.contactE164,
+      source: options.source,
+      placa,
+      tomador: datosParciales
+    });
+
   // El límite anti-abuso solo protege la cuenta COMPARTIDA de Noova — si el
   // corredor conectó su propia cuenta (de cualquiera de los dos
   // proveedores), ese gasto es suyo, no hay nada que limitar de parte de Noova.
   if (!provider.usingOwnAccount && contactKey) {
     const recentLookups = await countRecentVehicleLookups(ctx.db, ctx.organizationId, contactKey);
     if (recentLookups >= VEHICLE_LOOKUP_MAX_PER_WINDOW) {
-      return {
-        ok: false,
-        reason:
-          "Ya consultamos varios vehículos para este contacto hoy. Un asesor humano puede continuar la cotización manualmente."
-      };
+      const quoteRequest = await queuePartial();
+      return { ok: true, pendiente: true, technical: true, quote_request_id: quoteRequest.id };
     }
   }
 
@@ -204,8 +240,17 @@ export async function cotizarSeguroAuto(
   try {
     vehiculo = await provider.lookup(placa, input.documento_tomador);
   } catch (err) {
-    const reason = isVehicleProviderApiError(err) ? err.message : "No se pudo consultar el vehículo por placa.";
-    return { ok: false, reason };
+    if (!isVehicleLookupTechnicalError(err)) {
+      // Error de NEGOCIO (ej. PlacApi no encontró el vehículo con esa
+      // placa/documento) — sí es accionable por el cliente, se le explica.
+      const reason = isVehicleProviderApiError(err) ? err.message : "No se pudo consultar el vehículo por placa.";
+      return { ok: false, reason };
+    }
+    // Fallo TÉCNICO del proveedor de datos (caído, credenciales, timeout):
+    // se guarda lo que ya se tiene y se cierra el turno como "pendiente" —
+    // nunca se le explica el motivo real al cliente (ver AutoQuoteResult.technical).
+    const quoteRequest = await queuePartial();
+    return { ok: true, pendiente: true, technical: true, quote_request_id: quoteRequest.id };
   }
   if (!provider.usingOwnAccount && contactKey) {
     await logVehicleLookup(ctx.db, ctx.organizationId, contactKey, placa);
@@ -256,9 +301,13 @@ export async function cotizarSeguroAuto(
 
   const resultado = await ejecutarCotizacionReal(ctx, vehiculo, tomador);
   if ("reason" in resultado) {
-    // Falla la cotización automática, pero la solicitud queda en la cola
-    // ('pendiente') para que un asesor la intente manualmente después.
-    return { ok: false, vehiculo, reason: resultado.reason, quote_request_id: quoteRequest.id };
+    // Falla la cotización automática, pero la solicitud YA quedó en la cola
+    // ('pendiente') más arriba (upsertPendingQuoteRequest) para que un
+    // asesor la intente manualmente después — por eso, aunque ok:false, el
+    // cliente no se queda sin nada: sus datos están guardados. `technical`
+    // le dice al agente de texto que nunca debe explicarle este motivo tal
+    // cual (ver AutoQuoteResult.technical).
+    return { ok: false, vehiculo, reason: resultado.reason, technical: true, quote_request_id: quoteRequest.id };
   }
 
   await markQuoteRequestQuoted(ctx.db, quoteRequest.id, {

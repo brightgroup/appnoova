@@ -90,7 +90,11 @@ export async function executeAgentTool(
   try {
     return await def.execute(args, ctx);
   } catch (err) {
+    // No exponer el mensaje crudo del error (puede traer detalle interno de
+    // DB/red) al modelo — technical:true le dice a los agentes de
+    // cotización que nunca deben explicarle este motivo al cliente tal
+    // cual, solo decir que un asesor va a seguir con su solicitud.
     console.error(`[agent-tools] ${name}:`, err);
-    return { ok: false, reason: err instanceof Error ? err.message : "Error ejecutando la tool" };
+    return { ok: false, technical: true, reason: "No se pudo completar la solicitud en este momento." };
   }
 }

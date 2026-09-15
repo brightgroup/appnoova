@@ -13,13 +13,25 @@ interface BoldEvent {
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const signature = req.headers.get("x-bold-signature");
+  const db = adminClient();
 
   if (!verifyBoldWebhookSignature(rawBody, signature)) {
+    // TEMP DEBUG (14 sep 2026): capturamos cuerpo+firma crudos para diagnosticar
+    // qué llave secreta usa Bold realmente para firmar Link de pagos — quitar
+    // este bloque en cuanto se confirme la llave correcta.
+    try {
+      await db.from("bold_unmatched_events").insert({
+        event_type: "DEBUG_INVALID_SIGNATURE",
+        reason: "invalid_signature",
+        payload: { raw_body: rawBody, signature },
+      });
+    } catch {
+      // no-op: esto es solo diagnóstico temporal
+    }
     return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
   }
 
   const event = JSON.parse(rawBody) as BoldEvent;
-  const db = adminClient();
 
   try {
     switch (event.type) {
