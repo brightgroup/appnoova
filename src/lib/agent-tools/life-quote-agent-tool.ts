@@ -2,6 +2,7 @@ import { Type } from "@google/genai";
 import type { AgentToolDefinition, AgentToolContext, AgentToolResult } from "@/lib/agent-tools/registry";
 import { calificarSeguroVida, ALL_FIELD_KEYS } from "@/lib/insurers/life-quote-tool";
 import { resolveCampos, buildCamposPromptBlock, presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
+import { resolveQuoteSource } from "@/lib/widget-channel";
 
 /**
  * Tool de calificación de seguro de vida para agentes que hablan con el
@@ -79,7 +80,7 @@ export const calificarSeguroVidaAgentTool: AgentToolDefinition = {
       },
       ctx,
       {
-        source: ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp",
+        source: resolveQuoteSource(ctx.channel),
         conversationId: ctx.conversationId,
         contactE164: ctx.contactE164
       },

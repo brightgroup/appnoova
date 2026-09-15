@@ -5,6 +5,7 @@ import { RAMOS_COTIZABLES, RAMOS_MOTOR_GENERICO } from "@/lib/insurers/ramos-cot
 import { presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
 import type { PolizaCampoFieldType, PolizaCampoPresentacion } from "@/lib/insurers/poliza-ramo-campos-db";
 import type { RamoCampoDef } from "@/lib/insurers/ramo-campos-defaults";
+import { resolveQuoteSource } from "@/lib/widget-channel";
 
 const RAMOS_GENERICOS_LABEL = RAMOS_MOTOR_GENERICO.map(r => RAMOS_COTIZABLES[r].label).join(", ");
 
@@ -99,7 +100,7 @@ export const cotizarSeguroAgentTool: AgentToolDefinition = {
       ctx.organizationId,
       { ramo, conversationId: ctx.conversationId, campos: campoStringOnly(args) },
       {
-        source: ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp",
+        source: resolveQuoteSource(ctx.channel),
         conversationId: ctx.conversationId,
         contactE164: ctx.contactE164
       }

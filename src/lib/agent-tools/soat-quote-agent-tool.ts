@@ -2,6 +2,7 @@ import { Type } from "@google/genai";
 import type { AgentToolDefinition, AgentToolContext, AgentToolResult } from "@/lib/agent-tools/registry";
 import { calificarSoat, ALL_FIELD_KEYS } from "@/lib/insurers/soat-quote-tool";
 import { resolveCampos, buildCamposPromptBlock, presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
+import { resolveQuoteSource } from "@/lib/widget-channel";
 
 /** Tool de calificación de SOAT para agentes que hablan con el CLIENTE FINAL — mismo patrón que life/home-quote-agent-tool.ts. */
 export const calificarSoatAgentTool: AgentToolDefinition = {
@@ -47,7 +48,7 @@ export const calificarSoatAgentTool: AgentToolDefinition = {
       },
       ctx,
       {
-        source: ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp",
+        source: resolveQuoteSource(ctx.channel),
         conversationId: ctx.conversationId,
         contactE164: ctx.contactE164
       },

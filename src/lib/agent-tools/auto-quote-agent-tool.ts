@@ -2,6 +2,7 @@ import { Type } from "@google/genai";
 import type { AgentToolDefinition, AgentToolContext, AgentToolResult } from "@/lib/agent-tools/registry";
 import { cotizarSeguroAuto, ALL_CAMPO_KEYS } from "@/lib/insurers/auto-quote-tool";
 import { resolveCampos, buildCamposPromptBlock, presentGuidedQuestion } from "@/lib/agent-tools/guided-questions";
+import { resolveQuoteSource } from "@/lib/widget-channel";
 
 /**
  * Tool de cotización de autos para agentes que hablan con el CLIENTE FINAL
@@ -73,7 +74,7 @@ export const cotizarSeguroAutoAgentTool: AgentToolDefinition = {
       ctx,
       {
         autoQuote: ctx.quotingRules.autoQuote,
-        source: ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp",
+        source: resolveQuoteSource(ctx.channel),
         conversationId: ctx.conversationId,
         contactE164: ctx.contactE164
       },
