@@ -2415,6 +2415,13 @@ html:not(.dark) [data-noova-dashboard] .bg-orange-500\/35 {
 .dark .ori-eye-fill {
   fill: #ffffff;
 }
+/* Ítem activo del menú lateral en tema claro: el fondo del "pill" activo es
+   negro (.nv-nav-active más arriba), así que ahí los ojos deben quedar
+   blancos aunque el resto del tema sea claro — si no, se pierden negro sobre
+   negro (mismo patrón de bug reportado antes en el rebrand de color). */
+html:not(.dark) [data-noova-sidebar] .nv-nav-active .ori-eye-fill {
+  fill: #ffffff;
+}
 
 .ori-anim-idle-look {
   transform-box: fill-box;

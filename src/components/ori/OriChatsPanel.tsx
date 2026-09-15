@@ -13,6 +13,21 @@ interface OriChatsPanelProps {
   onClose: () => void;
 }
 
+function itemDateLabel(updatedAt: string): string {
+  const date = new Date(updatedAt);
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  if (sameDay) {
+    return date.toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" });
+  }
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleDateString("es-CO", {
+    day: "numeric",
+    month: "short",
+    year: sameYear ? undefined : "numeric",
+  });
+}
+
 function groupLabel(updatedAt: string): string {
   const date = new Date(updatedAt);
   const now = new Date();
@@ -31,7 +46,10 @@ const GROUP_ORDER = ["Hoy", "Ayer", "Últimos 7 días", "Últimos 30 días", "An
 /** Panel "Chats" — historial de conversaciones de Ori, al estilo Claude/Gemini/GPT, pero anclado a la derecha (ya que el menú principal de Noova ocupa la izquierda). Exclusivo de /dashboard/ori. */
 export function OriChatsPanel({ conversations, loading, activeId, onSelect, onNewChat, onDelete, onClose }: OriChatsPanelProps) {
   const groups = new Map<string, OriConversationSummary[]>();
-  for (const c of conversations) {
+  const sorted = [...conversations].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+  for (const c of sorted) {
     const label = groupLabel(c.updatedAt);
     if (!groups.has(label)) groups.set(label, []);
     groups.get(label)!.push(c);
@@ -86,6 +104,9 @@ export function OriChatsPanel({ conversations, loading, activeId, onSelect, onNe
                 onClick={() => onSelect(c.id)}
               >
                 <span className="flex-1 min-w-0 truncate text-[13px]">{c.title}</span>
+                <span className="shrink-0 text-[10.5px] text-gray-600 tabular-nums group-hover:opacity-0 transition-opacity">
+                  {itemDateLabel(c.updatedAt)}
+                </span>
                 <button
                   type="button"
                   title="Eliminar chat"

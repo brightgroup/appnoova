@@ -2,21 +2,27 @@
 
 import { useEffect, useState } from "react";
 
-const WORDS = ["Pensando", "Revisando los datos", "Cotizando"];
+const WORDS = [
+  "Pensando",
+  "Trabajando para ti",
+  "Revisando tu información",
+  "Un momento más",
+  "Ya casi",
+  "Aún por aquí",
+];
 
 function labelForSecond(s: number): string {
-  if (s < 2) return WORDS[0];
-  if (s < 4) return WORDS[1];
-  if (s < 6) return WORDS[2];
-  return "Aún pensando";
+  return WORDS[Math.floor(s / 2) % WORDS.length];
 }
 
 /**
- * "Pensando… 4s" con las palabras cambiando cada par de segundos y "Aún
- * pensando" después de 6s — mismo espíritu que el indicador de Claude
- * mientras trabaja. El contador es un intervalo real, no decorativo: no
- * sabemos cuánto va a tardar la respuesta de Ori (el endpoint no transmite
- * en streaming todavía), así que esto es lo más honesto que podemos mostrar.
+ * "Pensando… 4s" con las palabras rotando cada par de segundos en bucle —
+ * mismo espíritu que el indicador de Claude mientras trabaja. Son frases
+ * puramente decorativas, no pasos reales: el endpoint no transmite en
+ * streaming todavía, así que no sabemos qué está haciendo Ori en cada
+ * instante y sería deshonesto nombrar una acción específica (ej. "Cotizando")
+ * que puede no corresponder a lo que en verdad está pasando. El contador de
+ * segundos sí es real.
  */
 export function OriThinkingStatus({ className = "" }: { className?: string }) {
   const [seconds, setSeconds] = useState(0);

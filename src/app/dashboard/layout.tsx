@@ -529,8 +529,8 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
               <>
                 <OriAnimatedIcon
                   state="idle"
-                  variant="hole"
-                  className={`w-5 h-5 mr-3 ${sidebarIconBase} ${sidebarNeonIcon.ori}`}
+                  variant="solid"
+                  className={`w-[26px] h-[26px] mr-3 shrink-0 ${sidebarNeonIcon.ori}`}
                 />
                 <div className="flex-1 flex items-center gap-2">
                   <span>ORI</span>
@@ -540,8 +540,8 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
             ) : (
               <OriAnimatedIcon
                 state="idle"
-                variant="hole"
-                className={`w-5 h-5 ${sidebarIconBase} ${sidebarNeonIcon.ori}`}
+                variant="solid"
+                className={`w-[26px] h-[26px] shrink-0 ${sidebarNeonIcon.ori}`}
               />
             )}
           </Link>
