@@ -61,6 +61,12 @@ Fusionar `iniciar_cotizacion_seguro` + `registrar_dato_cotizacion` en **una sola
 1. **Campos con clave desconocida rompían los 6 ramos dedicados** (commit `5a0ca02`): la org de prueba tenía filas viejas en `poliza_ramo_campos` para Hogar (18 campos, de una sesión anterior al 12 de sept) con claves que no coinciden con el esquema fijo de `home-quote-tool.ts`. `resolveCampos()` ahora filtra a solo las claves que la tool puede recibir de verdad. **Quedan 18 filas de Hogar en la DB para la org de prueba que ya no afectan nada pero son ruido en la UI admin** — si algún día migras Hogar al motor genérico, esas filas (con el desglose "Valores a asegurar" completo) se vuelven útiles automáticamente; si no, puedes borrarlas cuando quieras.
 2. **Posible envío duplicado de botones bajo respuesta lenta**: una sola vez, en la prueba de Mascotas, los botones "Perro"/"Gato" llegaron dos veces seguidas. No se repitió en los turnos siguientes. Hipótesis más probable: reintento de webhook de Twilio por una respuesta lenta (no exclusivo de mi código nuevo — le pasaría a cualquier tool que tarde). No alcancé a confirmarlo con logs de Twilio/Coolify.
 
+## Link directo / microsite — probado, funciona igual que WhatsApp (mismo bug)
+
+Existe un microsite de prueba `testlucia` (org Resguarda, agente Lucia, `quoting_rules.enabled: true`) — probablemente configurado por mí antes del corte de contexto de esta sesión. Local: `http://localhost:62832/c/testlucia`. Probé el flujo completo del widget de chat público: arranca bien, pide tomador, responde de forma coherente — y reproduce el mismo bug de persistencia del motor genérico (quote `02bcac17-9517-419f-9512-8b3569849196`, ramo mascotas: solo `nombre_tomador` guardado, una sola escritura). Es exactamente lo esperado, mismo motor genérico por debajo — no es un bug nuevo del canal web, solo confirma que el problema no es específico de WhatsApp.
+
+**Nota menor, no crítica:** esa fila quedó con `source: "whatsapp"` en vez de `"web"` a pesar de venir del microsite — la lógica en `generic-quote-agent-tools.ts` (`ctx.channel === "web_embed" || ctx.channel === "web_test" ? "web" : "whatsapp"`) parece no estar recibiendo el valor de canal esperado en esta ruta. Cosmético (solo afecta el campo `source`, no el bug de datos), no lo investigué más a fondo esta noche.
+
 ## Documento de Figuro — recuperado, no perdido
 
 La sesión que se cerró al cambiar de plan (Pro→Team) sí completó trabajo real: quedó guardado directo en Supabase (`poliza_ramo_campos`, filas del 12 de sept para Hogar y Salud en 2 organizaciones de prueba) en vez de en un documento. Ya lo usé para verificar mis propios defaults contra ese trabajo previo.
@@ -90,11 +96,20 @@ src/components/seguros/PolizaRamoCamposPanel.tsx (filas expandibles + multiselec
 src/app/dashboard/seguros/configuracion/page.tsx (layout lista + panel, 26 ramos)
 ```
 
+## Resumen ejecutivo (para leer primero)
+
+- ✅ **Los 6 ramos con tool dedicada** (autos, motos, vida, hogar, SOAT, accidentes personales) están sólidos: botones deterministas, sin preguntas duplicadas, UI de configuración funcionando, persistencia confirmada en producción.
+- ✅ **UI de configuración** ("Preguntas que hace la IA"): probada en 5+ ramos distintos (Autos, Hogar, Bicicleta, Transporte de Mercancías, Mascotas) — carga de defaults, edición, guardado automático (onBlur), tipo multiselección, todo funcionando bien tanto en config nueva como ya materializada.
+- ✅ **Link directo / microsite**: confirmado funcional para arrancar cotizaciones del motor genérico (antes no probado, gap cerrado esta noche).
+- 🔴 **Los 20 ramos nuevos del motor genérico NO guardan de forma confiable los datos de la cotización** — el modelo llama la tool de guardado una sola vez y luego conversa de memoria. Confirmado con 3 pruebas en vivo independientes (Mascotas x2, Bicicleta) en dos canales distintos (WhatsApp y microsite). Un intento de arreglarlo reforzando el prompt (commit `f1c23ec`) NO fue suficiente. La solución real requiere fusionar las dos tools del motor genérico en una sola que reciba todos los campos conocidos cada turno — cambio de arquitectura, no de una línea — pendiente de tu visto bueno antes de tocarlo. Ver sección de arriba para el detalle completo.
+
 ## Datos para depurar
 
 | Qué | Valor |
 |---|---|
 | Org de prueba | Resguarda — `bd23473f-a2dd-436b-9f4a-5814bb24b1ec` |
 | WhatsApp probado esta noche | "Noova 360 Oficial" (noova360.com) — cuenta de empresa real, NO Lucia/Resguarda |
-| Quote de prueba (Mascotas, incompleta) | `6b547013-d97a-4327-9268-940999982e4b` |
+| Microsite de prueba | `testlucia` (agente Lucia, quoting habilitado) — `/c/testlucia` |
+| Quotes de prueba (motor genérico, todas con datos_riesgo vacío — se pueden borrar) | `6b547013-d97a-4327-9268-940999982e4b` (mascotas, WhatsApp), `39c1ec21-260d-474c-b439-96ba74f20b50` (bicicleta, WhatsApp), `02bcac17-9517-419f-9512-8b3569849196` / `3e61ecc0-7b0e-4ba8-8f4f-ad1f47b761f9` (mascotas, microsite) |
 | Migraciones nuevas | 145, 146 (ya aplicadas en dev) |
+| Commits de esta sesión nocturna | `e039d9a`, `95f993d`, `5a0ca02`, `7d920a6`, `f1c23ec`, `db7d21c` |
