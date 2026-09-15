@@ -716,15 +716,16 @@ html:has(.agente-clientes-root) body {
 
 .ac-msg-row {
   display: flex;
+  flex-direction: column;
   animation: ac-fade-in 0.35s ease-out both;
 }
 
 .ac-msg-row--user {
-  justify-content: flex-end;
+  align-items: flex-end;
 }
 
 .ac-msg-row--assistant {
-  justify-content: flex-start;
+  align-items: flex-start;
 }
 
 .ac-bubble {
