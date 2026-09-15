@@ -6,6 +6,7 @@ import {
   buildFunctionDeclarations,
   executeAgentTool,
   enforcePendingQuestion,
+  resolvePendingQuoteToolName,
   type AgentToolResult
 } from "@/lib/agent-tools/registry";
 import {
@@ -130,6 +131,34 @@ export async function generateOpenAiAgentReply(
   );
   usage = addUsage(usage, readOpenAiUsage(response));
   let choice = response.choices[0];
+
+  // Misma red de seguridad que en text-agent-generate.ts (Gemini): si el
+  // modelo no llamó ninguna tool pese a que esta conversación ya tiene una
+  // cotización pendiente, se le repite el turno forzando tool_choice sobre
+  // esa tool puntual en vez de dejar pasar una respuesta que pierde el dato.
+  if (toolsEnabled && choice?.finish_reason !== "tool_calls") {
+    const forcedTool = await resolvePendingQuoteToolName(input.toolContext);
+    if (forcedTool) {
+      response = await withLlmTimeout(
+        abortSignal =>
+          client.chat.completions.create(
+            {
+              model: input.model,
+              messages,
+              max_completion_tokens: input.maxOutputTokens,
+              temperature: input.temperature,
+              tools,
+              tool_choice: { type: "function", function: { name: forcedTool } }
+            },
+            { signal: abortSignal }
+          ),
+        undefined,
+        "OpenAI"
+      );
+      usage = addUsage(usage, readOpenAiUsage(response));
+      choice = response.choices[0];
+    }
+  }
 
   // Compartido por referencia entre las hasta 3 rondas de este turno — evita
   // mandar el mismo botón/lista de WhatsApp dos veces si el modelo llama la

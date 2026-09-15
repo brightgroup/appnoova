@@ -161,6 +161,27 @@ function yaPreguntoEsto(text: string, pregunta: string): boolean {
   return encontradas.length / claves.length >= 0.6;
 }
 
+/**
+ * ¿Hay una cotización pendiente en esta conversación que el modelo debería
+ * seguir alimentando este turno? Se usa ANTES de aceptar la respuesta del
+ * modelo: si llamó cero tools pese a que esto devuelve un nombre, los
+ * *-generate.ts fuerzan una llamada correctiva a esa tool en vez de dejar
+ * pasar la respuesta en texto — causa raíz confirmada en pruebas en vivo del
+ * bug de pérdida de datos del motor genérico (el modelo llama la tool una
+ * vez y luego sigue de memoria sin volver a persistir nada). No verifica si
+ * a la cotización le faltan datos — eso lo decide la tool misma al forzarla;
+ * si ya estaba completa, forzarla solo la reconfirma sin dañar nada.
+ */
+export async function resolvePendingQuoteToolName(
+  ctx: Pick<AgentToolContext, "db" | "organizationId" | "conversationId">
+): Promise<string | null> {
+  if (!ctx.conversationId) return null;
+  const { findAnyPendingQuoteRequestByConversation } = await import("@/lib/insurers/quote-requests-db");
+  const { quoteToolNameForRamo } = await import("@/lib/insurers/ramos-cotizables");
+  const quote = await findAnyPendingQuoteRequestByConversation(ctx.db, ctx.organizationId, ctx.conversationId);
+  return quote ? quoteToolNameForRamo(quote.ramo) : null;
+}
+
 export function enforcePendingQuestion(text: string, toolResults: { name: string; result: AgentToolResult }[]): string {
   const last = toolResults[toolResults.length - 1]?.result as
     | { pregunta_enviada?: boolean; siguiente_pregunta?: string }

@@ -78,3 +78,19 @@ export function ramoCotizableFromCatalogoSlug(catalogoSlug: string): RamoCotizab
   );
   return entry ? entry[0] : null;
 }
+
+/** Nombre exacto de la tool que persiste este ramo — los 6 con tool dedicada (placa/Verifik para autos/motos, esquema fijo para los demás) o `cotizar_seguro` para el resto (ver RAMOS_MOTOR_GENERICO). Null si el ramo no es cotizable. Usado para forzar function-calling cuando el modelo se salta la tool (ver *-generate.ts). */
+const RAMO_A_TOOL_DEDICADA: Partial<Record<RamoCotizable, string>> = {
+  autos: "cotizar_seguro_auto",
+  motos: "cotizar_seguro_moto",
+  vida: "cotizar_seguro_vida",
+  hogar: "cotizar_seguro_hogar",
+  soat: "cotizar_seguro_soat",
+  accidentes_personales: "cotizar_seguro_accidentes"
+};
+
+export function quoteToolNameForRamo(ramo: string): string | null {
+  const dedicada = RAMO_A_TOOL_DEDICADA[ramo as RamoCotizable];
+  if (dedicada) return dedicada;
+  return RAMOS_MOTOR_GENERICO.includes(ramo as RamoCotizable) ? "cotizar_seguro" : null;
+}

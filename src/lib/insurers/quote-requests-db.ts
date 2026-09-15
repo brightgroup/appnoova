@@ -297,6 +297,31 @@ export async function findPendingQuoteRequestByLead(
   return data ? toRecord(data as QuoteRequestRow) : null;
 }
 
+/**
+ * Cualquier cotización "pendiente" de esta conversación, sin importar el
+ * ramo — usada por los motores de IA (*-generate.ts) para saber, ANTES de
+ * llamar al modelo, si esta conversación ya tiene una cotización en curso.
+ * No detecta si le faltan datos o no (eso lo decide la tool misma); solo
+ * responde "¿hay algo que este turno podría estar perdiendo si el modelo no
+ * llama ninguna tool?" — ver `forceQuoteToolIfSkipped` en los *-generate.ts.
+ */
+export async function findAnyPendingQuoteRequestByConversation(
+  db: SupabaseClient,
+  organizationId: string,
+  conversationId: string
+): Promise<QuoteRequestRecord | null> {
+  const { data } = await db
+    .from("insurance_quote_requests")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("conversation_id", conversationId)
+    .eq("estado", "pendiente")
+    .order("updated_at", { ascending: false })
+    .limit(1);
+  const rows = (data as QuoteRequestRow[] | null) ?? [];
+  return rows.length ? toRecord(rows[0]) : null;
+}
+
 /** Cotización más reciente ligada a un lead — usada por la tool de ORI `guiar_cotizacion_seguro` (solo recibe el lead, no distingue ramo). */
 export async function getLatestQuoteRequestForLead(
   db: SupabaseClient,

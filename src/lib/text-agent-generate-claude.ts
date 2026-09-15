@@ -6,6 +6,7 @@ import {
   buildFunctionDeclarations,
   executeAgentTool,
   enforcePendingQuestion,
+  resolvePendingQuoteToolName,
   type AgentToolResult
 } from "@/lib/agent-tools/registry";
 import {
@@ -182,6 +183,35 @@ export async function generateClaudeAgentReply(
     "Claude"
   );
   usage = addUsage(usage, readClaudeUsage(response));
+
+  // Misma red de seguridad que en text-agent-generate.ts (Gemini): si el
+  // modelo no llamó ninguna tool pese a que esta conversación ya tiene una
+  // cotización pendiente, se le repite el turno forzando tool_choice sobre
+  // esa tool puntual en vez de dejar pasar una respuesta que pierde el dato.
+  if (toolsEnabled && response.stop_reason !== "tool_use") {
+    const forcedTool = await resolvePendingQuoteToolName(input.toolContext);
+    if (forcedTool) {
+      response = await withLlmTimeout(
+        abortSignal =>
+          createClaudeMessage(
+            client,
+            {
+              model: input.model,
+              system,
+              messages,
+              max_tokens: input.maxOutputTokens,
+              temperature: input.temperature,
+              tools,
+              tool_choice: { type: "tool", name: forcedTool }
+            },
+            { signal: abortSignal }
+          ),
+        undefined,
+        "Claude"
+      );
+      usage = addUsage(usage, readClaudeUsage(response));
+    }
+  }
 
   // Compartido por referencia entre las hasta 3 rondas de este turno — evita
   // mandar el mismo botón/lista de WhatsApp dos veces si el modelo llama la

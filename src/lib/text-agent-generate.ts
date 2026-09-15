@@ -1,4 +1,4 @@
-import { GoogleGenAI, type Content, type Part } from "@google/genai";
+import { GoogleGenAI, FunctionCallingConfigMode, type Content, type Part } from "@google/genai";
 import { getOriApiKey } from "@/lib/google-ai";
 import { readGeminiUsage, type GeminiUsage } from "@/lib/billing/meter";
 import { withGeminiTimeout } from "@/lib/gemini-timeout";
@@ -13,6 +13,7 @@ import {
   buildFunctionDeclarations,
   executeAgentTool,
   enforcePendingQuestion,
+  resolvePendingQuoteToolName,
   type AgentToolContext,
   type AgentToolResult
 } from "@/lib/agent-tools/registry";
@@ -204,6 +205,34 @@ async function generateGeminiAgentReply(
       })
     )
   );
+
+  // Red de seguridad contra el bug confirmado en pruebas en vivo: el modelo
+  // llama cotizar_seguro (o la tool dedicada del ramo) una vez, y en turnos
+  // posteriores a veces responde de memoria sin volver a llamarla — perdiendo
+  // en silencio el dato que el cliente acaba de dar. Si esta conversación ya
+  // tiene una cotización pendiente y el modelo no llamó NINGUNA tool este
+  // turno, se le repite la misma pregunta pero forzando function-calling
+  // (mode: ANY) sobre esa tool puntual — nunca sobre notify_team ni
+  // agendamiento, que no deben forzarse. El resto del loop de abajo no
+  // cambia: solo reemplaza qué `response` entra a la primera vuelta.
+  if (toolsEnabled && !response.functionCalls?.length) {
+    const forcedTool = await resolvePendingQuoteToolName(input.toolContext);
+    if (forcedTool) {
+      response = await withOneRetryOnOverload(() =>
+        withGeminiTimeout(abortSignal =>
+          ai.models.generateContent({
+            model: input.model,
+            contents,
+            config: {
+              ...baseConfig,
+              abortSignal,
+              toolConfig: { functionCallingConfig: { mode: FunctionCallingConfigMode.ANY, allowedFunctionNames: [forcedTool] } }
+            }
+          })
+        )
+      );
+    }
+  }
 
   // Compartido por referencia entre las hasta 3 rondas de este turno — evita
   // mandar el mismo botón/lista de WhatsApp dos veces si el modelo llama la
