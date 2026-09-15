@@ -12,6 +12,7 @@ import {
   buildToolsPromptBlock,
   buildFunctionDeclarations,
   executeAgentTool,
+  enforcePendingQuestion,
   type AgentToolContext,
   type AgentToolResult
 } from "@/lib/agent-tools/registry";
@@ -257,10 +258,11 @@ async function generateGeminiAgentReply(
     );
   }
 
-  const text = response.text?.trim() ?? "";
-  if (!text) {
+  const rawText = response.text?.trim() ?? "";
+  if (!rawText) {
     throw new Error("IA sin respuesta");
   }
+  const text = enforcePendingQuestion(rawText, toolResults);
 
   return {
     text,

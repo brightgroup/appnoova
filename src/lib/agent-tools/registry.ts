@@ -113,3 +113,32 @@ export async function executeAgentTool(
     return { ok: false, reason: err instanceof Error ? err.message : "Error ejecutando la tool" };
   }
 }
+
+/**
+ * Red de seguridad final: si la ÚLTIMA tool de cotización llamada en el turno
+ * dejó una pregunta pendiente por escribir en texto (`pregunta_enviada:
+ * false` + `siguiente_pregunta`, ver guided-questions.ts), pero el texto
+ * final del modelo no la incluye, se la agrega igual — en vez de confiar en
+ * que el modelo la haya redactado (o no haya declarado, por su cuenta, que
+ * la cotización ya está completa cuando en realidad `faltan_datos` seguía
+ * teniendo algo).
+ *
+ * CONFIRMADO EN PRUEBAS EN VIVO 2026-09-15: el modelo puede llamar la tool,
+ * recibir `completo: false` + una pregunta pendiente, y aun así redactar un
+ * texto final tipo "¡Ya tengo todos tus datos!" — ignorando el resultado real
+ * de su propia tool. Mismo patrón que los otros dos bugs de esta sesión
+ * (botones que no salían, claves de campo inventadas): el prompt por sí solo
+ * no lo evita de forma confiable, hace falta esta verificación en código.
+ */
+export function enforcePendingQuestion(text: string, toolResults: { name: string; result: AgentToolResult }[]): string {
+  const last = toolResults[toolResults.length - 1]?.result as
+    | { pregunta_enviada?: boolean; siguiente_pregunta?: string }
+    | undefined;
+  if (!last || last.pregunta_enviada !== false) return text;
+
+  const pregunta = typeof last.siguiente_pregunta === "string" ? last.siguiente_pregunta.trim() : "";
+  if (!pregunta) return text;
+
+  const yaLaHizo = text.toLowerCase().includes(pregunta.toLowerCase().slice(0, 24));
+  return yaLaHizo ? text : `${text}\n\n${pregunta}`;
+}

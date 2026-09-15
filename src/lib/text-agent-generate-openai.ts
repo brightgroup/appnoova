@@ -5,6 +5,7 @@ import {
   buildToolsPromptBlock,
   buildFunctionDeclarations,
   executeAgentTool,
+  enforcePendingQuestion,
   type AgentToolResult
 } from "@/lib/agent-tools/registry";
 import {
@@ -170,8 +171,9 @@ export async function generateOpenAiAgentReply(
     choice = response.choices[0];
   }
 
-  const text = choice?.message.content?.trim() ?? "";
-  if (!text) throw new Error("IA sin respuesta");
+  const rawText = choice?.message.content?.trim() ?? "";
+  if (!rawText) throw new Error("IA sin respuesta");
+  const text = enforcePendingQuestion(rawText, toolResults);
 
   return { text, usage, toolResults };
 }

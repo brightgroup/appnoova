@@ -5,6 +5,7 @@ import {
   buildToolsPromptBlock,
   buildFunctionDeclarations,
   executeAgentTool,
+  enforcePendingQuestion,
   type AgentToolResult
 } from "@/lib/agent-tools/registry";
 import {
@@ -226,13 +227,14 @@ export async function generateClaudeAgentReply(
     usage = addUsage(usage, readClaudeUsage(response));
   }
 
-  const text = response.content
+  const rawText = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map(b => b.text)
     .join("\n")
     .trim();
 
-  if (!text) throw new Error("IA sin respuesta");
+  if (!rawText) throw new Error("IA sin respuesta");
+  const text = enforcePendingQuestion(rawText, toolResults);
 
   return { text, usage, toolResults };
 }
