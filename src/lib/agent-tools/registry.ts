@@ -130,6 +130,37 @@ export async function executeAgentTool(
  * (botones que no salían, claves de campo inventadas): el prompt por sí solo
  * no lo evita de forma confiable, hace falta esta verificación en código.
  */
+const PALABRAS_VACIAS = new Set([
+  "cual", "cuales", "cuál", "cuáles", "es", "el", "la", "los", "las", "de", "del", "tu", "su", "sus",
+  "que", "qué", "un", "una", "unos", "unas", "para", "con", "le", "les", "te", "ti", "y", "o", "en", "al"
+]);
+
+/** Palabras con carga de significado (≥3 letras, sin las de relleno de arriba) — usado para comparar por contenido, no por texto exacto. */
+function palabrasClave(s: string): string[] {
+  const normalizado = s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9\s]/g, "");
+  return normalizado.split(/\s+/).filter(w => w.length >= 3 && !PALABRAS_VACIAS.has(w));
+}
+
+/**
+ * ¿El texto ya cubre la pregunta, aunque la haya redactado con otras
+ * palabras? Compara por palabras clave (no substring exacto) — el modelo casi
+ * nunca copia el `siguiente_pregunta` literal, la parafrasea ("¿cuál es tu
+ * documento?" en vez de "¿Cuál es el número de documento de identidad del
+ * tomador?"), y una comparación textual estricta terminaba duplicando la
+ * pregunta en esos casos (confirmado en pruebas en vivo).
+ */
+function yaPreguntoEsto(text: string, pregunta: string): boolean {
+  const claves = palabrasClave(pregunta);
+  if (claves.length === 0) return false;
+  const textoNormalizado = palabrasClave(text).join(" ");
+  const encontradas = claves.filter(w => textoNormalizado.includes(w));
+  return encontradas.length / claves.length >= 0.6;
+}
+
 export function enforcePendingQuestion(text: string, toolResults: { name: string; result: AgentToolResult }[]): string {
   const last = toolResults[toolResults.length - 1]?.result as
     | { pregunta_enviada?: boolean; siguiente_pregunta?: string }
@@ -139,6 +170,5 @@ export function enforcePendingQuestion(text: string, toolResults: { name: string
   const pregunta = typeof last.siguiente_pregunta === "string" ? last.siguiente_pregunta.trim() : "";
   if (!pregunta) return text;
 
-  const yaLaHizo = text.toLowerCase().includes(pregunta.toLowerCase().slice(0, 24));
-  return yaLaHizo ? text : `${text}\n\n${pregunta}`;
+  return yaPreguntoEsto(text, pregunta) ? text : `${text}\n\n${pregunta}`;
 }
