@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireErpAccess } from "@/lib/erp/api-guard";
 import { adminClient } from "@/lib/voice-agents-server";
-import { getInventoryItem, updateInventoryItem } from "@/lib/erp/inventory-db";
+import { findInventoryItemByCodigo, getInventoryItem, updateInventoryItem } from "@/lib/erp/inventory-db";
 import { getOrgPermissionLevel } from "@/lib/org-server";
 import { PERMISSION_LEVEL_RANK } from "@/types/rbac";
 
@@ -33,6 +33,17 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (!existing) return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
 
   const patch: Parameters<typeof updateInventoryItem>[3] = {};
+  if (typeof body.codigo === "string") {
+    const codigo = body.codigo.trim();
+    if (!codigo) return NextResponse.json({ error: "codigo es requerido" }, { status: 400 });
+    if (codigo.toLowerCase() !== existing.codigo.toLowerCase()) {
+      const dup = await findInventoryItemByCodigo(db, ctx.organizationId, codigo);
+      if (dup && dup.id !== id) {
+        return NextResponse.json({ error: `Ya existe un producto con el código ${codigo}` }, { status: 409 });
+      }
+    }
+    patch.codigo = codigo;
+  }
   if (typeof body.nombre === "string" && body.nombre.trim()) patch.nombre = body.nombre;
   if ("marca" in body) patch.marca = body.marca;
   if ("responsable" in body) patch.responsable = body.responsable;

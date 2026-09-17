@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Upload, Settings, MoreHorizontal, AlertTriangle, Package, ArrowLeftRight, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { authFetch } from "@/lib/telephony-api";
@@ -44,8 +44,9 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "eliminados", label: "Eliminados" }
 ];
 
-export default function ErpInventarioPage() {
+function ErpInventarioContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { canWrite: canRegisterMovements } = useModuleWriteAccess("erp", "edit");
   const { canWrite: canEditItem } = useModuleWriteAccess("erp", "edit");
   const { canWrite: canManage } = useModuleWriteAccess("erp", "manage");
@@ -53,7 +54,10 @@ export default function ErpInventarioPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<Filter>(() => {
+    const requested = searchParams.get("filter");
+    return FILTERS.some(f => f.id === requested) ? (requested as Filter) : "all";
+  });
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const [itemModal, setItemModal] = useState<{ item?: InventoryItem } | null>(null);
@@ -125,6 +129,7 @@ export default function ErpInventarioPage() {
       ? await authFetch(`/api/erp/inventario/items/${editing.id}`, {
           method: "PATCH",
           body: JSON.stringify({
+            codigo: values.codigo,
             nombre: values.nombre,
             marca: values.marca || null,
             responsable: values.responsable || null,
@@ -393,5 +398,13 @@ export default function ErpInventarioPage() {
       />
       <InventoryImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImported={() => load(true)} />
     </>
+  );
+}
+
+export default function ErpInventarioPage() {
+  return (
+    <Suspense fallback={null}>
+      <ErpInventarioContent />
+    </Suspense>
   );
 }

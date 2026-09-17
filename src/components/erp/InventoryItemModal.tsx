@@ -71,11 +71,10 @@ export function InventoryItemModal({ open, item, saving, error, onClose, onSubmi
               <label className="block text-xs text-gray-500 mb-1.5">Código</label>
               <input
                 autoFocus={!isEdit}
-                disabled={isEdit}
                 value={codigo}
                 onChange={e => setCodigo(e.target.value)}
                 placeholder="Ej. P480CU"
-                className={`${fieldClass} font-mono disabled:opacity-50`}
+                className={`${fieldClass} font-mono`}
               />
             </div>
             <div>

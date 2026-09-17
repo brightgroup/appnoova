@@ -174,6 +174,7 @@ export async function createInventoryItem(
 }
 
 export interface InventoryItemPatch {
+  codigo?: string;
   nombre?: string;
   marca?: string | null;
   responsable?: string | null;
@@ -188,6 +189,7 @@ export async function updateInventoryItem(
   patch: InventoryItemPatch
 ): Promise<InventoryItemRecord> {
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (patch.codigo !== undefined) updates.codigo = patch.codigo.trim();
   if (patch.nombre !== undefined) updates.nombre = patch.nombre.trim();
   if (patch.marca !== undefined) updates.marca = patch.marca?.trim() || null;
   if (patch.responsable !== undefined) updates.responsable = patch.responsable?.trim() || null;

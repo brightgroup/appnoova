@@ -117,6 +117,7 @@ async function run(req: NextRequest) {
         id: i.id,
         codigo: i.codigo,
         nombre: i.nombre,
+        marca: i.marca,
         existencia: i.existencia,
         stockMinimo: i.stockMinimo ?? 0,
       })),

@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
           id: item.id,
           codigo: item.codigo,
           nombre: item.nombre,
+          marca: item.marca,
           existencia: result.existencia,
           stockMinimo: result.stockMinimo ?? 0
         }).catch(err => console.error("[erp] alerta stock mínimo:", err));

@@ -7,6 +7,7 @@ export interface LowStockItem {
   id: string;
   codigo: string;
   nombre: string;
+  marca?: string | null;
   existencia: number;
   stockMinimo: number;
 }
@@ -48,7 +49,7 @@ async function resolveRecipientEmails(
 }
 
 function buildHtml(items: LowStockItem[], organizationName: string | null): string {
-  const inventoryUrl = `${getAppBaseUrl()}/dashboard/erp/inventario`;
+  const inventoryUrl = `${getAppBaseUrl()}/dashboard/erp/inventario?filter=bajo_minimo`;
   const when = new Date().toLocaleString("es-CO", {
     dateStyle: "full",
     timeStyle: "short",
@@ -64,6 +65,7 @@ function buildHtml(items: LowStockItem[], organizationName: string | null): stri
         <tr>
           <td style="padding:10px 12px;border-top:1px solid #e2e8f0;font-family:ui-monospace,monospace;font-size:13px;color:#334155">${escapeHtml(item.codigo)}</td>
           <td style="padding:10px 12px;border-top:1px solid #e2e8f0;font-family:system-ui,-apple-system,sans-serif;font-size:13px;color:#0f172a">${escapeHtml(item.nombre)}</td>
+          <td style="padding:10px 12px;border-top:1px solid #e2e8f0;font-family:system-ui,-apple-system,sans-serif;font-size:13px;color:#334155">${escapeHtml(item.marca || "—")}</td>
           <td style="padding:10px 12px;border-top:1px solid #e2e8f0;font-family:system-ui,-apple-system,sans-serif;font-size:13px;color:#334155;text-align:right">${item.existencia}</td>
           <td style="padding:10px 12px;border-top:1px solid #e2e8f0;font-family:system-ui,-apple-system,sans-serif;font-size:13px;color:#334155;text-align:right">${item.stockMinimo}</td>
         </tr>`
@@ -96,6 +98,7 @@ function buildHtml(items: LowStockItem[], organizationName: string | null): stri
                   <tr>
                     <th style="padding:10px 12px;text-align:left;font-family:system-ui,-apple-system,sans-serif;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:#94a3b8">Código</th>
                     <th style="padding:10px 12px;text-align:left;font-family:system-ui,-apple-system,sans-serif;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:#94a3b8">Producto</th>
+                    <th style="padding:10px 12px;text-align:left;font-family:system-ui,-apple-system,sans-serif;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:#94a3b8">Marca</th>
                     <th style="padding:10px 12px;text-align:right;font-family:system-ui,-apple-system,sans-serif;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:#94a3b8">Existencia</th>
                     <th style="padding:10px 12px;text-align:right;font-family:system-ui,-apple-system,sans-serif;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:#94a3b8">Mínimo</th>
                   </tr>

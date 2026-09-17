@@ -6,7 +6,7 @@ import { notifyLowStock } from "@/lib/email/notify-low-stock";
 export async function maybeSendLowStockAlert(
   db: ReturnType<typeof adminClient>,
   organizationId: string,
-  item: { id: string; codigo: string; nombre: string; existencia: number; stockMinimo: number }
+  item: { id: string; codigo: string; nombre: string; marca?: string | null; existencia: number; stockMinimo: number }
 ): Promise<void> {
   const rule = await getInventoryAlertRule(db, organizationId);
   if (!rule.enabled || !rule.canalEmail) return;
