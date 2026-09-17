@@ -723,7 +723,7 @@ function InboxPageInner() {
                       <span className="text-xs text-white/50">{item.agent_name}</span>
                     </div>
                     {hasUnread && (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0f7eff] px-1.5 text-[11px] font-bold text-white shadow-[0_0_12px_rgba(15,126,255,0.5)]">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#0f7eff] text-[11px] font-bold text-white">
                         {item.unread_count > 9 ? "9+" : item.unread_count}
                       </span>
                     )}

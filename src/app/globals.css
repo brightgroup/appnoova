@@ -937,8 +937,9 @@ html:not(.dark) [data-noova-dashboard] [class*="bg-[#0f7eff]"] {
   background-color: rgba(0, 0, 0, 0.08) !important;
 }
 
-html:not(.dark) [data-noova-dashboard] button[class*="bg-[#0f7eff]"],
-html:not(.dark) [data-noova-dashboard] a[class*="bg-[#0f7eff]"] {
+html:not(.dark) [data-noova-dashboard] button[class*="bg-[#0f7eff]"]:not([class*="bg-[#0f7eff]/"]),
+html:not(.dark) [data-noova-dashboard] a[class*="bg-[#0f7eff]"]:not([class*="bg-[#0f7eff]/"]),
+html:not(.dark) [data-noova-dashboard] [class*="bg-[#0f7eff]"]:not([class*="bg-[#0f7eff]/"])[class*="text-white"] {
   background-color: #000000 !important;
   color: #ffffff !important;
 }
