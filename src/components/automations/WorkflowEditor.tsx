@@ -834,7 +834,7 @@ const EXAMPLE_JSON_IMAGE_EVENT = JSON.stringify(
   {
     event: "whatsapp.image_received",
     conversation_id: "5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02",
-    contact: { phone: "+573001234567", label: "Juan Pérez" },
+    contact: { phone: "+573001234567", id_type: "phone", label: "Juan Pérez" },
     image: { url: "https://.../foto.jpg", analysis: "Producto con empaque dañado" }
   },
   null,
@@ -845,7 +845,7 @@ const EXAMPLE_JSON_DOCUMENT_EVENT = JSON.stringify(
   {
     event: "whatsapp.document_received",
     conversation_id: "5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02",
-    contact: { phone: "+573001234567", label: "Juan Pérez" },
+    contact: { phone: "+573001234567", id_type: "phone", label: "Juan Pérez" },
     document: { url: "https://.../comprobante.pdf", analysis: "Comprobante de transferencia" }
   },
   null,
@@ -856,7 +856,7 @@ const EXAMPLE_JSON_TEXT_EVENT = JSON.stringify(
   {
     event: "whatsapp.text_received",
     conversation_id: "5b1e2b6a-3f21-4c9e-8a11-9d2f6e7c1a02",
-    contact: { phone: "+573001234567", label: "Juan Pérez" },
+    contact: { phone: "+573001234567", id_type: "phone", label: "Juan Pérez" },
     message: { text: "¿Tienen disponible la talla M?" }
   },
   null,
@@ -1802,7 +1802,9 @@ function NodeConfigPanel({
                   />
                   <p className="text-[11px] text-gray-500 leading-relaxed">
                     Variables disponibles — deben ir dentro de las comillas del JSON: <code>{"{{conversation_id}}"}</code>,{" "}
-                    <code>{"{{contact_phone}}"}</code>, <code>{"{{contact_label}}"}</code>, <code>{"{{message_text}}"}</code>,{" "}
+                    <code>{"{{contact_phone}}"}</code>, <code>{"{{contact_id_type}}"}</code> (&quot;phone&quot; o &quot;bsuid&quot; — WhatsApp
+                    a veces no revela el número real y manda un id en su lugar), <code>{"{{contact_label}}"}</code>,{" "}
+                    <code>{"{{message_text}}"}</code>,{" "}
                     <code>{"{{image_url}}"}</code>. La firma HMAC y{" "}
                     <code>Content-Type</code> se agregan siempre, sin importar los headers que pongas aquí.
                   </p>

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHmac } from "crypto";
+import { isWhatsAppBsuid } from "@/lib/whatsapp-channel";
 import { signedUrlForPath } from "@/lib/whatsapp/media-storage";
 import { getConnectionSecretsById, markConnectionError } from "@/lib/automations/connections-db";
 import { listActiveWorkflowsForOrg } from "@/lib/automations/workflows-db";
@@ -21,6 +22,17 @@ import { providerForLlmModel } from "@/lib/billing/pricing";
 const WEBHOOK_TIMEOUT_MS = 20_000;
 /** Cuánto del payload/respuesta se guarda para inspección en la UI — evita que un conector que devuelva HTML gigante llene la tabla. */
 const LOGGED_BODY_MAX_CHARS = 8000;
+
+/**
+ * Política de Meta (BSUID, obligatoria desde 2026): cuando el número real del contacto no es
+ * visible, `contactPhone` no es un teléfono sino un business-scoped id (`CO.1046820117844507`).
+ * Se manda igual en `contact.phone` (mismo campo de siempre, no rompe integraciones existentes)
+ * pero con esta señal aparte para que el workflow pueda distinguirlo — no hay forma de recuperar
+ * el teléfono real desde un BSUID, así que quien reciba el evento debe manejar ambos casos.
+ */
+function contactIdType(contactPhone: string): "phone" | "bsuid" {
+  return isWhatsAppBsuid(contactPhone) ? "bsuid" : "phone";
+}
 
 export interface EmitWhatsAppEventParams {
   organizationId: string;
@@ -161,7 +173,7 @@ async function logCapturedTriggerEvent(db: SupabaseClient, params: CapturedTrigg
   const requestBody = JSON.stringify({
     event: params.eventType,
     conversation_id: params.conversationId,
-    contact: { phone: params.contactPhone, label: params.contactLabel },
+    contact: { phone: params.contactPhone, id_type: contactIdType(params.contactPhone), label: params.contactLabel },
     ...(params.eventType === "whatsapp.image_received"
       ? { image: { url: params.mediaUrl, analysis: params.analysisText } }
       : params.eventType === "whatsapp.document_received"
@@ -217,6 +229,7 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
       conversation_id: params.conversationId,
       correlation_id: `${params.conversationId}:${params.messageSid}`,
       contact_phone: params.contactPhone,
+      contact_id_type: contactIdType(params.contactPhone),
       contact_label: params.contactLabel ?? "",
       message_text: params.analysisText,
       image_url: isImage ? params.mediaUrl ?? "" : "",
@@ -260,7 +273,7 @@ async function sendWebhookEvent(db: SupabaseClient, params: SendWebhookEventPara
       organization_id: params.organizationId,
       conversation_id: params.conversationId,
       correlation_id: `${params.conversationId}:${params.messageSid}`,
-      contact: { phone: params.contactPhone, label: params.contactLabel }
+      contact: { phone: params.contactPhone, id_type: contactIdType(params.contactPhone), label: params.contactLabel }
     };
     if (isImage) {
       payload.image = { url: params.mediaUrl, analysis: params.analysisText };

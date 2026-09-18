@@ -35,11 +35,6 @@ interface MetaWebhookPayload {
   }>;
 }
 
-function e164FromWaId(waId: string): string {
-  const digits = waId.replace(/\D/g, "");
-  return digits ? `+${digits}` : "";
-}
-
 /** Extrae mensajes entrantes del webhook Cloud API. */
 export function parseMetaWhatsAppInboundMessages(payload: MetaWebhookPayload): MetaInboundMessage[] {
   if (payload.object !== "whatsapp_business_account") return [];
@@ -77,7 +72,9 @@ export function parseMetaWhatsAppInboundMessages(payload: MetaWebhookPayload): M
         results.push({
           messageId: msg.id,
           phoneNumberId,
-          fromE164: e164FromWaId(msg.from),
+          // `msg.from` puede ser un teléfono (dígitos) o un BSUID (`CO.1046...`) cuando Meta oculta
+          // el número real — normalizeWhatsAppE164 detecta cuál es y no le arranca las letras al BSUID.
+          fromE164: normalizeWhatsAppE164(msg.from),
           toE164,
           body,
           profileName: contactName,
