@@ -17,9 +17,10 @@ import { CrmTenantLabelsPanel } from "@/components/crm/CrmTenantLabelsPanel";
 import { CreateStageModal } from "@/components/crm/CreateStageModal";
 import { CrmStageIconPicker } from "@/components/crm/CrmStageIconPicker";
 import { DeleteStageModal } from "@/components/crm/DeleteStageModal";
+import { CrmAutofillPanel } from "@/components/crm/CrmAutofillPanel";
 import type { CrmPipelineStage } from "@/types/crm";
 
-type Tab = "stages" | "contacts" | "leads" | "labels";
+type Tab = "stages" | "contacts" | "leads" | "labels" | "automatizacion";
 type StageDraft = Omit<CrmPipelineStage, "user_id" | "created_at" | "updated_at"> & { id?: string };
 
 export default function CrmConfigPage() {
@@ -208,6 +209,9 @@ export default function CrmConfigPage() {
           <button type="button" onClick={() => setTab("labels")} className={tab === "labels" ? btnFilterActive : btnFilterIdle}>
             Labels
           </button>
+          <button type="button" onClick={() => setTab("automatizacion")} className={tab === "automatizacion" ? btnFilterActive : btnFilterIdle}>
+            Automatización
+          </button>
         </div>
       </div>
 
@@ -286,6 +290,7 @@ export default function CrmConfigPage() {
           {tab === "contacts" && <CrmPropertyConfigPanel entityType="contact" />}
           {tab === "leads" && <CrmPropertyConfigPanel entityType="lead" />}
           {tab === "labels" && <CrmTenantLabelsPanel />}
+          {tab === "automatizacion" && <CrmAutofillPanel />}
         </div>
       </div>
 

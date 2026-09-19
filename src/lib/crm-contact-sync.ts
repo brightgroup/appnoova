@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CrmFieldProvenance, CrmFieldProvenanceEntry } from "@/types/crm";
 import { whatsappProvenanceEntry } from "@/lib/crm-contact-provenance";
+import { iaProvenanceEntry } from "@/lib/crm-ai-extract";
 import { normalizeWhatsAppE164 } from "@/lib/whatsapp-channel";
 
 export interface SyncContactFromWhatsAppInput {
@@ -256,6 +257,105 @@ export async function syncCrmContactFromWhatsAppInbound(
   const contactId = String(created.id);
   await linkConversationToContact(db, userId, conversationId, contactId);
   console.info(`[crm/sync] created contact ${contactId} from WhatsApp ${normalizedFrom}`);
+  return { contactId };
+}
+
+export interface SyncContactFromWidgetInput {
+  userId: string;
+  conversationId: string;
+  /** Nombre de respaldo mientras la IA no ha extraído uno real (ej. "Visitante Mi Link #ABC123"). */
+  displayName: string;
+  /** Canal de origen (web_widget, web_embed, ...) — solo se guarda en metadata, no hay columna dedicada. */
+  channel: string;
+}
+
+/** Busca un contacto ya vinculado a esta conversación (por metadata o por inbox_conversation_id). */
+async function findContactForConversationLink(
+  db: SupabaseClient,
+  userId: string,
+  conversationId: string
+): Promise<Record<string, unknown> | null> {
+  const { data: conv } = await db
+    .from("text_agent_conversations")
+    .select("metadata")
+    .eq("id", conversationId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const linkedId = (conv?.metadata as Record<string, unknown> | undefined)?.crm_contact_id;
+  if (linkedId) {
+    const { data: linked } = await db
+      .from("crm_contacts")
+      .select("*")
+      .eq("id", String(linkedId))
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (linked) return linked;
+  }
+
+  const { data: inboxLinked } = await db
+    .from("crm_contacts")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("inbox_conversation_id", conversationId)
+    .maybeSingle();
+  return inboxLinked ?? null;
+}
+
+/**
+ * Crea (o reutiliza) el contacto CRM de un visitante anónimo de Mi Link / widget web.
+ * A diferencia de WhatsApp, acá no hay teléfono de entrada: el contacto arranca solo
+ * con el nombre de visitante y se completa después vía `enrichCrmContactFromWhatsAppConversation`
+ * (nombre/email/ciudad/organización que la IA detecte en la charla).
+ */
+export async function syncCrmContactFromWidgetInbound(
+  db: SupabaseClient,
+  input: SyncContactFromWidgetInput
+): Promise<{ contactId: string | null; error?: string }> {
+  const { userId, conversationId, displayName, channel } = input;
+
+  const existing = await findContactForConversationLink(db, userId, conversationId);
+  if (existing) {
+    const contactId = String(existing.id);
+    await linkConversationToContact(db, userId, conversationId, contactId);
+    return { contactId };
+  }
+
+  const now = new Date().toISOString();
+  const { data: created, error } = await db
+    .from("crm_contacts")
+    .insert({
+      user_id: userId,
+      name: displayName,
+      tipo_contacto: "persona",
+      tipo_relacion: "prospecto",
+      fuente_origen: "recepcion_ia",
+      inbox_conversation_id: conversationId,
+      tags: [],
+      categorias_interes: [],
+      field_provenance: { name: iaProvenanceEntry("baja") } as CrmFieldProvenance,
+      metadata: { registro_canal: channel },
+      updated_at: now
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    if (error.code === "23505") {
+      const retry = await findContactForConversationLink(db, userId, conversationId);
+      if (retry) {
+        const contactId = String(retry.id);
+        await linkConversationToContact(db, userId, conversationId, contactId);
+        return { contactId };
+      }
+    }
+    console.error("[crm/sync-widget] insert failed:", error.message);
+    return { contactId: null, error: error.message };
+  }
+
+  const contactId = String(created.id);
+  await linkConversationToContact(db, userId, conversationId, contactId);
+  console.info(`[crm/sync-widget] created contact ${contactId} from ${channel} conversation ${conversationId}`);
   return { contactId };
 }
 

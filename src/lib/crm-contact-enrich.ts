@@ -92,12 +92,18 @@ function suggestionToPatchValue(suggestion: CrmAiFieldSuggestion): unknown {
 /**
  * Tras cada inbound de WhatsApp: extrae datos básicos de la conversación y actualiza
  * la ficha sin sobrescribir campos verificados manualmente.
+ *
+ * `extraFields` amplía REALTIME_AI_FIELDS para canales sin dato de entrada — en
+ * WhatsApp el teléfono ya se conoce por el propio canal, pero en Mi Link/widget el
+ * visitante es anónimo, así que ahí sí vale la pena que la IA lo tome del texto si
+ * lo menciona (ver microsite/chat route).
  */
 export async function enrichCrmContactFromWhatsAppConversation(
   db: SupabaseClient,
   userId: string,
   contactId: string,
-  conversationId: string
+  conversationId: string,
+  extraFields: CrmExtractableField[] = []
 ): Promise<{ updated: string[] }> {
   if (!getOriApiKey()) return { updated: [] };
 
@@ -117,10 +123,12 @@ export async function enrichCrmContactFromWhatsAppConversation(
   const messages = normalizeMessages(conv?.messages);
   if (messages.filter(m => m.role === "user").length === 0) return { updated: [] };
 
+  const applicableFields = extraFields.length ? [...REALTIME_AI_FIELDS, ...extraFields] : REALTIME_AI_FIELDS;
+
   let suggestions: CrmAiFieldSuggestion[];
   try {
     const extracted = await extractContactFieldsFromConversation(messages, contact);
-    suggestions = extracted.result.suggestions.filter(s => REALTIME_AI_FIELDS.includes(s.field));
+    suggestions = extracted.result.suggestions.filter(s => applicableFields.includes(s.field));
     // Enriquecimiento automático en tiempo real (no un botón que el cliente presionó):
     // costo real visible en /admin/consumption, sin cobrar crédito.
     await recordOriUsageForUser({

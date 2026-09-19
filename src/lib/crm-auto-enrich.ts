@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { enrichCrmContactFromWhatsAppConversation } from "@/lib/crm-contact-enrich";
 import { enrichCrmLeadForConversationId } from "@/lib/crm-lead-enrich";
+import type { CrmExtractableField } from "@/lib/crm-ai-extract";
 
 /**
  * Antes, cada mensaje entrante disparaba 2 llamadas a Gemini (ficha de contacto +
@@ -60,7 +61,8 @@ export async function runAutoCrmEnrichment(
   userId: string,
   contactId: string,
   conversationId: string,
-  trigger?: AutoEnrichTrigger
+  trigger?: AutoEnrichTrigger,
+  contactExtraFields?: CrmExtractableField[]
 ): Promise<void> {
   if (trigger && !trigger.hasMedia && isLowSignalMessage(trigger.text)) return;
 
@@ -89,7 +91,7 @@ export async function runAutoCrmEnrichment(
     .eq("user_id", userId);
 
   await Promise.all([
-    enrichCrmContactFromWhatsAppConversation(db, userId, contactId, conversationId).catch(err =>
+    enrichCrmContactFromWhatsAppConversation(db, userId, contactId, conversationId, contactExtraFields).catch(err =>
       console.error("[crm/auto-enrich] contact:", err)
     ),
     enrichCrmLeadForConversationId(db, userId, conversationId).catch(err =>
