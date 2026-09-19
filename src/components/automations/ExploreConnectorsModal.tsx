@@ -153,6 +153,24 @@ export function ExploreConnectorsModal({
     });
 
     list.push({
+      key: "woocommerce",
+      searchTerms: "woocommerce wordpress tienda ecommerce productos pedidos",
+      render: () => (
+        <ConnectorCard
+          key="woocommerce"
+          id="woocommerce"
+          name="WooCommerce"
+          description="Consulta (y, si lo activas, actualiza) tu catálogo y pedidos reales en vivo."
+          connected={false}
+          onConnect={() => {
+            close();
+            router.push("/dashboard/conectores/woocommerce");
+          }}
+        />
+      )
+    });
+
+    list.push({
       key: "gmail",
       searchTerms: "gmail correo email",
       render: () => (

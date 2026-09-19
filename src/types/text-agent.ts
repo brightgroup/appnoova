@@ -1,6 +1,7 @@
 import type { NotifyTeamRules } from "@/lib/text-notify-rules";
 import type { SchedulingRules } from "@/lib/scheduling/rules";
 import type { QuotingRules } from "@/lib/insurers/quoting-rules";
+import type { WooCommerceRules } from "@/lib/woocommerce/rules";
 
 export type TextSourceTemplateId =
   | "customer-assistant"
@@ -33,6 +34,7 @@ export interface TextAgentFormData {
   notify_rules?: NotifyTeamRules;
   scheduling_rules?: SchedulingRules;
   quoting_rules?: QuotingRules;
+  woocommerce_rules?: WooCommerceRules;
   /** Si es true, el agente no responde con IA: los chats quedan en cola humana. */
   human_only?: boolean;
 }

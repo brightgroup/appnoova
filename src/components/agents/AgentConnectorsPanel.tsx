@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Database, Plug, ShieldCheck } from "lucide-react";
+import { Database, Plug, ShieldCheck, ShoppingCart } from "lucide-react";
+import { DEFAULT_WOOCOMMERCE_RULES, type WooCommerceRules } from "@/lib/woocommerce/rules";
 import { Switch } from "@/components/ui/Switch";
 import { InsurerConnectorRow } from "@/components/automations/InsurerConnectorRow";
 import { ExploreConnectorsModal } from "@/components/automations/ExploreConnectorsModal";
@@ -32,7 +33,9 @@ export function AgentConnectorsPanel({
   dataTables,
   isSegurosTemplate,
   quotingRules,
-  onChangeQuotingRules
+  onChangeQuotingRules,
+  wooCommerceRules,
+  onChangeWooCommerceRules
 }: {
   showDataTable: boolean;
   dataTableId: string | null;
@@ -41,6 +44,8 @@ export function AgentConnectorsPanel({
   isSegurosTemplate: boolean;
   quotingRules?: AgentQuotingRulesValue;
   onChangeQuotingRules?: (value: AgentQuotingRulesValue) => void;
+  wooCommerceRules?: WooCommerceRules;
+  onChangeWooCommerceRules?: (value: WooCommerceRules) => void;
 }) {
   const { items: connectorItems } = useConnectorsSummary();
   const [exploreOpen, setExploreOpen] = useState(false);
@@ -48,6 +53,7 @@ export function AgentConnectorsPanel({
 
   const INSURER_CONNECTOR_IDS = ["la-equidad", "softseguros", "verifik", "placapi"];
   const hasAseguradoraConnected = connectorItems.some(i => INSURER_CONNECTOR_IDS.includes(i.id) && i.connected);
+  const wooCommerceConnected = connectorItems.some(i => i.id === "woocommerce" && i.connected);
   const hasAnyConnector = Boolean(dataTableId) || hasAseguradoraConnected;
   const selectedTable = dataTables.find(t => t.id === dataTableId) ?? null;
 
@@ -149,6 +155,70 @@ export function AgentConnectorsPanel({
             </>
           )}
         </>
+      )}
+
+      {wooCommerceRules && onChangeWooCommerceRules && (
+        <div className="rounded-xl border border-white/[.08] bg-white/[.03] overflow-hidden">
+          <div className="px-3.5 pt-3.5 pb-1">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">WooCommerce</p>
+          </div>
+          {!wooCommerceConnected ? (
+            <div className="px-3.5 pb-3.5">
+              <p className="text-xs text-gray-500">
+                Conecta tu tienda para activar esto —{" "}
+                <Link href="/dashboard/conectores/woocommerce" className="text-[#0f7eff] hover:underline">
+                  conéctala aquí
+                </Link>
+                .
+              </p>
+            </div>
+          ) : (
+            <div className="px-3.5 pb-3.5 space-y-2.5">
+              <label className="flex items-center justify-between gap-3 py-1">
+                <span className="flex items-center gap-2.5 min-w-0">
+                  <ShoppingCart className="w-4 h-4 text-[#99c9ff] shrink-0" />
+                  <span className="text-sm font-medium text-white">Activar WooCommerce para este agente</span>
+                </span>
+                <Switch
+                  checked={wooCommerceRules.enabled}
+                  onChange={v => onChangeWooCommerceRules(v ? { ...wooCommerceRules, enabled: true } : DEFAULT_WOOCOMMERCE_RULES)}
+                />
+              </label>
+              {wooCommerceRules.enabled && (
+                <div className="pl-1 space-y-2 border-l border-white/[.08] ml-2">
+                  <label className="flex items-center justify-between gap-3 pl-3">
+                    <span className="text-xs text-gray-400">Consultar productos</span>
+                    <Switch
+                      checked={wooCommerceRules.canReadProducts}
+                      onChange={v => onChangeWooCommerceRules({ ...wooCommerceRules, canReadProducts: v })}
+                    />
+                  </label>
+                  <label className="flex items-center justify-between gap-3 pl-3">
+                    <span className="text-xs text-gray-400">Consultar pedidos</span>
+                    <Switch
+                      checked={wooCommerceRules.canReadOrders}
+                      onChange={v => onChangeWooCommerceRules({ ...wooCommerceRules, canReadOrders: v })}
+                    />
+                  </label>
+                  <label className="flex items-center justify-between gap-3 pl-3">
+                    <span className="text-xs text-gray-400">Actualizar productos (stock/precio)</span>
+                    <Switch
+                      checked={wooCommerceRules.canWriteProducts}
+                      onChange={v => onChangeWooCommerceRules({ ...wooCommerceRules, canWriteProducts: v })}
+                    />
+                  </label>
+                  <label className="flex items-center justify-between gap-3 pl-3">
+                    <span className="text-xs text-gray-400">Actualizar pedidos (estado/nota)</span>
+                    <Switch
+                      checked={wooCommerceRules.canWriteOrders}
+                      onChange={v => onChangeWooCommerceRules({ ...wooCommerceRules, canWriteOrders: v })}
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       <button

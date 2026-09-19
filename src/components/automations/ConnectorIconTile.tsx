@@ -1,4 +1,4 @@
-import { Plug, Webhook } from "lucide-react";
+import { Plug, ShoppingCart, Webhook } from "lucide-react";
 import { GoogleCalendarLogo } from "@/components/icons/brands/GoogleCalendarLogo";
 import { GmailLogo } from "@/components/icons/brands/GmailLogo";
 import { HubSpotLogo } from "@/components/icons/brands/HubSpotLogo";
@@ -15,6 +15,7 @@ export type ConnectorLogoId =
   | "softseguros"
   | "verifik"
   | "placapi"
+  | "woocommerce"
   | "webhook";
 
 /**
@@ -40,6 +41,10 @@ export function ConnectorLogo({ id, className }: { id: string; className?: strin
       return <VerifikLogo className={className} />;
     case "placapi":
       return <PlacApiLogo className={className} />;
+    case "woocommerce":
+      // Sin logo de marca propio todavía (a diferencia de HubSpot/La Equidad/etc.) — un
+      // ícono de carrito genérico basta para distinguirlo en la grilla de conectores.
+      return <ShoppingCart className={className} />;
     case "webhook":
       return <Webhook className={className} />;
     default:

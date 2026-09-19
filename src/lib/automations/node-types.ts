@@ -13,6 +13,8 @@ export const NODE_TYPES = [
   "trigger.whatsapp_message",
   "trigger.webhook",
   "trigger.hubspot_message",
+  "trigger.woocommerce_order",
+  "trigger.woocommerce_product",
   "action.ai_extract",
   "action.webhook",
   "action.send_whatsapp_message",
@@ -109,6 +111,10 @@ export interface WorkflowNodeData {
   hubspotSenderActorId?: string;
   /** Solo aplica a action.hubspot_send_message: si es false, envía en cualquier mensaje entrante que aplique, no solo el primero del hilo. Default true. */
   hubspotOnlyFirstMessage?: boolean;
+  /** Solo aplica a trigger.woocommerce_order: token único de este nodo — la URL pública es /api/automations/woocommerce/{token}. Se genera al crear el nodo. */
+  woocommerceOrderWebhookToken?: string;
+  /** Solo aplica a trigger.woocommerce_product: token único de este nodo — la URL pública es /api/automations/woocommerce/{token}. Se genera al crear el nodo. */
+  woocommerceProductWebhookToken?: string;
   [key: string]: unknown;
 }
 
@@ -159,6 +165,18 @@ export const NODE_CATALOG: NodeCatalogEntry[] = [
     category: "trigger",
     label: "Mensaje recibido en HubSpot",
     description: "Elige las bandejas de Conversaciones a escuchar — requiere HubSpot conectado"
+  },
+  {
+    type: "trigger.woocommerce_order",
+    category: "trigger",
+    label: "Pedido nuevo/actualizado en WooCommerce",
+    description: "Se activa cuando un pedido se crea o cambia de estado — requiere WooCommerce conectado"
+  },
+  {
+    type: "trigger.woocommerce_product",
+    category: "trigger",
+    label: "Producto actualizado en WooCommerce",
+    description: "Se activa cuando un producto cambia (stock, precio, etc.) — requiere WooCommerce conectado"
   },
   {
     type: "action.ai_extract",
@@ -412,20 +430,77 @@ export function findWebhookActionConfigs(
   return configs;
 }
 
+export interface WooCommerceWebhookActionConfig extends WebhookActionConfig {
+  /**
+   * Id del nodo `trigger.woocommerce_order`/`trigger.woocommerce_product` del
+   * que sale esta acción — un workflow puede tener más de un nodo de este
+   * tipo, así que el emisor (`woocommerce-events.ts`) necesita filtrar solo
+   * las acciones conectadas al disparador que realmente se activó.
+   */
+  triggerNodeId: string;
+}
+
 /**
- * Asigna el token de URL pública a cualquier nodo `trigger.webhook` o
- * `trigger.hubspot_message` que aún no tenga uno (el editor ya lo genera al
- * crear el nodo — esto es solo un resguardo del lado del servidor antes de
+ * Análoga a `findWebhookActionConfigs`, pero para los disparadores de
+ * WooCommerce: no hay `mediaType`/`channelId` que filtrar (WooCommerce no
+ * tiene ese concepto), así que simplemente busca TODOS los nodos de
+ * `triggerType` en el grafo y, para cada uno, los `action.webhook`
+ * conectados por una arista directa (sin saltar a través de
+ * `action.ai_extract`, a diferencia del flujo de WhatsApp).
+ */
+export function findWooCommerceActionConfigs(
+  graph: WorkflowGraph,
+  triggerType: "trigger.woocommerce_order" | "trigger.woocommerce_product"
+): WooCommerceWebhookActionConfig[] {
+  const triggerIds = new Set(graph.nodes.filter((n) => n.type === triggerType).map((n) => n.id));
+  if (triggerIds.size === 0) return [];
+
+  const actionNodesById = new Map(
+    graph.nodes.filter((n) => n.type === "action.webhook").map((n) => [n.id, n])
+  );
+
+  const seen = new Set<string>();
+  const configs: WooCommerceWebhookActionConfig[] = [];
+  for (const edge of graph.edges) {
+    if (!triggerIds.has(edge.source)) continue;
+    const action = actionNodesById.get(edge.target);
+    const connectionId = action?.data.connectionId;
+    if (!action || typeof connectionId !== "string" || !connectionId) continue;
+    const seenKey = `${edge.source}:${action.id}`;
+    if (seen.has(seenKey)) continue;
+    seen.add(seenKey);
+    configs.push({
+      triggerNodeId: edge.source,
+      connectionId,
+      customRequest: Boolean(action.data.customRequest),
+      requestMethod:
+        typeof action.data.requestMethod === "string" && action.data.requestMethod ? action.data.requestMethod : "POST",
+      requestHeadersJson: typeof action.data.requestHeadersJson === "string" ? action.data.requestHeadersJson : undefined,
+      requestBodyTemplate: typeof action.data.requestBodyTemplate === "string" ? action.data.requestBodyTemplate : undefined
+    });
+  }
+  return configs;
+}
+
+/**
+ * Asigna el token de URL pública a cualquier nodo `trigger.webhook`,
+ * `trigger.hubspot_message`, `trigger.woocommerce_order` o
+ * `trigger.woocommerce_product` que aún no tenga uno (el editor ya lo genera
+ * al crear el nodo — esto es solo un resguardo del lado del servidor antes de
  * persistir el grafo). Cada tipo guarda su token en su propio campo
- * (`webhookToken` / `hubspotWebhookToken`) porque son URLs de callback
- * distintas (`/api/automations/inbound/...` vs `/api/automations/hubspot/...`).
+ * (`webhookToken` / `hubspotWebhookToken` / `woocommerceOrderWebhookToken` /
+ * `woocommerceProductWebhookToken`) porque son URLs de callback distintas
+ * (`/api/automations/inbound/...` vs `/api/automations/hubspot/...` vs
+ * `/api/automations/woocommerce/...`).
  */
 /** Mismo formato que valida el campo del editor — letras, números, punto, guion y guion bajo. */
 const VALID_WEBHOOK_SLUG = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
 
 const TOKEN_FIELD_BY_TRIGGER_TYPE: Partial<Record<WorkflowNodeType, keyof WorkflowNodeData>> = {
   "trigger.webhook": "webhookToken",
-  "trigger.hubspot_message": "hubspotWebhookToken"
+  "trigger.hubspot_message": "hubspotWebhookToken",
+  "trigger.woocommerce_order": "woocommerceOrderWebhookToken",
+  "trigger.woocommerce_product": "woocommerceProductWebhookToken"
 };
 
 export function ensureWebhookTokens(graph: WorkflowGraph): WorkflowGraph {

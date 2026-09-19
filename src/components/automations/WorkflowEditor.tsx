@@ -35,7 +35,9 @@ import {
   Radio,
   Undo2,
   Redo2,
-  Bot
+  Bot,
+  ShoppingCart,
+  Package
 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { supabase } from "@/lib/supabase";
@@ -80,6 +82,8 @@ const NODE_PICKER_ICON: Record<WorkflowNodeType, React.ReactNode> = {
   "trigger.whatsapp_message": <WhatsAppLogo className="w-4 h-4 text-white" />,
   "trigger.webhook": <Webhook className="w-4 h-4 text-white" strokeWidth={1.8} />,
   "trigger.hubspot_message": <HubSpotLogo className="w-4 h-4 text-white" />,
+  "trigger.woocommerce_order": <ShoppingCart className="w-4 h-4 text-white" strokeWidth={1.8} />,
+  "trigger.woocommerce_product": <Package className="w-4 h-4 text-white" strokeWidth={1.8} />,
   "action.ai_extract": <Bot className="w-4 h-4 text-white" strokeWidth={1.6} />,
   "action.webhook": <Globe className="w-4 h-4 text-white" strokeWidth={1.6} />,
   "action.send_whatsapp_message": <WhatsAppLogo className="w-4 h-4 text-white" />,
@@ -97,7 +101,13 @@ const AI_EXTRACT_MODEL_OPTIONS: { value: string; label: string }[] = [
 ];
 const DEFAULT_AI_EXTRACT_MODEL = "gemini-2.5-flash";
 
-const TRIGGER_TYPES: WorkflowNodeType[] = ["trigger.whatsapp_message", "trigger.webhook", "trigger.hubspot_message"];
+const TRIGGER_TYPES: WorkflowNodeType[] = [
+  "trigger.whatsapp_message",
+  "trigger.webhook",
+  "trigger.hubspot_message",
+  "trigger.woocommerce_order",
+  "trigger.woocommerce_product"
+];
 
 interface WhatsAppTemplateOption {
   id: string;
@@ -307,7 +317,11 @@ export function WorkflowEditor({ workflowId, initialTab }: { workflowId: string;
         ? { webhookToken: crypto.randomUUID().replace(/-/g, "") }
         : type === "trigger.hubspot_message"
           ? { hubspotWebhookToken: crypto.randomUUID().replace(/-/g, "") }
-          : type === "action.ai_extract"
+          : type === "trigger.woocommerce_order"
+            ? { woocommerceOrderWebhookToken: crypto.randomUUID().replace(/-/g, "") }
+            : type === "trigger.woocommerce_product"
+              ? { woocommerceProductWebhookToken: crypto.randomUUID().replace(/-/g, "") }
+              : type === "action.ai_extract"
             ? { aiModel: DEFAULT_AI_EXTRACT_MODEL }
             : type === "action.hubspot_upsert_contact"
               ? { hubspotCreateIfMissing: true }
@@ -869,6 +883,19 @@ const EXAMPLE_JSON_HUBSPOT_EVENT = JSON.stringify(
     contact: { phone: "+573001234567", label: "Juan Pérez" },
     conversation_id: "10896772776",
     message: { text: "Hola, quiero información" }
+  },
+  null,
+  2
+);
+
+const EXAMPLE_JSON_WOOCOMMERCE_EVENT = JSON.stringify(
+  {
+    id: 4821,
+    number: "4821",
+    status: "processing",
+    total: "129900",
+    line_items: [{ name: "Camiseta talla M", quantity: 1, total: "129900" }],
+    billing: { first_name: "Juan", last_name: "Pérez", phone: "+573001234567" }
   },
   null,
   2
@@ -1478,6 +1505,7 @@ function NodeConfigPanel({
   const isTrigger = TRIGGER_TYPES.includes(type);
   const webhookBaseUrl = typeof window !== "undefined" ? `${window.location.origin}/api/automations/inbound` : "";
   const hubspotWebhookBaseUrl = typeof window !== "undefined" ? `${window.location.origin}/api/automations/hubspot` : "";
+  const woocommerceWebhookBaseUrl = typeof window !== "undefined" ? `${window.location.origin}/api/automations/woocommerce` : "";
 
   const displayLabel = resolveNodeLabel(type, node.data, channels, connections, hubspotInboxes);
   const [editingLabel, setEditingLabel] = useState(false);
@@ -1735,6 +1763,33 @@ function NodeConfigPanel({
               />
               <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
                 Sin elegir ninguna = escucha cualquier bandeja del portal.
+              </p>
+            </div>
+          );
+        })()}
+
+        {(type === "trigger.woocommerce_order" || type === "trigger.woocommerce_product") && (() => {
+          const isOrder = type === "trigger.woocommerce_order";
+          const tokenField = isOrder ? "woocommerceOrderWebhookToken" : "woocommerceProductWebhookToken";
+          const topic = isOrder ? "Pedido creado / Pedido actualizado" : "Producto actualizado";
+
+          return (
+            <div>
+              <InfoNote example={EXAMPLE_JSON_WOOCOMMERCE_EVENT} exampleLabel="Ver ejemplo ilustrativo de JSON (sin datos reales aún)">
+                Se activa cuando WooCommerce manda el webhook correspondiente a tu tienda. Conecta{" "}
+                <strong className="text-gray-300">HTTP Request</strong> para reenviar el evento a otro sistema (n8n, tu CRM, etc.).
+              </InfoNote>
+              <label className="block text-xs font-semibold text-gray-400 mb-1.5">URL del webhook</label>
+              <WebhookSlugField
+                baseUrl={woocommerceWebhookBaseUrl}
+                value={(node.data[tokenField] as string) ?? ""}
+                onChange={token => onSetData({ [tokenField]: token })}
+              />
+              <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+                Pega esta URL en tu tienda, en WooCommerce → Ajustes → Avanzado → Webhooks → Agregar webhook, con tema{" "}
+                <strong className="text-gray-300">{topic}</strong>. En "Secreto" pega el mismo que se muestra en{" "}
+                <Link href="/dashboard/conectores/woocommerce" className="underline">tu conexión de WooCommerce</Link> — sin
+                eso, Noova no puede verificar que el webhook viene realmente de tu tienda y lo rechaza.
               </p>
             </div>
           );

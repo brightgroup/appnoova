@@ -20,6 +20,7 @@ import {
   type OrgBusinessHours
 } from "@/lib/scheduling/rules";
 import { normalizeQuotingRules } from "@/lib/insurers/quoting-rules";
+import { normalizeWooCommerceRules } from "@/lib/woocommerce/rules";
 import { ALL_TEXT_AGENT_TOOLS } from "@/lib/agent-tools/all-text-tools";
 import type {
   GenerateTextAgentReplyInput,
@@ -87,7 +88,9 @@ export async function generateOpenAiAgentReply(
     businessHours: normalizeOrgBusinessHours(input.businessHours) as OrgBusinessHours,
     calendarConnection: input.calendarConnection ?? null,
     quotingRules: normalizeQuotingRules(input.quotingRules),
-    ramoCampos: input.ramoCampos ?? {}
+    ramoCampos: input.ramoCampos ?? {},
+    wooCommerceConnection: input.wooCommerceConnection ?? null,
+    wooCommerceRules: normalizeWooCommerceRules(input.wooCommerceRules)
   };
 
   const enabledTools = resolveEnabledTools(ALL_TEXT_AGENT_TOOLS, rulesCtx);

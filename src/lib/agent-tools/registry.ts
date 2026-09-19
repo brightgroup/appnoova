@@ -6,6 +6,8 @@ import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import type { CalendarConnectionRecord } from "@/lib/google-calendar/connections-db";
 import type { QuotingRules } from "@/lib/insurers/quoting-rules";
 import type { RamoCampoDef } from "@/lib/insurers/ramo-campos-defaults";
+import type { WooCommerceConnectionRecord } from "@/lib/woocommerce/connections-db";
+import type { WooCommerceRules } from "@/lib/woocommerce/rules";
 
 /**
  * Registro genérico de "tools" para agentes IA (texto y, a futuro, voz).
@@ -33,6 +35,10 @@ export interface AgentToolRulesContext {
    * o no se precargó (ej. canal sin seguros).
    */
   ramoCampos: Record<string, RamoCampoDef[]>;
+  /** Conexión de WooCommerce activa de la organización (si hay), para las tools de catálogo/pedidos. */
+  wooCommerceConnection?: WooCommerceConnectionRecord | null;
+  /** Interruptor propio del agente para WooCommerce (lectura/escritura configurable) — ver src/lib/woocommerce/rules.ts. */
+  wooCommerceRules: WooCommerceRules;
 }
 
 /** Contexto de ejecución de una tool (una vez el modelo decide invocarla). */

@@ -27,9 +27,10 @@ export function useConnectorsSummary() {
     try {
       const { getAuthHeaders } = await import("@/lib/text-agents-api");
       const headers = await getAuthHeaders();
-      const [calRes, hubspotRes, laEquidadRes, softsegurosRes, verifikRes, placapiRes] = await Promise.all([
+      const [calRes, hubspotRes, woocommerceRes, laEquidadRes, softsegurosRes, verifikRes, placapiRes] = await Promise.all([
         fetch("/api/conectores/google-calendar/status", { headers }),
         fetch("/api/conectores/hubspot/status", { headers }),
+        fetch("/api/conectores/woocommerce/status", { headers }),
         modules.seguros ? fetch("/api/seguros/conectores/la-equidad/status", { headers }) : Promise.resolve(null),
         modules.seguros ? fetch("/api/seguros/conectores/softseguros/status", { headers }) : Promise.resolve(null),
         modules.seguros ? fetch("/api/seguros/conectores/verifik/status", { headers }) : Promise.resolve(null),
@@ -38,6 +39,7 @@ export function useConnectorsSummary() {
 
       const calJson = calRes.ok ? await calRes.json() : null;
       const hubspotJson = hubspotRes.ok ? await hubspotRes.json() : null;
+      const woocommerceJson = woocommerceRes.ok ? await woocommerceRes.json() : null;
       const laEquidadJson = laEquidadRes?.ok ? await laEquidadRes.json() : null;
       const softsegurosJson = softsegurosRes?.ok ? await softsegurosRes.json() : null;
       const verifikJson = verifikRes?.ok ? await verifikRes.json() : null;
@@ -45,7 +47,8 @@ export function useConnectorsSummary() {
 
       const next: ConnectorSummaryItem[] = [
         { id: "google-calendar", name: "Google Calendar", connected: Boolean(calJson?.configured) },
-        { id: "hubspot", name: "HubSpot", connected: hubspotJson?.connection?.status === "active" }
+        { id: "hubspot", name: "HubSpot", connected: hubspotJson?.connection?.status === "active" },
+        { id: "woocommerce", name: "WooCommerce", connected: woocommerceJson?.connection?.status === "active" }
       ];
       if (modules.seguros) {
         next.push(

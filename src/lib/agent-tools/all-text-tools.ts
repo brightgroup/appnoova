@@ -10,11 +10,13 @@ import { calificarAccidentesAgentTool } from "@/lib/agent-tools/accident-quote-a
 import { presentarOpcionesWhatsAppTool } from "@/lib/agent-tools/whatsapp-options-tool";
 import { radicarSiniestroAgentTool } from "@/lib/agent-tools/siniestro-agent-tool";
 import { cotizarSeguroAgentTool } from "@/lib/agent-tools/generic-quote-agent-tools";
+import { WOOCOMMERCE_TOOLS } from "@/lib/woocommerce/agent-tools";
 
 /** Todas las tools disponibles para agentes de texto (Gemini `generateContent`). */
 export const ALL_TEXT_AGENT_TOOLS: AgentToolDefinition[] = [
   notifyTeamTool,
   ...SCHEDULING_TOOLS,
+  ...WOOCOMMERCE_TOOLS,
   cotizarSeguroAutoAgentTool,
   calificarSeguroVidaAgentTool,
   calificarSeguroHogarAgentTool,

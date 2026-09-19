@@ -4,6 +4,7 @@ import { resolveBaseTextTemplateId } from "@/lib/text-agent-templates";
 import { normalizeNotifyTeamRules } from "@/lib/text-notify-rules";
 import { normalizeSchedulingRules } from "@/lib/scheduling/rules";
 import { normalizeQuotingRules } from "@/lib/insurers/quoting-rules";
+import { normalizeWooCommerceRules } from "@/lib/woocommerce/rules";
 
 export function normalizeTextAgentForm(raw: Partial<TextAgentFormData>): TextAgentFormData {
   const temperature = Number(raw.temperature);
@@ -22,6 +23,7 @@ export function normalizeTextAgentForm(raw: Partial<TextAgentFormData>): TextAge
     notify_rules: normalizeNotifyTeamRules(raw.notify_rules),
     scheduling_rules: normalizeSchedulingRules(raw.scheduling_rules),
     quoting_rules: normalizeQuotingRules(raw.quoting_rules),
+    woocommerce_rules: normalizeWooCommerceRules(raw.woocommerce_rules),
     human_only: raw.human_only === true
   };
 }

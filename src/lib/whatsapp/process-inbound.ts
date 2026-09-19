@@ -59,6 +59,7 @@ import {
 } from "@/lib/billing/meter";
 import { providerForLlmModel } from "@/lib/billing/pricing";
 import { getActiveCalendarConnection } from "@/lib/google-calendar/connections-db";
+import { getWooCommerceConnection } from "@/lib/woocommerce/connections-db";
 import { getOrgBusinessHours } from "@/lib/scheduling/business-hours-db";
 import { normalizeQuotingRules } from "@/lib/insurers/quoting-rules";
 import { getAllRamoCampoDefinitionsParaCotizar } from "@/lib/insurers/quote-guidance";
@@ -759,6 +760,7 @@ async function processTwilioWhatsAppInboundLocked(
 
   try {
     const calendarConnection = orgId ? await getActiveCalendarConnection(db, orgId) : null;
+    const wooCommerceConnection = orgId ? await getWooCommerceConnection(db, orgId) : null;
     const businessHours = orgId ? await getOrgBusinessHours(db, orgId) : undefined;
     const ramoCampos =
       orgId && normalizeQuotingRules(agent.quoting_rules).enabled ? await getAllRamoCampoDefinitionsParaCotizar(db, orgId) : {};
@@ -777,6 +779,8 @@ async function processTwilioWhatsAppInboundLocked(
       calendarConnection,
       quotingRules: agent.quoting_rules,
       ramoCampos,
+      wooCommerceConnection,
+      wooCommerceRules: agent.woocommerce_rules,
       toolContext: {
         db,
         organizationId: orgId,

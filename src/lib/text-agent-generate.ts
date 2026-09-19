@@ -6,6 +6,8 @@ import { normalizeNotifyTeamRules, type NotifyTeamRules } from "@/lib/text-notif
 import { normalizeSchedulingRules, normalizeOrgBusinessHours, type SchedulingRules, type OrgBusinessHours } from "@/lib/scheduling/rules";
 import { normalizeQuotingRules, type QuotingRules } from "@/lib/insurers/quoting-rules";
 import type { RamoCampoDef } from "@/lib/insurers/ramo-campos-defaults";
+import { normalizeWooCommerceRules, type WooCommerceRules } from "@/lib/woocommerce/rules";
+import type { WooCommerceConnectionRecord } from "@/lib/woocommerce/connections-db";
 import { ALL_TEXT_AGENT_TOOLS } from "@/lib/agent-tools/all-text-tools";
 import {
   resolveEnabledTools,
@@ -40,9 +42,18 @@ export interface GenerateTextAgentReplyInput {
   quotingRules?: QuotingRules | unknown;
   /** Precargado por process-inbound.ts/microsite chat route con getAllRamoCampoDefinitionsParaCotizar — ver registry.ts. */
   ramoCampos?: Record<string, RamoCampoDef[]>;
+  wooCommerceConnection?: WooCommerceConnectionRecord | null;
+  wooCommerceRules?: WooCommerceRules | unknown;
   toolContext: Omit<
     AgentToolContext,
-    "notifyRules" | "schedulingRules" | "businessHours" | "calendarConnection" | "quotingRules" | "ramoCampos"
+    | "notifyRules"
+    | "schedulingRules"
+    | "businessHours"
+    | "calendarConnection"
+    | "quotingRules"
+    | "ramoCampos"
+    | "wooCommerceConnection"
+    | "wooCommerceRules"
   >;
 }
 
@@ -152,7 +163,9 @@ async function generateGeminiAgentReply(
     businessHours: normalizeOrgBusinessHours(input.businessHours),
     calendarConnection: input.calendarConnection ?? null,
     quotingRules: normalizeQuotingRules(input.quotingRules),
-    ramoCampos: input.ramoCampos ?? {}
+    ramoCampos: input.ramoCampos ?? {},
+    wooCommerceConnection: input.wooCommerceConnection ?? null,
+    wooCommerceRules: normalizeWooCommerceRules(input.wooCommerceRules)
   };
 
   const enabledTools = resolveEnabledTools(ALL_TEXT_AGENT_TOOLS, rulesCtx);

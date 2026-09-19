@@ -425,6 +425,8 @@ function ConfigContent() {
                 quoting_rules: { ...value, insurer_connection_ids: f.quoting_rules?.insurer_connection_ids ?? [] }
               }))
             }
+            wooCommerceRules={form.woocommerce_rules}
+            onChangeWooCommerceRules={woocommerce_rules => setForm(f => ({ ...f, woocommerce_rules }))}
           />
         </div>
       )}

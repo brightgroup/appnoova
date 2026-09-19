@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Zap, Webhook, Globe, Copy, Check, Bot } from "lucide-react";
+import { Zap, Webhook, Globe, Copy, Check, Bot, ShoppingCart, Package } from "lucide-react";
 import { WhatsAppLogo } from "@/components/icons/brands/WhatsAppLogo";
 import { HubSpotLogo } from "@/components/icons/brands/HubSpotLogo";
 import type { AutomationConnectionRecord } from "@/lib/automations/connections-db";
@@ -25,6 +25,8 @@ export const NODE_BRAND_COLOR: Record<string, string> = {
   "trigger.whatsapp_message": "#25D366",
   "trigger.webhook": "#F5A623",
   "trigger.hubspot_message": "#FF7A59",
+  "trigger.woocommerce_order": "#96588A",
+  "trigger.woocommerce_product": "#96588A",
   "action.ai_extract": "#8B5CF6",
   "action.webhook": "#0EA5E9",
   "action.send_whatsapp_message": "#25D366",
@@ -38,6 +40,8 @@ export const NODE_TITLE: Record<WorkflowNodeType, string> = {
   "trigger.whatsapp_message": "Mensaje de WhatsApp recibido",
   "trigger.webhook": "Webhook entrante",
   "trigger.hubspot_message": "Mensaje recibido en HubSpot",
+  "trigger.woocommerce_order": "Pedido nuevo/actualizado en WooCommerce",
+  "trigger.woocommerce_product": "Producto actualizado en WooCommerce",
   "action.ai_extract": "IA",
   "action.webhook": "HTTP Request",
   "action.send_whatsapp_message": "Enviar mensaje de WhatsApp",
@@ -159,6 +163,27 @@ export function HubspotTriggerNode({ selected, data }: NodeProps) {
   );
 }
 
+/** Sin logo de marca propio en el repo — ícono genérico (igual criterio que trigger.webhook), distinguido del de producto por el ícono. */
+export function WooCommerceOrderTriggerNode({ selected, data }: NodeProps) {
+  const label = resolveNodeLabel("trigger.woocommerce_order", (data as WorkflowNodeData) ?? {}, [], []);
+  return (
+    <NodeShell selected={selected} label={label} isTrigger color={NODE_BRAND_COLOR["trigger.woocommerce_order"]}>
+      <ShoppingCart className="w-10 h-10 text-white" strokeWidth={1.8} />
+      <Handle type="source" position={Position.Right} className="!bg-white !w-2.5 !h-2.5 !border-2 !border-[#111218]" />
+    </NodeShell>
+  );
+}
+
+export function WooCommerceProductTriggerNode({ selected, data }: NodeProps) {
+  const label = resolveNodeLabel("trigger.woocommerce_product", (data as WorkflowNodeData) ?? {}, [], []);
+  return (
+    <NodeShell selected={selected} label={label} isTrigger color={NODE_BRAND_COLOR["trigger.woocommerce_product"]}>
+      <Package className="w-10 h-10 text-white" strokeWidth={1.8} />
+      <Handle type="source" position={Position.Right} className="!bg-white !w-2.5 !h-2.5 !border-2 !border-[#111218]" />
+    </NodeShell>
+  );
+}
+
 export function WebhookActionNode({ selected, data }: NodeProps) {
   const connections = useContext(ConnectionsContext);
   const label = resolveNodeLabel("action.webhook", (data as WorkflowNodeData) ?? {}, [], connections);
@@ -237,6 +262,8 @@ export const WORKFLOW_NODE_TYPES = {
   "trigger.whatsapp_message": WhatsAppTriggerNode,
   "trigger.webhook": WebhookTriggerNode,
   "trigger.hubspot_message": HubspotTriggerNode,
+  "trigger.woocommerce_order": WooCommerceOrderTriggerNode,
+  "trigger.woocommerce_product": WooCommerceProductTriggerNode,
   "action.hubspot_upsert_contact": HubspotUpsertContactNode,
   "action.hubspot_assign_owner": HubspotAssignOwnerNode,
   "action.hubspot_send_message": HubspotSendMessageNode,

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FunctionDeclaration } from "@google/genai";
 import { inventoryLookupTool } from "@/lib/agent-tools/inventory-lookup-tool";
 import { inventoryMovementsTool } from "@/lib/agent-tools/inventory-movements-tool";
+import { ORI_WOOCOMMERCE_TOOLS } from "@/lib/woocommerce/ori-tools";
 
 /**
  * Registro de tools SOLO para ORI (copiloto interno) — deliberadamente separado
@@ -62,4 +63,4 @@ export async function executeOriTool(
 }
 
 /** Registro de todas las tools de Ori — agregar una nueva es sumarla acá. */
-export const ORI_TOOLS: OriToolDefinition[] = [inventoryLookupTool, inventoryMovementsTool];
+export const ORI_TOOLS: OriToolDefinition[] = [inventoryLookupTool, inventoryMovementsTool, ...ORI_WOOCOMMERCE_TOOLS];

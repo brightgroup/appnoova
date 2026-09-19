@@ -17,6 +17,7 @@ import { checkBillingForUser, recordUsageSafe } from "@/lib/billing/meter";
 import { providerForLlmModel } from "@/lib/billing/pricing";
 import { resolveOrgActiveWhatsAppChannel } from "@/lib/text-notify-team";
 import { getActiveCalendarConnection } from "@/lib/google-calendar/connections-db";
+import { getWooCommerceConnection } from "@/lib/woocommerce/connections-db";
 import { getOrgBusinessHours } from "@/lib/scheduling/business-hours-db";
 import { getRamosOfrecidosLabels, mergeRamosOfrecidosContext } from "@/lib/insurers/ramos-ofrecidos-context";
 
@@ -139,6 +140,7 @@ export async function POST(req: NextRequest) {
   const orgId = billing.organizationId || String(agent.organization_id || "");
   const waChannel = orgId ? await resolveOrgActiveWhatsAppChannel(db, orgId) : null;
   const calendarConnection = orgId ? await getActiveCalendarConnection(db, orgId) : null;
+  const wooCommerceConnection = orgId ? await getWooCommerceConnection(db, orgId) : null;
   const businessHours = orgId ? await getOrgBusinessHours(db, orgId) : undefined;
 
   try {
@@ -155,6 +157,8 @@ export async function POST(req: NextRequest) {
       schedulingRules: agent.scheduling_rules,
       businessHours,
       calendarConnection,
+      wooCommerceConnection,
+      wooCommerceRules: agent.woocommerce_rules,
       toolContext: {
         db,
         organizationId: orgId,

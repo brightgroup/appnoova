@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { makeVisitorLabel } from "@/lib/inbox-utils";
+import { formatInboxDisplayTitle, makeVisitorLabel } from "@/lib/inbox-utils";
+import { syncCrmContactFromWidgetInbound } from "@/lib/crm-contact-sync";
+import { runAutoCrmEnrichment } from "@/lib/crm-auto-enrich";
+import { getOrgCrmAutofillEnabled } from "@/lib/crm-autofill-settings";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
 import { resolveMicrositeAgentForChat } from "@/lib/microsite-server";
@@ -35,6 +38,7 @@ import {
 import { notifyPushForOrg } from "@/lib/push/send";
 import { resolveOrgActiveWhatsAppChannel } from "@/lib/text-notify-team";
 import { getActiveCalendarConnection } from "@/lib/google-calendar/connections-db";
+import { getWooCommerceConnection } from "@/lib/woocommerce/connections-db";
 import { getOrgBusinessHours } from "@/lib/scheduling/business-hours-db";
 import { normalizeQuotingRules } from "@/lib/insurers/quoting-rules";
 import { getAllRamoCampoDefinitionsParaCotizar } from "@/lib/insurers/quote-guidance";
@@ -46,6 +50,50 @@ const PUBLIC_BILLING_FALLBACK =
 interface ChatMessage {
   role: "user" | "assistant" | "human";
   content: string;
+}
+
+/**
+ * A diferencia de WhatsApp (sync-and-enrich vive en process-inbound.ts), este canal
+ * nunca tuvo contacto/lead de CRM conectados — un visitante de Mi Link o del widget
+ * podía chatear sin que se creara ficha ni pipeline. No hay teléfono de entrada, así
+ * que el contacto arranca solo con un nombre de visitante y se completa con la misma
+ * IA de enriquecimiento que ya usa WhatsApp.
+ */
+async function syncAndEnrichCrmFromWidget(
+  db: ReturnType<typeof textAgentsAdminClient>,
+  userId: string,
+  organizationId: string | null,
+  conversationId: string,
+  channel: string,
+  visitorText: string
+): Promise<void> {
+  try {
+    if (organizationId && !(await getOrgCrmAutofillEnabled(db, organizationId))) return;
+
+    const displayName = formatInboxDisplayTitle("", channel, conversationId);
+    const { contactId, error } = await syncCrmContactFromWidgetInbound(db, {
+      userId,
+      conversationId,
+      displayName,
+      channel
+    });
+    if (error) console.error("[microsite/chat] crm sync:", error);
+    if (!contactId) return;
+
+    // Solo "telefono" (no "whatsapp"): esa columna tiene un índice único por
+    // usuario y un visitante puede escribir un número que ya es el WhatsApp de
+    // otro contacto — eso rompía el update completo (ver [crm/enrich] logs).
+    await runAutoCrmEnrichment(
+      db,
+      userId,
+      contactId,
+      conversationId,
+      { text: visitorText, hasMedia: false },
+      ["telefono"]
+    );
+  } catch (err) {
+    console.error("[microsite/chat] crm sync/enrich:", err);
+  }
 }
 
 export async function GET(
@@ -296,6 +344,9 @@ export async function POST(
   const calendarConnection = billing.organizationId
     ? await getActiveCalendarConnection(db, billing.organizationId)
     : null;
+  const wooCommerceConnection = billing.organizationId
+    ? await getWooCommerceConnection(db, billing.organizationId)
+    : null;
   const businessHours = billing.organizationId
     ? await getOrgBusinessHours(db, billing.organizationId)
     : undefined;
@@ -320,6 +371,8 @@ export async function POST(
       calendarConnection,
       quotingRules: agent.quoting_rules,
       ramoCampos,
+      wooCommerceConnection,
+      wooCommerceRules: agent.woocommerce_rules,
       toolContext: {
         db,
         organizationId: billing.organizationId,
@@ -364,6 +417,17 @@ export async function POST(
       if (persisted.conversationId) savedConversationId = persisted.conversationId;
     } catch (err) {
       console.error("[public/microsite/chat] persist:", err);
+    }
+
+    if (savedConversationId) {
+      void syncAndEnrichCrmFromWidget(
+        db,
+        userId,
+        billing.organizationId,
+        savedConversationId,
+        channel,
+        visitorText
+      );
     }
 
     // `guarded.needsHuman`: el agente afirmó un dato que no existe en el

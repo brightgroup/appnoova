@@ -124,6 +124,7 @@ export async function POST(req: NextRequest) {
     notify_rules: form.notify_rules ?? {},
     scheduling_rules: form.scheduling_rules ?? {},
     quoting_rules: form.quoting_rules ?? {},
+    woocommerce_rules: form.woocommerce_rules ?? {},
     human_only: form.human_only === true,
     updated_at: new Date().toISOString()
   };
@@ -137,9 +138,10 @@ export async function POST(req: NextRequest) {
       || error?.message?.includes("notify_rules")
       || error?.message?.includes("scheduling_rules")
       || error?.message?.includes("quoting_rules")
+      || error?.message?.includes("woocommerce_rules")
       || error?.message?.includes("human_only")
     ) {
-      const { company_context_id: _c, data_table_id: _d, notify_rules: _n, scheduling_rules: _s, quoting_rules: _q, human_only: _h, ...rest } = row;
+      const { company_context_id: _c, data_table_id: _d, notify_rules: _n, scheduling_rules: _s, quoting_rules: _q, woocommerce_rules: _w, human_only: _h, ...rest } = row;
       ({ data, error } = await updateTextAgentRow(db, rest, body.id, orgCtx.organizationId));
     }
 
@@ -161,9 +163,10 @@ export async function POST(req: NextRequest) {
     || error?.message?.includes("notify_rules")
     || error?.message?.includes("scheduling_rules")
     || error?.message?.includes("quoting_rules")
+    || error?.message?.includes("woocommerce_rules")
     || error?.message?.includes("human_only")
   ) {
-    const { company_context_id: _c, data_table_id: _d, notify_rules: _n, scheduling_rules: _s, quoting_rules: _q, human_only: _h, ...rest } = row;
+    const { company_context_id: _c, data_table_id: _d, notify_rules: _n, scheduling_rules: _s, quoting_rules: _q, woocommerce_rules: _w, human_only: _h, ...rest } = row;
     ({ data, error } = await insertTextAgentRow(db, rest));
   }
 
