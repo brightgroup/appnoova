@@ -58,6 +58,7 @@ export const DEMO_MICROSITE_CONFIG: PublicMicrositeConfig = {
   faviconUrl: BROKER.faviconUrl,
   accent: BROKER.accent,
   buttonColor: BROKER.accent,
+  greetingSubtitle: "Puedo ayudarte a cotizar, consultar pólizas, reportar siniestros y más.",
   quickActions: DEMO_QUICK_ACTIONS,
   chatEndpoint: "/api/agenteclientes/chat"
 };

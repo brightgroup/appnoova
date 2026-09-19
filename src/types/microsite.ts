@@ -15,6 +15,8 @@ export interface BrokerMicrositeFormData {
   logo_url: string | null;
   favicon_url: string | null;
   agent_display_name: string | null;
+  /** Subtítulo del saludo inicial. Si es null/vacío se usa un mensaje genérico (no asume que el negocio es una aseguradora). */
+  greeting_subtitle: string | null;
   quick_actions: MicrositeQuickAction[];
   is_published: boolean;
 }
@@ -57,6 +59,7 @@ export interface PublicMicrositeConfig {
   faviconUrl: string | null;
   accent: string;
   buttonColor: string;
+  greetingSubtitle: string;
   quickActions: MicrositeQuickAction[];
   chatEndpoint: string;
 }

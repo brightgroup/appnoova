@@ -623,8 +623,7 @@ export default function AgenteClientesClient() {
 
               <h1 className="ac-greeting-text">Hola, soy {config.agentName}</h1>
               <p className="ac-greeting-sub">
-                Tu asistente de {config.name}. Puedo ayudarte a cotizar, consultar pólizas,
-                reportar siniestros y más.
+                Tu asistente de {config.name}. {config.greetingSubtitle}
               </p>
             </div>
 

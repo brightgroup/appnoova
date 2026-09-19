@@ -1,6 +1,7 @@
 import {
   DEFAULT_MICROSITE_ACCENT,
-  DEFAULT_MICROSITE_BUTTON
+  DEFAULT_MICROSITE_BUTTON,
+  DEFAULT_MICROSITE_GREETING
 } from "@/lib/microsite-defaults";
 import { isValidMicrositeSlug, slugifyBrandName, slugToDisplayName } from "@/lib/microsite-slug";
 import type {
@@ -45,6 +46,7 @@ export function normalizeMicrositeForm(raw: Partial<BrokerMicrositeFormData>): B
     logo_url: raw.logo_url ? String(raw.logo_url).trim() : null,
     favicon_url: raw.favicon_url ? String(raw.favicon_url).trim() : null,
     agent_display_name: raw.agent_display_name ? String(raw.agent_display_name).trim() : null,
+    greeting_subtitle: raw.greeting_subtitle ? String(raw.greeting_subtitle).trim().slice(0, 240) : null,
     quick_actions: normalizeQuickActions(raw.quick_actions),
     is_published: Boolean(raw.is_published)
   };
@@ -66,6 +68,7 @@ export function toMicrositeRecord(raw: Record<string, unknown>): BrokerMicrosite
       logo_url: raw.logo_url ? String(raw.logo_url) : null,
       favicon_url: raw.favicon_url ? String(raw.favicon_url) : null,
       agent_display_name: raw.agent_display_name ? String(raw.agent_display_name) : null,
+      greeting_subtitle: raw.greeting_subtitle ? String(raw.greeting_subtitle) : null,
       quick_actions: raw.quick_actions as MicrositeQuickAction[] | undefined,
       is_published: Boolean(raw.is_published)
     })
@@ -99,6 +102,7 @@ export function toPublicMicrositeConfig(
     faviconUrl: withAssetCacheBust(microsite.favicon_url, version),
     accent: microsite.accent_color,
     buttonColor: microsite.button_color,
+    greetingSubtitle: microsite.greeting_subtitle?.trim() || DEFAULT_MICROSITE_GREETING,
     quickActions: microsite.quick_actions.filter(
       a => a.enabled && a.label.trim() && a.prompt.trim()
     ),

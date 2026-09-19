@@ -121,6 +121,7 @@ export async function POST(req: NextRequest) {
     logo_url: form.logo_url,
     favicon_url: form.favicon_url,
     agent_display_name: form.agent_display_name,
+    greeting_subtitle: form.greeting_subtitle,
     quick_actions: form.quick_actions,
     is_published: form.is_published,
     updated_at: new Date().toISOString()

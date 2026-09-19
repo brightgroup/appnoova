@@ -12,6 +12,7 @@ import { getAuthHeaders } from "@/lib/text-agents-api";
 import {
   DEFAULT_MICROSITE_ACCENT,
   DEFAULT_MICROSITE_BUTTON,
+  DEFAULT_MICROSITE_GREETING,
   DEFAULT_MICROSITE_QUICK_ACTIONS
 } from "@/lib/microsite-defaults";
 import { resolveMicrositeIcon } from "@/lib/microsite-icons";
@@ -49,6 +50,7 @@ function normalizeRecord(record: BrokerMicrositeRecord): BrokerMicrositeFormData
     logo_url: record.logo_url,
     favicon_url: record.favicon_url,
     agent_display_name: record.agent_display_name,
+    greeting_subtitle: record.greeting_subtitle,
     quick_actions: record.quick_actions.map(a => ({ ...a })),
     is_published: record.is_published
   };
@@ -104,6 +106,7 @@ function ConfigContent({
     logo_url: null,
     favicon_url: null,
     agent_display_name: null,
+    greeting_subtitle: null,
     quick_actions: DEFAULT_MICROSITE_QUICK_ACTIONS.map(a => ({ ...a })),
     is_published: false
   });
@@ -412,6 +415,21 @@ function ConfigContent({
               <p className="text-[10px] text-gray-500 mt-1.5 leading-snug">
                 Si lo dejas vacío o igual al agente, al cambiar de agente se actualiza solo.
                 Solo se conserva si escribes un nombre distinto (p. ej. “Asistente”).
+              </p>
+            </Field>
+
+            <Field label="Mensaje de bienvenida">
+              <textarea
+                value={form.greeting_subtitle ?? ""}
+                onChange={e => updateForm({ greeting_subtitle: e.target.value || null })}
+                placeholder={DEFAULT_MICROSITE_GREETING}
+                rows={2}
+                maxLength={240}
+                className={`${inputCls} resize-none`}
+              />
+              <p className="text-[10px] text-gray-500 mt-1.5 leading-snug">
+                Aparece debajo del saludo inicial. Ajústalo al rubro de tu negocio — no todos
+                los Mi Link son de una aseguradora. Si lo dejas vacío se usa un mensaje genérico.
               </p>
             </Field>
 

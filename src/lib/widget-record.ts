@@ -1,6 +1,7 @@
 import {
   DEFAULT_MICROSITE_ACCENT,
   DEFAULT_MICROSITE_BUTTON,
+  DEFAULT_MICROSITE_GREETING,
   DEFAULT_MICROSITE_QUICK_ACTIONS
 } from "@/lib/microsite-defaults";
 import { brandInitials, slugToDisplayName } from "@/lib/microsite-slug";
@@ -100,6 +101,7 @@ export function toPublicWidgetConfig(
     faviconUrl: withAssetCacheBust(widget.favicon_url, version),
     accent: widget.accent_color,
     buttonColor: widget.button_color,
+    greetingSubtitle: DEFAULT_MICROSITE_GREETING,
     quickActions: widget.quick_actions.filter(
       a => a.enabled && a.label.trim() && a.prompt.trim()
     ),
