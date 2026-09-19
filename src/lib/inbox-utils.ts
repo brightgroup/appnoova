@@ -1,6 +1,6 @@
 import { channelLabel, inboxChannelBadge, normalizeChatMessages } from "@/lib/text-chat-utils";
 import { WHATSAPP_CONVERSATION_CHANNEL } from "@/lib/whatsapp-channel";
-import type { InboxListItem, InboxTextDetail } from "@/types/inbox";
+import type { InboxFilter, InboxListItem, InboxTextDetail } from "@/types/inbox";
 import type { TextChatMessage } from "@/types/text-agent-conversation";
 import type { TranscriptEntry } from "@/types/voice-agent-call";
 
@@ -223,6 +223,26 @@ export function filterInboxItems(
     );
   }
   return notArchived;
+}
+
+/**
+ * Cuenta conversaciones con `unread_count > 0` por cada tab del inbox, a partir de la
+ * lista completa (sin filtrar) — así el badge de "Archivadas" (u otro tab) es visible
+ * aunque el usuario esté viendo otro filtro.
+ */
+export function computeInboxUnreadCounts(
+  items: InboxListItem[],
+  currentUserName: string
+): Record<InboxFilter, number> {
+  const countUnread = (list: InboxListItem[]) =>
+    list.filter(i => (i.unread_count ?? 0) > 0).length;
+
+  return {
+    all: countUnread(filterInboxItems(items, "all", currentUserName)),
+    mine: countUnread(filterInboxItems(items, "mine", currentUserName)),
+    unassigned: countUnread(filterInboxItems(items, "unassigned", currentUserName)),
+    archived: countUnread(filterInboxItems(items, "archived", currentUserName))
+  };
 }
 
 export function inboxMessageLabel(role: string): string {

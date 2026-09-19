@@ -35,6 +35,7 @@ export default function MobileChatsPage() {
   const [currentUserName, setCurrentUserName] = useState("Usuario");
   const [assignees, setAssignees] = useState<ChatAssignee[]>([]);
   const [actionsItem, setActionsItem] = useState<InboxListItem | null>(null);
+  const [archivedUnread, setArchivedUnread] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async (silent = false) => {
@@ -49,6 +50,7 @@ export default function MobileChatsPage() {
       const data = await res.json();
       setItems(Array.isArray(data.items) ? data.items : []);
       if (data.current_user_name) setCurrentUserName(data.current_user_name);
+      if (data.unread_counts) setArchivedUnread(Number(data.unread_counts.archived) || 0);
       setError(null);
     } catch {
       if (!silent) setError("No se pudo cargar la lista de chats.");
@@ -177,6 +179,9 @@ export default function MobileChatsPage() {
               onClick={() => setFilter(f => (f === "archived" ? "all" : "archived"))}
             >
               <ArchiveIcon />
+              {archivedUnread > 0 && filter !== "archived" ? (
+                <span className="filter-btn-badge">{archivedUnread > 9 ? "9+" : archivedUnread}</span>
+              ) : null}
             </button>
           </div>
         </div>

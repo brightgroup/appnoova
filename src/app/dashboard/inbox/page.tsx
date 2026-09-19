@@ -92,6 +92,12 @@ function InboxPageInner() {
   const [templateVars, setTemplateVars] = useState<string[]>([]);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: InboxListItem } | null>(null);
   const [crmLeadId, setCrmLeadId] = useState<string | null>(null);
+  const [unreadCounts, setUnreadCounts] = useState<Record<InboxFilter, number>>({
+    all: 0,
+    mine: 0,
+    unassigned: 0,
+    archived: 0
+  });
   const assignRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -197,6 +203,7 @@ function InboxPageInner() {
       }
       setItems(data.items ?? []);
       if (data.current_user_name) setCurrentUserName(data.current_user_name);
+      if (data.unread_counts) setUnreadCounts(data.unread_counts);
     } catch {
       if (!silent) setError("Error de red al conectar con /api/inbox");
     } finally {
@@ -633,20 +640,32 @@ function InboxPageInner() {
         </div>
 
         <div className="flex flex-wrap gap-2 border-b border-white/[.05] px-4 py-3">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setFilter(tab.id)}
-              className={`rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors sm:px-4 sm:py-2 sm:text-sm ${
-                filter === tab.id
-                  ? "bg-[#0f7eff] text-white"
-                  : "bg-white/[.10] text-white/60 hover:text-white/90"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {tabs.map(tab => {
+            const count = unreadCounts[tab.id] ?? 0;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setFilter(tab.id)}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors sm:px-4 sm:py-2 sm:text-sm ${
+                  filter === tab.id
+                    ? "bg-[#0f7eff] text-white"
+                    : "bg-white/[.10] text-white/60 hover:text-white/90"
+                }`}
+              >
+                {tab.label}
+                {count > 0 && (
+                  <span
+                    className={`flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-bold ${
+                      filter === tab.id ? "bg-white/25 text-white" : "bg-red-500 text-white"
+                    }`}
+                  >
+                    {count > 9 ? "9+" : count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex-1 overflow-y-auto">

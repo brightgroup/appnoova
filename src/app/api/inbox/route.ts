@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  computeInboxUnreadCounts,
   filterInboxItems,
   formatInboxDisplayTitle,
   inboxDetailChannelLabel,
@@ -255,9 +256,11 @@ export async function GET(req: NextRequest) {
   );
 
   const items = filterInboxItems(sortInboxItems(textItems), filter, currentUserName);
+  const unreadCounts = computeInboxUnreadCounts(textItems, currentUserName);
 
   return NextResponse.json({
     items,
+    unread_counts: unreadCounts,
     current_user_name: currentUserName,
     dbReady: textRes.error ? false : true
   });
