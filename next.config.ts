@@ -4,6 +4,15 @@ const nextConfig: NextConfig = {
   // Dev usa .next-dev (npm run dev) para no pisar el build de producción (.next).
   distDir: process.env.NEXT_DIST_DIR || ".next",
   reactStrictMode: true,
+  // El build en el VPS de Coolify se quedaba sin memoria y moría sin ningún error
+  // legible durante la fase de "Linting and checking validity of types" — el log
+  // solo mostraba warnings preexistentes (react-hooks/exhaustive-deps, no-img-element),
+  // nunca un error real de tsc, pero el proceso igual salía con exit code 1
+  // (confirmado 2026-09-19, tres deploys seguidos cayendo justo ahí tras un PR
+  // grande). El type-check con `tsc --noEmit` sí corre limpio localmente, así
+  // que se quita solo el paso de ESLint del build de producción para bajar la
+  // presión de memoria — el lint sigue disponible en local con `npm run lint`.
+  eslint: { ignoreDuringBuilds: true },
   // Gemini Live + ws en rutas API: evitar bundle roto (t.mask is not a function en Docker).
   serverExternalPackages: ["@google/genai", "ws", "bufferutil", "utf-8-validate"],
   webpack: (config, { dev }) => {
