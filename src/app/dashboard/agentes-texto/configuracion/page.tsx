@@ -4,36 +4,47 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  ChevronLeft, Save, Loader2, CheckCircle2, MessageSquare, Settings2,
-  History, Radio, BarChart3, FileCode2, CalendarClock, Bell, Users, Plug
+  ChevronLeft, Save, Loader2, CheckCircle2, Settings2,
+  History, Radio, BarChart3, CalendarClock, Bell
 } from "lucide-react";
-import { InfoBox } from "@/components/ui/InfoBox";
 import { btnPrimary, tabActive, tabIdle } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { getTextTemplateMeta } from "@/lib/text-agent-templates";
 import { getPurposeMeta } from "@/lib/agent-purpose-catalog";
-import { AgentConnectorsPanel } from "@/components/agents/AgentConnectorsPanel";
+import { AgentConnectorsPopover } from "@/components/agents/AgentConnectorsPopover";
+import { AgentPromptModal } from "@/components/agents/AgentPromptModal";
+import { TextAgentIcon } from "@/components/icons/TextAgentIcon";
 import { normalizeTextAgentForm } from "@/lib/text-agent-form";
-import { TEXT_LLM_MODELS, TEXT_OUTPUT_TOKEN_OPTIONS } from "@/lib/text-agent-options";
+import { TEXT_LLM_MODELS } from "@/lib/text-agent-options";
 import { llmModelIcon } from "@/lib/llm/provider-icon";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import type { TextAgentFormData, TextAgentRecord } from "@/types/text-agent";
 import type { CompanyContext } from "@/types/company-context";
 import type { DataTableRecord } from "@/types/data-table";
 import { TextAgentTestPanel } from "@/components/text/TextAgentTestPanel";
+import { TextConfigSidebar } from "@/components/text/TextConfigSidebar";
 import { ChatRegistryPanel } from "@/components/text/ChatRegistryPanel";
 import { NotifyTeamRulesEditor } from "@/components/text/NotifyTeamRulesEditor";
 import { SchedulingRulesEditor } from "@/components/scheduling/SchedulingRulesEditor";
-import { NoovaSelect } from "@/components/ui/NoovaSelect";
-import { Switch } from "@/components/ui/Switch";
 import { defaultNotifyTeamRules, hasIncompleteWhatsAppNotifyRule } from "@/lib/text-notify-rules";
 import { defaultSchedulingRules } from "@/lib/scheduling/rules";
 
-type TabId = "probar" | "config" | "conectores" | "agendamiento" | "notificaciones" | "analisis" | "registro" | "canales";
+type TabId = "config" | "agendamiento" | "notificaciones" | "analisis" | "registro" | "canales";
 
-const ENABLED_TABS: TabId[] = ["config", "conectores", "probar", "registro", "agendamiento", "notificaciones"];
+const ENABLED_TABS: TabId[] = ["config", "registro", "agendamiento", "notificaciones"];
+
+/** "Probar agente" y "Conectores" se fusionaron dentro de "Configurar y
+ *  probar". Los enlaces viejos (y los marcadores que la gente ya tenga)
+ *  siguen llegando a donde esperaban. */
+const TAB_ALIASES: Record<string, TabId> = {
+  probar: "config",
+  conectores: "config"
+};
 
 function parseTab(tab: string | null): TabId {
-  if (tab && (ENABLED_TABS as string[]).includes(tab)) return tab as TabId;
+  if (!tab) return "config";
+  if (TAB_ALIASES[tab]) return TAB_ALIASES[tab];
+  if ((ENABLED_TABS as string[]).includes(tab)) return tab as TabId;
   return "config";
 }
 
@@ -58,6 +69,7 @@ function ConfigContent() {
   }, [params]);
 
   const [editorMode, setEditorMode] = useState<"preview" | "markdown">("markdown");
+  const [promptOpen, setPromptOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -171,9 +183,7 @@ function ConfigContent() {
   const isSegurosTemplate = getPurposeMeta("text", form.source_template).vertical === "seguros";
 
   const tabs: { id: TabId; label: string; icon: React.ElementType; warn?: boolean }[] = [
-    { id: "probar", label: "Probar agente", icon: MessageSquare },
-    { id: "config", label: "Configuración", icon: Settings2 },
-    { id: "conectores", label: "Conectores", icon: Plug },
+    { id: "config", label: "Configurar y probar", icon: Settings2 },
     { id: "agendamiento", label: "Agendamiento", icon: CalendarClock },
     { id: "notificaciones", label: "Notificaciones", icon: Bell, warn: notifyIncomplete },
     { id: "analisis", label: "Análisis", icon: BarChart3 },
@@ -216,6 +226,9 @@ function ConfigContent() {
           >
             <ChevronLeft className="w-5 h-5" />
           </Link>
+          <div className="w-9 h-9 rounded-full bg-[#0f7eff]/10 flex items-center justify-center shrink-0">
+            <TextAgentIcon className="w-[22px] h-[22px]" />
+          </div>
           <div className="min-w-0">
             <h1 className="text-lg font-bold truncate">{form.name}</h1>
             <p className="text-xs text-gray-400">
@@ -273,161 +286,51 @@ function ConfigContent() {
 
       {activeTab === "config" && (
         <div className="flex-1 flex min-h-0 overflow-hidden">
-          <div className="w-72 border-r border-white/[.08] p-5 overflow-y-auto shrink-0">
-            <h2 className="text-sm font-semibold text-gray-300 mb-4">Configuración del agente</h2>
-
-            <div className="space-y-4">
-              <div className="rounded-xl border border-white/[.08] bg-white/[.03] px-3 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="flex items-center gap-2 text-sm font-semibold text-gray-100">
-                    <Users className="w-4 h-4 text-[var(--nv-text)] shrink-0" />
-                    Solo respuesta humana
-                  </span>
-                  <Switch
-                    checked={form.human_only === true}
-                    onChange={v => setForm(f => ({ ...f, human_only: v }))}
-                  />
-                </div>
-                <p className="text-[10px] text-gray-500 leading-relaxed mt-1.5">
-                  La IA no responde. Los mensajes de WhatsApp, widget o Mi Link quedan en el inbox para que los atienda el equipo.
-                </p>
-              </div>
-
-              <Field label="Marca / contexto">
-                <NoovaSelect
-                  value={form.company_context_id ?? ""}
-                  onChange={v => setForm(f => ({
-                    ...f,
-                    company_context_id: v || null
-                  }))}
-                  allowEmpty={true}
-                  emptyLabel="Sin marca (solo prompt del agente)"
-                  options={contexts.map(c => ({
-                    value: c.id,
-                    label: `${c.name}${c.is_default ? " · predeterminada" : ""}`
-                  }))}
-                />
-                <Link
-                  href="/dashboard/contextos"
-                  className="inline-block mt-2 text-[11px] text-[#0f7eff] hover:text-[#99c9ff]"
-                >
-                  Gestionar contextos de marca →
-                </Link>
-              </Field>
-
-              <SliderField
-                label="Temperatura"
-                hint="Creatividad del modelo (0.1 = precisa · 2 = más libre)"
-                value={form.temperature}
-                min={0.1}
-                max={2}
-                step={0.1}
-                onChange={v => setForm(f => ({ ...f, temperature: v }))}
-              />
-
-              <Field label="Modelo de LLM">
+          <div className="flex-1 min-w-0 flex flex-col">
+            <TextAgentTestPanel
+              agentId={agentId}
+              llmModel={form.llm_model}
+              ready={!loading && !!agentId}
+              humanOnly={form.human_only === true}
+              onConversationSaved={() => setRegistryRefresh(k => k + 1)}
+              modelSelector={
                 <NoovaSelect
                   value={form.llm_model}
-                  onChange={v => setForm(f => ({ ...f, llm_model: v }))}
+                  onChange={llm_model => setForm(f => ({ ...f, llm_model }))}
                   allowEmpty={false}
+                  className="w-auto min-w-[130px]"
                   options={TEXT_LLM_MODELS.map(m => ({ value: m.id, label: m.label, icon: llmModelIcon(m.id) }))}
                 />
-              </Field>
-
-              <Field label="Máximo de tokens de salida">
-                <NoovaSelect
-                  value={String(form.max_output_tokens)}
-                  onChange={v => setForm(f => ({
-                    ...f,
-                    max_output_tokens: parseInt(v, 10)
-                  }))}
-                  allowEmpty={false}
-                  options={TEXT_OUTPUT_TOKEN_OPTIONS.map(o => ({
-                    value: String(o.id),
-                    label: o.label
-                  }))}
+              }
+              composerAccessory={
+                <AgentConnectorsPopover
+                  showDataTable
+                  dataTableId={form.data_table_id ?? null}
+                  onChangeDataTableId={data_table_id => setForm(f => ({ ...f, data_table_id }))}
+                  dataTables={dataTables}
+                  isSegurosTemplate={isSegurosTemplate}
+                  quotingRules={form.quoting_rules}
+                  onChangeQuotingRules={value =>
+                    setForm(f => ({
+                      ...f,
+                      quoting_rules: { ...value, insurer_connection_ids: f.quoting_rules?.insurer_connection_ids ?? [] }
+                    }))
+                  }
+                  wooCommerceRules={form.woocommerce_rules}
+                  onChangeWooCommerceRules={woocommerce_rules => setForm(f => ({ ...f, woocommerce_rules }))}
                 />
-                <p className="text-[10px] text-gray-500 mt-1.5 leading-relaxed">
-                  Es un tope de seguridad, no el control real del largo de la respuesta — eso lo define el
-                  prompt del agente. Elige una opción con margen sobre lo que esperas, para que nunca se
-                  corte una respuesta a media frase.
-                </p>
-              </Field>
-
-            </div>
-
-            <InfoBox
-              icon={FileCode2}
-              label="Plantilla base"
-              variant="accent"
-              className="mt-6"
-            >
-              Los cambios aquí son solo para tu cuenta. La plantilla original no se modifica.
-            </InfoBox>
+              }
+            />
           </div>
 
-          <div className="flex-1 flex flex-col min-w-0">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-white/[.06]">
-              <Field label="Nombre del agente" className="flex-1 max-w-md mb-0">
-                <input
-                  value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  className="w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50"
-                />
-              </Field>
-              <div className="flex gap-1 ml-4 shrink-0">
-                {(["preview", "markdown"] as const).map(mode => (
-                  <button
-                    key={mode}
-                    onClick={() => setEditorMode(mode)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
-                      editorMode === mode
-                        ? "bg-white/[.10] text-white"
-                        : "text-gray-500 hover:text-white"
-                    }`}
-                  >
-                    {mode === "preview" ? "Vista previa" : "Markdown"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex-1 p-5 overflow-hidden">
-              {editorMode === "markdown" ? (
-                <textarea
-                  value={form.prompt}
-                  onChange={e => setForm(f => ({ ...f, prompt: e.target.value }))}
-                  className="w-full h-full min-h-[400px] bg-noova-surface border border-white/[.08] rounded-xl p-4 text-sm text-gray-200 font-mono leading-relaxed resize-none focus:outline-none focus:border-[#0f7eff]/40"
-                  spellCheck={false}
-                />
-              ) : (
-                <div className="w-full h-full min-h-[400px] bg-noova-surface border border-white/[.08] rounded-xl p-6 overflow-y-auto prose prose-invert prose-sm max-w-none">
-                  <PromptPreview text={form.prompt} />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === "conectores" && (
-        <div className="flex-1 overflow-y-auto">
-          <AgentConnectorsPanel
-            showDataTable
-            dataTableId={form.data_table_id ?? null}
-            onChangeDataTableId={data_table_id => setForm(f => ({ ...f, data_table_id }))}
-            dataTables={dataTables}
-            isSegurosTemplate={isSegurosTemplate}
-            quotingRules={form.quoting_rules}
-            onChangeQuotingRules={value =>
-              setForm(f => ({
-                ...f,
-                quoting_rules: { ...value, insurer_connection_ids: f.quoting_rules?.insurer_connection_ids ?? [] }
-              }))
-            }
-            wooCommerceRules={form.woocommerce_rules}
-            onChangeWooCommerceRules={woocommerce_rules => setForm(f => ({ ...f, woocommerce_rules }))}
-          />
+          <aside className="w-[300px] shrink-0 border-l border-[var(--nv-border)] overflow-y-auto">
+            <TextConfigSidebar
+              form={form}
+              setForm={setForm}
+              contexts={contexts}
+              onEditPrompt={() => setPromptOpen(true)}
+            />
+          </aside>
         </div>
       )}
 
@@ -453,74 +356,17 @@ function ConfigContent() {
         <ChatRegistryPanel agentId={agentId} refreshKey={registryRefresh} />
       )}
 
-      {activeTab === "probar" && (
-        <TextAgentTestPanel
-          agentId={agentId}
-          agentName={form.name}
-          llmModel={form.llm_model}
-          ready={!loading && !!agentId}
-          humanOnly={form.human_only === true}
-          onConversationSaved={() => setRegistryRefresh(k => k + 1)}
-        />
-      )}
+
+      <AgentPromptModal
+        open={promptOpen}
+        onClose={() => setPromptOpen(false)}
+        subtitle={`${form.name || "Agente de texto"} · ${meta.tag}`}
+        value={form.prompt}
+        onChange={prompt => setForm(f => ({ ...f, prompt }))}
+        editorMode={editorMode}
+        onChangeEditorMode={setEditorMode}
+      />
     </div>
-  );
-}
-
-function PromptPreview({ text }: { text: string }) {
-  return (
-    <>
-      {text.split("\n").map((line, i) => {
-        if (line.startsWith("# ")) return <h1 key={i} className="text-xl font-bold text-white mt-4 mb-2">{line.slice(2)}</h1>;
-        if (line.startsWith("## ")) return <h2 key={i} className="text-lg font-semibold text-white mt-3 mb-1">{line.slice(3)}</h2>;
-        if (line.startsWith("- ")) return <li key={i} className="text-gray-300 ml-4">{line.slice(2)}</li>;
-        if (line.trim() === "") return <br key={i} />;
-        return <p key={i} className="text-gray-300 mb-2">{line}</p>;
-      })}
-    </>
-  );
-}
-
-function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={className}>
-      <label className="block text-[11px] font-medium text-gray-400 mb-1.5 uppercase tracking-wide">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-function SliderField({
-  label, hint, value, min, max, step, onChange
-}: {
-  label: string;
-  hint?: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (v: number) => void;
-}) {
-  const safe = Number.isFinite(value) ? value : min;
-
-  return (
-    <Field label={label}>
-      <div className="flex items-center gap-3">
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={safe}
-          onInput={e => onChange(parseFloat(e.currentTarget.value))}
-          className="nv-range flex-1 h-2 cursor-pointer rounded-full appearance-none"
-        />
-        <span className="text-xs text-gray-300 w-9 text-right tabular-nums font-medium">
-          {safe.toFixed(2)}
-        </span>
-      </div>
-      {hint && <p className="text-[10px] text-gray-400 mt-1 leading-snug">{hint}</p>}
-    </Field>
   );
 }
 

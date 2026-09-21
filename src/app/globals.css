@@ -1304,15 +1304,40 @@ html:not(.dark) [data-noova-dashboard] tr:hover {
   background-color: var(--nv-hover) !important;
 }
 
-/* Scrollbar dashboard */
+/* Scrollbar dashboard — la barra solo se pinta mientras algo se desplaza o al
+   pasar el ratón por encima; la clase la pone ScrollbarAutoHide. El ancho fija
+   el grosor allí donde el sistema usa barras clásicas (Windows/Linux); en macOS
+   son superpuestas y no ocupan espacio. */
 [data-noova-dashboard] ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 [data-noova-dashboard] ::-webkit-scrollbar-thumb {
-  background: var(--nv-scrollbar);
+  background: transparent;
   border-radius: 999px;
+  transition: background 0.25s ease;
+}
+
+html.nv-scrolling [data-noova-dashboard] ::-webkit-scrollbar-thumb,
+[data-noova-dashboard] *:hover::-webkit-scrollbar-thumb {
+  background: var(--nv-scrollbar);
+}
+
+/* Firefox: no distingue "mientras scrollea", así que se deja fino y discreto.
+   Va dentro de @supports a propósito: en Chrome, declarar las propiedades
+   estándar desactiva el estilado ::-webkit-scrollbar de arriba y las barras
+   volverían al ancho del sistema en todo el dashboard. */
+@supports not selector(::-webkit-scrollbar) {
+  [data-noova-dashboard] * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  html.nv-scrolling [data-noova-dashboard] *,
+  [data-noova-dashboard] *:hover {
+    scrollbar-color: var(--nv-scrollbar) transparent;
+  }
 }
 
 /* Modales dentro del dashboard */

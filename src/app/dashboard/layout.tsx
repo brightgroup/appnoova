@@ -21,17 +21,12 @@ import { ERP_NAV } from "@/lib/erp-nav";
 import { SEGUROS_NAV } from "@/lib/seguros-nav";
 import { sidebarIconBase, sidebarNeonIcon } from "@/lib/sidebar-neon";
 import { DesktopOnlyGate } from "@/components/layout/DesktopOnlyGate";
+import { ScrollbarAutoHide } from "@/components/layout/ScrollbarAutoHide";
 import { SidebarAccountMenu } from "@/components/layout/SidebarAccountMenu";
 import { OrgPermissionsProvider, useOrgPermissions } from "@/components/layout/OrgPermissionsProvider";
 import { DashboardRouteGuard } from "@/components/layout/DashboardRouteGuard";
 import { BillingSuspendedGate } from "@/components/layout/BillingSuspendedGate";
 import type { LucideIcon } from "lucide-react";
-
-function formatCreditsShort(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
-  return new Intl.NumberFormat("es-CO").format(Math.round(n));
-}
 
 function SidebarSubMenu({
   items,
@@ -230,6 +225,7 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
   return (
     <DesktopOnlyGate>
     <div className="flex h-screen bg-noova-main text-white" data-noova-dashboard>
+      <ScrollbarAutoHide />
       {showShell && (
       <div
         className={`${sidebarOpen ? "w-64" : "w-20"} border-r border-white/[.10] transition-all duration-300 flex flex-col overflow-hidden`}
@@ -597,7 +593,6 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
         <div className={`${sidebarOpen ? "p-3 space-y-3" : "p-3 space-y-3"} border-t border-white/[.08]`}>
           {/* Plan Card */}
           {sidebarOpen && permFlags.can_view_billing && (() => {
-            const pct   = billing?.usedPct ?? 0;
             const st    = billing?.status ?? "active";
             const badgeVariant: BadgeVariant =
               st === "active"    ? "emerald" :
@@ -637,23 +632,6 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
                     ${billing.promoPriceUsd}/mes
                   </p>
                 )}
-
-                {/* Fila 3: créditos + barra */}
-                <div>
-                  <div className="flex items-baseline justify-between mb-1.5">
-                    <span className="text-xs text-gray-400 tabular-nums">
-                      {billing ? formatCreditsShort(billing.remaining) : "—"}
-                      <span className="text-gray-600"> / {billing ? formatCreditsShort(billing.total) : "—"} créditos</span>
-                    </span>
-                    <span className="text-xs font-semibold text-gray-400">{pct}%</span>
-                  </div>
-                  <div className="h-[3px] rounded-full bg-[var(--nv-border)] overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-[var(--nv-hubspot-teal)]" : "bg-[#0f7eff]"}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
               </Link>
             );
           })()}

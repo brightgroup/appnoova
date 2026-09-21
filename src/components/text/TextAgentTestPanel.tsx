@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowUp, Loader2, MessageSquare, RotateCcw } from "lucide-react";
+import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
+import { ArrowUp, Loader2, RotateCcw } from "lucide-react";
 import { getAuthHeaders } from "@/lib/text-agents-api";
 import { TEXT_LLM_MODELS } from "@/lib/text-agent-options";
 
@@ -13,11 +13,15 @@ interface ChatMessage {
 
 interface TextAgentTestPanelProps {
   agentId: string | null;
-  agentName: string;
   llmModel: string;
   ready: boolean;
   humanOnly?: boolean;
   onConversationSaved?: () => void;
+  /** Controles extra a la izquierda del composer, ej. el "+" de conectores. */
+  composerAccessory?: ReactNode;
+  /** Selector de modelo dentro del composer, como en ORI. Sin él se muestra
+   *  solo el nombre del modelo. */
+  modelSelector?: ReactNode;
 }
 
 const STARTER_PROMPTS = [
@@ -28,11 +32,12 @@ const STARTER_PROMPTS = [
 
 export function TextAgentTestPanel({
   agentId,
-  agentName,
   llmModel,
   ready,
   humanOnly = false,
-  onConversationSaved
+  onConversationSaved,
+  composerAccessory,
+  modelSelector
 }: TextAgentTestPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -149,17 +154,8 @@ export function TextAgentTestPanel({
         <div className="absolute top-[15%] left-1/2 -translate-x-1/2 w-[500px] h-[320px] bg-[#0f7eff]/[.05] rounded-full blur-[90px]" />
       </div>
 
-      <div className="relative z-10 shrink-0 flex items-center justify-between px-8 py-4 border-b border-white/[.06]">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0f7eff] to-[#3392ff] flex items-center justify-center shadow-lg shadow-[#0f7eff]/25">
-            <MessageSquare className="w-4 h-4 text-white" strokeWidth={2} />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-white">{agentName || "Agente de texto"}</p>
-            <p className="text-[11px] text-gray-500">Prueba en vivo · {modelLabel}</p>
-          </div>
-        </div>
-        {hasChat && (
+      {hasChat && (
+        <div className="relative z-10 shrink-0 flex items-center justify-end px-8 py-3">
           <button
             onClick={resetChat}
             className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-[#99c9ff] transition-colors"
@@ -167,8 +163,8 @@ export function TextAgentTestPanel({
             <RotateCcw className="w-3.5 h-3.5" />
             Nueva conversación
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className={`relative z-10 flex-1 flex flex-col items-center min-h-0 ${hasChat ? "overflow-hidden" : "overflow-y-auto px-8"}`}>
         <div className={`w-full max-w-[780px] flex flex-col flex-1 min-h-0 ${hasChat ? "h-full" : ""}`}>
@@ -214,7 +210,9 @@ export function TextAgentTestPanel({
                   Prueba tu agente de texto
                 </h2>
                 <p className="text-sm text-gray-500 max-w-md mx-auto">
-                  Escribe como lo haría un cliente. Usa la clave de Ori (Gemini) para generar respuestas con el prompt configurado.
+                  Escríbele como lo haría un cliente. Responde con las instrucciones y los
+                  conectores que tiene ahora mismo, y nada de lo que pruebes aquí llega a
+                  tus clientes.
                 </p>
               </div>
             )}
@@ -223,7 +221,7 @@ export function TextAgentTestPanel({
               <p className="mb-4 text-center text-xs font-medium text-red-400">{error}</p>
             )}
 
-            <div className="rounded-[1.25rem] border border-[var(--nv-input-border)] bg-[var(--nv-bg-control)] focus-within:border-[#0f7eff]/30 focus-within:shadow-[0_0_0_1px_rgba(15,126,255,0.15)] transition-all">
+            <div className="nv-ori-composer rounded-[1.35rem] border border-[var(--nv-input-border)] bg-[var(--nv-bg-elevated)] focus-within:border-[#0f7eff]/30 focus-within:shadow-[0_0_0_1px_rgba(15,126,255,0.15)] transition-all">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -232,21 +230,24 @@ export function TextAgentTestPanel({
                 placeholder="Escribe un mensaje de prueba..."
                 disabled={loading}
                 rows={hasChat ? 1 : 2}
-                className="w-full bg-transparent px-5 pt-4 pb-2 text-base text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] resize-none focus:outline-none disabled:opacity-50 min-h-[52px] leading-relaxed"
+                className="nv-ori-composer-input w-full bg-transparent px-6 pt-4 pb-2 text-base text-[var(--nv-text)] placeholder-[var(--nv-text-faint)] resize-none focus:outline-none disabled:opacity-50 min-h-[56px] leading-relaxed"
               />
-              <div className="flex items-center justify-end px-4 pb-4 pt-1 gap-2">
-                <span className="text-[11px] text-gray-600 mr-auto">{modelLabel}</span>
-                <button
-                  onClick={() => sendMessage(input)}
-                  disabled={!input.trim() || loading}
-                  className="p-2.5 rounded-xl bg-[#0f7eff] hover:bg-[#3392ff] text-white shadow-lg shadow-[#0f7eff]/25 disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed transition-all"
-                >
-                  {loading ? (
-                    <Loader2 className="w-[18px] h-[18px] animate-spin" />
-                  ) : (
-                    <ArrowUp className="w-[18px] h-[18px]" strokeWidth={2.25} />
-                  )}
-                </button>
+              <div className="flex items-center justify-between px-4 pb-4 pt-1 gap-2">
+                {composerAccessory}
+                <div className="flex items-center gap-1.5">
+                  {modelSelector ?? <span className="text-[11px] text-gray-600">{modelLabel}</span>}
+                  <button
+                    onClick={() => sendMessage(input)}
+                    disabled={!input.trim() || loading}
+                    className="p-2.5 rounded-xl bg-[#0f7eff] hover:bg-[#3392ff] text-white shadow-lg shadow-[#0f7eff]/25 disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+                  >
+                    {loading ? (
+                      <Loader2 className="w-[18px] h-[18px] animate-spin" />
+                    ) : (
+                      <ArrowUp className="w-[18px] h-[18px]" strokeWidth={2.25} />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 

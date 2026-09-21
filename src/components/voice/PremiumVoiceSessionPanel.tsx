@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Mic, MicOff, PhoneOff, Loader2, RefreshCw, MessageSquare, Headphones, Star } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Loader2, RefreshCw, MessageSquare, Headphones } from "lucide-react";
 import { VoiceConversation, type DisconnectionDetails } from "@elevenlabs/client";
+import { ElevenLabsLogo } from "@/components/icons/brands/ElevenLabsLogo";
 import { getTemplateMeta } from "@/lib/voice-agent-templates";
 import { getAuthHeaders, getAuthToken } from "@/lib/voice-agents-api";
 import {
@@ -42,6 +43,7 @@ export function PremiumVoiceSessionPanel({
   onEndCall,
   onCallSaved,
   onCallStatusChange,
+  modelSelector,
 }: VoiceSessionPanelProps) {
   const meta = getTemplateMeta(sourceTemplate);
   const isOutboundTemplate = meta.tag === "Outbound";
@@ -460,11 +462,6 @@ export function PremiumVoiceSessionPanel({
     state === "speaking" ? "En línea · Hablando" :
     state === "error" ? "Error de conexión" : "Desconectado";
 
-  const webrtcLabel =
-    isActive ? "WebRTC · Conectado" :
-    isConnecting ? "WebRTC · Conectando" :
-    state === "error" ? "WebRTC · Error" : "WebRTC · Listo";
-
   const statusDotClass =
     isActive ? "bg-emerald-400 premium-voice-dot-live" :
     isConnecting ? "bg-[var(--nv-accent)] animate-pulse" :
@@ -473,7 +470,7 @@ export function PremiumVoiceSessionPanel({
   return (
     <div className="flex-1 flex min-h-0 p-4 gap-4 overflow-hidden nv-voice-session">
         <aside className="w-[min(100%,320px)] shrink-0 flex flex-col">
-          <div className="flex-1 rounded-2xl border border-white/[.08] bg-[#0c0c10]/80 backdrop-blur-sm p-6 flex flex-col min-h-[440px]">
+          <div className="flex-1 rounded-2xl border border-white/[.08] bg-[var(--nv-bg-elevated)] p-6 flex flex-col min-h-[440px]">
             <div className="flex flex-col items-center text-center flex-1">
               <PremiumVoiceAvatar
                 initial={agentInitial}
@@ -483,10 +480,10 @@ export function PremiumVoiceSessionPanel({
               <h2 className="mt-5 text-xl font-bold text-white tracking-tight">{agentName}</h2>
               <p className="mt-1 text-xs text-gray-500">{voiceSubtitle}</p>
 
-              <div className="mt-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#243048]/60 border border-[#8FA4E8]/20">
-                <Star className="w-3 h-3 text-[#8FA4E8] fill-[#8FA4E8]" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#a8b8ee]">
-                  Premium
+              <div className="mt-4 inline-flex items-center gap-2 text-[var(--nv-text)]">
+                <ElevenLabsLogo className="w-[18px] h-[18px] shrink-0" />
+                <span className="text-[11px] font-semibold uppercase tracking-wider">
+                  ElevenLabs · Premium
                 </span>
               </div>
 
@@ -508,7 +505,7 @@ export function PremiumVoiceSessionPanel({
                   <button
                     onClick={() => void startSession()}
                     disabled={!ready || !agentId}
-                    className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#0f7eff] to-[#7c6cf6] hover:from-[#6b6bf7] hover:to-[#8b7cf7] shadow-[0_8px_32px_rgba(15,126,255,0.35)] transition-all disabled:opacity-45 disabled:shadow-none"
+                    className="nv-btn-primary w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-45 disabled:shadow-none"
                   >
                     {state === "error" ? (
                       <><RefreshCw className="w-4 h-4" /> Reintentar</>
@@ -572,16 +569,13 @@ export function PremiumVoiceSessionPanel({
           </div>
         </aside>
 
-        <section className="flex-1 min-w-0 flex flex-col rounded-2xl border border-white/[.08] bg-[#0c0c10]/80 backdrop-blur-sm overflow-hidden">
+        <section className="flex-1 min-w-0 flex flex-col rounded-2xl border border-white/[.08] bg-[var(--nv-bg-elevated)] overflow-hidden">
           <div className="px-5 py-3.5 border-b border-white/[.06] flex items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-2 min-w-0">
               <MessageSquare className="w-4 h-4 text-[#99c9ff] shrink-0" />
               <span className="text-sm font-medium text-gray-200">Transcripción en vivo</span>
             </div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[.03] border border-white/[.08] shrink-0">
-              <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-400 premium-voice-dot-live" : isConnecting ? "bg-[var(--nv-accent)] animate-pulse" : "bg-gray-600"}`} />
-              <span className="text-[10px] text-gray-500">{webrtcLabel}</span>
-            </div>
+            <div className="shrink-0">{modelSelector}</div>
           </div>
 
           <div ref={transcriptRef} className="flex-1 overflow-y-auto p-5 space-y-3 min-h-[320px]">

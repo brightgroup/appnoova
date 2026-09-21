@@ -18,7 +18,7 @@ export const PLATFORM_HELP_ARTICLES: PlatformHelpArticle[] = [
 3. Elige plantilla (calificación, recordatorios, seguimiento, etc.), nombre e idioma.
 4. Asocia un **contexto de empresa** con productos y tono de la marca.
 5. Revisa el prompt generado y crea el agente.
-6. En **Configuración → Probar** puedes probar por web o teléfono.
+6. En **Configurar y probar** ajustas el agente y lo pruebas por web o teléfono en la misma pantalla.
 7. Asigna un número en **Canales → Teléfono**.`,
   },
   {

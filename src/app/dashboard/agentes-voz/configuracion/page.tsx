@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  ChevronLeft, Save, Loader2, CheckCircle2, Phone, Settings2,
-  BarChart3, History, Radio, LayoutGrid, RefreshCw, Cpu, FileCode2
+  ChevronLeft, Save, Loader2, CheckCircle2, Settings2,
+  BarChart3, History, Radio, LayoutGrid, RefreshCw
 } from "lucide-react";
 import { btnPrimary, tabActive, tabIdle } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
@@ -19,17 +19,23 @@ import { VOICE_CREDITS_PER_MINUTE, VOICE_PREMIUM_CREDITS_PER_MINUTE } from "@/li
 import { usePricingCatalog } from "@/hooks/usePricingCatalog";
 import type { VoiceAgentFormData, VoiceAgentRecord } from "@/types/voice-agent";
 import type { CompanyContext } from "@/types/company-context";
-import { AgentTestPanel } from "@/components/voice/AgentTestPanel";
+import { AgentTestPanel, type VoiceTestMode } from "@/components/voice/AgentTestPanel";
+import { VoiceConfigSidebar } from "@/components/voice/VoiceConfigSidebar";
 import { CallRegistryPanel } from "@/components/voice/CallRegistryPanel";
 import { AgentPhoneChannelPanel } from "@/components/telephony/AgentPhoneChannelPanel";
-import { NoovaSelect } from "@/components/ui/NoovaSelect";
+import { AgentPromptModal } from "@/components/agents/AgentPromptModal";
+import { VoiceAgentIcon } from "@/components/icons/VoiceAgentIcon";
 import { InfoBox } from "@/components/ui/InfoBox";
+import { NoovaSelect } from "@/components/ui/NoovaSelect";
 import { llmModelIcon } from "@/lib/llm/provider-icon";
 
-type TabId = "probar" | "config" | "analisis" | "registro" | "metrica" | "canales";
+type TabId = "config" | "analisis" | "registro" | "metrica" | "canales";
 
+/** "Probar agente" se fusionó dentro de "Configurar y probar": los enlaces
+ *  viejos siguen llegando a donde esperaban. */
 function parseTab(tab: string | null): TabId {
-  if (tab === "probar" || tab === "config" || tab === "registro" || tab === "canales") return tab;
+  if (tab === "probar") return "config";
+  if (tab === "config" || tab === "registro" || tab === "canales") return tab;
   return "config";
 }
 
@@ -55,6 +61,8 @@ function ConfigContent() {
   const [callActive, setCallActive] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [editorMode, setEditorMode] = useState<"preview" | "markdown">("markdown");
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [testMode, setTestMode] = useState<VoiceTestMode>("web");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -182,6 +190,22 @@ function ConfigContent() {
     setSaving(false);
   };
 
+  // Memoizados a propósito: ahora la configuración vive al lado del panel de
+  // llamada y se re-renderiza con cada tecla. Si estos callbacks cambiaran de
+  // identidad, los efectos de la sesión de voz se reejecutarían sin parar.
+  const handleCallStatusChange = useCallback((active: boolean, sec: number) => {
+    setCallActive(active);
+    setCallDuration(sec);
+  }, []);
+
+  const handleCallSaved = useCallback(() => {
+    setRegistryRefresh(k => k + 1);
+  }, []);
+
+  const handleEndCall = useCallback(() => {
+    setTab("registro");
+  }, [setTab]);
+
   const restoreTemplate = () => {
     const empresa = companyName.trim() || "Mi empresa";
     if (
@@ -203,8 +227,7 @@ function ConfigContent() {
   };
 
   const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
-    { id: "probar", label: "Probar agente", icon: Phone },
-    { id: "config", label: "Configuración", icon: Settings2 },
+    { id: "config", label: "Configurar y probar", icon: Settings2 },
     { id: "analisis", label: "Análisis de llamadas", icon: BarChart3 },
     { id: "registro", label: "Registro de llamadas", icon: History },
     { id: "metrica", label: "Métrica", icon: LayoutGrid },
@@ -247,6 +270,9 @@ function ConfigContent() {
           >
             <ChevronLeft className="w-5 h-5" />
           </Link>
+          <div className="w-9 h-9 rounded-full bg-[#0f7eff]/10 flex items-center justify-center shrink-0">
+            <VoiceAgentIcon className="w-[22px] h-[22px]" />
+          </div>
           <div className="min-w-0">
             <h1 className="text-lg font-bold truncate">{form.name}</h1>
             <p className="text-xs text-gray-400">
@@ -284,7 +310,7 @@ function ConfigContent() {
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
-          const disabled = !["config", "probar", "registro", "canales"].includes(tab.id);
+          const disabled = !["config", "registro", "canales"].includes(tab.id);
 
           return (
             <button
@@ -314,206 +340,52 @@ function ConfigContent() {
       {/* Config tab */}
       {activeTab === "config" && (
         <div className="flex-1 flex min-h-0 overflow-hidden">
-
-          {/* Left: voice settings */}
-          <div className="w-72 border-r border-white/[.08] p-5 overflow-y-auto overflow-x-visible shrink-0">
-            <h2 className="text-sm font-semibold text-gray-300 mb-4">Configuración de voz</h2>
-
-            <div className="space-y-4">
-              <InfoBox
-                icon={Cpu}
-                label="Motor"
-                title={isPremium ? "Voz premium" : "Voz estándar"}
-                variant="accent"
-              >
-                El proveedor se elige al crear el agente.
-              </InfoBox>
-
-              <Field label="Marca / contexto">
+          <div className="flex-1 min-w-0 flex flex-col">
+            <AgentTestPanel
+              sourceTemplate={form.source_template}
+              agentId={agentId}
+              agentName={form.name}
+              agentConfig={form}
+              companyContext={companyContextText}
+              companyName={companyName}
+              ready={!loading && !!agentId}
+              mode={testMode}
+              modelSelector={
                 <NoovaSelect
-                  value={form.company_context_id ?? ""}
-                  onChange={v => setForm(f => ({
-                    ...f,
-                    company_context_id: v || null
-                  }))}
-                  allowEmpty={true}
-                  emptyLabel="Sin marca (solo prompt del agente)"
-                  options={contexts.map(c => ({
-                    value: c.id,
-                    label: `${c.name}${c.is_default ? " · predeterminada" : ""}`
-                  }))}
-                />
-                <p className="text-[10px] text-gray-500 mt-1.5">
-                  {assignedContext
-                    ? `Marca: ${assignedContext.name} (${companyContextText.trim().length.toLocaleString()} caracteres) — se añade al final de cada llamada.`
-                    : "Asigna una marca para inyectar productos, servicios y políticas al final de cada llamada."}
-                </p>
-                <Link
-                  href="/dashboard/contextos"
-                  className="inline-block mt-2 text-[11px] text-[#0f7eff] hover:text-[#99c9ff]"
-                >
-                  Gestionar contextos de marca →
-                </Link>
-              </Field>
-
-              {isPremium ? (
-                <Field label="Voz premium">
-                  <NoovaSelect
-                    value={form.elevenlabs_voice_id ?? DEFAULT_ELEVENLABS_VOICE_ID}
-                    onChange={v => setForm(f => ({ ...f, elevenlabs_voice_id: v }))}
-                    allowEmpty={false}
-                    options={(elevenlabsVoices.length ? elevenlabsVoices : ELEVENLABS_DEFAULT_VOICES).map(v => ({
-                      value: v.id,
-                      label: v.label,
-                    }))}
-                  />
-                </Field>
-              ) : (
-                <>
-                  <Field label="Voz">
-                    <NoovaSelect
-                      value={form.voice_name}
-                      onChange={v => setForm(f => ({ ...f, voice_name: v }))}
-                      allowEmpty={false}
-                      options={GEMINI_VOICES.map(v => ({ value: v.id, label: v.label }))}
-                    />
-                  </Field>
-
-                  <Field label="Modelo de voz">
-                    <NoovaSelect
-                      value={form.model}
-                      onChange={v => setForm(f => ({ ...f, model: v }))}
-                      allowEmpty={false}
-                      options={VOICE_MODELS.map(m => ({ value: m.id, label: m.label, icon: llmModelIcon(m.id) }))}
-                    />
-                  </Field>
-                </>
-              )}
-
-              {!isPremium && (
-              <>
-              <SliderField
-                label="Velocidad de voz"
-                hint="Reproducción del audio en la prueba (0.5 lento · 1.5 rápido)"
-                value={form.voice_speed}
-                min={0.5}
-                max={1.5}
-                step={0.05}
-                onChange={v => setForm(f => ({ ...f, voice_speed: v }))}
-              />
-              <SliderField
-                label="Volumen"
-                hint="Nivel de salida en tu navegador durante la sesión"
-                value={form.volume}
-                min={0}
-                max={2}
-                step={0.05}
-                onChange={v => setForm(f => ({ ...f, volume: v }))}
-              />
-
-              <Field label="Modelo de LLM">
-                <NoovaSelect
-                  value={form.llm_model}
-                  onChange={v => setForm(f => ({ ...f, llm_model: v }))}
+                  value={
+                    isPremium
+                      ? (isElevenLabsLlm(form.llm_model) ? form.llm_model : ELEVENLABS_RECOMMENDED_LLM)
+                      : form.llm_model
+                  }
+                  onChange={llm_model => setForm(f => ({ ...f, llm_model }))}
                   allowEmpty={false}
-                  options={LLM_MODELS.map(m => ({ value: m.id, label: m.label, icon: llmModelIcon(m.id) }))}
+                  className="w-auto min-w-[130px]"
+                  options={(isPremium ? ELEVENLABS_LLM_MODELS : LLM_MODELS).map(m => ({
+                    value: m.id,
+                    label: m.label,
+                    icon: llmModelIcon(m.id)
+                  }))}
                 />
-              </Field>
-              </>
-              )}
-
-              {isPremium && (
-                <Field label="Modelo de IA (LLM)">
-                  <NoovaSelect
-                    value={isElevenLabsLlm(form.llm_model) ? form.llm_model : ELEVENLABS_RECOMMENDED_LLM}
-                    onChange={v => setForm(f => ({ ...f, llm_model: v }))}
-                    allowEmpty={false}
-                    options={ELEVENLABS_LLM_MODELS.map(m => ({ value: m.id, label: m.label, icon: llmModelIcon(m.id) }))}
-                  />
-                </Field>
-              )}
-
-              <SliderField
-                label="Temperatura"
-                hint={isPremium ? "Creatividad del agente premium (0 = precisa · 2 = más libre)" : "Creatividad del agente (0 = precisa · 2 = más libre)"}
-                value={form.temperature}
-                min={0.1}
-                max={2}
-                step={0.1}
-                onChange={v => setForm(f => ({ ...f, temperature: v }))}
-              />
-            </div>
-
-            <InfoBox
-              icon={FileCode2}
-              label="Plantilla base"
-              variant="accent"
-              className="mt-6"
-            >
-              Los cambios aquí son solo para tu cuenta. La plantilla original no se modifica.
-            </InfoBox>
-          </div>
-
-          {/* Right: prompt editor */}
-          <div className="flex-1 flex flex-col min-w-0">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-white/[.06]">
-              <Field label="Nombre del agente" className="flex-1 max-w-md mb-0">
-                <input
-                  value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  className="w-full bg-white/[.04] border border-white/[.10] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#0f7eff]/50"
-                />
-              </Field>
-              <div className="flex gap-1 ml-4 shrink-0">
-                {(["preview", "markdown"] as const).map(mode => (
-                  <button
-                    key={mode}
-                    onClick={() => setEditorMode(mode)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
-                      editorMode === mode
-                        ? "bg-white/[.10] text-white"
-                        : "text-gray-500 hover:text-white"
-                    }`}
-                  >
-                    {mode === "preview" ? "Vista previa" : "Markdown"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <InfoBox
-              layout="row"
-              variant="accent"
-              className="mx-5 mt-3 mb-1"
-              action={
-                <button
-                  type="button"
-                  onClick={restoreTemplate}
-                  disabled={callActive}
-                  className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#0f7eff]/30 bg-[#0f7eff]/15 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-[#0f7eff]/25 disabled:opacity-50"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" /> Restaurar plantilla
-                </button>
               }
-            >
-              {VOICE_AGENT_PROMPT_GUIDE}
-            </InfoBox>
-
-            <div className="flex-1 p-5 overflow-hidden">
-              {editorMode === "markdown" ? (
-                <textarea
-                  value={form.prompt}
-                  onChange={e => setForm(f => ({ ...f, prompt: e.target.value }))}
-                  className="w-full h-full min-h-[400px] bg-noova-surface border border-white/[.08] rounded-xl p-4 text-sm text-gray-200 font-mono leading-relaxed resize-none focus:outline-none focus:border-[#0f7eff]/40"
-                  spellCheck={false}
-                />
-              ) : (
-                <div className="w-full h-full min-h-[400px] bg-noova-surface border border-white/[.08] rounded-xl p-6 overflow-y-auto prose prose-invert prose-sm max-w-none">
-                  <PromptPreview text={form.prompt} />
-                </div>
-              )}
-            </div>
+              onEndCall={handleEndCall}
+              onCallSaved={handleCallSaved}
+              onCallStatusChange={handleCallStatusChange}
+            />
           </div>
+
+          <aside className="w-[300px] shrink-0 border-l border-[var(--nv-border)] overflow-y-auto">
+            <VoiceConfigSidebar
+              form={form}
+              setForm={setForm}
+              contexts={contexts}
+              elevenlabsVoices={elevenlabsVoices}
+              isPremium={isPremium}
+              callActive={callActive}
+              testMode={testMode}
+              onChangeTestMode={setTestMode}
+              onEditPrompt={() => setPromptOpen(true)}
+            />
+          </aside>
         </div>
       )}
 
@@ -526,82 +398,32 @@ function ConfigContent() {
         <AgentPhoneChannelPanel agentId={agentId} isPremium={isPremium} />
       )}
 
-      {/* Probar agente — web o teléfono */}
-      {activeTab === "probar" && (
-        <AgentTestPanel
-          sourceTemplate={form.source_template}
-          agentId={agentId}
-          agentName={form.name}
-          agentConfig={form}
-          companyContext={companyContextText}
-          companyName={companyName}
-          ready={!loading && !!agentId}
-          onEndCall={() => setTab("registro")}
-          onCallSaved={() => setRegistryRefresh(k => k + 1)}
-          onCallStatusChange={(active, sec) => {
-            setCallActive(active);
-            setCallDuration(sec);
-          }}
-        />
-      )}
+
+      <AgentPromptModal
+        open={promptOpen}
+        onClose={() => setPromptOpen(false)}
+        subtitle={`${form.name || "Agente de voz"} · ${meta.tag}`}
+        value={form.prompt}
+        onChange={prompt => setForm(f => ({ ...f, prompt }))}
+        editorMode={editorMode}
+        onChangeEditorMode={setEditorMode}
+        guide={
+          <InfoBox layout="row" variant="accent">
+            {VOICE_AGENT_PROMPT_GUIDE}
+          </InfoBox>
+        }
+        headerAction={
+          <button
+            type="button"
+            onClick={restoreTemplate}
+            disabled={callActive}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#0f7eff]/30 bg-[#0f7eff]/15 px-2.5 py-1.5 text-[11px] font-medium text-[var(--nv-text)] hover:bg-[#0f7eff]/25 disabled:opacity-50"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Restaurar plantilla
+          </button>
+        }
+      />
     </div>
-  );
-}
-
-function PromptPreview({ text }: { text: string }) {
-  return (
-    <>
-      {text.split("\n").map((line, i) => {
-        if (line.startsWith("# ")) return <h1 key={i} className="text-xl font-bold text-white mt-4 mb-2">{line.slice(2)}</h1>;
-        if (line.startsWith("## ")) return <h2 key={i} className="text-lg font-semibold text-white mt-3 mb-1">{line.slice(3)}</h2>;
-        if (line.startsWith("- ")) return <li key={i} className="text-gray-300 ml-4">{line.slice(2)}</li>;
-        if (line.trim() === "") return <br key={i} />;
-        return <p key={i} className="text-gray-300 mb-2">{line}</p>;
-      })}
-    </>
-  );
-}
-
-function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={className}>
-      <label className="block text-[11px] font-medium text-gray-400 mb-1.5 uppercase tracking-wide">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-function SliderField({
-  label, hint, value, min, max, step, onChange
-}: {
-  label: string;
-  hint?: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (v: number) => void;
-}) {
-  const safe = Number.isFinite(value) ? value : min;
-
-  return (
-    <Field label={label}>
-      <div className="flex items-center gap-3">
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={safe}
-          onInput={e => onChange(parseFloat(e.currentTarget.value))}
-          className="nv-range flex-1 h-2 cursor-pointer rounded-full appearance-none"
-        />
-        <span className="text-xs text-gray-300 w-9 text-right tabular-nums font-medium">
-          {safe.toFixed(2)}
-        </span>
-      </div>
-      {hint && <p className="text-[10px] text-gray-400 mt-1 leading-snug">{hint}</p>}
-    </Field>
   );
 }
 
