@@ -32,6 +32,7 @@ export function AgentConnectorsManagerModal({
   onOpenExplore,
   connectors,
   connectorsLoading,
+  whatsapp,
   showDataTable,
   dataTableId,
   onChangeDataTableId,
@@ -47,6 +48,7 @@ export function AgentConnectorsManagerModal({
   onOpenExplore: () => void;
   connectors: ConnectorSummaryItem[];
   connectorsLoading: boolean;
+  whatsapp: { id: string; e164: string; friendlyName: string | null } | null;
   showDataTable: boolean;
   dataTableId: string | null;
   onChangeDataTableId: (id: string | null) => void;
@@ -80,7 +82,7 @@ export function AgentConnectorsManagerModal({
   const showTableCard = showDataTable;
   const simpleConnected = connectors.filter(i => i.connected && i.id !== "woocommerce");
   const isEmpty =
-    !showTableCard && !wooConnected && simpleConnected.length === 0 && !isSegurosTemplate;
+    !showTableCard && !wooConnected && simpleConnected.length === 0 && !isSegurosTemplate && !whatsapp;
 
   return (
     <div
@@ -150,6 +152,22 @@ export function AgentConnectorsManagerModal({
                     className="mt-2 inline-block text-[11px] text-[#0f7eff] hover:text-[#99c9ff]"
                   >
                     Gestionar tablas de datos →
+                  </Link>
+                </ConnectorCard>
+              )}
+
+              {whatsapp && (
+                <ConnectorCard
+                  icon={<ConnectorLogo id="whatsapp" className="h-8 w-8 rounded-lg object-contain" />}
+                  title={whatsapp.friendlyName || "WhatsApp"}
+                  subtitle={`${whatsapp.e164} · atiende este agente`}
+                  active
+                >
+                  <Link
+                    href={`/dashboard/canales/whatsapp/${whatsapp.id}`}
+                    className="text-[11px] text-[#0f7eff] hover:text-[#99c9ff]"
+                  >
+                    Administrar la línea →
                   </Link>
                 </ConnectorCard>
               )}

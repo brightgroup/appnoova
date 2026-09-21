@@ -46,7 +46,9 @@ export function useConnectorsSummary() {
       const placapiJson = placapiRes?.ok ? await placapiRes.json() : null;
 
       const next: ConnectorSummaryItem[] = [
-        { id: "google-calendar", name: "Google Calendar", connected: Boolean(calJson?.configured) },
+        // `configured` solo dice que la plataforma tiene credenciales de Google;
+        // lo que importa es si esta organización conectó su calendario.
+        { id: "google-calendar", name: "Google Calendar", connected: calJson?.connection?.status === "active" },
         { id: "hubspot", name: "HubSpot", connected: hubspotJson?.connection?.status === "active" },
         { id: "woocommerce", name: "WooCommerce", connected: woocommerceJson?.connection?.status === "active" }
       ];

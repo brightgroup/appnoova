@@ -3,6 +3,7 @@ import { GoogleCalendarLogo } from "@/components/icons/brands/GoogleCalendarLogo
 import { GmailLogo } from "@/components/icons/brands/GmailLogo";
 import { HubSpotLogo } from "@/components/icons/brands/HubSpotLogo";
 import { WooCommerceLogo } from "@/components/icons/brands/WooCommerceLogo";
+import { WhatsAppLogo } from "@/components/icons/brands/WhatsAppLogo";
 import { LaEquidadLogo } from "@/components/icons/brands/LaEquidadLogo";
 import { SoftsegurosLogo } from "@/components/icons/brands/SoftsegurosLogo";
 import { VerifikLogo } from "@/components/icons/brands/VerifikLogo";
@@ -17,6 +18,7 @@ export type ConnectorLogoId =
   | "verifik"
   | "placapi"
   | "woocommerce"
+  | "whatsapp"
   | "webhook";
 
 /**
@@ -44,6 +46,8 @@ export function ConnectorLogo({ id, className }: { id: string; className?: strin
       return <PlacApiLogo className={className} />;
     case "woocommerce":
       return <WooCommerceLogo className={className} />;
+    case "whatsapp":
+      return <WhatsAppLogo tile className={className} />;
     case "webhook":
       return <Webhook className={className} />;
     default:

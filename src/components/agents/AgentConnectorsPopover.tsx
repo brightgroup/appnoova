@@ -8,10 +8,13 @@ import { ConnectorLogo } from "@/components/automations/ConnectorIconTile";
 import { ExploreConnectorsModal } from "@/components/automations/ExploreConnectorsModal";
 import { AgentConnectorsManagerModal, type AgentQuotingRulesValue } from "@/components/agents/AgentConnectorsManagerModal";
 import { useConnectorsSummary } from "@/hooks/useConnectorsSummary";
+import { useAgentWhatsAppChannel } from "@/hooks/useAgentWhatsAppChannel";
 import type { WooCommerceRules } from "@/lib/woocommerce/rules";
 import type { DataTableRecord } from "@/types/data-table";
 
 interface AgentConnectorsPopoverProps {
+  /** Para saber qué número de WhatsApp atiende a este agente. */
+  agentId?: string | null;
   showDataTable: boolean;
   dataTableId: string | null;
   onChangeDataTableId: (id: string | null) => void;
@@ -31,6 +34,7 @@ interface AgentConnectorsPopoverProps {
 export function AgentConnectorsPopover(props: AgentConnectorsPopoverProps) {
   const { showDataTable, dataTableId, dataTables } = props;
   const { items, loading, refresh } = useConnectorsSummary();
+  const { channel: whatsapp } = useAgentWhatsAppChannel(props.agentId ?? null);
   const [open, setOpen] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
   const [exploreOpen, setExploreOpen] = useState(false);
@@ -41,8 +45,12 @@ export function AgentConnectorsPopover(props: AgentConnectorsPopoverProps) {
   // El cotizador no es un conector de la cuenta, pero sí algo que el agente usa
   // para responder: se muestra junto a los demás.
   const quotingOn = props.quotingRules?.enabled === true;
+  const whatsappOn = whatsapp?.active === true;
   const activeCount =
-    connected.length + (showDataTable && selectedTable ? 1 : 0) + (quotingOn ? 1 : 0);
+    connected.length +
+    (showDataTable && selectedTable ? 1 : 0) +
+    (quotingOn ? 1 : 0) +
+    (whatsappOn ? 1 : 0);
 
   return (
     <>
@@ -74,6 +82,9 @@ export function AgentConnectorsPopover(props: AgentConnectorsPopoverProps) {
                 <Database className="h-3 w-3 text-[var(--nv-text-muted)]" />
               </span>
             )}
+            {whatsappOn && (
+              <ConnectorLogo id="whatsapp" className="h-[18px] w-[18px] rounded-[5px] object-contain" />
+            )}
             {quotingOn && (
               <span className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px] bg-[var(--nv-bg-control)]">
                 <ShieldCheck className="h-3 w-3 text-[var(--nv-text-muted)]" />
@@ -100,6 +111,7 @@ export function AgentConnectorsPopover(props: AgentConnectorsPopoverProps) {
           loading={loading}
           connected={connected}
           quotingOn={quotingOn}
+          whatsapp={whatsappOn ? whatsapp : null}
           showDataTable={showDataTable}
           selectedTable={selectedTable}
           onOpenManager={() => {
@@ -122,6 +134,7 @@ export function AgentConnectorsPopover(props: AgentConnectorsPopoverProps) {
         }}
         connectors={items}
         connectorsLoading={loading}
+        whatsapp={whatsappOn ? whatsapp : null}
         showDataTable={props.showDataTable}
         dataTableId={props.dataTableId}
         onChangeDataTableId={props.onChangeDataTableId}
@@ -157,6 +170,7 @@ function ConnectorsPopoverPanel({
   loading,
   connected,
   quotingOn,
+  whatsapp,
   showDataTable,
   selectedTable,
   onOpenManager,
@@ -167,6 +181,7 @@ function ConnectorsPopoverPanel({
   loading: boolean;
   connected: { id: string; name: string }[];
   quotingOn: boolean;
+  whatsapp: { e164: string; friendlyName: string | null } | null;
   showDataTable: boolean;
   selectedTable: DataTableRecord | null;
   onOpenManager: () => void;
@@ -230,8 +245,17 @@ function ConnectorsPopoverPanel({
           <div className="flex items-center justify-center py-5">
             <Loader2 className="h-4 w-4 animate-spin text-[var(--nv-text-faint)]" />
           </div>
-        ) : showDataTable || connected.length > 0 || quotingOn ? (
+        ) : showDataTable || connected.length > 0 || quotingOn || whatsapp ? (
           <>
+            {whatsapp && (
+              <ConnectorRow
+                icon={<ConnectorLogo id="whatsapp" className="h-5 w-5 shrink-0 rounded-[6px] object-contain" />}
+                name={whatsapp.friendlyName || "WhatsApp"}
+                detail={whatsapp.e164}
+                active
+                onClick={onOpenManager}
+              />
+            )}
             {showDataTable && (
               <ConnectorRow
                 icon={<Database className="h-5 w-5 shrink-0 text-[var(--nv-text-muted)]" />}

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Save, Loader2, CheckCircle2, Settings2,
-  History, Radio, BarChart3, CalendarClock, Bell
+  History, BarChart3, CalendarClock, Bell
 } from "lucide-react";
 import { btnPrimary, tabActive, tabIdle } from "@/lib/brand-ui";
 import { getAuthHeaders } from "@/lib/text-agents-api";
@@ -29,16 +29,18 @@ import { SchedulingRulesEditor } from "@/components/scheduling/SchedulingRulesEd
 import { defaultNotifyTeamRules, hasIncompleteWhatsAppNotifyRule } from "@/lib/text-notify-rules";
 import { defaultSchedulingRules } from "@/lib/scheduling/rules";
 
-type TabId = "config" | "agendamiento" | "notificaciones" | "analisis" | "registro" | "canales";
+type TabId = "config" | "agendamiento" | "notificaciones" | "analisis" | "registro";
 
 const ENABLED_TABS: TabId[] = ["config", "registro", "agendamiento", "notificaciones"];
 
 /** "Probar agente" y "Conectores" se fusionaron dentro de "Configurar y
- *  probar". Los enlaces viejos (y los marcadores que la gente ya tenga)
- *  siguen llegando a donde esperaban. */
+ *  probar", y "Canales" desapareció (WhatsApp es ahora un conector más). Los
+ *  enlaces viejos, y los marcadores que la gente ya tenga, siguen llegando a
+ *  donde esperaban. */
 const TAB_ALIASES: Record<string, TabId> = {
   probar: "config",
-  conectores: "config"
+  conectores: "config",
+  canales: "config"
 };
 
 function parseTab(tab: string | null): TabId {
@@ -187,8 +189,7 @@ function ConfigContent() {
     { id: "agendamiento", label: "Agendamiento", icon: CalendarClock },
     { id: "notificaciones", label: "Notificaciones", icon: Bell, warn: notifyIncomplete },
     { id: "analisis", label: "Análisis", icon: BarChart3 },
-    { id: "registro", label: "Registro de chats", icon: History },
-    { id: "canales", label: "Canales", icon: Radio }
+    { id: "registro", label: "Registro de chats", icon: History }
   ];
 
   if (!agentIdParam) {
@@ -304,6 +305,7 @@ function ConfigContent() {
               }
               composerAccessory={
                 <AgentConnectorsPopover
+                  agentId={agentId}
                   showDataTable
                   dataTableId={form.data_table_id ?? null}
                   onChangeDataTableId={data_table_id => setForm(f => ({ ...f, data_table_id }))}
