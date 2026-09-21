@@ -55,6 +55,9 @@ interface Invoice {
   id: string; plan_id?: string; period_start: string; period_end: string;
   due_date: string; amount_usd: number; amount_cop: number; status: string;
   paddle_transaction_id?: string | null;
+  siigo_invoice_url?: string | null;
+  siigo_invoice_number?: string | null;
+  siigo_invoice_error?: string | null;
 }
 interface Plan {
   id: string; name: string; price_usd: number; monthly_credits: number;
@@ -940,7 +943,17 @@ export default function FacturacionPage() {
                                         </button>
                                       </>
                                   )}
-                                  {inv.paddle_transaction_id && inv.status === "paid" ? (
+                                  {inv.siigo_invoice_url ? (
+                                    <a
+                                      href={inv.siigo_invoice_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-1 p-1.5 hover:bg-white/[.06] rounded-md hover:text-white text-[11px] font-semibold"
+                                      title={`Ver factura electrónica DIAN${inv.siigo_invoice_number ? ` (${inv.siigo_invoice_number})` : ""}`}
+                                    >
+                                      <ExternalLink className="w-3.5 h-3.5" /> Factura DIAN
+                                    </a>
+                                  ) : inv.paddle_transaction_id && inv.status === "paid" ? (
                                     <>
                                       <button
                                         className="p-1.5 hover:bg-white/[.06] rounded-md hover:text-white"
@@ -967,8 +980,15 @@ export default function FacturacionPage() {
                                         <Download className="w-3.5 h-3.5" />
                                       </button>
                                     </>
+                                  ) : inv.status === "paid" && inv.siigo_invoice_error ? (
+                                    <span
+                                      className="text-[10px] text-amber-500 px-1"
+                                      title={`Factura DIAN pendiente — falló la emisión automática: ${inv.siigo_invoice_error}`}
+                                    >
+                                      Factura pendiente
+                                    </span>
                                   ) : (
-                                    <span className="text-[10px] text-gray-600 px-1" title="Factura interna, sin PDF de Paddle">—</span>
+                                    <span className="text-[10px] text-gray-600 px-1" title="Factura interna, sin PDF">—</span>
                                   )}
                                 </div>
                               </td>
