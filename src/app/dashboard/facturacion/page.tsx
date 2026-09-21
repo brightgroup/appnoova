@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   CreditCard, RefreshCw, AlertTriangle, CheckCircle2, Zap,
   Receipt, Search, ExternalLink, HelpCircle, Eye, Download,
@@ -21,7 +22,7 @@ import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { usePricingCatalog } from "@/hooks/usePricingCatalog";
 import { PaddleCheckoutButton, usePaddleCheckout } from "@/components/billing/PaddleCheckoutButton";
 import { BoldCheckoutButton, useBoldCheckout } from "@/components/billing/BoldCheckoutButton";
-import { BillingProfileForm, type BillingProfile } from "@/components/billing/BillingProfileForm";
+import type { BillingProfile } from "@/components/billing/BillingProfileForm";
 import { isBillingProfileComplete } from "@/lib/billing/billing-profile";
 import { openInvoicePdf } from "@/lib/billing/open-invoice-pdf";
 import { CardBrandIcon } from "@/components/billing/CardBrandIcon";
@@ -199,7 +200,6 @@ const daysUntil = (iso: string | null) =>
 export default function FacturacionPage() {
   const [tab, setTab]         = useState("overview");
   const [showPlanPicker, setShowPlanPicker] = useState(false);
-  const [editingBillingProfile, setEditingBillingProfile] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelMsg, setCancelMsg] = useState("");
@@ -1274,27 +1274,24 @@ export default function FacturacionPage() {
                   ← Volver a mi plan
                 </button>
 
-                {(!data.billing_profile || editingBillingProfile) ? (
-                  <BillingProfileForm
-                    initial={data.billing_profile}
-                    onCancel={data.billing_profile ? () => setEditingBillingProfile(false) : undefined}
-                    onSaved={(profile) => {
-                      setData((d) => (d ? { ...d, billing_profile: profile } : d));
-                      setEditingBillingProfile(false);
-                    }}
-                  />
+                {!isBillingProfileComplete(data.billing_profile) ? (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 flex items-center justify-between gap-3 text-xs">
+                    <span className="text-[var(--nv-text-muted)]">
+                      Completa los <span className="text-[var(--nv-text)] font-semibold">datos de facturación</span> de tu organización antes de poder pagar un plan.
+                    </span>
+                    <Link href="/dashboard/perfil" className="text-[var(--nv-accent)] hover:underline shrink-0 font-semibold">
+                      Completar en Perfil →
+                    </Link>
+                  </div>
                 ) : (
                   <div className="rounded-xl border border-[var(--nv-border)] bg-[var(--nv-bg-control)] p-3 flex items-center justify-between gap-3 text-xs">
                     <span className="text-[var(--nv-text-muted)]">
-                      Facturando a <span className="text-[var(--nv-text)] font-semibold">{data.billing_profile.razon_social}</span>
-                      {" "}· {data.billing_profile.tipo_documento} {data.billing_profile.numero_documento}
+                      Facturando a <span className="text-[var(--nv-text)] font-semibold">{data.billing_profile!.razon_social}</span>
+                      {" "}· {data.billing_profile!.tipo_documento} {data.billing_profile!.numero_documento}
                     </span>
-                    <button
-                      onClick={() => setEditingBillingProfile(true)}
-                      className="text-[var(--nv-accent)] hover:underline shrink-0"
-                    >
-                      Editar
-                    </button>
+                    <Link href="/dashboard/perfil" className="text-[var(--nv-accent)] hover:underline shrink-0">
+                      Editar en Perfil
+                    </Link>
                   </div>
                 )}
 
@@ -1460,9 +1457,12 @@ export default function FacturacionPage() {
                                 />
                               </>
                             ) : (
-                              <p className="text-[10px] text-[var(--nv-text-faint)] text-center">
-                                Completa los datos de facturación arriba para poder pagar
-                              </p>
+                              <Link
+                                href="/dashboard/perfil"
+                                className="block text-[10px] text-[var(--nv-accent)] hover:underline text-center"
+                              >
+                                Completa tus datos de facturación para poder pagar
+                              </Link>
                             )}
                           </div>
                         )}

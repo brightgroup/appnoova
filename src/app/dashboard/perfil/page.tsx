@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, Loader2 } from "lucide-react";
+import { ChevronLeft, Loader2, Building2, Pencil } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { authFetch } from "@/lib/telephony-api";
 import {
@@ -12,6 +12,8 @@ import {
   registryToolbar,
   textMuted,
 } from "@/lib/brand-ui";
+import { BillingProfileForm, type BillingProfile } from "@/components/billing/BillingProfileForm";
+import { isBillingProfileComplete } from "@/lib/billing/billing-profile";
 
 function displayName(meta: Record<string, unknown> | undefined, email: string | undefined): string {
   const fromMeta =
@@ -29,13 +31,16 @@ export default function PerfilPage() {
   const [email, setEmail] = useState("—");
   const [orgName, setOrgName] = useState("—");
   const [initials, setInitials] = useState("?");
+  const [billingProfile, setBillingProfile] = useState<BillingProfile | null>(null);
+  const [editingBillingProfile, setEditingBillingProfile] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [{ data: { user } }, billingRes] = await Promise.all([
+      const [{ data: { user } }, billingRes, profileRes] = await Promise.all([
         supabase.auth.getUser(),
         authFetch("/api/billing/me"),
+        authFetch("/api/billing/profile"),
       ]);
       if (cancelled) return;
 
@@ -53,6 +58,11 @@ export default function PerfilPage() {
       if (billingRes.ok) {
         const json = await billingRes.json();
         setOrgName(json.organization?.name ?? json.subscription?.plans?.name ?? "—");
+      }
+      if (profileRes.ok) {
+        const json = await profileRes.json();
+        setBillingProfile(json.profile ?? null);
+        if (!isBillingProfileComplete(json.profile)) setEditingBillingProfile(true);
       }
       setLoading(false);
     })();
@@ -116,6 +126,77 @@ export default function PerfilPage() {
                 <dd className="mt-1 text-[var(--nv-text)]">{orgName}</dd>
               </div>
             </dl>
+          </div>
+        )}
+
+        {!loading && (
+          <div className={`${registryPanel} max-w-lg rounded-xl border border-[var(--nv-border)] bg-[var(--nv-bg-surface)] p-6 mt-5`}>
+            <div className="flex items-center justify-between gap-3 mb-5">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-[var(--nv-accent)]" />
+                <div>
+                  <h2 className="text-sm font-bold text-[var(--nv-text)]">Datos de facturación</h2>
+                  <p className="text-[11px] text-[var(--nv-text-muted)] mt-0.5">
+                    Requeridos para poder pagar tu plan — así podemos emitir la factura.
+                  </p>
+                </div>
+              </div>
+              {isBillingProfileComplete(billingProfile) && !editingBillingProfile && (
+                <button
+                  onClick={() => setEditingBillingProfile(true)}
+                  className="flex items-center gap-1 text-[11px] text-[var(--nv-accent)] hover:underline shrink-0"
+                >
+                  <Pencil className="w-3 h-3" /> Editar
+                </button>
+              )}
+            </div>
+
+            {isBillingProfileComplete(billingProfile) && !editingBillingProfile ? (
+              <dl className="space-y-4 text-sm">
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-[var(--nv-text-faint)]">
+                    {billingProfile!.tipo_persona === "natural" ? "Nombre completo" : "Razón social"}
+                  </dt>
+                  <dd className="mt-1 text-[var(--nv-text)]">{billingProfile!.razon_social}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-[var(--nv-text-faint)]">
+                    Documento
+                  </dt>
+                  <dd className="mt-1 text-[var(--nv-text)]">
+                    {billingProfile!.tipo_documento} {billingProfile!.numero_documento}
+                    {billingProfile!.digito_verificacion ? `-${billingProfile!.digito_verificacion}` : ""}
+                  </dd>
+                </div>
+                {billingProfile!.direccion && (
+                  <div>
+                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-[var(--nv-text-faint)]">
+                      Dirección
+                    </dt>
+                    <dd className="mt-1 text-[var(--nv-text)]">
+                      {billingProfile!.direccion}{billingProfile!.ciudad ? `, ${billingProfile!.ciudad}` : ""}
+                    </dd>
+                  </div>
+                )}
+                {billingProfile!.email_facturacion && (
+                  <div>
+                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-[var(--nv-text-faint)]">
+                      Email de facturación
+                    </dt>
+                    <dd className="mt-1 text-[var(--nv-text)]">{billingProfile!.email_facturacion}</dd>
+                  </div>
+                )}
+              </dl>
+            ) : (
+              <BillingProfileForm
+                initial={billingProfile}
+                onCancel={isBillingProfileComplete(billingProfile) ? () => setEditingBillingProfile(false) : undefined}
+                onSaved={(profile) => {
+                  setBillingProfile(profile);
+                  setEditingBillingProfile(false);
+                }}
+              />
+            )}
           </div>
         )}
       </div>

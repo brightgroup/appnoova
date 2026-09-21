@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Building2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { authFetch } from "@/lib/telephony-api";
 import { btnPrimary, btnGhost } from "@/lib/brand-ui";
 
@@ -32,8 +32,8 @@ const emptyForm: BillingProfile = {
 /**
  * Datos fiscales requeridos antes de poder pagar un plan (persona natural/
  * jurídica, documento, razón social, dirección) — se usan para poder emitir
- * después la factura electrónica DIAN. Se muestra inline (no modal) en la
- * pestaña "Planes" cuando el perfil está incompleto.
+ * después la factura electrónica DIAN. Vive en /dashboard/perfil (ficha de
+ * facturación); sin outer card — el contenedor con título lo pone quien la usa.
  */
 export function BillingProfileForm({
   initial,
@@ -72,17 +72,7 @@ export function BillingProfileForm({
   const isNatural = form.tipo_persona === "natural";
 
   return (
-    <div className="rounded-xl border border-[var(--nv-accent)]/40 bg-[var(--nv-bg-module)] p-5 space-y-4">
-      <div className="flex items-start gap-2">
-        <Building2 className="w-4 h-4 text-[var(--nv-accent)] shrink-0 mt-0.5" />
-        <div>
-          <h3 className="text-sm font-bold text-[var(--nv-text)]">Datos de facturación</h3>
-          <p className="text-[11px] text-[var(--nv-text-muted)] mt-0.5">
-            Los necesitamos antes de procesar tu pago, para poder emitir la factura a nombre de tu empresa o tuyo.
-          </p>
-        </div>
-      </div>
-
+    <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="text-[10px] font-semibold text-[var(--nv-text-muted)] uppercase">Tipo</label>
