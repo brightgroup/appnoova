@@ -7,11 +7,10 @@ import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { NoovaLogo } from "@/components/brand/NoovaLogo";
 import { OriAnimatedIcon } from "@/components/icons/OriAnimatedIcon";
-import { authFetch } from "@/lib/telephony-api";
 import {
-  sidebarNavActive, sidebarNavIdle, sidebarPlanCard
+  sidebarNavActive, sidebarNavIdle
 } from "@/lib/brand-ui";
-import { Badge, type BadgeVariant } from "@/components/ui/Badge";
+import { Badge } from "@/components/ui/Badge";
 import { CANALES_NAV } from "@/lib/canales-nav";
 import { AGENTES_VOZ_NAV } from "@/lib/agentes-voz-nav";
 import { AGENTES_TEXTO_NAV } from "@/lib/agentes-texto-nav";
@@ -87,16 +86,6 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
   const [authReady, setAuthReady] = useState(false);
   const [profileName, setProfileName] = useState("");
   const [profileEmail, setProfileEmail] = useState("");
-  const [billing, setBilling] = useState<{
-    planName: string;
-    remaining: number;
-    total: number;
-    usedPct: number;
-    status: string;
-    promoLabel?: string | null;
-    promoPriceUsd?: number | null;
-    promoPriceCatalogUsd?: number | null;
-  } | null>(null);
   const router = useRouter();
   const pathname = usePathname();
   const { flags: permFlags, branding, modules } = useOrgPermissions();
@@ -116,36 +105,6 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
   const showErpSection = modules.erp && permFlags.can_view_erp;
   const showSegurosSection = modules.seguros && permFlags.can_view_seguros;
   const crmNavItems = CRM_NAV.filter(item => !item.requiresModule || modules[item.requiresModule]);
-
-  useEffect(() => {
-    if (!checked) return;
-    if (!permFlags.can_view_billing) {
-      setBilling(null);
-      return;
-    }
-    let cancelled = false;
-    authFetch("/api/billing/me")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (cancelled || !json) return;
-        const w = json.wallet;
-        const planName = json.subscription?.plans?.name ?? json.subscription?.plan_id ?? "Plan";
-        if (w) {
-          setBilling({
-            planName,
-            remaining: Number(w.remaining_credits ?? 0),
-            total:     Number(w.total_credits ?? 0),
-            usedPct:   Number(w.used_pct ?? 0),
-            status:    json.subscription?.status ?? "active",
-            promoLabel: json.plan_promo?.label ?? json.plan_promo?.headline ?? null,
-            promoPriceUsd: json.plan_promo?.price_usd ?? null,
-            promoPriceCatalogUsd: json.plan_promo?.price_usd_catalog ?? null,
-          });
-        }
-      })
-      .catch(() => { /* silencioso */ });
-    return () => { cancelled = true; };
-  }, [checked, pathname, permFlags.can_view_billing]);
 
   useEffect(() => {
     if (pathname.startsWith("/dashboard/agentes-voz")) {
@@ -589,53 +548,8 @@ function DashboardLayoutShell({ children }: { children: React.ReactNode }) {
           )}
         </nav>
 
-        {/* Footer - Plan & Logout */}
+        {/* Footer - Cuenta */}
         <div className={`${sidebarOpen ? "p-3 space-y-3" : "p-3 space-y-3"} border-t border-white/[.08]`}>
-          {/* Plan Card */}
-          {sidebarOpen && permFlags.can_view_billing && (() => {
-            const st    = billing?.status ?? "active";
-            const badgeVariant: BadgeVariant =
-              st === "active"    ? "emerald" :
-              st === "trialing"  ? "sky"     :
-              st === "past_due"  ? "amber"   :
-              st === "suspended" ? "danger"  : "neutral";
-            const badgeLabel =
-              st === "active"    ? "Activo"     :
-              st === "trialing"  ? "En prueba"  :
-              st === "past_due"  ? "Vencida"    :
-              st === "suspended" ? "Suspendida" : "Inactivo";
-            return (
-              <Link
-                href="/dashboard/facturacion"
-                className={`block ${sidebarPlanCard}`}
-              >
-                {/* Fila 1: etiqueta + badge */}
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-widest">Plan actual</p>
-                  <Badge variant={badgeVariant}>{badgeLabel}</Badge>
-                </div>
-
-                {/* Fila 2: nombre del plan */}
-                <p className="text-lg font-bold text-white leading-snug mb-1 capitalize">
-                  {billing?.planName ?? "—"}
-                </p>
-                {billing?.promoLabel && (
-                  <p className="text-[10px] text-[#99c9ff] font-medium mb-1 truncate" title={billing.promoLabel}>
-                    {billing.promoLabel}
-                  </p>
-                )}
-                {billing?.promoPriceUsd != null &&
-                  billing.promoPriceCatalogUsd != null &&
-                  billing.promoPriceUsd < billing.promoPriceCatalogUsd && (
-                  <p className="text-[10px] text-green-400 mb-2">
-                    <span className="line-through text-gray-500 mr-1">${billing.promoPriceCatalogUsd}</span>
-                    ${billing.promoPriceUsd}/mes
-                  </p>
-                )}
-              </Link>
-            );
-          })()}
-
           {/* Cuenta + Logout */}
           <div className={`flex items-center gap-2 ${sidebarOpen ? "" : "flex-col"}`}>
             <SidebarAccountMenu
