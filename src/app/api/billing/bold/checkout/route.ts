@@ -5,6 +5,7 @@ import { createBoldPaymentLink, BoldApiError } from "@/lib/billing/bold/client";
 import { getAppBaseUrl } from "@/lib/telephony/app-url";
 import { isSuperAdminUser } from "@/lib/admin-server";
 import { isInternalCheckoutPlan } from "@/lib/billing/plan-visibility";
+import { fetchBillingProfile, isBillingProfileComplete } from "@/lib/billing/billing-profile";
 
 /**
  * POST { plan_id } — crea un link de pago Bold para pagar/cambiar de plan.
@@ -47,8 +48,24 @@ export async function POST(req: NextRequest) {
   if (!isCurrentPlan && (isInternalCheckoutPlan(plan) || (plan.is_public !== true && plan.is_system !== true))) {
     const superAdmin = await isSuperAdminUser(ctx.userId);
     if (!superAdmin) {
-      return NextResponse.json({ error: "Plan no disponible" }, { status: 403 });
+      const { data: grant } = await db
+        .from("plan_organization_grants")
+        .select("plan_id")
+        .eq("plan_id", planId)
+        .eq("organization_id", ctx.organizationId)
+        .maybeSingle();
+      if (!grant) {
+        return NextResponse.json({ error: "Plan no disponible" }, { status: 403 });
+      }
     }
+  }
+
+  const billingProfile = await fetchBillingProfile(db, ctx.organizationId);
+  if (!isBillingProfileComplete(billingProfile)) {
+    return NextResponse.json(
+      { error: "Completa los datos de facturación de tu organización antes de pagar", code: "billing_profile_incomplete" },
+      { status: 428 }
+    );
   }
 
   const { data: payer } = await db.from("profiles").select("email").eq("id", ctx.userId).maybeSingle();

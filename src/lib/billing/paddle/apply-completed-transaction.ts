@@ -4,6 +4,8 @@ import {
   getPaddleTransaction,
   type PaddleTransaction,
 } from "@/lib/billing/paddle/client";
+import { getPricingConfig } from "@/lib/billing/pricing-config";
+import { emitSiigoInvoiceForPayment } from "@/lib/billing/siigo/invoice";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -250,6 +252,29 @@ export async function applyPaddleTransactionCompleted(
     });
   } catch (err) {
     console.error("[paddle:webhook] pago aplicado pero falló el email", txn.id, err);
+  }
+
+  try {
+    const [{ data: org }, { data: plan }, { data: invoiceRow }] = await Promise.all([
+      db.from("organizations").select("name").eq("id", organizationId).maybeSingle(),
+      db.from("plans").select("name").eq("id", planId).maybeSingle(),
+      db.from("billing_invoices").select("id").eq("paddle_transaction_id", txn.id).maybeSingle(),
+    ]);
+    const amountCop = Math.round(amountUsd * getPricingConfig().trmCop);
+    await emitSiigoInvoiceForPayment(db, {
+      organizationId,
+      organizationName: org?.name ?? "Organización",
+      planName: plan?.name ?? planId,
+      amountCop,
+      billingInvoiceId: invoiceRow?.id ?? null,
+    });
+  } catch (err) {
+    console.error("[paddle:webhook] pago aplicado pero falló la factura Siigo", txn.id, err);
+    const message = err instanceof Error ? err.message : String(err);
+    await db
+      .from("billing_invoices")
+      .update({ siigo_invoice_error: message.slice(0, 500) })
+      .eq("paddle_transaction_id", txn.id);
   }
 
   return { ok: true };

@@ -21,6 +21,8 @@ import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { usePricingCatalog } from "@/hooks/usePricingCatalog";
 import { PaddleCheckoutButton, usePaddleCheckout } from "@/components/billing/PaddleCheckoutButton";
 import { BoldCheckoutButton, useBoldCheckout } from "@/components/billing/BoldCheckoutButton";
+import { BillingProfileForm, type BillingProfile } from "@/components/billing/BillingProfileForm";
+import { isBillingProfileComplete } from "@/lib/billing/billing-profile";
 import { openInvoicePdf } from "@/lib/billing/open-invoice-pdf";
 import { CardBrandIcon } from "@/components/billing/CardBrandIcon";
 import type { PlanPromoDisplay } from "@/lib/billing/plan-promo";
@@ -68,6 +70,7 @@ interface Stats {
 }
 interface BillingData {
   organization: { id: string; name: string };
+  billing_profile?: BillingProfile | null;
   subscription: Subscription | null;
   plan_monthly_credits?: number;
   plan_promo?: PlanPromoDisplay | null;
@@ -157,6 +160,18 @@ const PLAN_COPY: Record<string, { tagline: string; features: string[]; ideal: st
     features: ["3.800.000 créditos/mes", "Usuarios ilimitados", "Misma plataforma completa", "Soporte dedicado"],
     ideal: "Operación grande · más de 15 personas o alto consumo",
   },
+  empresarial: {
+    tagline: "CRM, automatizaciones e integraciones de pago a la medida",
+    features: [
+      "1.600.000 créditos/mes",
+      "CRM Integrado",
+      "Automatizaciones e integraciones",
+      "Pasarelas de pago y plataformas de la empresa",
+      "Hasta 20 usuarios",
+      "Soporte prioritario",
+    ],
+    ideal: "Empresas con necesidades de integración a medida",
+  },
   paddle_qa: {
     tagline: "Solo superadmin · no aparece a clientes",
     features: [
@@ -181,6 +196,7 @@ const daysUntil = (iso: string | null) =>
 export default function FacturacionPage() {
   const [tab, setTab]         = useState("overview");
   const [showPlanPicker, setShowPlanPicker] = useState(false);
+  const [editingBillingProfile, setEditingBillingProfile] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelMsg, setCancelMsg] = useState("");
@@ -1237,6 +1253,31 @@ export default function FacturacionPage() {
                 >
                   ← Volver a mi plan
                 </button>
+
+                {(!data.billing_profile || editingBillingProfile) ? (
+                  <BillingProfileForm
+                    initial={data.billing_profile}
+                    onCancel={data.billing_profile ? () => setEditingBillingProfile(false) : undefined}
+                    onSaved={(profile) => {
+                      setData((d) => (d ? { ...d, billing_profile: profile } : d));
+                      setEditingBillingProfile(false);
+                    }}
+                  />
+                ) : (
+                  <div className="rounded-xl border border-[var(--nv-border)] bg-[var(--nv-bg-control)] p-3 flex items-center justify-between gap-3 text-xs">
+                    <span className="text-[var(--nv-text-muted)]">
+                      Facturando a <span className="text-[var(--nv-text)] font-semibold">{data.billing_profile.razon_social}</span>
+                      {" "}· {data.billing_profile.tipo_documento} {data.billing_profile.numero_documento}
+                    </span>
+                    <button
+                      onClick={() => setEditingBillingProfile(true)}
+                      className="text-[var(--nv-accent)] hover:underline shrink-0"
+                    >
+                      Editar
+                    </button>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {plans.map(p => {
                     const isActive  = p.id === sub?.plan_id;
@@ -1385,16 +1426,24 @@ export default function FacturacionPage() {
                             forma de pagar su plan actual desde el panel. */}
                         {p.price_usd > 0 && (!isActive || sub?.billing_provider !== "paddle") && (
                           <div className="px-5 pb-5 space-y-1.5">
-                            <BoldCheckoutButton
-                              planId={p.id}
-                              planName={p.name}
-                              onCheckoutCompleted={() => { void load(); setShowPlanPicker(false); }}
-                            />
-                            <PaddleCheckoutButton
-                              planId={p.id}
-                              planName={p.name}
-                              onCheckoutCompleted={() => { void load(); setShowPlanPicker(false); }}
-                            />
+                            {isBillingProfileComplete(data.billing_profile) ? (
+                              <>
+                                <BoldCheckoutButton
+                                  planId={p.id}
+                                  planName={p.name}
+                                  onCheckoutCompleted={() => { void load(); setShowPlanPicker(false); }}
+                                />
+                                <PaddleCheckoutButton
+                                  planId={p.id}
+                                  planName={p.name}
+                                  onCheckoutCompleted={() => { void load(); setShowPlanPicker(false); }}
+                                />
+                              </>
+                            ) : (
+                              <p className="text-[10px] text-[var(--nv-text-faint)] text-center">
+                                Completa los datos de facturación arriba para poder pagar
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>

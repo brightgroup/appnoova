@@ -17,6 +17,7 @@ import {
 } from "@/lib/billing/wallet-display";
 import { isSuperAdminUser } from "@/lib/admin-server";
 import { planVisibleInBillingCatalog } from "@/lib/billing/plan-visibility";
+import { fetchBillingProfile } from "@/lib/billing/billing-profile";
 
 interface UsageEventRow {
   created_at: string;
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest) {
 
   const chartFrom = new Date(Date.now() - CHART_HISTORY_DAYS * 86_400_000).toISOString();
 
-  const [subRes, walletRes, invoicesRes, plansRes, eventsRes, creditPackagesRes] = await Promise.all([
+  const [subRes, walletRes, invoicesRes, plansRes, eventsRes, creditPackagesRes, grantsRes] = await Promise.all([
     db
       .from("organization_subscriptions")
       .select("*, plans(name, price_usd, monthly_credits, whatsapp_included, support_level)")
@@ -76,6 +77,7 @@ export async function GET(req: NextRequest) {
       .gte("created_at", chartFrom)
       .order("created_at", { ascending: true }),
     db.from("credit_packages").select("id, credits, price_usd").eq("is_active", true).order("sort_order"),
+    db.from("plan_organization_grants").select("plan_id").eq("organization_id", orgId),
   ]);
 
   const wallet = walletRes.data;
@@ -83,9 +85,11 @@ export async function GET(req: NextRequest) {
   const subscription = subRes.data;
   const currentPlanId = subscription?.plan_id;
   const superAdmin = await isSuperAdminUser(ctx.userId);
+  const grantedPlanIds = new Set((grantsRes.data ?? []).map((g) => g.plan_id as string));
   const visiblePlans = allPlans.filter((p) =>
-    planVisibleInBillingCatalog(p, { superAdmin, currentPlanId })
+    planVisibleInBillingCatalog(p, { superAdmin, currentPlanId, grantedPlanIds })
   );
+  const billingProfile = await fetchBillingProfile(db, orgId);
   // Si el plan actual es un clon privado con precio a la medida (ej.
   // "esencial_cmarket", mismo nombre que el público "esencial"), no mostrar
   // los dos — el selector se vería con "Esencial" duplicado.
@@ -243,6 +247,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     organization: { id: orgId, name: ctx.organizationName },
+    billing_profile: billingProfile,
     subscription: subscription ?? null,
     plan_monthly_credits: planMonthlyCredits,
     plan_promo: planPromo,

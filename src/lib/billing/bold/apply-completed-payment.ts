@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getPricingConfig } from "@/lib/billing/pricing-config";
+import { emitSiigoInvoiceForPayment } from "@/lib/billing/siigo/invoice";
 
 export interface BoldWebhookData {
   payment_id: string;
@@ -150,6 +151,31 @@ export async function applyBoldSaleApproved(
     });
   } catch (err) {
     console.error("[bold:webhook] pago aplicado pero falló el email", data.payment_id, err);
+  }
+
+  if (reqRow.kind === "plan" && reqRow.plan_id) {
+    try {
+      const [{ data: org }, { data: plan }, { data: invoiceRow }] = await Promise.all([
+        db.from("organizations").select("name").eq("id", reqRow.organization_id).maybeSingle(),
+        db.from("plans").select("name").eq("id", reqRow.plan_id).maybeSingle(),
+        db.from("billing_invoices").select("id").eq("bold_transaction_id", data.payment_id).maybeSingle(),
+      ]);
+      const { amountCop } = resolveChargedAmounts(data, reqRow);
+      await emitSiigoInvoiceForPayment(db, {
+        organizationId: reqRow.organization_id,
+        organizationName: org?.name ?? "Organización",
+        planName: plan?.name ?? reqRow.plan_id,
+        amountCop,
+        billingInvoiceId: invoiceRow?.id ?? null,
+      });
+    } catch (err) {
+      console.error("[bold:webhook] pago aplicado pero falló la factura Siigo", data.payment_id, err);
+      const message = err instanceof Error ? err.message : String(err);
+      await db
+        .from("billing_invoices")
+        .update({ siigo_invoice_error: message.slice(0, 500) })
+        .eq("bold_transaction_id", data.payment_id);
+    }
   }
 
   return { ok: true };

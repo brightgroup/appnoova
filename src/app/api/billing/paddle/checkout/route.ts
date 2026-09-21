@@ -4,6 +4,7 @@ import { adminClient } from "@/lib/voice-agents-server";
 import { createPaddleCheckoutTransaction } from "@/lib/billing/paddle/client";
 import { isSuperAdminUser } from "@/lib/admin-server";
 import { isInternalCheckoutPlan } from "@/lib/billing/plan-visibility";
+import { fetchBillingProfile, isBillingProfileComplete } from "@/lib/billing/billing-profile";
 
 /** POST { plan_id } — crea una transacción Paddle en borrador para abrir el checkout overlay. */
 export async function POST(req: NextRequest) {
@@ -38,12 +39,29 @@ export async function POST(req: NextRequest) {
 
   // Un plan privado (precio negociado a la medida de una org, ej. contratos
   // enterprise) es pagable por su propia org aunque no esté en el catálogo
-  // público — solo se restringe a superadmin cuando NO es el plan ya asignado.
+  // público — solo se restringe a superadmin cuando NO es el plan ya asignado
+  // ni fue habilitado explícitamente para esta org vía plan_organization_grants.
   if (!isCurrentPlan && (isInternalCheckoutPlan(plan) || (plan.is_public !== true && plan.is_system !== true))) {
     const superAdmin = await isSuperAdminUser(ctx.userId);
     if (!superAdmin) {
-      return NextResponse.json({ error: "Plan no disponible" }, { status: 403 });
+      const { data: grant } = await db
+        .from("plan_organization_grants")
+        .select("plan_id")
+        .eq("plan_id", planId)
+        .eq("organization_id", ctx.organizationId)
+        .maybeSingle();
+      if (!grant) {
+        return NextResponse.json({ error: "Plan no disponible" }, { status: 403 });
+      }
     }
+  }
+
+  const billingProfile = await fetchBillingProfile(db, ctx.organizationId);
+  if (!isBillingProfileComplete(billingProfile)) {
+    return NextResponse.json(
+      { error: "Completa los datos de facturación de tu organización antes de pagar", code: "billing_profile_incomplete" },
+      { status: 428 }
+    );
   }
 
   const priceId =
