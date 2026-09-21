@@ -2243,6 +2243,14 @@ html:not(.dark) [data-noova-dashboard] [role="switch"][aria-checked="false"] {
   background-color: #e2e2e2 !important;
 }
 
+/* La bolita del switch es blanca: sobre el track negro del estado activo se ve
+   sola, pero sobre el gris claro del apagado se perdía. Un borde fino la
+   devuelve sin tocar el color del componente. */
+html:not(.dark) [data-noova-dashboard] [role="switch"][aria-checked="false"] > span,
+html:not(.dark) [data-noova-sidebar] [role="switch"][aria-checked="false"] > span {
+  border: 1px solid rgba(0, 0, 0, 0.22);
+}
+
 /* Wizard campañas — pasos y conectores */
 html:not(.dark) [data-noova-dashboard] .nv-wizard-step-done,
 html:not(.dark) [data-noova-dashboard] .nv-wizard-step-active {

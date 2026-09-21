@@ -221,7 +221,7 @@ export function TextAgentTestPanel({
               <p className="mb-4 text-center text-xs font-medium text-red-400">{error}</p>
             )}
 
-            <div className="nv-ori-composer rounded-[1.35rem] border border-[var(--nv-input-border)] bg-[var(--nv-bg-elevated)] focus-within:border-[#0f7eff]/30 focus-within:shadow-[0_0_0_1px_rgba(15,126,255,0.15)] transition-all">
+            <div className="nv-ori-composer rounded-[1.35rem] border border-[var(--nv-input-border)] bg-[var(--nv-bg-chat)] focus-within:border-[#0f7eff]/30 focus-within:shadow-[0_0_0_1px_rgba(15,126,255,0.15)] transition-all">
               <textarea
                 ref={textareaRef}
                 value={input}

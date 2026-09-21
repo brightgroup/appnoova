@@ -170,7 +170,7 @@ export function SidebarAccountMenu({
         aria-label="Mi cuenta"
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`nv-sidebar-account-btn flex items-center justify-center rounded-lg p-2.5 transition-colors ${
+        className={`nv-sidebar-account-btn flex items-center justify-center rounded-full p-2.5 transition-colors ${
           open || accountActive
             ? "text-white bg-white/[.08]"
             : "text-gray-300 hover:text-white hover:bg-white/[.06]"
