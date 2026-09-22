@@ -6,7 +6,8 @@ import { getAuthHeaders } from "@/lib/text-agents-api";
 import { formatLeadValue, filterPipelineStages } from "@/lib/crm-record";
 import { resolveCrmStageIcon } from "@/lib/crm-stage-icons";
 import { PlateBadge } from "@/components/crm/PlateBadge";
-import type { CrmLead, CrmPipelineStage } from "@/types/crm";
+import { dateRangeQueryParams, isDateRangeActive, type DateRangeValue } from "@/lib/date-range-filter";
+import type { CrmLead, CrmLeadFilter, CrmPipelineStage } from "@/types/crm";
 
 const PAGE_SIZE = 25;
 
@@ -19,15 +20,30 @@ interface ColumnState {
 
 interface CrmLeadsKanbanProps {
   stages: CrmPipelineStage[];
-  outcome: "open" | "mine";
+  outcome: CrmLeadFilter;
   currentUserName: string;
   /** Búsqueda controlada desde el toolbar compartido (misma línea que Filtro/Ordenar) — ya no tiene su propio buscador. */
   searchQuery: string;
+  /** Mismo orden que la vista de lista; el tablero lo resuelve en el servidor. */
+  sortField: "llegada" | "alfabetico";
+  sortDirection: "asc" | "desc";
+  /** Mismo rango de fechas de creación que la vista de lista. */
+  dateRange: DateRangeValue;
   onSelectLead: (id: string) => void;
   onLeadMoved: (lead: CrmLead) => void;
 }
 
-export function CrmLeadsKanban({ stages, outcome, currentUserName, searchQuery, onSelectLead, onLeadMoved }: CrmLeadsKanbanProps) {
+export function CrmLeadsKanban({
+  stages,
+  outcome,
+  currentUserName,
+  searchQuery,
+  sortField,
+  sortDirection,
+  dateRange,
+  onSelectLead,
+  onLeadMoved
+}: CrmLeadsKanbanProps) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overStageId, setOverStageId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,6 +52,7 @@ export function CrmLeadsKanban({ stages, outcome, currentUserName, searchQuery, 
   const [search, setSearch] = useState("");
 
   const pipelineStages = useMemo(() => filterPipelineStages(stages), [stages]);
+  const hasNarrowingFilters = Boolean(search) || isDateRangeActive(dateRange);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(searchQuery.trim()), 350);
@@ -44,12 +61,18 @@ export function CrmLeadsKanban({ stages, outcome, currentUserName, searchQuery, 
 
   const boardParams = useCallback(
     (extra?: Record<string, string>) => {
-      const params = new URLSearchParams({ outcome, ...extra });
+      const params = new URLSearchParams({
+        outcome,
+        sort: sortField,
+        dir: sortDirection,
+        ...dateRangeQueryParams(dateRange),
+        ...extra
+      });
       if (outcome === "mine" && currentUserName) params.set("asesor", currentUserName);
       if (search) params.set("q", search);
       return params;
     },
-    [outcome, currentUserName, search]
+    [outcome, currentUserName, search, sortField, sortDirection, dateRange]
   );
 
   const loadBoard = useCallback(async () => {
@@ -293,7 +316,11 @@ export function CrmLeadsKanban({ stages, outcome, currentUserName, searchQuery, 
                   ))}
                   {stageLeads.length === 0 && (
                     <p className="text-xs text-center text-gray-600 py-8 pointer-events-none">
-                      {isOver ? "Soltar aquí" : search ? "Sin resultados en esta etapa" : "Arrastra leads aquí"}
+                      {isOver
+                        ? "Soltar aquí"
+                        : hasNarrowingFilters
+                          ? "Sin resultados en esta etapa"
+                          : "Arrastra leads aquí"}
                     </p>
                   )}
                   {!search && col?.hasMore && (

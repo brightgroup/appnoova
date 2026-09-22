@@ -14,11 +14,31 @@ function sanitizeSearch(raw: string): string {
 }
 
 /**
- * El tablero solo necesita "abiertos" o "ganados/perdidos"; "mine" y "open" comparten el
- * outcome real y se distinguen por el filtro de asesor (ver `asesor` más abajo).
+ * "mine" y "open" comparten el outcome real y se distinguen por el filtro de asesor
+ * (ver `asesor` más abajo). "all" no filtra por outcome: devuelve null.
  */
-function resolveOutcome(outcome: string): "open" | "won" | "lost" {
-  return outcome === "won" || outcome === "lost" ? outcome : "open";
+function resolveOutcome(outcome: string): "open" | "won" | "lost" | null {
+  if (outcome === "won" || outcome === "lost") return outcome;
+  if (outcome === "all") return null;
+  return "open";
+}
+
+/** Mismo orden que la vista de lista: llegada (created_at) o alfabético (title). */
+function resolveOrder(sp: URLSearchParams): { column: string; ascending: boolean } {
+  const column = sp.get("sort") === "alfabetico" ? "title" : "created_at";
+  const dir = sp.get("dir");
+  const ascending = dir === "asc" ? true : dir === "desc" ? false : column === "title";
+  return { column, ascending };
+}
+
+/** Rango de fechas de creación (ISO). Se ignora lo que no sea una fecha válida. */
+function resolveDateRange(sp: URLSearchParams): { from: string | null; to: string | null } {
+  const parse = (raw: string | null) => {
+    if (!raw) return null;
+    const t = new Date(raw).getTime();
+    return Number.isNaN(t) ? null : new Date(t).toISOString();
+  };
+  return { from: parse(sp.get("from")), to: parse(sp.get("to")) };
 }
 
 export async function GET(req: NextRequest) {
@@ -33,6 +53,9 @@ export async function GET(req: NextRequest) {
   const asesor = outcome === "mine" ? sp.get("asesor") : null;
   const q = sanitizeSearch(sp.get("q") ?? "");
   const stageId = sp.get("stage_id");
+  const order = resolveOrder(sp);
+  const dateRange = resolveDateRange(sp);
+
 
   let stages;
   try {
@@ -70,14 +93,16 @@ export async function GET(req: NextRequest) {
       .from("crm_leads")
       .select(LEAD_SELECT, { count: "exact" })
       .eq("user_id", userId)
-      .eq("stage_id", stageId)
-      .eq("outcome", effectiveOutcome);
+      .eq("stage_id", stageId);
+    if (effectiveOutcome) query = query.eq("outcome", effectiveOutcome);
     if (!canManageAll) query = query.eq("assigned_user_id", callerUserId);
     if (asesor) query = query.ilike("asesor_responsable", asesor);
+    if (dateRange.from) query = query.gte("created_at", dateRange.from);
+    if (dateRange.to) query = query.lte("created_at", dateRange.to);
     if (orClause) query = query.or(orClause);
 
     const { data, error, count } = await query
-      .order("created_at", { ascending: false })
+      .order(order.column, { ascending: order.ascending })
       .range(offset, offset + limit - 1);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -90,9 +115,12 @@ export async function GET(req: NextRequest) {
   }
 
   // Sin stage_id: arranque del tablero — resumen (conteo + suma) y primera página por etapa.
-  let summaryQuery = db.from("crm_leads").select("stage_id, value_amount").eq("user_id", userId).eq("outcome", effectiveOutcome);
+  let summaryQuery = db.from("crm_leads").select("stage_id, value_amount").eq("user_id", userId);
+  if (effectiveOutcome) summaryQuery = summaryQuery.eq("outcome", effectiveOutcome);
   if (!canManageAll) summaryQuery = summaryQuery.eq("assigned_user_id", callerUserId);
   if (asesor) summaryQuery = summaryQuery.ilike("asesor_responsable", asesor);
+  if (dateRange.from) summaryQuery = summaryQuery.gte("created_at", dateRange.from);
+  if (dateRange.to) summaryQuery = summaryQuery.lte("created_at", dateRange.to);
   if (orClause) summaryQuery = summaryQuery.or(orClause);
   const { data: summaryRows, error: summaryError } = await summaryQuery;
   if (summaryError) return NextResponse.json({ error: summaryError.message }, { status: 500 });
@@ -114,12 +142,16 @@ export async function GET(req: NextRequest) {
           .from("crm_leads")
           .select(LEAD_SELECT)
           .eq("user_id", userId)
-          .eq("stage_id", stage.id)
-          .eq("outcome", effectiveOutcome);
+          .eq("stage_id", stage.id);
+        if (effectiveOutcome) pageQuery = pageQuery.eq("outcome", effectiveOutcome);
         if (!canManageAll) pageQuery = pageQuery.eq("assigned_user_id", callerUserId);
         if (asesor) pageQuery = pageQuery.ilike("asesor_responsable", asesor);
+        if (dateRange.from) pageQuery = pageQuery.gte("created_at", dateRange.from);
+        if (dateRange.to) pageQuery = pageQuery.lte("created_at", dateRange.to);
         if (orClause) pageQuery = pageQuery.or(orClause);
-        const { data, error } = await pageQuery.order("created_at", { ascending: false }).range(0, PAGE_SIZE - 1);
+        const { data, error } = await pageQuery
+          .order(order.column, { ascending: order.ascending })
+          .range(0, PAGE_SIZE - 1);
         if (error) throw error;
         pages[stage.id] = (data ?? []).map(r => toCrmLead(r as Record<string, unknown>));
       })

@@ -33,6 +33,13 @@ import {
 } from "@/lib/crm-record";
 import { resolveCrmStageIcon } from "@/lib/crm-stage-icons";
 import { NoovaSelect } from "@/components/ui/NoovaSelect";
+import { DateRangeFilter } from "@/components/ui/DateRangeFilter";
+import {
+  DATE_RANGE_ALL,
+  dateRangeMatches,
+  isDateRangeActive,
+  type DateRangeValue
+} from "@/lib/date-range-filter";
 import { RegistryTableLayout } from "@/components/ui/RegistryTableLayout";
 import { RegistryTablePagination } from "@/components/ui/RegistryTablePagination";
 import { useRegistryPagination } from "@/hooks/useRegistryPagination";
@@ -132,16 +139,20 @@ function FiltroPopover({
   onFilterChange,
   stageFilter,
   onStageFilterChange,
+  dateRange,
+  onDateRangeChange,
   stages
 }: {
   filter: CrmLeadFilter;
   onFilterChange: (v: CrmLeadFilter) => void;
   stageFilter: string | null;
   onStageFilterChange: (v: string | null) => void;
+  dateRange: DateRangeValue;
+  onDateRangeChange: (v: DateRangeValue) => void;
   stages: CrmPipelineStage[];
 }) {
   const [open, setOpen] = useState(false);
-  const isDefault = filter === "open" && stageFilter === null;
+  const isDefault = filter === "open" && stageFilter === null && !isDateRangeActive(dateRange);
 
   const stageOptions = useMemo(
     () => [
@@ -169,6 +180,7 @@ function FiltroPopover({
                 onClick={() => {
                   onFilterChange("open");
                   onStageFilterChange(null);
+                  onDateRangeChange(DATE_RANGE_ALL);
                 }}
                 className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-white"
               >
@@ -187,6 +199,7 @@ function FiltroPopover({
               <p className="text-xs text-gray-400 mb-1.5">Estado</p>
               <NoovaSelect value={filter} onChange={v => onFilterChange(v as CrmLeadFilter)} options={OUTCOME_OPTIONS.map(o => ({ value: o.id, label: o.label }))} />
             </div>
+            <DateRangeFilter value={dateRange} onChange={onDateRangeChange} label="Fecha de creación" />
           </div>
         </>
       )}
@@ -205,6 +218,7 @@ export default function CrmLeadsPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<DateRangeValue>(DATE_RANGE_ALL);
   const [loading, setLoading] = useState(true);
   const [currentUserName, setCurrentUserName] = useState("");
 
@@ -238,6 +252,8 @@ export default function CrmLeadsPage() {
 
     if (stageFilter) list = list.filter(l => l.stage_id === stageFilter);
 
+    if (isDateRangeActive(dateRange)) list = list.filter(l => dateRangeMatches(dateRange, l.created_at));
+
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter(
@@ -256,11 +272,11 @@ export default function CrmLeadsPage() {
       );
     }
     return sorted;
-  }, [leads, filter, currentUserName, stageFilter, search, sortField, sortDirection]);
+  }, [leads, filter, currentUserName, stageFilter, dateRange, search, sortField, sortDirection]);
 
   const pagination = useRegistryPagination(
     filteredLeads.length,
-    `${filter}-${view}-${stageFilter}-${search}-${sortField}-${sortDirection}`
+    `${filter}-${view}-${stageFilter}-${dateRange.preset}-${dateRange.from}-${dateRange.to}-${search}-${sortField}-${sortDirection}`
   );
   const pageRows = pagination.pageRows(filteredLeads);
 
@@ -284,7 +300,6 @@ export default function CrmLeadsPage() {
     [stageName]
   );
 
-  const kanbanFilters: CrmLeadFilter[] = ["open", "mine"];
   const kanbanStages = useMemo(
     () => (stageFilter ? stages.filter(s => s.id === stageFilter) : stages),
     [stages, stageFilter]
@@ -331,6 +346,8 @@ export default function CrmLeadsPage() {
                 onFilterChange={setFilter}
                 stageFilter={stageFilter}
                 onStageFilterChange={setStageFilter}
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
                 stages={stages}
               />
               <OrdenarPopover
@@ -422,20 +439,17 @@ export default function CrmLeadsPage() {
               <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando leads…
             </div>
           ) : view === "kanban" ? (
-            kanbanFilters.includes(filter) ? (
-              <CrmLeadsKanban
-                stages={kanbanStages}
-                outcome={filter as "open" | "mine"}
-                currentUserName={currentUserName}
-                searchQuery={search}
-                onSelectLead={id => router.push(`/dashboard/crm/leads/${id}`)}
-                onLeadMoved={lead => setLeads(prev => prev.map(l => (l.id === lead.id ? lead : l)))}
-              />
-            ) : (
-              <div className={registryTableEmpty}>
-                El kanban muestra leads abiertos. Usa el filtro de Estado (Abiertos o Míos).
-              </div>
-            )
+            <CrmLeadsKanban
+              stages={kanbanStages}
+              outcome={filter}
+              currentUserName={currentUserName}
+              searchQuery={search}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              dateRange={dateRange}
+              onSelectLead={id => router.push(`/dashboard/crm/leads/${id}`)}
+              onLeadMoved={lead => setLeads(prev => prev.map(l => (l.id === lead.id ? lead : l)))}
+            />
           ) : filteredLeads.length === 0 ? (
             <div className={registryTableEmpty}>
               No hay leads con estos filtros.
