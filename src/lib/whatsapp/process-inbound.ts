@@ -13,6 +13,12 @@ import { geminiTextTemperature, isTextAgentHumanOnly } from "@/lib/text-agent-fo
 import { generateTextAgentReply } from "@/lib/text-agent-generate";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import {
+  buildAgentThreadContext,
+  buildRollingSummary,
+  persistThreadContextSummary,
+  readThreadContextSummary
+} from "@/lib/ai-thread-context";
+import {
   persistAssistantReplyOnly,
   persistHumanReply,
   persistUserMessageOnly
@@ -26,7 +32,6 @@ import {
   HANDOFF_VISITOR_REPLY
 } from "@/lib/text-handoff";
 import {
-  allConversationMessagesForGemini,
   buildWhatsAppContactLabel,
   contactMetaKey,
   findWhatsAppConversation
@@ -726,8 +731,26 @@ async function processTwilioWhatsAppInboundLocked(
     inbound.fromE164
   );
 
-  const geminiContents = refreshed
-    ? allConversationMessagesForGemini(refreshed)
+  // Historial del turno: incluye los turnos del asesor humano (etiquetados) y
+  // recorta el hilo a una ventana con nota rodante — ver `ai-thread-context`.
+  const threadMessages = refreshed ? normalizeChatMessages(refreshed.messages) : [];
+  const priorSummary = refreshed ? readThreadContextSummary(refreshed.metadata) : null;
+  let threadContext = buildAgentThreadContext(threadMessages, priorSummary);
+
+  if (refreshed && threadContext.summarizeUpto !== null) {
+    const nextSummary = await buildRollingSummary(
+      threadMessages,
+      priorSummary,
+      threadContext.summarizeUpto
+    );
+    if (nextSummary) {
+      await persistThreadContextSummary(db, userPersist.conversationId, channel.user_id, nextSummary);
+      threadContext = buildAgentThreadContext(threadMessages, nextSummary);
+    }
+  }
+
+  const geminiContents = threadContext.messages.length
+    ? threadContext.messages
     : [{ role: "user" as const, content: userForAi }];
 
   let dataTableContext = { text: "", rows: [], columns: [] } as Awaited<ReturnType<typeof buildDataTableContext>>;
@@ -751,7 +774,9 @@ async function processTwilioWhatsAppInboundLocked(
   const ramosOfrecidos = orgId ? await getRamosOfrecidosLabels(db, orgId) : [];
   const mergedPrompt = mergeRamosOfrecidosContext(mergeCompanyContext(promptWithCatalog, companyContextText), ramosOfrecidos);
   const temporal = buildColombiaTemporalContext();
-  const systemInstruction = `${temporal.promptBlock}\n\n${mergedPrompt}`;
+  const systemInstruction = [temporal.promptBlock, mergedPrompt, threadContext.contextBlock]
+    .filter(Boolean)
+    .join("\n\n");
   // Solo las instrucciones, SIN la tabla del catálogo: es lo que el guardián
   // toma como "importes y enlaces que el negocio autoriza". Si se le pasara el
   // prompt completo, la propia tabla incrustada daría por bueno cualquier

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { WHATSAPP_CONVERSATION_CHANNEL } from "@/lib/whatsapp-channel";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
+import { toAgentThreadMessage, type AgentThreadMessage } from "@/lib/ai-thread-context";
 import { toTextConversationRecord } from "@/lib/text-conversation-record";
 import type { TextAgentConversationRecord, TextChatMessage } from "@/types/text-agent-conversation";
 
@@ -61,27 +62,25 @@ export function messageContentForAi(msg: TextChatMessage): string {
   return msg.content;
 }
 
-export function allConversationMessagesForGemini(
+/**
+ * Historial completo del hilo para el agente, sin recorte. El mapeo de roles
+ * (incluidos los turnos del asesor humano, que antes se descartaban) vive en
+ * `toAgentThreadMessage`. Para el camino normal usa `buildAgentThreadContext`,
+ * que además aplica la ventana y el resumen rodante.
+ */
+export function allConversationMessagesForAgent(
   record: TextAgentConversationRecord
-): { role: "user" | "assistant"; content: string }[] {
+): AgentThreadMessage[] {
   return normalizeChatMessages(record.messages)
-    .filter(m => m.role === "user" || m.role === "assistant")
-    .map(m => ({
-      role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
-      content: m.role === "assistant" ? m.content : messageContentForAi(m)
-    }))
-    .filter(m => m.content.trim());
+    .map(toAgentThreadMessage)
+    .filter((m): m is AgentThreadMessage => m !== null);
 }
 
-export function conversationMessagesForGemini(
+export function conversationMessagesForAgent(
   record: TextAgentConversationRecord,
   newUserMessage: string
-): { role: "user" | "assistant"; content: string }[] {
-  const history = normalizeChatMessages(record.messages).map(m => ({
-    role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
-    content: m.role === "assistant" ? m.content : messageContentForAi(m)
-  }));
-  return [...history, { role: "user", content: newUserMessage }];
+): AgentThreadMessage[] {
+  return [...allConversationMessagesForAgent(record), { role: "user", content: newUserMessage }];
 }
 
 export { contactMetaKey };

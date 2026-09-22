@@ -12,6 +12,13 @@ import { WEB_EMBED_CHANNEL } from "@/lib/widget-channel";
 import { geminiTextTemperature, isTextAgentHumanOnly } from "@/lib/text-agent-form";
 import { generateTextAgentReply } from "@/lib/text-agent-generate";
 import { persistChatTurn, persistUserMessageOnly } from "@/lib/text-conversation-persist";
+import {
+  buildAgentThreadContext,
+  buildRollingSummary,
+  persistThreadContextSummary,
+  readThreadContextSummary,
+  type ThreadContextSummary
+} from "@/lib/ai-thread-context";
 import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
 import { resolvePublicChatChannel } from "@/lib/widget-channel";
@@ -171,15 +178,17 @@ export async function POST(
   const humanOnly = isTextAgentHumanOnly(agent);
 
   let existingHandoff: "human" | "ai" | null = null;
+  let priorSummary: ThreadContextSummary | null = null;
   if (conversationId) {
     const { data: existing } = await db
       .from("text_agent_conversations")
-      .select("handoff_mode")
+      .select("handoff_mode, metadata")
       .eq("id", conversationId)
       .eq("user_id", userId)
       .maybeSingle();
     if (existing) {
       existingHandoff = existing.handoff_mode === "human" ? "human" : "ai";
+      priorSummary = readThreadContextSummary(existing.metadata);
     }
   }
 
@@ -331,7 +340,25 @@ export async function POST(
   );
   const ramosOfrecidos = billing.organizationId ? await getRamosOfrecidosLabels(db, billing.organizationId) : [];
   const temporal = buildColombiaTemporalContext();
-  const systemInstruction = `${temporal.promptBlock}\n\n${mergeRamosOfrecidosContext(mergeCompanyContext(promptWithCatalog, companyContextText), ramosOfrecidos)}`;
+
+  // Mismo tratamiento del hilo que en WhatsApp: turnos del asesor humano
+  // etiquetados y ventana con nota rodante — ver `ai-thread-context`.
+  let threadContext = buildAgentThreadContext(messages, priorSummary);
+  if (conversationId && threadContext.summarizeUpto !== null) {
+    const nextSummary = await buildRollingSummary(messages, priorSummary, threadContext.summarizeUpto);
+    if (nextSummary) {
+      await persistThreadContextSummary(db, conversationId, userId, nextSummary);
+      threadContext = buildAgentThreadContext(messages, nextSummary);
+    }
+  }
+
+  const systemInstruction = [
+    temporal.promptBlock,
+    mergeRamosOfrecidosContext(mergeCompanyContext(promptWithCatalog, companyContextText), ramosOfrecidos),
+    threadContext.contextBlock
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   // Solo las instrucciones, SIN la tabla del catálogo: es lo que el guardián
   // toma como "importes y enlaces que el negocio autoriza". Si se le pasara el
   // prompt completo, la propia tabla incrustada daría por bueno cualquier
@@ -359,10 +386,7 @@ export async function POST(
     const generated = await generateTextAgentReply({
       model,
       systemInstruction,
-      messages: messages.map(m => ({
-        role: m.role === "user" ? ("user" as const) : ("assistant" as const),
-        content: m.content
-      })),
+      messages: threadContext.messages,
       temperature,
       maxOutputTokens,
       notifyRules: agent.notify_rules,
