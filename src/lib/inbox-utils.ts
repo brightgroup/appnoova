@@ -226,16 +226,17 @@ export function filterInboxItems(
 }
 
 /**
- * Cuenta conversaciones con `unread_count > 0` por cada tab del inbox, a partir de la
- * lista completa (sin filtrar) — así el badge de "Archivadas" (u otro tab) es visible
- * aunque el usuario esté viendo otro filtro.
+ * Suma los mensajes sin leer de cada tab del inbox, a partir de la lista completa
+ * (sin filtrar) — así el badge de "Archivadas" (u otro tab) es visible aunque el
+ * usuario esté viendo otro filtro. Se cuentan mensajes, no conversaciones, para que
+ * la burbuja diga lo mismo que la de cada conversación de la lista.
  */
 export function computeInboxUnreadCounts(
   items: InboxListItem[],
   currentUserName: string
 ): Record<InboxFilter, number> {
   const countUnread = (list: InboxListItem[]) =>
-    list.filter(i => (i.unread_count ?? 0) > 0).length;
+    list.reduce((sum, i) => sum + (i.unread_count ?? 0), 0);
 
   return {
     all: countUnread(filterInboxItems(items, "all", currentUserName)),

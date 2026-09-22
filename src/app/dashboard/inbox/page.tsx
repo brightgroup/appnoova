@@ -11,7 +11,6 @@ import {
   ChevronDown,
   ExternalLink,
   FileText,
-  Filter,
   Film,
   Loader2,
   MessageSquare,
@@ -39,6 +38,8 @@ import {
   resolveTemplateVariableValues
 } from "@/lib/whatsapp/template-variable-context";
 import { InboxTemplateComposer } from "@/components/inbox/InboxTemplateComposer";
+import { InboxFilterPopover } from "@/components/inbox/InboxFilterPopover";
+import { DATE_RANGE_ALL, dateRangeMatches, type DateRangeValue } from "@/lib/date-range-filter";
 import { NoovaListMenu, NoovaListMenuItem } from "@/components/ui/NoovaSelect";
 import { Badge } from "@/components/ui/Badge";
 import { InfoBox } from "@/components/ui/InfoBox";
@@ -82,6 +83,8 @@ function InboxPageInner() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<InboxFilter>("all");
+  const [channelFilter, setChannelFilter] = useState("");
+  const [dateRange, setDateRange] = useState<DateRangeValue>(DATE_RANGE_ALL);
   const [offline, setOffline] = useState(false);
   const [currentUserName, setCurrentUserName] = useState("Usuario");
   const [assignees, setAssignees] = useState<InboxAssignee[]>([]);
@@ -386,17 +389,29 @@ function InboxPageInner() {
     };
   }, [contextMenu]);
 
+  /** Canales realmente presentes en la bandeja — el selector no ofrece opciones vacías. */
+  const availableChannels = useMemo(() => {
+    const seen = new Set<string>();
+    for (const i of items) if (i.channel) seen.add(i.channel);
+    return [...seen].sort();
+  }, [items]);
+
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      i =>
+    return items.filter(i => {
+      if (channelFilter && i.channel !== channelFilter) return false;
+      if (!dateRangeMatches(dateRange, i.updated_at)) return false;
+      if (!q) return true;
+      return (
         i.display_title.toLowerCase().includes(q) ||
         i.contact_label.toLowerCase().includes(q) ||
         i.preview.toLowerCase().includes(q) ||
         i.agent_name.toLowerCase().includes(q)
-    );
-  }, [items, search]);
+      );
+    });
+  }, [items, search, channelFilter, dateRange]);
+
+  const hasActiveFilters = Boolean(search.trim()) || Boolean(channelFilter) || dateRange.preset !== "all";
 
   const selectItem = (item: InboxListItem) => {
     setSelectedId(item.id);
@@ -464,11 +479,19 @@ function InboxPageInner() {
       }
       setError("");
       if (id === selectedId) {
-        setDetail(prev =>
-          prev && prev.kind === "text"
-            ? { ...prev, archived_at: archived ? new Date().toISOString() : null }
-            : prev
-        );
+        if (archived) {
+          // Al archivar se cierra la conversación: si quedara abierta, el refresco del
+          // detalle (cada 4 s) la marcaría como leída una y otra vez y los mensajes
+          // nuevos nunca llegarían a encender la burbuja de "Archivadas".
+          setSelectedId(null);
+          setConversationInUrl(null);
+          setDetail(null);
+          setReply("");
+        } else {
+          setDetail(prev =>
+            prev && prev.kind === "text" ? { ...prev, archived_at: null } : prev
+          );
+        }
       }
       await loadList(true);
     } catch {
@@ -630,37 +653,49 @@ function InboxPageInner() {
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </button>
-          <button
-            type="button"
-            className="rounded-xl border border-white/[.08] bg-white/[.08] p-2.5 text-white/50 transition-colors hover:text-white"
-            aria-label="Filtros"
-          >
-            <Filter className="h-4 w-4" />
-          </button>
+          <InboxFilterPopover
+            channel={channelFilter}
+            onChannelChange={setChannelFilter}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+            availableChannels={availableChannels}
+          />
         </div>
 
         <div className="flex flex-wrap gap-2 border-b border-white/[.05] px-4 py-3">
           {tabs.map(tab => {
             const count = unreadCounts[tab.id] ?? 0;
+            const active = filter === tab.id;
+            // Una conversación archivada con mensajes nuevos es fácil de perder de vista:
+            // mientras el asesor esté en otra pestaña, la burbuja de "Archivadas" late.
+            const pulsing = tab.id === "archived" && count > 0 && !active;
             return (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setFilter(tab.id)}
                 className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors sm:px-4 sm:py-2 sm:text-sm ${
-                  filter === tab.id
+                  active
                     ? "bg-[#0f7eff] text-white"
-                    : "bg-white/[.10] text-white/60 hover:text-white/90"
+                    : pulsing
+                      ? "bg-red-500/15 text-white ring-1 ring-red-500/40"
+                      : "bg-white/[.10] text-white/60 hover:text-white/90"
                 }`}
+                title={pulsing ? `${count} mensaje${count === 1 ? "" : "s"} sin leer en archivadas` : undefined}
               >
                 {tab.label}
                 {count > 0 && (
-                  <span
-                    className={`flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-bold ${
-                      filter === tab.id ? "bg-white/25 text-white" : "bg-red-500 text-white"
-                    }`}
-                  >
-                    {count > 9 ? "9+" : count}
+                  <span className="relative flex h-4 min-w-4 shrink-0 items-center justify-center">
+                    {pulsing && (
+                      <span className="absolute inset-0 animate-ping rounded-full bg-red-500 opacity-75" />
+                    )}
+                    <span
+                      className={`relative flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold ${
+                        active ? "bg-white/25 text-white" : "bg-red-500 text-white"
+                      }`}
+                    >
+                      {count > 99 ? "99+" : count}
+                    </span>
                   </span>
                 )}
               </button>
@@ -681,9 +716,11 @@ function InboxPageInner() {
             </div>
           ) : filteredItems.length === 0 && !error ? (
             <p className="px-5 py-10 text-center text-sm text-white/40">
-              {filter === "archived"
-                ? "No hay conversaciones archivadas."
-                : "No hay conversaciones todavía. Aparecerán aquí los chats del micrositio y las pruebas de agentes de texto."}
+              {hasActiveFilters
+                ? "No hay conversaciones con estos filtros."
+                : filter === "archived"
+                  ? "No hay conversaciones archivadas."
+                  : "No hay conversaciones todavía. Aparecerán aquí los chats del micrositio y las pruebas de agentes de texto."}
             </p>
           ) : filteredItems.length === 0 ? null : (
             filteredItems.map(item => {
