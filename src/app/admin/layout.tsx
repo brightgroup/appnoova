@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, Settings, Phone, LogOut,
   ChevronLeft, ChevronRight, Shield, Loader2, Building2, KeyRound, CreditCard, BarChart3, Settings2,
-  PhoneOutgoing
+  PhoneOutgoing, Sparkles
 } from "lucide-react";
 import {
   sidebarNavActive, sidebarNavIdle, sidebarIconActive, accentGradientIcon
@@ -28,6 +28,7 @@ const NAV_ITEMS = [
   { href: "/admin/telephony",     label: "Líneas telefónicas", icon: Phone, badgeKey: "telephony" as const },
   { href: "/admin/whatsapp",      label: "WhatsApp",         icon: Phone },
   { href: "/admin/templates",     label: "Agentes IA",       icon: Settings },
+  { href: "/admin/ori",           label: "Ori",              icon: Sparkles },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

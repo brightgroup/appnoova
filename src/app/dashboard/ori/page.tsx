@@ -4,7 +4,7 @@ import { Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Sparkles, History, FileText, Users, RefreshCw,
-  Mail, Phone, Loader2, Plus, Mic, ArrowUp, Shield
+  Mail, Phone, Loader2, Plus, Mic, ArrowUp, Shield, SlidersHorizontal
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getAuthHeaders } from "@/lib/voice-agents-api";
@@ -61,7 +61,7 @@ const QUICK_ACTIONS = [
 
 /** useSearchParams() (para el prefill ?quote_id=) exige un límite de Suspense al pre-renderizar — ver el export default más abajo. */
 function OriCopilotoPageContent() {
-  const { modules } = useOrgPermissions();
+  const { modules, can } = useOrgPermissions();
   const router = useRouter();
   const searchParams = useSearchParams();
   const prefillHandled = useRef(false);
@@ -306,6 +306,15 @@ function OriCopilotoPageContent() {
             <History className="w-3.5 h-3.5" />
             Chats
           </button>
+          {can("company_context", "view") && (
+            <button
+              onClick={() => router.push("/dashboard/ori/instrucciones")}
+              className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-white transition-colors"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              Instrucciones
+            </button>
+          )}
         </div>
       </div>
 

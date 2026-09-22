@@ -18,6 +18,12 @@ import { ORI_WOOCOMMERCE_TOOLS } from "@/lib/woocommerce/ori-tools";
 export interface OriToolContext {
   db: SupabaseClient;
   organizationId: string;
+  /**
+   * Cuántas filas devuelve una tool de listado cuando el modelo no pide una
+   * cantidad. Lo configura el cliente (ori_org_instructions.filas_por_consulta);
+   * se aplica acá, en código, y no solo pidiéndoselo al modelo en el prompt.
+   */
+  defaultRowLimit?: number;
 }
 
 export interface OriToolResult {

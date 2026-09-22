@@ -1,10 +1,12 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, ArrowUpRight } from "lucide-react";
 import {
   toolProductRows,
   toolMovementRows,
   toolTruncationCaption,
+  toolInventoryListingQuery,
   toolInsuranceQuote,
   toolQuoteResultPreview,
   type OriToolCall,
@@ -38,6 +40,7 @@ export function OriToolResultView({
         const productos = toolProductRows(call);
         const movimientos = toolMovementRows(call);
         const caption = toolTruncationCaption(call);
+        const listingQuery = toolInventoryListingQuery(call);
         const quote = toolInsuranceQuote(call);
         const quotePreview = toolQuoteResultPreview(call);
 
@@ -77,7 +80,22 @@ export function OriToolResultView({
                   ))}
                 </tbody>
               </table>
-              {caption && <p className="px-3 py-1.5 text-[11px] text-gray-500 border-t border-white/[.06]">{caption}</p>}
+              {(caption || listingQuery !== null) && (
+                <div className="flex items-center justify-between gap-3 px-3 py-1.5 border-t border-white/[.06]">
+                  <span className="text-[11px] text-gray-500">{caption}</span>
+                  {listingQuery !== null && (
+                    <Link
+                      href={`/dashboard/erp/inventario${
+                        new URLSearchParams(listingQuery).get("bajo_minimo") === "1" ? "?filter=bajo_minimo" : ""
+                      }`}
+                      className="flex items-center gap-1 text-[11px] font-medium text-[#99c9ff] hover:text-white transition-colors whitespace-nowrap"
+                    >
+                      Ver el listado completo
+                      <ArrowUpRight className="w-3 h-3" />
+                    </Link>
+                  )}
+                </div>
+              )}
             </div>
           );
         }

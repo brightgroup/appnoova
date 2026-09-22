@@ -33,12 +33,12 @@ export const inventoryLookupTool: OriToolDefinition = {
     }
   },
   promptBlock:
-    "Tienes una herramienta (consultar_inventario) para ver en tiempo real el inventario de esta empresa: existencias, stock mínimo, marca y responsable por producto. Úsala cada vez que te pregunten por inventario, existencias, qué se está agotando, o listados por producto/marca — nunca respondas esas preguntas de memoria ni inventes cifras. Cuando reportes números, cópialos exactamente como vienen en la respuesta de la herramienta — no los redondees ni los recuerdes de un mensaje anterior. Si `mostrados` es menor que `total_encontrados`, dilo explícitamente (ej. \"te muestro los primeros 20 de 43\") y sugiere que para ver el listado completo revisen la tabla en ERP → Inventario, que sí lo trae completo, ordenable y exportable a Excel.",
+    "Tienes una herramienta (consultar_inventario) para ver en tiempo real el inventario de esta empresa: existencias, stock mínimo, marca y responsable por producto. Úsala cada vez que te pregunten por inventario, existencias, qué se está agotando, o listados por producto/marca — nunca respondas esas preguntas de memoria ni inventes cifras. Cuando reportes números, cópialos exactamente como vienen en la respuesta de la herramienta — no los redondees ni los recuerdes de un mensaje anterior.\n\nMUY IMPORTANTE sobre el formato: la plataforma pinta automáticamente una tabla con los productos que devuelve la herramienta, justo debajo de tu mensaje. NUNCA repitas esos productos en tu texto — ni en viñetas, ni numerados, ni en tabla markdown, ni línea por línea. Tu texto debe ser solo una o dos frases de contexto alrededor de la tabla: cuántos encontraste, qué vale la pena destacar (por ejemplo cuáles están bajo mínimo) y qué puede hacer el usuario a continuación. Si `mostrados` es menor que `total_encontrados`, dilo en esa frase (ej. \"te muestro los primeros 20 de 43\") y sugiere que para ver el listado completo revisen la tabla en ERP → Inventario, que sí lo trae completo, ordenable y exportable a Excel. Solo puedes nombrar un producto puntual en el texto cuando la pregunta era por ese producto específico o cuando lo mencionas como excepción dentro de una frase.",
   async execute(args: Record<string, unknown>, ctx: OriToolContext): Promise<OriToolResult> {
     const busqueda = typeof args.busqueda === "string" ? args.busqueda.trim() : "";
     const marca = typeof args.marca === "string" ? args.marca.trim().toLowerCase() : "";
     const soloBajoMinimo = args.solo_bajo_minimo === true;
-    const limite = Math.min(Math.max(Number(args.limite) || 15, 1), 30);
+    const limite = Math.min(Math.max(Number(args.limite) || ctx.defaultRowLimit || 15, 1), 30);
 
     const items = await listInventoryItems(ctx.db, ctx.organizationId, { search: busqueda || undefined });
 
@@ -60,6 +60,14 @@ export const inventoryLookupTool: OriToolDefinition = {
       ok: true,
       total_encontrados: filtered.length,
       mostrados: productos.length,
+      // Los filtros viajan de vuelta para que la UI pueda ofrecer "ver el
+      // listado completo" con esta misma búsqueda ya aplicada, en vez de
+      // obligar al usuario a repetirla (ver toolInventoryListingQuery).
+      filtros: {
+        busqueda: busqueda || null,
+        marca: marca || null,
+        solo_bajo_minimo: soloBajoMinimo
+      },
       productos
     };
   }

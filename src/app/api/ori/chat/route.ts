@@ -24,6 +24,8 @@ import { providerForLlmModel } from "@/lib/billing/pricing";
 import { getOriInventoryAccess } from "@/lib/erp/ori-access-db";
 import { getOriSegurosAccess } from "@/lib/insurers/ori-seguros-access";
 import { createConversation, appendConversationMessages, deriveConversationTitle } from "@/lib/ori/ori-conversations-db";
+import { stripRenderedRows } from "@/lib/ori/strip-rendered-rows";
+import { compileOriOrgBlock, getOriBasePrompt, getOriOrgInstructions } from "@/lib/ori/ori-prompt-settings";
 import { cotizarSeguroAutoTool } from "@/lib/agent-tools/auto-quote-ori-tool";
 import { calificarSeguroVidaOriTool } from "@/lib/agent-tools/life-quote-ori-tool";
 import { calificarSeguroHogarOriTool } from "@/lib/agent-tools/home-quote-ori-tool";
@@ -214,15 +216,28 @@ export async function POST(req: NextRequest) {
     .filter(Boolean)
     .join("\n\n");
 
+  // Prompt en capas: base editable por superadmin (platform_settings.ori_prompt)
+  // + instrucciones que configuró el propio cliente. Ver
+  // src/lib/ori/ori-prompt-settings.ts para por qué se anexan en vez de reemplazar.
+  const [oriBasePrompt, oriOrgConfig] = await Promise.all([
+    getOriBasePrompt(billingDb),
+    billing.organizationId ? getOriOrgInstructions(billingDb, billing.organizationId) : Promise.resolve(null)
+  ]);
+  const oriOrgBlock = oriOrgConfig ? compileOriOrgBlock(oriOrgConfig) : "";
+
   const systemInstruction = [
-    buildOriSystemInstruction(companyContextText, platformHelp, temporal.promptBlock),
+    buildOriSystemInstruction(companyContextText, platformHelp, temporal.promptBlock, oriBasePrompt, oriOrgBlock),
     toolsPromptBlock,
     quoteContextBlock
   ]
     .filter(block => block.trim().length > 0)
     .join("\n\n");
 
-  const toolCtx = { db: billingDb, organizationId: billing.organizationId ?? "" };
+  const toolCtx = {
+    db: billingDb,
+    organizationId: billing.organizationId ?? "",
+    defaultRowLimit: oriOrgConfig?.filasPorConsulta
+  };
 
   const toolCalls: OriToolCallRecord[] = [];
 
@@ -374,6 +389,11 @@ export async function POST(req: NextRequest) {
     if (!reply) {
       return NextResponse.json({ error: "Ori no generó respuesta" }, { status: 502 });
     }
+
+    // La tabla que ve el cliente se pinta desde `tool_calls`; si el modelo
+    // además enumeró las mismas filas en su prosa, la lista aparece dos veces
+    // (reportado por CMarket). Ver src/lib/ori/strip-rendered-rows.ts.
+    reply = stripRenderedRows(reply, toolCalls);
 
     if (billing.organizationId) {
       await recordUsageSafe({

@@ -61,13 +61,32 @@ export function toolMovementRows(call: OriToolCall): OriInventoryMovementRow[] {
   return Array.isArray(rows) ? (rows as OriInventoryMovementRow[]) : [];
 }
 
+/**
+ * Query string para abrir el listado completo con los mismos filtros que usó
+ * Ori. Devuelve null cuando la tool trajo todo lo que había: en ese caso la
+ * tabla del chat ya es la respuesta completa y el link sobraría.
+ */
+export function toolInventoryListingQuery(call: OriToolCall): string | null {
+  if (call.name !== "consultar_inventario") return null;
+  const total = call.result.total_encontrados;
+  const mostrados = call.result.mostrados;
+  if (typeof total !== "number" || typeof mostrados !== "number" || mostrados >= total) return null;
+
+  const filtros = (call.result.filtros ?? {}) as Record<string, unknown>;
+  const qs = new URLSearchParams();
+  if (typeof filtros.busqueda === "string" && filtros.busqueda) qs.set("q", filtros.busqueda);
+  if (typeof filtros.marca === "string" && filtros.marca) qs.set("marca", filtros.marca);
+  if (filtros.solo_bajo_minimo === true) qs.set("bajo_minimo", "1");
+  return qs.toString();
+}
+
 /** Texto "mostrando X de Y" cuando la tool truncó el resultado — mismo criterio en las dos tablas. */
 export function toolTruncationCaption(call: OriToolCall): string | null {
   const total = call.result.total_encontrados;
   const mostrados = call.result.mostrados;
   if (typeof total !== "number" || typeof mostrados !== "number") return null;
   if (mostrados >= total) return null;
-  return `Mostrando ${mostrados} de ${total} — para el listado completo, revisa la tabla en ERP.`;
+  return `Mostrando ${mostrados} de ${total}.`;
 }
 
 export type InsuranceQuoteRamo = "autos" | "vida" | "hogar" | "motos" | "soat" | "accidentes_personales";

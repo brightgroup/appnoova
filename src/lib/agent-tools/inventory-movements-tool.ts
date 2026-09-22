@@ -33,12 +33,12 @@ export const inventoryMovementsTool: OriToolDefinition = {
     }
   },
   promptBlock:
-    "Tienes una herramienta (consultar_movimientos_inventario) para ver el kardex real: entradas, salidas y ajustes, con fecha, cantidad, saldo resultante y quién lo registró. Úsala para cualquier pregunta sobre movimientos o historial de inventario — nunca la inventes ni la deduzcas de memoria.",
+    "Tienes una herramienta (consultar_movimientos_inventario) para ver el kardex real: entradas, salidas y ajustes, con fecha, cantidad, saldo resultante y quién lo registró. Úsala para cualquier pregunta sobre movimientos o historial de inventario — nunca la inventes ni la deduzcas de memoria. La plataforma pinta automáticamente una tabla con esos movimientos debajo de tu mensaje: no los repitas en tu texto (ni en viñetas ni en tabla markdown), limítate a una o dos frases que interpreten lo que muestra la tabla.",
   async execute(args: Record<string, unknown>, ctx: OriToolContext): Promise<OriToolResult> {
     const codigo = typeof args.codigo === "string" ? args.codigo.trim() : "";
     const tipoRaw = typeof args.tipo === "string" ? args.tipo.trim() : "";
     const tipo = VALID_TIPOS.has(tipoRaw as InventoryMovementType) ? (tipoRaw as InventoryMovementType) : null;
-    const limite = Math.min(Math.max(Number(args.limite) || 15, 1), 30);
+    const limite = Math.min(Math.max(Number(args.limite) || ctx.defaultRowLimit || 15, 1), 30);
 
     let itemId: string | undefined;
     let itemLabel: string | null = null;

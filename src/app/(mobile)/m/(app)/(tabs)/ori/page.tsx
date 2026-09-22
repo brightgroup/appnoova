@@ -1,11 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { authFetch } from "@/lib/telephony-api";
 import { DEFAULT_TEXT_MODEL } from "@/lib/text-agent-options";
-import { SendIcon, SparkleIcon } from "../../../icons";
-import { toolProductRows, toolMovementRows, toolTruncationCaption, type OriToolCall } from "@/types/ori";
+import { SendIcon, SparkleIcon, ChevronRightIcon } from "../../../icons";
+import {
+  toolProductRows,
+  toolMovementRows,
+  toolTruncationCaption,
+  toolInventoryListingQuery,
+  type OriToolCall
+} from "@/types/ori";
 
 interface Message {
   id: string;
@@ -15,12 +22,16 @@ interface Message {
 }
 
 function OriToolResultCards({ toolCalls }: { toolCalls: OriToolCall[] }) {
+  const router = useRouter();
   return (
     <>
       {toolCalls.map((call, i) => {
         const productos = toolProductRows(call);
         const movimientos = toolMovementRows(call);
         const caption = toolTruncationCaption(call);
+        // Cuando la consulta trajo más de lo que cabe en el chat, el listado
+        // completo vive en su propia pantalla — recorrerlo ahí no cuesta créditos.
+        const listingQuery = toolInventoryListingQuery(call);
 
         if (productos.length > 0) {
           return (
@@ -35,6 +46,16 @@ function OriToolResultCards({ toolCalls }: { toolCalls: OriToolCall[] }) {
                 </div>
               ))}
               {caption && <p className="ori-result-caption">{caption}</p>}
+              {listingQuery !== null && (
+                <button
+                  type="button"
+                  className="ori-result-link"
+                  onClick={() => router.push(`/m/inventario${listingQuery ? `?${listingQuery}` : ""}`)}
+                >
+                  Ver el listado completo
+                  <ChevronRightIcon />
+                </button>
+              )}
             </div>
           );
         }

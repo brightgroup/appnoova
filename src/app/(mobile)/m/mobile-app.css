@@ -618,3 +618,36 @@ html:has(.nv-m-app .nv-m-onboarding) body {
 .nv-m-app .step p b { font-weight: 650; color: var(--ink); }
 
 .nv-m-app .install-actions { margin-top: 22px; display: flex; flex-direction: column; gap: 4px; }
+
+/* ============ INVENTARIO (listado completo desde Ori) ============ */
+.nv-m-app .app-head .head-row .back-btn { margin-left: -9px; }
+.nv-m-app .inv-filters { display: flex; gap: 7px; margin-top: 11px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.nv-m-app .inv-filters::-webkit-scrollbar { display: none; }
+.nv-m-app .inv-chip {
+  flex: none; border: 1px solid var(--border); background: var(--surface-2); color: var(--muted);
+  font-size: 12.5px; font-weight: 600; padding: 6px 11px; border-radius: 10px; white-space: nowrap;
+  font-family: inherit; transition: background .14s ease, color .14s ease, border-color .14s ease;
+}
+.nv-m-app .inv-chip.on { background: var(--accent-soft); color: var(--accent-text); border-color: transparent; }
+.nv-m-app .inv-count { margin-top: 11px; }
+
+.nv-m-app .inv-body { padding: 4px 14px calc(34px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; }
+.nv-m-app .inv-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--border-soft); }
+.nv-m-app .inv-row:last-of-type { border-bottom: none; }
+.nv-m-app .inv-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nv-m-app .inv-name { font-size: 14px; font-weight: 570; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nv-m-app .inv-sub { font-size: 11.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.nv-m-app .inv-nums { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.nv-m-app .inv-stock { font-size: 15px; font-weight: 660; color: var(--ink); font-variant-numeric: tabular-nums; }
+.nv-m-app .inv-stock.warn { color: var(--overdue); }
+.nv-m-app .inv-min { font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.nv-m-app .inv-more { padding: 18px 0 6px; text-align: center; font-size: 12px; color: var(--faint); min-height: 24px; }
+
+/* Pie de la tarjeta de Ori que salta al listado completo. */
+.nv-m-app .ori-result-link {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  padding: 9px 12px; border: none; border-top: 1px solid var(--border); background: transparent;
+  color: var(--accent-text); font-size: 12px; font-weight: 630; font-family: inherit; text-align: left;
+}
+.nv-m-app .ori-result-link:active { background: var(--surface); }
+.nv-m-app .ori-result-link svg { width: 15px; height: 15px; flex: none; }
