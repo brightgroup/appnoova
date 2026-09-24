@@ -152,6 +152,52 @@ function isSumOfKnown(value: number, pool: number[]): boolean {
   return false;
 }
 
+/** ¿Es exactamente la suma de los subtotales ya validados en este bloque? */
+function sumsToExact(value: number, subtotals: number[]): boolean {
+  if (!subtotals.length) return false;
+  const total = subtotals.reduce((a, b) => a + b, 0);
+  return Math.abs(total - value) < 0.01;
+}
+
+/** Máximo factor de cantidad que se admite (pedidos al por mayor incluidos). */
+const MAX_QUANTITY_FACTOR = 100000;
+
+/**
+ * Enteros "sueltos" de la línea — candidatos a ser la cantidad pedida — una
+ * vez quitados los importes ya reconocidos (para no leer "230" dentro de
+ * "$230.000" como si fuera una cantidad).
+ */
+function quantityCandidatesIn(line: string): number[] {
+  const stripped = line.replace(CURRENCY_AMOUNT_RE, " ").replace(BARE_AMOUNT_RE, " ");
+  return [...stripped.matchAll(/\b\d{1,6}\b/g)].map(m => Number(m[0])).filter(n => n > 0);
+}
+
+/**
+ * Cotizar no es solo citar un precio: es multiplicarlo por una cantidad
+ * ("10 cajas × $23.000 = $230.000") y sumar varios productos en un total. El
+ * guardián original solo reconocía el precio crudo del catálogo o una suma de
+ * hasta 3 importes conocidos — cualquier pedido con cantidad quedaba
+ * indistinguible de un precio inventado y se escalaba a un asesor, aunque el
+ * cálculo fuera correcto. Esto no depende del cliente ni de configuración
+ * alguna: solo de que la línea nombre a UNA fila del catálogo (ver `row`/`col`
+ * más abajo) y mencione la cantidad como un número suelto.
+ */
+function isMultipleOfRowPrice(
+  value: number,
+  row: DataTableRowRecord | null,
+  col: DataTableColumn | undefined,
+  line: string
+): boolean {
+  if (!row || !col) return false;
+  const raw = row.data[col.key];
+  const unit = typeof raw === "number" ? raw : parseAmount(String(raw ?? ""));
+  if (unit === null || unit <= 0 || value <= unit) return false;
+  if (value % unit !== 0) return false;
+  const factor = value / unit;
+  if (!Number.isInteger(factor) || factor < 2 || factor > MAX_QUANTITY_FACTOR) return false;
+  return quantityCandidatesIn(line).includes(factor);
+}
+
 /**
  * Largo máximo de lo que puede acompañar al importe para dar la línea por
  * "línea de precio de una ficha": una etiqueta corta y poco más ("*Bolsillo:*",
@@ -329,6 +375,11 @@ export function enforceCatalogAmounts(
     // presentaciones), y dejarlos sueltos es lo que hacía llegar al cliente un
     // enlace que no corresponde junto al aviso de que falta el dato.
     let blockPoisoned = false;
+    // Subtotales de línea ya validados en ESTE bloque (precio real o cantidad
+    // × precio real) — el total que los suma no tiene por qué caber en 3
+    // términos del pool de precios crudos (ver `isSumOfKnown`): un pedido de
+    // varios productos suma tantos subtotales como líneas tenga.
+    const blockSubtotals: number[] = [];
 
     for (const { line, scopeAmounts, lineAmounts, row, col, isFichaPrice, allowSums, isFamilyFallback } of lineInfos) {
       // Un precio de la familia solo sirve para reconocer UNA presentación. Si
@@ -339,18 +390,38 @@ export function enforceCatalogAmounts(
         (scopeAmounts.has(v) || (!isFichaPrice && promptAmounts.has(v)));
       const sumPool = [...new Set([...scopeAmounts, ...promptAmounts, ...verifiedInReply])];
 
-      const offenders = lineAmounts.filter(raw => {
+      const offenders: string[] = [];
+      const acceptedValues: number[] = [];
+      for (const raw of lineAmounts) {
         const value = parseAmount(raw);
-        if (value === null || isKnown(value)) return false;
-        return !(allowSums && isSumOfKnown(value, sumPool));
-      });
+        if (value === null) continue;
+        if (isKnown(value)) {
+          acceptedValues.push(value);
+          continue;
+        }
+        if (allowSums && (isSumOfKnown(value, sumPool) || sumsToExact(value, blockSubtotals))) {
+          continue; // es el total del bloque, no el subtotal de esta línea
+        }
+        if (isMultipleOfRowPrice(value, row, col, line)) {
+          acceptedValues.push(value);
+          continue;
+        }
+        offenders.push(raw);
+      }
 
       if (offenders.length === 0) {
+        // El total de la línea no se guarda como "subtotal" de sí mismo — solo
+        // los productos individuales alimentan la suma que valida el total.
+        if (!allowSums && acceptedValues.length) blockSubtotals.push(Math.max(...acceptedValues));
         keptLines.push(line);
         continue;
       }
 
-      if (row && col) {
+      // Una línea de TOTAL no tiene "su" fila: es la suma de varias. Si ninguna
+      // suma cuadró, "corregirla" al precio crudo de la última fila nombrada es
+      // un número plausible pero falso — peor que escalar, porque no se nota.
+      // Aquí sí se prefiere caer y avisar.
+      if (row && col && !allowSums) {
         let fixed = line;
         for (const offender of offenders) {
           const real = formatCell(row.data[col.key], col);
