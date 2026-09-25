@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getOrgServiceBlock } from "@/lib/billing/org-service-gate";
 import { requireSuperAdmin } from "@/lib/admin-server";
 import { adminClient } from "@/lib/voice-agents-server";
 import { toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
@@ -45,8 +46,15 @@ async function run(req: NextRequest) {
 
   const results: { recipient_id: string; ok: boolean; reason?: string }[] = [];
   const touchedCampaignIds = new Set<string>();
+  const orgBlocked = new Map<string, boolean>();
 
   for (const recipient of claimed) {
+    // Cuenta suspendida/desactivada: el destinatario queda pendiente (sin
+    // reclamarlo) y la campaña sigue sola cuando la cuenta se reactive.
+    const orgId = recipient.campaign.organizationId;
+    if (!orgBlocked.has(orgId)) orgBlocked.set(orgId, Boolean(await getOrgServiceBlock(db, orgId)));
+    if (orgBlocked.get(orgId)) continue;
+
     touchedCampaignIds.add(recipient.campaign.id);
 
     if (recipient.contactId) {

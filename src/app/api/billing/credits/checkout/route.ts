@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PADDLE_CHECKOUT_ENABLED } from "@/lib/billing/payment-providers";
+import { isSuperAdminUser } from "@/lib/admin-server";
 import { requireOrgModule } from "@/lib/module-auth";
 import { adminClient } from "@/lib/voice-agents-server";
 import { createPaddleCheckoutTransaction } from "@/lib/billing/paddle/client";
@@ -11,6 +13,9 @@ import { createPaddleCheckoutTransaction } from "@/lib/billing/paddle/client";
 export async function POST(req: NextRequest) {
   const ctx = await requireOrgModule(req, "billing", "manage");
   if (ctx instanceof NextResponse) return ctx;
+  if (!PADDLE_CHECKOUT_ENABLED && !(await isSuperAdminUser(ctx.userId))) {
+    return NextResponse.json({ error: "El pago en USD no está disponible. Paga con Bold (COP)." }, { status: 403 });
+  }
 
   const body = await req.json().catch(() => null);
   const packageId = body?.package_id as string | undefined;

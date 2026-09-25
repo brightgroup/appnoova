@@ -45,6 +45,24 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   const isCurrentPlan = currentSub?.plan_id === planId;
 
+  // Con facturas impagas, "pagar el plan" no puede abrir un periodo nuevo: eso
+  // dejaba la deuda viva y el cron volvía a suspender la cuenta al día
+  // siguiente. Se exige saldar primero cada factura (ver bold/invoice/checkout).
+  const { count: unpaidCount } = await db
+    .from("billing_invoices")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", ctx.organizationId)
+    .in("status", ["pending", "overdue"]);
+  if ((unpaidCount ?? 0) > 0) {
+    return NextResponse.json(
+      {
+        error: "Tienes facturas pendientes. Págalas desde la pestaña Facturas antes de pagar o cambiar de plan.",
+        code: "unpaid_invoices",
+      },
+      { status: 409 }
+    );
+  }
+
   if (!isCurrentPlan && (isInternalCheckoutPlan(plan) || (plan.is_public !== true && plan.is_system !== true))) {
     const superAdmin = await isSuperAdminUser(ctx.userId);
     if (!superAdmin) {

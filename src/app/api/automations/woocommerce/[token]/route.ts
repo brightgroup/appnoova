@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getOrgServiceBlock } from "@/lib/billing/org-service-gate";
 import { createHash } from "crypto";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
 import { getWebhookTriggerByToken } from "@/lib/automations/webhook-triggers-db";
@@ -51,6 +52,13 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   const triggerNode = workflow?.graph.nodes.find(n => n.id === trigger.nodeId);
   if (!workflow || (triggerNode?.type !== "trigger.woocommerce_order" && triggerNode?.type !== "trigger.woocommerce_product")) {
     return NextResponse.json({ error: "Token inválido" }, { status: 404 });
+  }
+
+  // Cuenta suspendida/desactivada: se ignora el evento con 200 — WooCommerce
+  // desactiva el webhook del lado de la tienda tras varias respuestas con error.
+  const blocked = await getOrgServiceBlock(db, trigger.organizationId);
+  if (blocked) {
+    return NextResponse.json({ ok: true, skipped: blocked });
   }
 
   const secrets = await getActiveWooCommerceConnectionSecrets(db, trigger.organizationId);

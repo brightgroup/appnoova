@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getOrgServiceBlock } from "@/lib/billing/org-service-gate";
 import { requireSuperAdmin } from "@/lib/admin-server";
 import { adminClient } from "@/lib/voice-agents-server";
 import { assertOrgErpEnabled } from "@/lib/org-modules";
@@ -98,7 +99,7 @@ async function run(req: NextRequest) {
         .eq("organization_id", organizationId);
 
     const gate = await assertOrgErpEnabled(db, organizationId);
-    if (!gate.ok) {
+    if (!gate.ok || (await getOrgServiceBlock(db, organizationId))) {
       await markProcessedToday();
       continue;
     }

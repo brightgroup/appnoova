@@ -1,4 +1,5 @@
 import { resolveElevenLabsPhoneLine } from "@/lib/elevenlabs/phone-line";
+import { getOrgServiceBlock } from "@/lib/billing/org-service-gate";
 import { resolvePlatformSipConfig } from "@/lib/elevenlabs/sip-config";
 import { billingBlockedMessage, checkBillingForOrg } from "@/lib/billing/meter";
 import { releaseStuckCampaignRows } from "@/lib/call-engine/campaign-audience-status";
@@ -200,6 +201,10 @@ async function placeCampaignCall(input: {
     throw new Error("Campaña sin agente o audiencia");
   }
 
+  const orgBlock = await getOrgServiceBlock(db, campaign.organization_id);
+  if (orgBlock) {
+    throw new Error(billingBlockedMessage(orgBlock));
+  }
   const billing = await checkBillingForOrg(db, campaign.organization_id);
   if (!billing.allowed) {
     throw new Error(billingBlockedMessage(billing.reason));

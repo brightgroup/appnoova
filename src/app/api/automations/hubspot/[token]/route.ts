@@ -3,6 +3,7 @@ import { textAgentsAdminClient } from "@/lib/text-agents-server";
 import { getWebhookTriggerByToken } from "@/lib/automations/webhook-triggers-db";
 import { getWorkflowById } from "@/lib/automations/workflows-db";
 import { runHubspotMessageEvent, type HubspotConversationEvent } from "@/lib/automations/hubspot-runner";
+import { getOrgServiceBlock } from "@/lib/billing/org-service-gate";
 
 type Ctx = { params: Promise<{ token: string }> };
 
@@ -43,6 +44,14 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   const triggerNode = workflow?.graph.nodes.find((n) => n.id === trigger.nodeId);
   if (!workflow || triggerNode?.type !== "trigger.hubspot_message") {
     return NextResponse.json({ error: "Token inválido" }, { status: 404 });
+  }
+
+  // Cuenta suspendida/desactivada: no se procesa nada (ni contactos ni
+  // respuestas). Se responde 200 igual — un error haría que HubSpot reintente
+  // el mismo evento en bucle mientras dure la suspensión.
+  const blocked = await getOrgServiceBlock(db, trigger.organizationId);
+  if (blocked) {
+    return NextResponse.json({ ok: true, skipped: blocked });
   }
 
   for (const rawEvent of events) {

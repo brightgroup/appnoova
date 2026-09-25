@@ -107,6 +107,29 @@ export async function applyBoldSaleApproved(
       p_reason: `Compra de créditos (Bold payment ${data.payment_id})`,
     });
     if (error) throw error;
+  } else if (reqRow.kind === "invoice") {
+    if (!reqRow.invoice_id) {
+      await recordUnmatched(db, eventType, data, "invoice_request_missing_invoice_id");
+      return { ok: false, unmatched: true };
+    }
+    const { amountUsd, amountCop } = resolveChargedAmounts(data, reqRow);
+    const { data: result, error } = await db.rpc("billing_record_invoice_payment", {
+      p_invoice: reqRow.invoice_id,
+      p_amount_cop: amountCop,
+      p_amount_usd: amountUsd,
+      p_bold_transaction_id: data.payment_id,
+    });
+    if (error) throw error;
+    // Última factura saldada → la cuenta volvió a activa; WhatsApp suspendido
+    // por mora queda listo para reactivar (mismo flujo que el pago manual).
+    if ((result as { remaining_unpaid?: number } | null)?.remaining_unpaid === 0) {
+      try {
+        const { markOrgWhatsAppChannelsPendingReactivation } = await import("@/lib/whatsapp/billing-lifecycle");
+        await markOrgWhatsAppChannelsPendingReactivation(db, reqRow.organization_id);
+      } catch (err) {
+        console.error("[bold:webhook] factura pagada pero falló la reactivación de WhatsApp", data.payment_id, err);
+      }
+    }
   } else {
     if (!reqRow.plan_id) {
       await recordUnmatched(db, eventType, data, "plan_request_missing_plan_id");
@@ -175,6 +198,30 @@ export async function applyBoldSaleApproved(
         .from("billing_invoices")
         .update({ siigo_invoice_error: message.slice(0, 500) })
         .eq("bold_transaction_id", data.payment_id);
+    }
+  }
+
+  if (reqRow.kind === "invoice" && reqRow.invoice_id) {
+    try {
+      const [{ data: org }, { data: inv }] = await Promise.all([
+        db.from("organizations").select("name").eq("id", reqRow.organization_id).maybeSingle(),
+        db.from("billing_invoices").select("description, plan_id").eq("id", reqRow.invoice_id).maybeSingle(),
+      ]);
+      const { amountCop } = resolveChargedAmounts(data, reqRow);
+      await emitSiigoInvoiceForPayment(db, {
+        organizationId: reqRow.organization_id,
+        organizationName: org?.name ?? "Organización",
+        planName: inv?.description || inv?.plan_id || "Suscripción Noova 360",
+        amountCop,
+        billingInvoiceId: reqRow.invoice_id,
+      });
+    } catch (err) {
+      console.error("[bold:webhook] factura pagada pero falló la factura Siigo", data.payment_id, err);
+      const message = err instanceof Error ? err.message : String(err);
+      await db
+        .from("billing_invoices")
+        .update({ siigo_invoice_error: message.slice(0, 500) })
+        .eq("id", reqRow.invoice_id);
     }
   }
 

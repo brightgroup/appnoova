@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getOrgServiceBlock } from "@/lib/billing/org-service-gate";
 import { createHmac } from "crypto";
 import { isWhatsAppBsuid } from "@/lib/whatsapp-channel";
 import { signedUrlForPath } from "@/lib/whatsapp/media-storage";
@@ -67,6 +68,7 @@ export async function emitAutomationEvent(
   db: SupabaseClient,
   params: EmitWhatsAppEventParams
 ): Promise<void> {
+  if (await getOrgServiceBlock(db, params.organizationId)) return;
   const workflows = await listActiveWorkflowsForOrg(db, params.organizationId);
   if (workflows.length === 0) return;
 

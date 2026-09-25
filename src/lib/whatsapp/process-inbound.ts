@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getOrgServiceBlock } from "@/lib/billing/org-service-gate";
 import { getOriApiKey } from "@/lib/google-ai";
 import { mergeCompanyContext } from "@/lib/merge-company-context";
 import { buildColombiaTemporalContext } from "@/lib/colombia-calendar";
@@ -263,6 +264,12 @@ async function processTwilioWhatsAppInboundLocked(
   }
 
   const orgId = await resolveChannelOrgId(db, channel);
+
+  // Cuenta suspendida/desactivada: sin respuestas, CRM ni automatizaciones.
+  const blocked = await getOrgServiceBlock(db, orgId);
+  if (blocked) {
+    return { ok: false, error: `Organización ${blocked === "disabled" ? "desactivada" : "suspendida"}` };
+  }
 
   const { agent, error: agentErr } = await resolveTextAgentForChannel(db, channel);
 

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getOrgServiceBlock } from "@/lib/billing/org-service-gate";
 import { getWorkflowById } from "@/lib/automations/workflows-db";
 import { walkHubspotChain, findMatchingHubspotTriggerNodeIds, resolveJsonPath } from "@/lib/automations/node-types";
 import { getActiveHubspotConnectionSecrets } from "@/lib/hubspot/connections-db";
@@ -73,6 +74,9 @@ async function logEvent(
  */
 export async function runHubspotMessageEvent(db: SupabaseClient, params: RunParams): Promise<void> {
   const threadId = String(params.event.objectId);
+
+  // Cuenta suspendida/desactivada: sin servicio (ver org-service-gate.ts).
+  if (await getOrgServiceBlock(db, params.organizationId)) return;
 
   // 1. Dedup — HubSpot reintenta webhooks que no respondieron a tiempo; sin esto, un reintento
   // volvería a reprocesar todo. Silencioso a propósito: es ruido esperado, no un evento de negocio.

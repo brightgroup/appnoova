@@ -5,7 +5,7 @@ import { billingAdminEmails, orgBillingEmails, splitClientOnlyEmails } from "@/l
 export interface BoldPaymentNotifyContext {
   organizationId: string;
   organizationName: string;
-  kind: "plan" | "topup";
+  kind: "plan" | "topup" | "invoice";
   planId?: string | null;
   /** Lo que se le cobró al cliente en su tarjeta (moneda multidivisa de Bold). */
   amountUsd: number;
@@ -39,7 +39,7 @@ export async function notifyBoldPaymentRecorded(ctx: BoldPaymentNotifyContext): 
   const usd = fmtUsd(ctx.amountUsd);
   const cop = fmtCop(ctx.amountCop);
   const txn = escapeHtml(ctx.boldPaymentId);
-  const concept = ctx.kind === "topup" ? "recarga de créditos" : `plan ${escapeHtml(ctx.planId ?? "")}`;
+  const concept = ctx.kind === "topup" ? "recarga de créditos" : ctx.kind === "invoice" ? "pago de factura" : `plan ${escapeHtml(ctx.planId ?? "")}`;
 
   const clientHtml = `
     <div style="font-family:system-ui,sans-serif;max-width:560px;color:#111">

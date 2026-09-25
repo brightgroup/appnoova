@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getOrgServiceBlock } from "@/lib/billing/org-service-gate";
 import { formatInboxDisplayTitle, makeVisitorLabel } from "@/lib/inbox-utils";
 import { syncCrmContactFromWidgetInbound } from "@/lib/crm-contact-sync";
 import { runAutoCrmEnrichment } from "@/lib/crm-auto-enrich";
@@ -176,6 +177,11 @@ export async function POST(
   const model = String(agent.llm_model || "gemini-2.5-flash");
   const db = textAgentsAdminClient();
   const humanOnly = isTextAgentHumanOnly(agent);
+
+  // Cuenta suspendida/desactivada: el canal público deja de atender.
+  if (await getOrgServiceBlock(db, await resolveOrgIdForUser(db, userId))) {
+    return NextResponse.json({ error: "Canal no disponible" }, { status: 404 });
+  }
 
   let existingHandoff: "human" | "ai" | null = null;
   let priorSummary: ThreadContextSummary | null = null;

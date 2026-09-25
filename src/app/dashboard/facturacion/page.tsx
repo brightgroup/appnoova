@@ -1,4 +1,5 @@
 "use client";
+import { PADDLE_CHECKOUT_ENABLED } from "@/lib/billing/payment-providers";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -55,6 +56,10 @@ interface Subscription {
 interface Invoice {
   id: string; plan_id?: string; period_start: string; period_end: string;
   due_date: string; amount_usd: number; amount_cop: number; status: string;
+  /** Concepto visible (p. ej. un saldo de un periodo anterior). */
+  description?: string | null;
+  /** 'COP' → se cobra `amount_cop` exacto por Bold, factura por factura. */
+  currency?: "USD" | "COP";
   paddle_transaction_id?: string | null;
   siigo_invoice_url?: string | null;
   siigo_invoice_number?: string | null;
@@ -190,6 +195,9 @@ const PLAN_COPY: Record<string, { tagline: string; features: string[]; ideal: st
 // ── Utilidades ────────────────────────────────────────────────────────────────
 
 const fmtN = (n: number) => new Intl.NumberFormat("es-CO").format(Math.round(n));
+/** Monto principal de una factura en su moneda de cobro. */
+const fmtInvoiceAmount = (inv: { currency?: string; amount_usd: number; amount_cop: number }) =>
+  inv.currency === "COP" ? `$${fmtN(inv.amount_cop)} COP` : `US$ ${fmtN(inv.amount_usd)}`;
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 const daysUntil = (iso: string | null) =>
@@ -211,6 +219,14 @@ export default function FacturacionPage() {
   const { openCheckout: openPlanCheckout, loading: payingPlan } = usePaddleCheckout();
   const { openCheckout: openBoldPlanCheckout, loading: payingBoldPlanRaw, polling: payingBoldPlanPolling } = useBoldCheckout();
   const payingBoldPlan = payingBoldPlanRaw || payingBoldPlanPolling;
+  const {
+    openCheckout: openBoldInvoiceCheckoutRaw,
+    loading: payingBoldInvoiceRaw,
+    polling: payingBoldInvoicePolling,
+    error: payBoldInvoiceError,
+  } = useBoldCheckout();
+  const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
+  const payingBoldInvoice = payingBoldInvoiceRaw || payingBoldInvoicePolling;
   const {
     openCheckout: openBoldCreditsCheckout,
     loading: buyingBoldCreditsRaw,
@@ -362,6 +378,20 @@ export default function FacturacionPage() {
       .filter((inv) => inv.status === "pending" || inv.status === "overdue")
       .sort((a, b) => a.due_date.localeCompare(b.due_date))[0] ?? null;
   }, [data?.invoices]);
+  const unpaidInvoices = useMemo(
+    () => (data?.invoices ?? []).filter((inv) => inv.status === "pending" || inv.status === "overdue"),
+    [data?.invoices]
+  );
+  const unpaidAllCop = unpaidInvoices.length > 0 && unpaidInvoices.every((inv) => inv.currency === "COP");
+  const unpaidTotalCop = unpaidInvoices.reduce((sum, inv) => sum + Number(inv.amount_cop || 0), 0);
+  const payInvoiceWithBold = useCallback((invoiceId: string) => {
+    setPayingInvoiceId(invoiceId);
+    void openBoldInvoiceCheckoutRaw(
+      "/api/billing/bold/invoice/checkout",
+      { invoice_id: invoiceId },
+      () => void load()
+    );
+  }, [openBoldInvoiceCheckoutRaw, load]);
   const dueDaysLeft = daysUntil(nextDueInvoice?.due_date ?? null);
 
   // Filtrado de facturas
@@ -451,7 +481,9 @@ export default function FacturacionPage() {
           </button>
         </div>
         <div className="flex gap-0 overflow-x-auto px-5 text-sm">
-          {TABS.map(t => (
+          {/* Recarga automática cobra a la tarjeta guardada en Paddle: solo para
+              quien ya paga por Paddle mientras los checkouts nuevos estén apagados. */}
+          {TABS.filter(t => t.id !== "auto" || PADDLE_CHECKOUT_ENABLED || sub?.billing_provider === "paddle").map(t => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
@@ -537,34 +569,30 @@ export default function FacturacionPage() {
                             ({dueDaysLeft > 0 ? `en ${dueDaysLeft} día${dueDaysLeft === 1 ? "" : "s"}` : dueDaysLeft === 0 ? "hoy" : `hace ${Math.abs(dueDaysLeft)} día${Math.abs(dueDaysLeft) === 1 ? "" : "s"}`})
                           </span>
                         )}
-                        {" · "}US$ {fmtN(nextDueInvoice.amount_usd)}
+                        {" · "}{fmtInvoiceAmount(nextDueInvoice)}
                       </p>
+                      {nextDueInvoice.description && (
+                        <p className="text-xs text-gray-400 mt-0.5">{nextDueInvoice.description}</p>
+                      )}
+                      {unpaidInvoices.length > 1 && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Tienes {unpaidInvoices.length} facturas por pagar
+                          {unpaidAllCop && <> · total <span className="font-semibold text-gray-200">${fmtN(unpaidTotalCop)} COP</span></>}
+                          . El servicio se mantiene activo solo si todas quedan pagas antes de su fecha límite.
+                        </p>
+                      )}
+                      {payBoldInvoiceError && <p className="text-xs text-red-400 mt-1">{payBoldInvoiceError}</p>}
                     </div>
                     <div className="shrink-0 flex items-center gap-2">
-                      {sub?.billing_provider !== "paddle" && sub?.plan_id && (
+                      {/* Se paga la factura misma (monto exacto en pesos), no "el plan":
+                          pagar el plan abría un periodo nuevo sin saldar esta deuda. */}
+                      {sub?.billing_provider !== "paddle" && (
                         <button
-                          onClick={() => openBoldPlanCheckout(
-                            "/api/billing/bold/checkout",
-                            { plan_id: sub.plan_id },
-                            () => void load()
-                          )}
-                          disabled={payingBoldPlan}
+                          onClick={() => payInvoiceWithBold(nextDueInvoice.id)}
+                          disabled={payingBoldInvoice}
                           className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[var(--nv-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                         >
-                          {payingBoldPlan ? "Abriendo…" : "Pagar con Bold"}
-                        </button>
-                      )}
-                      {sub?.billing_provider !== "paddle" && sub?.plan_id && (
-                        <button
-                          onClick={() => openPlanCheckout(
-                            "/api/billing/paddle/checkout",
-                            { plan_id: sub.plan_id },
-                            () => void load()
-                          )}
-                          disabled={payingPlan}
-                          className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-white/20 text-gray-200 hover:bg-white/10 transition-colors disabled:opacity-50"
-                        >
-                          {payingPlan ? "Abriendo…" : "Pagar en USD"}
+                          {payingBoldInvoice && payingInvoiceId === nextDueInvoice.id ? "Abriendo…" : "Pagar con Bold"}
                         </button>
                       )}
                       <button
@@ -898,7 +926,10 @@ export default function FacturacionPage() {
                               <td className={registryTableCell}>
                                 <span className="font-mono text-xs text-gray-300">{inv.id.substring(0, 8).toUpperCase()}</span>
                               </td>
-                              <td className={`${registryTableCell} capitalize text-gray-300`}>{inv.plan_id ?? planName}</td>
+                              <td className={`${registryTableCell} text-gray-300`}>
+                                <p className="capitalize">{inv.plan_id ?? planName}</p>
+                                {inv.description && <p className="text-[11px] text-gray-500 normal-case">{inv.description}</p>}
+                              </td>
                               <td className={`${registryTableCell} text-gray-400`}>{fmtDate(inv.due_date)}</td>
                               <td className={registryTableCell}>
                                 <Badge variant={s.variant} icon={inv.status === "paid" ? CheckCircle2 : undefined}>
@@ -906,42 +937,27 @@ export default function FacturacionPage() {
                                 </Badge>
                               </td>
                               <td className={registryTableCell}>
-                                <p className="text-sm font-bold text-white">${inv.amount_usd.toFixed(2)}</p>
-                                <p className="text-[10px] text-gray-500">${fmtN(inv.amount_cop)} COP</p>
+                                {inv.currency === "COP" ? (
+                                  <p className="text-sm font-bold text-white">${fmtN(inv.amount_cop)} COP</p>
+                                ) : (
+                                  <>
+                                    <p className="text-sm font-bold text-white">${inv.amount_usd.toFixed(2)}</p>
+                                    <p className="text-[10px] text-gray-500">${fmtN(inv.amount_cop)} COP</p>
+                                  </>
+                                )}
                               </td>
                               <td className={registryTableCell}>
                                 <div className="flex items-center gap-1 text-gray-500">
-                                  {/* Solo se puede pagar desde aquí la factura del plan
-                                      ACTUAL de la org — una factura vieja de un plan ya
-                                      reemplazado no debe pagarse por este botón, porque el
-                                      checkout fijaría ese plan viejo como el plan vigente. */}
-                                  {(inv.status === "pending" || inv.status === "overdue") &&
-                                    sub?.billing_provider !== "paddle" &&
-                                    inv.plan_id === sub?.plan_id && (
-                                      <>
-                                        <button
-                                          onClick={() => openBoldPlanCheckout(
-                                            "/api/billing/bold/checkout",
-                                            { plan_id: sub!.plan_id },
-                                            () => void load()
-                                          )}
-                                          disabled={payingBoldPlan}
-                                          className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-[var(--nv-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
-                                        >
-                                          {payingBoldPlan ? "Abriendo…" : "Pagar con Bold"}
-                                        </button>
-                                        <button
-                                          onClick={() => openPlanCheckout(
-                                            "/api/billing/paddle/checkout",
-                                            { plan_id: sub!.plan_id },
-                                            () => void load()
-                                          )}
-                                          disabled={payingPlan}
-                                          className="text-[11px] font-semibold px-2.5 py-1 rounded-md border border-white/15 hover:bg-white/10 transition-colors disabled:opacity-50"
-                                        >
-                                          {payingPlan ? "Abriendo…" : "USD"}
-                                        </button>
-                                      </>
+                                  {/* Se paga la factura misma (monto exacto en COP) — nunca "el plan", que
+                                      abriría un periodo nuevo dejando esta deuda viva. */}
+                                  {(inv.status === "pending" || inv.status === "overdue") && sub?.billing_provider !== "paddle" && (
+                                    <button
+                                      onClick={() => payInvoiceWithBold(inv.id)}
+                                      disabled={payingBoldInvoice}
+                                      className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-[var(--nv-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                                    >
+                                      {payingBoldInvoice && payingInvoiceId === inv.id ? "Abriendo…" : "Pagar con Bold"}
+                                    </button>
                                   )}
                                   {inv.siigo_invoice_url ? (
                                     <a
@@ -1225,7 +1241,7 @@ export default function FacturacionPage() {
                   {buyCreditsError && <p className="text-xs text-red-400">{buyCreditsError}</p>}
                   {buyBoldCreditsError && <p className="text-xs text-red-400">{buyBoldCreditsError}</p>}
                   <p className="text-[11px] text-[var(--nv-text-faint)]">
-                    Bold: tarjeta, PSE, Nequi o Botón Bancolombia en COP. Tarjeta: pago internacional en USD.
+                    Bold: tarjeta, PSE, Nequi o Botón Bancolombia en COP.{PADDLE_CHECKOUT_ENABLED && " Tarjeta: pago internacional en USD."}
                   </p>
                   <div className="flex justify-end gap-2 pt-2">
                     <button
@@ -1234,19 +1250,21 @@ export default function FacturacionPage() {
                     >
                       Volver
                     </button>
-                    <button
-                      onClick={() => {
-                        if (!buyPackageId) return;
-                        void openCreditsCheckout("/api/billing/credits/checkout", { package_id: buyPackageId }, () => {
-                          setShowBuyCredits(false);
-                          void load();
-                        });
-                      }}
-                      disabled={buyingCredits || buyingBoldCredits || !buyPackageId}
-                      className="px-4 py-2 rounded-lg text-sm font-medium border border-white/20 text-gray-200 hover:bg-white/10 transition-colors disabled:opacity-50"
-                    >
-                      {buyingCredits ? "Abriendo…" : "Comprar en USD"}
-                    </button>
+                    {PADDLE_CHECKOUT_ENABLED && (
+                      <button
+                        onClick={() => {
+                          if (!buyPackageId) return;
+                          void openCreditsCheckout("/api/billing/credits/checkout", { package_id: buyPackageId }, () => {
+                            setShowBuyCredits(false);
+                            void load();
+                          });
+                        }}
+                        disabled={buyingCredits || buyingBoldCredits || !buyPackageId}
+                        className="px-4 py-2 rounded-lg text-sm font-medium border border-white/20 text-gray-200 hover:bg-white/10 transition-colors disabled:opacity-50"
+                      >
+                        {buyingCredits ? "Abriendo…" : "Comprar en USD"}
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         if (!buyPackageId) return;
@@ -1450,11 +1468,13 @@ export default function FacturacionPage() {
                                   planName={p.name}
                                   onCheckoutCompleted={() => { void load(); setShowPlanPicker(false); }}
                                 />
-                                <PaddleCheckoutButton
-                                  planId={p.id}
-                                  planName={p.name}
-                                  onCheckoutCompleted={() => { void load(); setShowPlanPicker(false); }}
-                                />
+                                {PADDLE_CHECKOUT_ENABLED && (
+                                  <PaddleCheckoutButton
+                                    planId={p.id}
+                                    planName={p.name}
+                                    onCheckoutCompleted={() => { void load(); setShowPlanPicker(false); }}
+                                  />
+                                )}
                               </>
                             ) : (
                               <Link

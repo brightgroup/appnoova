@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getOrgServiceBlock } from "@/lib/billing/org-service-gate";
+import { billingBlockedMessage } from "@/lib/billing/meter";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
 import { getWebhookTriggerByToken, type WebhookTriggerLookup } from "@/lib/automations/webhook-triggers-db";
 import { getWorkflowById } from "@/lib/automations/workflows-db";
@@ -320,6 +322,11 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   const trigger = await getWebhookTriggerByToken(db, token);
   if (!trigger) {
     return NextResponse.json({ error: "Token inválido" }, { status: 404 });
+  }
+
+  const blocked = await getOrgServiceBlock(db, trigger.organizationId);
+  if (blocked) {
+    return NextResponse.json({ error: billingBlockedMessage(blocked), code: blocked }, { status: 402 });
   }
 
   const workflow = await getWorkflowById(db, trigger.organizationId, trigger.workflowId);

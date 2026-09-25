@@ -10,6 +10,7 @@ import { formatCOP, formatUSD, formatShortDate } from "../../../format";
 interface Invoice {
   id: string;
   plan_id: string | null;
+  description?: string | null;
   period_start: string;
   period_end: string;
   due_date: string;
@@ -178,7 +179,7 @@ export default function MobileFacturacionPage() {
                         <div>
                           <div className="inv-id">FAC-{inv.id.slice(0, 8).toUpperCase()}</div>
                           <div className="inv-desc">
-                            {PLAN_LABELS[inv.plan_id ?? ""] ?? inv.plan_id ?? "Plan"} · {invoiceMonthLabel(inv.period_start)}
+                            {inv.description || `${PLAN_LABELS[inv.plan_id ?? ""] ?? inv.plan_id ?? "Plan"} · ${invoiceMonthLabel(inv.period_start)}`}
                           </div>
                         </div>
                         <span className={`status ${inv.status}`}>

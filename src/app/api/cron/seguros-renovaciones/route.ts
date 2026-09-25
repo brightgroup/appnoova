@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getOrgServiceBlock } from "@/lib/billing/org-service-gate";
 import { requireSuperAdmin } from "@/lib/admin-server";
 import { adminClient } from "@/lib/voice-agents-server";
 import { assertOrgSegurosEnabled } from "@/lib/org-modules";
@@ -98,6 +99,7 @@ async function run(req: NextRequest) {
   for (const rule of rules) {
     const gate = await assertOrgSegurosEnabled(db, rule.organizationId);
     if (!gate.ok) continue;
+    if (await getOrgServiceBlock(db, rule.organizationId)) continue;
 
     const crmUserId = await resolveOrgCrmTenantUserId(rule.organizationId, "");
     if (!crmUserId) continue;
