@@ -71,13 +71,13 @@ export function MetaMessagingConnectModal({ open, onClose, onSuccess }: MetaMess
   }, [config?.appId, initFacebookSdk, sdkReady]);
 
   const finish = useCallback(
-    async (authCode: string) => {
+    async (userAccessToken: string) => {
       try {
         const headers = await getAuthHeaders();
         const res = await fetch("/api/meta-messaging/connect", {
           method: "POST",
           headers,
-          body: JSON.stringify({ auth_code: authCode, text_agent_id: textAgentId })
+          body: JSON.stringify({ user_access_token: userAccessToken, text_agent_id: textAgentId })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "No se pudo conectar");
@@ -102,19 +102,18 @@ export function MetaMessagingConnectModal({ open, onClose, onSuccess }: MetaMess
 
     window.FB.login(
       (response: unknown) => {
-        const code = (response as { authResponse?: { code?: string } }).authResponse?.code?.trim();
-        if (!code) {
+        // Token de usuario corto: el servidor lo valida con debug_token y lo
+        // cambia por uno largo. (El flujo con `code` no sirve aquí: Meta exige
+        // en el canje el mismo redirect_uri interno que usó el SDK.)
+        const token = (response as { authResponse?: { accessToken?: string } }).authResponse?.accessToken?.trim();
+        if (!token) {
           setLoading(false);
           setError("Conexión cancelada");
           return;
         }
-        void finish(code);
+        void finish(token);
       },
-      {
-        config_id: config.configId,
-        response_type: "code",
-        override_default_response_type: true
-      }
+      { config_id: config.configId }
     );
   };
 

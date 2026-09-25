@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { encryptToken } from "@/lib/crypto/token-cipher";
 import { getMetaAppId, getMetaAppSecret, metaGraphBaseUrl } from "@/lib/meta/graph-config";
-import { exchangeMetaEmbeddedSignupCode } from "@/lib/meta/oauth";
 import type { MetaMessagingChannelRecord, MetaMessagingPlatform } from "@/lib/meta-messaging/types";
 
 /** Campos de página que activan Messenger y, vía la misma página, Instagram Direct. */
@@ -21,6 +20,30 @@ async function graphGet<T>(path: string, token: string): Promise<T> {
     throw new Error(json.error?.message || `Meta Graph error ${res.status}`);
   }
   return json;
+}
+
+/**
+ * El SDK de JS entrega el token de usuario al navegador; antes de usarlo se
+ * confirma con Meta que es válido y que fue emitido para ESTA app (si no, un
+ * token de otra app con permisos de páginas podría colarse).
+ */
+async function assertUserTokenForThisApp(userToken: string): Promise<void> {
+  const appId = getMetaAppId();
+  const appSecret = getMetaAppSecret();
+  if (!appId || !appSecret) throw new Error("META_APP_ID y META_APP_SECRET requeridos");
+
+  const url = new URL(`${metaGraphBaseUrl()}/debug_token`);
+  url.searchParams.set("input_token", userToken);
+  url.searchParams.set("access_token", `${appId}|${appSecret}`);
+
+  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(15000) });
+  const json = (await res.json().catch(() => ({}))) as {
+    data?: { app_id?: string; is_valid?: boolean; type?: string };
+  } & GraphError;
+
+  if (!res.ok || !json.data?.is_valid || json.data.app_id !== appId || json.data.type !== "USER") {
+    throw new Error("La sesión de Facebook no es válida. Vuelve a conectar.");
+  }
 }
 
 /** Token de usuario de larga duración (60 días); los tokens de página derivados de él no expiran. */
@@ -203,16 +226,16 @@ async function upsertChannel(
 }
 
 /**
- * Finaliza el login de Meta: canjea el código, trae las páginas que el usuario
+ * Finaliza el login de Meta: valida el token, trae las páginas que el usuario
  * autorizó en el popup, suscribe cada una a la app y registra sus canales
  * (Messenger siempre; Instagram si la página tiene cuenta profesional vinculada).
  */
-export async function connectMetaMessagingFromAuthCode(
+export async function connectMetaMessagingFromUserToken(
   db: SupabaseClient,
-  input: { organizationId: string; userId: string; textAgentId: string; authCode: string }
+  input: { organizationId: string; userId: string; textAgentId: string; userAccessToken: string }
 ): Promise<ConnectMetaMessagingResult> {
-  const { accessToken } = await exchangeMetaEmbeddedSignupCode(input.authCode);
-  const userToken = await exchangeForLongLivedUserToken(accessToken);
+  await assertUserTokenForThisApp(input.userAccessToken);
+  const userToken = await exchangeForLongLivedUserToken(input.userAccessToken);
   const pages = await listGrantedPages(userToken);
 
   if (!pages.length) {
