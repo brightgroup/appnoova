@@ -27,6 +27,9 @@ export const DEFAULT_CREDIT_COST: Record<UsageEventType, number> = {
   // whatsapp_ai, sin línea propia editable. 90 créditos cubre con margen sano
   // tanto Gemini Flash como Claude Sonnet (el más caro de analizar).
   whatsapp_media_ai: 90,
+  // Messenger / Instagram Direct con IA — Meta no cobra la entrega (a diferencia de
+  // WhatsApp), así que el turno cubre solo el LLM con margen.
+  meta_messaging_ai: 30,
   // Extracción de campos estructurados (workflows/automatizaciones) — llamada de
   // Gemini separada de la respuesta al cliente. Perfil de referencia más liviano
   // que whatsapp_media_ai (salida JSON compacta, sin analizar la imagen de nuevo).
@@ -100,6 +103,7 @@ export const DEFAULT_UNIT_PRICE_META: UnitPriceMeta[] = [
   { event_type: "whatsapp_ai", label: "WhatsApp con IA", description: "Turno IA completo", unit_label: "por turno", category: "whatsapp", price_usd: usdFromCopCredits(60), credits_cop: 60, sort_order: 30, is_active: true },
   { event_type: "whatsapp_manual", label: "WhatsApp manual", description: "Sin IA", unit_label: "por mensaje", category: "whatsapp", price_usd: usdFromCopCredits(30), credits_cop: 30, sort_order: 31, is_active: true },
   { event_type: "whatsapp_media_ai", label: "Imagen/PDF por WhatsApp", description: "Análisis de imagen o documento adjunto (Gemini o Claude, según el modelo del agente)", unit_label: "por archivo", category: "whatsapp", price_usd: usdFromCopCredits(90), credits_cop: 90, sort_order: 32, is_active: true },
+  { event_type: "meta_messaging_ai", label: "Messenger/Instagram con IA", description: "Turno completo: cliente escribe + IA responde (Meta no cobra la entrega)", unit_label: "por turno", category: "social", price_usd: usdFromCopCredits(30), credits_cop: 30, sort_order: 35, is_active: true },
   { event_type: "automation_extract", label: "Extracción con IA (automatización)", description: "Campos estructurados definidos en un workflow, extraídos con Gemini y enviados al webhook", unit_label: "por extracción", category: "whatsapp", price_usd: usdFromCopCredits(50), credits_cop: 50, sort_order: 33, is_active: true },
   { event_type: "hubspot_send_message", label: "Mensaje enviado (HubSpot)", description: "Respuesta publicada en un hilo de Conversaciones de HubSpot vía el nodo 'Enviar mensaje'", unit_label: "por mensaje", category: "automations", price_usd: usdFromCopCredits(10), credits_cop: 10, sort_order: 34, is_active: true },
   { event_type: "voice", label: "Voz estándar", description: "Gemini Live + Telnyx", unit_label: "por minuto", category: "voice", price_usd: usdFromCopCredits(900), credits_cop: 900, sort_order: 40, is_active: true },

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { persistHumanReply } from "@/lib/text-conversation-persist";
 import { sendWhatsAppOutboundForConversation } from "@/lib/whatsapp/process-inbound";
+import {
+  isMetaMessagingChannel,
+  metaHumanReplyGate,
+  sendMetaOutboundForConversation
+} from "@/lib/meta-messaging/outbound";
 import { toTextConversationRecord } from "@/lib/text-conversation-record";
 import { isMissingTableError } from "@/lib/supabase-table-error";
 import { textAgentsAdminClient } from "@/lib/text-agents-server";
@@ -84,6 +89,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const isMeta = isMetaMessagingChannel(String(existing.channel));
+  if (isMeta) {
+    const gate = metaHumanReplyGate((existing.metadata ?? {}) as Record<string, unknown>);
+    if (!gate.allowed) {
+      return NextResponse.json({ error: gate.error, code: gate.code }, { status: 409 });
+    }
+  }
+
   const ownerUserId = String(existing.user_id ?? actorUserId);
 
   const result = await persistHumanReply({
@@ -98,11 +111,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: result.error ?? "No se pudo enviar" }, { status: 500 });
   }
 
-  const waSend = await sendWhatsAppOutboundForConversation(db, ownerUserId, conversationId, content);
+  const waSend = isMeta
+    ? await sendMetaOutboundForConversation(db, ownerUserId, conversationId, content)
+    : await sendWhatsAppOutboundForConversation(db, ownerUserId, conversationId, content);
   if (!waSend.ok) {
     return NextResponse.json(
       {
-        error: waSend.error ?? "Mensaje guardado pero no se pudo enviar por WhatsApp",
+        error: waSend.error ?? (isMeta ? "Mensaje guardado pero no se pudo enviar por Meta" : "Mensaje guardado pero no se pudo enviar por WhatsApp"),
         code: waSend.code
       },
       { status: waSend.code === "session_closed" || waSend.code === "opted_out" ? 409 : 502 }

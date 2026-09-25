@@ -8,18 +8,35 @@ import type {
   MetaInboundEvent,
   MetaMessagingChannelRecord
 } from "@/lib/meta-messaging/types";
+import { generateMetaAgentReply } from "@/lib/meta-messaging/ai-reply";
+import { sendMetaTextMessage, sendMetaTypingOn } from "@/lib/meta-messaging/send";
+import { checkBillingForOrg, recordUsageSafe } from "@/lib/billing/meter";
+import { providerForLlmModel } from "@/lib/billing/pricing";
 import { notifyPushForOrg } from "@/lib/push/send";
-import { persistHumanReply, persistUserMessageOnly } from "@/lib/text-conversation-persist";
+import { isTextAgentHumanOnly } from "@/lib/text-agent-form";
+import { resolveTextAgentForChannel } from "@/lib/text-agent-resolve";
+import {
+  detectAssistantHandoffOffer,
+  detectUserHandoffIntent,
+  escalateConversationToHuman,
+  shouldAutoReturnToAi,
+  HANDOFF_VISITOR_REPLY
+} from "@/lib/text-handoff";
+import {
+  persistAssistantReplyOnly,
+  persistHumanReply,
+  persistUserMessageOnly
+} from "@/lib/text-conversation-persist";
 import { toTextConversationRecord } from "@/lib/text-conversation-record";
 import { withConversationLock } from "@/lib/whatsapp/conversation-lock";
 import { uploadWhatsAppMedia } from "@/lib/whatsapp/media-storage";
 import type { TextAgentConversationRecord, TextChatMessage } from "@/types/text-agent-conversation";
 
 /**
- * Fase 1 de Messenger / Instagram Direct: cada mensaje entrante queda en el
- * inbox (conversación con channel = 'messenger' | 'instagram') en cola de
- * asesor. La respuesta automática de la IA y el envío de salida llegan en la
- * siguiente fase — por eso aquí no se llama al LLM ni se descuentan créditos.
+ * Mensajes entrantes de Messenger / Instagram Direct (conversación con
+ * channel = 'messenger' | 'instagram'). Mismo flujo de decisión que WhatsApp:
+ * modo humano → sin créditos → cliente pide asesor → respuesta de la IA,
+ * sin lo exclusivo de WhatsApp (opt-out STOP, botones, CRM por teléfono).
  */
 
 const PLATFORM_LABEL = { messenger: "Messenger", instagram: "Instagram" } as const;
@@ -165,6 +182,11 @@ async function handleEcho(
   const content = await buildInboundContent(db, channel, event);
   if (!content.text && !content.mediaStoragePath) return { ok: true };
 
+  // Respaldo del dedup por mid: si el echo repite lo último que Noova ya guardó
+  // (respuesta de la IA o del asesor), es el reflejo de ese envío, no un mensaje nuevo.
+  const lastOutgoing = [...(existing.messages ?? [])].reverse().find(m => m.role !== "user");
+  if (lastOutgoing && lastOutgoing.content.trim() === content.text.trim()) return { ok: true };
+
   return persistHumanReply({
     db,
     userId: channel.user_id,
@@ -178,53 +200,49 @@ async function handleEcho(
   });
 }
 
+async function sendReply(
+  db: SupabaseClient,
+  channel: MetaMessagingChannelRecord,
+  contactId: string,
+  body: string
+): Promise<{ ok: boolean; sentCount: number; error?: string }> {
+  try {
+    const { sentCount } = await sendMetaTextMessage({ db, channel, contactId, body });
+    return { ok: true, sentCount };
+  } catch (err) {
+    return { ok: false, sentCount: 0, error: err instanceof Error ? err.message : "Error al enviar" };
+  }
+}
+
 async function handleCustomerMessage(
   db: SupabaseClient,
   channel: MetaMessagingChannelRecord,
   event: MetaInboundEvent
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!channel.text_agent_id) return { ok: false, error: "Canal sin agente de texto asignado" };
+  const orgId = channel.organization_id;
 
-  const blocked = await getOrgServiceBlock(db, channel.organization_id);
+  const blocked = await getOrgServiceBlock(db, orgId);
   if (blocked) {
     return { ok: false, error: `Organización ${blocked === "disabled" ? "desactivada" : "suspendida"}` };
   }
 
-  const { data: agent } = await db
-    .from("text_agents")
-    .select("id, name, llm_model")
-    .eq("id", channel.text_agent_id)
-    .maybeSingle();
-  if (!agent) return { ok: false, error: "Agente de texto no encontrado" };
+  const { agent, error: agentErr } = await resolveTextAgentForChannel(db, channel);
+  if (agentErr || !agent) return { ok: false, error: agentErr ?? "Agente de texto no encontrado" };
+  const model = String(agent.llm_model || "gemini-2.5-flash");
 
   const content = await buildInboundContent(db, channel, event);
   if (!content.text) return { ok: false, error: "Mensaje vacío" };
+  // La IA todavía no analiza adjuntos de Meta: se le avisa en vez de mostrarle solo el emoji.
+  const userForAi = content.mediaLabel
+    ? `${content.text}\n\n[El cliente envió un adjunto (${content.mediaLabel}). En este canal aún no puedes verlo: pídele que te cuente por escrito lo que necesitas saber.]`
+    : content.text;
 
   const existing = await findMetaConversation(db, channel, event.contactId);
   const contact = existing ? null : await resolveContactLabel(channel, event.contactId);
+  const contactLabel = existing?.contact_label || contact?.label || `Cliente de ${PLATFORM_LABEL[channel.platform]}`;
   const nowIso = new Date().toISOString();
 
-  const persisted = await persistUserMessageOnly({
-    db,
-    userId: channel.user_id,
-    agentId: String(agent.id),
-    agentName: String(agent.name),
-    conversationId: existing?.id ?? null,
-    userMessage: content.text,
-    llmModel: String(agent.llm_model || "gemini-2.5-flash"),
-    channel: channel.platform,
-    contactLabel: contact?.label,
-    bumpUnread: true,
-    handoffMode: "human",
-    statusLabel: "Esperando asesor",
-    userMediaType: content.mediaType,
-    userMediaLabel: content.mediaLabel,
-    userMediaStoragePath: content.mediaStoragePath,
-    userMediaMime: content.mediaMime
-  });
-  if (persisted.error) return { ok: false, error: persisted.error };
-
-  await mergeConversationMetadata(db, persisted.conversationId, channel.user_id, {
+  const metaPatch = {
     meta_channel_id: channel.id,
     meta_platform: channel.platform,
     meta_contact_id: event.contactId,
@@ -236,14 +254,167 @@ async function handleCustomerMessage(
     ...(event.referral ? { meta_last_referral: event.referral } : {}),
     ...(event.postbackPayload ? { meta_last_postback: event.postbackPayload } : {}),
     ...(event.quickReplyPayload ? { meta_last_quick_reply: event.quickReplyPayload } : {})
-  });
+  };
 
-  const label = existing?.contact_label || contact?.label || "Nuevo mensaje";
-  void notifyPushForOrg(channel.organization_id, {
-    title: `${label} · ${PLATFORM_LABEL[channel.platform]}`,
-    body: content.text.length > 120 ? `${content.text.slice(0, 120)}…` : content.text,
-    url: `/m/chats/${persisted.conversationId}`,
-    tag: `msg-${persisted.conversationId}`
+  async function persistInbound(handoffMode: "ai" | "human", statusLabel: string) {
+    const persisted = await persistUserMessageOnly({
+      db,
+      userId: channel.user_id,
+      agentId: String(agent!.id),
+      agentName: String(agent!.name),
+      conversationId: existing?.id ?? null,
+      userMessage: content.text,
+      userInternalContent: userForAi !== content.text ? userForAi : undefined,
+      llmModel: model,
+      channel: channel.platform,
+      contactLabel: contact?.label,
+      bumpUnread: true,
+      handoffMode,
+      statusLabel,
+      userMediaType: content.mediaType,
+      userMediaLabel: content.mediaLabel,
+      userMediaStoragePath: content.mediaStoragePath,
+      userMediaMime: content.mediaMime
+    });
+    if (!persisted.error) {
+      await mergeConversationMetadata(db, persisted.conversationId, channel.user_id, metaPatch);
+    }
+    return persisted;
+  }
+
+  function notifyTeam(conversationId: string) {
+    void notifyPushForOrg(orgId, {
+      title: `${contactLabel} · ${PLATFORM_LABEL[channel.platform]}`,
+      body: content.text.length > 120 ? `${content.text.slice(0, 120)}…` : content.text,
+      url: `/m/chats/${conversationId}`,
+      tag: `msg-${conversationId}`
+    });
+  }
+
+  const escalate = (conversationId: string, reason: "human_only" | "user_request" | "ai_escalation") =>
+    escalateConversationToHuman({
+      db,
+      userId: channel.user_id,
+      conversationId,
+      organizationId: orgId,
+      reason,
+      channel: channel.platform,
+      agentName: String(agent.name),
+      contactLabel,
+      visitorMessage: content.text,
+      notifyRules: agent.notify_rules
+    });
+
+  // —— Modo humano —— (si nadie respondió a tiempo, vuelve sola a la IA; human_only nunca vuelve)
+  const humanOnly = isTextAgentHumanOnly(agent);
+  if (humanOnly || (existing?.handoff_mode === "human" && !shouldAutoReturnToAi(existing.messages ?? []))) {
+    const persisted = await persistInbound("human", "Esperando asesor");
+    if (persisted.error) return { ok: false, error: persisted.error };
+    if (humanOnly && existing?.handoff_mode !== "human") {
+      await escalate(persisted.conversationId, "human_only");
+    } else {
+      notifyTeam(persisted.conversationId);
+    }
+    return { ok: true };
+  }
+
+  // —— Sin créditos / suspendida: se registra el mensaje pero no se gasta IA ——
+  const billing = await checkBillingForOrg(db, orgId);
+  if (!billing.allowed) {
+    const persisted = await persistInbound("human", "Sin créditos");
+    if (persisted.error) return { ok: false, error: persisted.error };
+    notifyTeam(persisted.conversationId);
+    return { ok: true };
+  }
+
+  // —— El cliente pide un asesor ——
+  if (detectUserHandoffIntent(content.text)) {
+    const persisted = await persistInbound("human", "Esperando asesor");
+    if (persisted.error) return { ok: false, error: persisted.error };
+    await persistAssistantReplyOnly({
+      db,
+      userId: channel.user_id,
+      conversationId: persisted.conversationId,
+      assistantReply: HANDOFF_VISITOR_REPLY,
+      llmModel: model
+    });
+    await escalate(persisted.conversationId, "user_request");
+    const sent = await sendReply(db, channel, event.contactId, HANDOFF_VISITOR_REPLY);
+    if (!sent.ok) console.error("[meta-messaging] handoff send:", sent.error);
+    return { ok: true };
+  }
+
+  // —— Respuesta IA ——
+  const persisted = await persistInbound("ai", "Chat activo");
+  if (persisted.error) return { ok: false, error: persisted.error };
+  const conversationId = persisted.conversationId;
+
+  await sendMetaTypingOn(channel, event.contactId);
+  // Meta apaga el "escribiendo…" a los ~20 s: se refresca si la IA tarda más.
+  const typingRefresh = setInterval(() => void sendMetaTypingOn(channel, event.contactId), 15_000);
+
+  let generated: Awaited<ReturnType<typeof generateMetaAgentReply>>;
+  try {
+    const refreshed = await findMetaConversation(db, channel, event.contactId);
+    generated = await generateMetaAgentReply({
+      db,
+      channel,
+      agent,
+      conversation: refreshed,
+      conversationId,
+      userForAi,
+      contactLabel
+    });
+  } catch (err) {
+    console.error("[meta-messaging] generación falló, escalando a humano:", err instanceof Error ? err.message : err);
+    const fallbackReply = "En un momento un asesor te contactará.";
+    await persistAssistantReplyOnly({
+      db,
+      userId: channel.user_id,
+      conversationId,
+      assistantReply: fallbackReply,
+      llmModel: model
+    });
+    await escalate(conversationId, "ai_escalation");
+    const sent = await sendReply(db, channel, event.contactId, fallbackReply);
+    if (!sent.ok) console.error("[meta-messaging] fallback send:", sent.error);
+    return { ok: true };
+  } finally {
+    clearInterval(typingRefresh);
+  }
+
+  const assistantPersist = await persistAssistantReplyOnly({
+    db,
+    userId: channel.user_id,
+    conversationId,
+    assistantReply: generated.reply,
+    llmModel: model
+  });
+  if (!assistantPersist.ok) return { ok: false, error: assistantPersist.error };
+
+  if (generated.catalogNeedsHuman || detectAssistantHandoffOffer(generated.reply)) {
+    await escalate(conversationId, "ai_escalation");
+  }
+
+  const sent = await sendReply(db, channel, event.contactId, generated.reply);
+  if (!sent.ok) {
+    console.error("[meta-messaging] send:", sent.error);
+    return { ok: false, error: sent.error };
+  }
+
+  // Meta no cobra la entrega: una sola línea con el costo real del LLM.
+  await recordUsageSafe({
+    db,
+    organizationId: orgId,
+    userId: channel.user_id,
+    eventType: "meta_messaging_ai",
+    channel: channel.platform,
+    provider: providerForLlmModel(generated.engine),
+    model: generated.engine,
+    gemini: generated.usage,
+    referenceType: "text_agent_conversation",
+    referenceId: conversationId,
+    idempotencyKey: `meta_ai_${event.messageId}`
   });
 
   return { ok: true };

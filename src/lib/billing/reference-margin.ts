@@ -20,6 +20,8 @@ const REFERENCE_USAGE: Record<UsageEventType, ReferenceUsageProfile> = {
   // Referencia con Gemini Flash (el caso típico); con Claude Sonnet el costo real
   // es ~8x más por token — cubierto aparte por el piso de margen dinámico en recordUsage.
   whatsapp_media_ai: { geminiModel: "flash", promptTokens: 1600, completionTokens: 250 },
+  // Mismo turno conversacional que whatsapp_ai, sin costo de entrega (Meta no cobra).
+  meta_messaging_ai: { geminiModel: "flash", promptTokens: 900, completionTokens: 650 },
   // Esquema con anidamiento moderado (ej. varios comprobantes con monto/fecha/banco) —
   // la salida es JSON compacto, más liviana que una respuesta conversacional.
   automation_extract: { geminiModel: "flash", promptTokens: 1000, completionTokens: 400 },

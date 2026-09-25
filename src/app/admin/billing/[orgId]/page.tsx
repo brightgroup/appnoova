@@ -65,7 +65,7 @@ const STATUS_OPTIONS = [
 
 const EVENT_LABELS: Record<string, string> = {
   ori: "ORI", milink: "Mi Link", widget: "Widget", text_test: "Prueba",
-  whatsapp_ai: "WhatsApp IA", whatsapp_manual: "WhatsApp", whatsapp_media_ai: "WhatsApp — Imagen/PDF", voice: "Voz",
+  whatsapp_ai: "WhatsApp IA", whatsapp_manual: "WhatsApp", whatsapp_media_ai: "WhatsApp — Imagen/PDF", meta_messaging_ai: "Messenger/Instagram IA", voice: "Voz",
   doc_scan: "Documentos", form_fill: "Formularios", quote: "Cotizaciones"
 };
 
