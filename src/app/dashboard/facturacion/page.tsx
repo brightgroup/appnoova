@@ -402,6 +402,17 @@ export default function FacturacionPage() {
       );
     });
   }, [withBillingProfile, openBoldInvoiceCheckoutRaw, load]);
+  // Un solo cobro por el total de todas las facturas pendientes/vencidas.
+  const payAllUnpaid = useCallback(() => {
+    withBillingProfile(() => {
+      setPayingInvoiceId("all");
+      void openBoldInvoiceCheckoutRaw(
+        "/api/billing/bold/invoice/checkout",
+        { all_unpaid: true },
+        () => void load()
+      );
+    });
+  }, [withBillingProfile, openBoldInvoiceCheckoutRaw, load]);
   const dueDaysLeft = daysUntil(nextDueInvoice?.due_date ?? null);
 
   // Filtrado de facturas
@@ -586,7 +597,7 @@ export default function FacturacionPage() {
                         )}
                       </p>
 
-                      {/* Cada factura por separado — concepto, valor y su propio botón de pago. */}
+                      {/* Cada factura por separado (concepto y valor), pagadas en un solo cobro. */}
                       <ul className="mt-3 space-y-2">
                         {unpaidInvoices
                           .slice()
@@ -604,26 +615,28 @@ export default function FacturacionPage() {
                                   FAC-{inv.id.substring(0, 8).toUpperCase()} · vence {fmtDate(inv.due_date)}
                                 </p>
                               </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <span className="text-sm font-bold text-white">{fmtInvoiceAmount(inv)}</span>
-                                {sub?.billing_provider !== "paddle" && (
-                                  <button
-                                    onClick={() => payInvoiceWithBold(inv.id)}
-                                    disabled={payingBoldInvoice}
-                                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[var(--nv-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
-                                  >
-                                    {payingBoldInvoice && payingInvoiceId === inv.id ? "Abriendo…" : "Pagar con Bold"}
-                                  </button>
-                                )}
-                              </div>
+                              <span className="text-sm font-bold text-white shrink-0">{fmtInvoiceAmount(inv)}</span>
                             </li>
                           ))}
                       </ul>
 
-                      {unpaidInvoices.length > 1 && (
-                        <p className="text-xs text-gray-400 mt-2">
-                          El servicio se mantiene activo solo si todas quedan pagas antes de su fecha límite.
-                        </p>
+                      {sub?.billing_provider !== "paddle" && (
+                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                          <button
+                            onClick={payAllUnpaid}
+                            disabled={payingBoldInvoice}
+                            className="text-sm font-semibold px-4 py-2 rounded-lg bg-[var(--nv-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                          >
+                            {payingBoldInvoice && payingInvoiceId === "all"
+                              ? (payingBoldInvoicePolling ? "Esperando confirmación…" : "Abriendo…")
+                              : unpaidAllCop ? `Pagar $${fmtN(unpaidTotalCop)} COP` : "Pagar"}
+                          </button>
+                          {unpaidInvoices.length > 1 && (
+                            <span className="text-xs text-gray-400">
+                              Salda las {unpaidInvoices.length} facturas en un solo pago.
+                            </span>
+                          )}
+                        </div>
                       )}
                       {payBoldInvoiceError && <p className="text-xs text-red-400 mt-1">{payBoldInvoiceError}</p>}
                     </div>
@@ -981,7 +994,7 @@ export default function FacturacionPage() {
                                       disabled={payingBoldInvoice}
                                       className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-[var(--nv-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                                     >
-                                      {payingBoldInvoice && payingInvoiceId === inv.id ? "Abriendo…" : "Pagar con Bold"}
+                                      {payingBoldInvoice && payingInvoiceId === inv.id ? "Abriendo…" : "Pagar"}
                                     </button>
                                   )}
                                   {inv.siigo_invoice_url ? (
@@ -1228,7 +1241,7 @@ export default function FacturacionPage() {
                   <div>
                     <h3 className="text-base font-bold text-[var(--nv-text)]">Datos para tu factura</h3>
                     <p className="text-sm text-[var(--nv-text-muted)] mt-1">
-                      Los necesitamos una sola vez para emitir tu factura electrónica. Al guardar te llevamos directo al pago con Bold.
+                      Los necesitamos una sola vez para emitir tu factura electrónica. Al guardar te llevamos directo al pago.
                     </p>
                   </div>
                   <BillingProfileForm
@@ -1289,7 +1302,7 @@ export default function FacturacionPage() {
                   {buyCreditsError && <p className="text-xs text-red-400">{buyCreditsError}</p>}
                   {buyBoldCreditsError && <p className="text-xs text-red-400">{buyBoldCreditsError}</p>}
                   <p className="text-[11px] text-[var(--nv-text-faint)]">
-                    Bold: tarjeta, PSE, Nequi o Botón Bancolombia en COP.{PADDLE_CHECKOUT_ENABLED && " Tarjeta: pago internacional en USD."}
+                    Paga con tarjeta, PSE, Nequi o Botón Bancolombia (COP).{PADDLE_CHECKOUT_ENABLED && " Tarjeta: pago internacional en USD."}
                   </p>
                   <div className="flex justify-end gap-2 pt-2">
                     <button
@@ -1324,7 +1337,7 @@ export default function FacturacionPage() {
                       disabled={buyingCredits || buyingBoldCredits || !buyPackageId}
                       className={`${btnPrimary} disabled:opacity-50`}
                     >
-                      {buyingBoldCredits ? (buyingBoldCreditsPolling ? "Esperando…" : "Abriendo…") : "Comprar con Bold"}
+                      {buyingBoldCredits ? (buyingBoldCreditsPolling ? "Esperando…" : "Abriendo…") : "Comprar"}
                     </button>
                   </div>
                 </div>
@@ -1538,7 +1551,7 @@ export default function FacturacionPage() {
                                 })}
                                 className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-[var(--nv-accent)] hover:opacity-90 text-white text-[11px] font-semibold py-2 transition-opacity"
                               >
-                                Pagar {p.name} con Bold (COP)
+                                Pagar {p.name}
                               </button>
                             )}
                           </div>

@@ -28,6 +28,12 @@ async function recordUnmatched(
   if (error) console.error("[bold:webhook] no se pudo guardar unmatched", error);
 }
 
+/** Facturas que cubre un cobro kind='invoice' (varias, o la única de `invoice_id`). */
+function invoiceIdsOf(reqRow: { invoice_id?: string | null; invoice_ids?: string[] | null }): string[] {
+  if (reqRow.invoice_ids?.length) return reqRow.invoice_ids;
+  return reqRow.invoice_id ? [reqRow.invoice_id] : [];
+}
+
 /** Un mes calendario después de `from` (mismo criterio que billing_bootstrap_subscription). */
 function addOneMonth(from: Date): Date {
   const d = new Date(from);
@@ -108,21 +114,29 @@ export async function applyBoldSaleApproved(
     });
     if (error) throw error;
   } else if (reqRow.kind === "invoice") {
-    if (!reqRow.invoice_id) {
+    const invoiceIds = invoiceIdsOf(reqRow);
+    if (invoiceIds.length === 0) {
       await recordUnmatched(db, eventType, data, "invoice_request_missing_invoice_id");
       return { ok: false, unmatched: true };
     }
+    // Un cobro puede saldar varias facturas: cada una conserva su propio monto
+    // (p_amount_cop = 0 → la RPC deja el amount_cop de la factura), salvo el
+    // caso de una sola, donde se registra lo que Bold reportó realmente.
     const { amountUsd, amountCop } = resolveChargedAmounts(data, reqRow);
-    const { data: result, error } = await db.rpc("billing_record_invoice_payment", {
-      p_invoice: reqRow.invoice_id,
-      p_amount_cop: amountCop,
-      p_amount_usd: amountUsd,
-      p_bold_transaction_id: data.payment_id,
-    });
-    if (error) throw error;
+    let remainingUnpaid: number | undefined;
+    for (const id of invoiceIds) {
+      const { data: result, error } = await db.rpc("billing_record_invoice_payment", {
+        p_invoice: id,
+        p_amount_cop: invoiceIds.length === 1 ? amountCop : 0,
+        p_amount_usd: invoiceIds.length === 1 ? amountUsd : 0,
+        p_bold_transaction_id: data.payment_id,
+      });
+      if (error) throw error;
+      remainingUnpaid = (result as { remaining_unpaid?: number } | null)?.remaining_unpaid;
+    }
     // Última factura saldada → la cuenta volvió a activa; WhatsApp suspendido
     // por mora queda listo para reactivar (mismo flujo que el pago manual).
-    if ((result as { remaining_unpaid?: number } | null)?.remaining_unpaid === 0) {
+    if (remainingUnpaid === 0) {
       try {
         const { markOrgWhatsAppChannelsPendingReactivation } = await import("@/lib/whatsapp/billing-lifecycle");
         await markOrgWhatsAppChannelsPendingReactivation(db, reqRow.organization_id);
@@ -201,27 +215,30 @@ export async function applyBoldSaleApproved(
     }
   }
 
-  if (reqRow.kind === "invoice" && reqRow.invoice_id) {
-    try {
-      const [{ data: org }, { data: inv }] = await Promise.all([
-        db.from("organizations").select("name").eq("id", reqRow.organization_id).maybeSingle(),
-        db.from("billing_invoices").select("description, plan_id").eq("id", reqRow.invoice_id).maybeSingle(),
-      ]);
-      const { amountCop } = resolveChargedAmounts(data, reqRow);
-      await emitSiigoInvoiceForPayment(db, {
-        organizationId: reqRow.organization_id,
-        organizationName: org?.name ?? "Organización",
-        planName: inv?.description || inv?.plan_id || "Suscripción Noova 360",
-        amountCop,
-        billingInvoiceId: reqRow.invoice_id,
-      });
-    } catch (err) {
-      console.error("[bold:webhook] factura pagada pero falló la factura Siigo", data.payment_id, err);
-      const message = err instanceof Error ? err.message : String(err);
-      await db
-        .from("billing_invoices")
-        .update({ siigo_invoice_error: message.slice(0, 500) })
-        .eq("id", reqRow.invoice_id);
+  if (reqRow.kind === "invoice") {
+    const { data: org } = await db.from("organizations").select("name").eq("id", reqRow.organization_id).maybeSingle();
+    const { data: paidInvoices } = await db
+      .from("billing_invoices")
+      .select("id, description, plan_id, amount_cop")
+      .in("id", invoiceIdsOf(reqRow));
+    // Una factura electrónica DIAN por cada factura saldada, con su propio valor.
+    for (const inv of paidInvoices ?? []) {
+      try {
+        await emitSiigoInvoiceForPayment(db, {
+          organizationId: reqRow.organization_id,
+          organizationName: org?.name ?? "Organización",
+          planName: inv.description || inv.plan_id || "Suscripción Noova 360",
+          amountCop: Number(inv.amount_cop) || 0,
+          billingInvoiceId: inv.id,
+        });
+      } catch (err) {
+        console.error("[bold:webhook] factura pagada pero falló la factura Siigo", data.payment_id, inv.id, err);
+        const message = err instanceof Error ? err.message : String(err);
+        await db
+          .from("billing_invoices")
+          .update({ siigo_invoice_error: message.slice(0, 500) })
+          .eq("id", inv.id);
+      }
     }
   }
 

@@ -100,7 +100,7 @@ export function BoldCheckoutButton({
         className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-[var(--nv-accent)] hover:opacity-90 text-white text-[11px] font-semibold py-2 transition-opacity disabled:opacity-50"
       >
         {loading || polling ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wallet2 className="w-3 h-3" />}
-        {loading ? "Abriendo…" : polling ? "Esperando confirmación de Bold…" : `Pagar ${planName} con Bold (COP)`}
+        {loading ? "Abriendo…" : polling ? "Esperando confirmación del pago…" : `Pagar ${planName}`}
       </button>
       {error && <p className="text-[10px] text-red-400">{error}</p>}
     </div>

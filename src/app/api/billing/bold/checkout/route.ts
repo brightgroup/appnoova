@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("[bold:checkout]", err);
     await db.from("bold_payment_requests").update({ status: "failed" }).eq("id", reqRow.id);
-    const message = err instanceof BoldApiError ? err.message : "No se pudo iniciar el checkout con Bold";
+    const message = err instanceof BoldApiError ? err.message : "No se pudo iniciar el pago";
     return NextResponse.json({ error: message }, { status: 422 });
   }
 }
