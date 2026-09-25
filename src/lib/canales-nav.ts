@@ -1,4 +1,4 @@
-import { Link2, Code2, MessageCircle, Phone, type LucideIcon } from "lucide-react";
+import { Link2, Code2, MessageCircle, Phone, Instagram, type LucideIcon } from "lucide-react";
 
 export interface CanalNavItem {
   name: string;
@@ -10,5 +10,6 @@ export const CANALES_NAV: CanalNavItem[] = [
   { name: "Mi Link", href: "/dashboard/canales/mi-link", icon: Link2 },
   { name: "Widget web", href: "/dashboard/canales/widget", icon: Code2 },
   { name: "WhatsApp", href: "/dashboard/canales/whatsapp", icon: MessageCircle },
+  { name: "Messenger e Instagram", href: "/dashboard/canales/messenger-instagram", icon: Instagram },
   { name: "Teléfono", href: "/dashboard/canales/telefono", icon: Phone }
 ];
