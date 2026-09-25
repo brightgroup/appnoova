@@ -23,7 +23,7 @@ import { useRegistryPagination } from "@/hooks/useRegistryPagination";
 import { usePricingCatalog } from "@/hooks/usePricingCatalog";
 import { PaddleCheckoutButton, usePaddleCheckout } from "@/components/billing/PaddleCheckoutButton";
 import { BoldCheckoutButton, useBoldCheckout } from "@/components/billing/BoldCheckoutButton";
-import type { BillingProfile } from "@/components/billing/BillingProfileForm";
+import { BillingProfileForm, type BillingProfile } from "@/components/billing/BillingProfileForm";
 import { isBillingProfileComplete } from "@/lib/billing/billing-profile";
 import { openInvoicePdf } from "@/lib/billing/open-invoice-pdf";
 import { CardBrandIcon } from "@/components/billing/CardBrandIcon";
@@ -384,14 +384,24 @@ export default function FacturacionPage() {
   );
   const unpaidAllCop = unpaidInvoices.length > 0 && unpaidInvoices.every((inv) => inv.currency === "COP");
   const unpaidTotalCop = unpaidInvoices.reduce((sum, inv) => sum + Number(inv.amount_cop || 0), 0);
+  // Sin datos de facturación no se puede pagar (el backend responde 428): en
+  // vez de mandar al cliente a buscar el formulario en Perfil, se le pide ahí
+  // mismo en un modal y al guardar se continúa directo al pago.
+  const [profileGate, setProfileGate] = useState<{ then: () => void } | null>(null);
+  const withBillingProfile = useCallback((then: () => void) => {
+    if (isBillingProfileComplete(data?.billing_profile)) then();
+    else setProfileGate({ then });
+  }, [data?.billing_profile]);
   const payInvoiceWithBold = useCallback((invoiceId: string) => {
-    setPayingInvoiceId(invoiceId);
-    void openBoldInvoiceCheckoutRaw(
-      "/api/billing/bold/invoice/checkout",
-      { invoice_id: invoiceId },
-      () => void load()
-    );
-  }, [openBoldInvoiceCheckoutRaw, load]);
+    withBillingProfile(() => {
+      setPayingInvoiceId(invoiceId);
+      void openBoldInvoiceCheckoutRaw(
+        "/api/billing/bold/invoice/checkout",
+        { invoice_id: invoiceId },
+        () => void load()
+      );
+    });
+  }, [withBillingProfile, openBoldInvoiceCheckoutRaw, load]);
   const dueDaysLeft = daysUntil(nextDueInvoice?.due_date ?? null);
 
   // Filtrado de facturas
@@ -560,7 +570,9 @@ export default function FacturacionPage() {
                     <AlertTriangle className={`w-5 h-5 shrink-0 mt-0.5 ${nextDueInvoice.status === "overdue" ? "text-red-400" : "text-amber-400"}`} />
                     <div className="min-w-0 flex-1">
                       <p className={`font-semibold ${nextDueInvoice.status === "overdue" ? "text-red-300" : "text-amber-300"}`}>
-                        {nextDueInvoice.status === "overdue" ? "Factura vencida" : "Factura pendiente de pago"}
+                        {unpaidInvoices.length > 1
+                          ? `Tienes ${unpaidInvoices.length} facturas por pagar`
+                          : nextDueInvoice.status === "overdue" ? "Factura vencida" : "Factura pendiente de pago"}
                       </p>
                       <p className="text-sm text-gray-300 mt-1">
                         Vence el {fmtDate(nextDueInvoice.due_date)}
@@ -569,38 +581,51 @@ export default function FacturacionPage() {
                             ({dueDaysLeft > 0 ? `en ${dueDaysLeft} día${dueDaysLeft === 1 ? "" : "s"}` : dueDaysLeft === 0 ? "hoy" : `hace ${Math.abs(dueDaysLeft)} día${Math.abs(dueDaysLeft) === 1 ? "" : "s"}`})
                           </span>
                         )}
-                        {" · "}{fmtInvoiceAmount(nextDueInvoice)}
+                        {unpaidInvoices.length > 1 && unpaidAllCop && (
+                          <> · total <span className="font-semibold text-white">${fmtN(unpaidTotalCop)} COP</span></>
+                        )}
                       </p>
-                      {nextDueInvoice.description && (
-                        <p className="text-xs text-gray-400 mt-0.5">{nextDueInvoice.description}</p>
-                      )}
+
+                      {/* Cada factura por separado — concepto, valor y su propio botón de pago. */}
+                      <ul className="mt-3 space-y-2">
+                        {unpaidInvoices
+                          .slice()
+                          .sort((a, b) => a.period_start.localeCompare(b.period_start))
+                          .map((inv) => (
+                            <li
+                              key={inv.id}
+                              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm text-gray-100 truncate">
+                                  {inv.description || `Plan ${inv.plan_id ?? planName} · ${fmtDate(inv.period_start)} → ${fmtDate(inv.period_end)}`}
+                                </p>
+                                <p className="text-[11px] text-gray-400">
+                                  FAC-{inv.id.substring(0, 8).toUpperCase()} · vence {fmtDate(inv.due_date)}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-sm font-bold text-white">{fmtInvoiceAmount(inv)}</span>
+                                {sub?.billing_provider !== "paddle" && (
+                                  <button
+                                    onClick={() => payInvoiceWithBold(inv.id)}
+                                    disabled={payingBoldInvoice}
+                                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[var(--nv-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                                  >
+                                    {payingBoldInvoice && payingInvoiceId === inv.id ? "Abriendo…" : "Pagar con Bold"}
+                                  </button>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                      </ul>
+
                       {unpaidInvoices.length > 1 && (
-                        <p className="text-xs text-gray-400 mt-1">
-                          Tienes {unpaidInvoices.length} facturas por pagar
-                          {unpaidAllCop && <> · total <span className="font-semibold text-gray-200">${fmtN(unpaidTotalCop)} COP</span></>}
-                          . El servicio se mantiene activo solo si todas quedan pagas antes de su fecha límite.
+                        <p className="text-xs text-gray-400 mt-2">
+                          El servicio se mantiene activo solo si todas quedan pagas antes de su fecha límite.
                         </p>
                       )}
                       {payBoldInvoiceError && <p className="text-xs text-red-400 mt-1">{payBoldInvoiceError}</p>}
-                    </div>
-                    <div className="shrink-0 flex items-center gap-2">
-                      {/* Se paga la factura misma (monto exacto en pesos), no "el plan":
-                          pagar el plan abría un periodo nuevo sin saldar esta deuda. */}
-                      {sub?.billing_provider !== "paddle" && (
-                        <button
-                          onClick={() => payInvoiceWithBold(nextDueInvoice.id)}
-                          disabled={payingBoldInvoice}
-                          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[var(--nv-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
-                        >
-                          {payingBoldInvoice && payingInvoiceId === nextDueInvoice.id ? "Abriendo…" : "Pagar con Bold"}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setTab("invoices")}
-                        className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-white/15 hover:bg-white/10 transition-colors"
-                      >
-                        Ver factura
-                      </button>
                     </div>
                   </div>
                 )}
@@ -1197,6 +1222,29 @@ export default function FacturacionPage() {
               </div>
             )}
 
+            {profileGate && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+                <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--nv-bg-module)] border border-[var(--nv-border)] p-6 space-y-4">
+                  <div>
+                    <h3 className="text-base font-bold text-[var(--nv-text)]">Datos para tu factura</h3>
+                    <p className="text-sm text-[var(--nv-text-muted)] mt-1">
+                      Los necesitamos una sola vez para emitir tu factura electrónica. Al guardar te llevamos directo al pago con Bold.
+                    </p>
+                  </div>
+                  <BillingProfileForm
+                    initial={data?.billing_profile}
+                    onSaved={(profile) => {
+                      setData((d) => (d ? { ...d, billing_profile: profile } : d));
+                      const next = profileGate.then;
+                      setProfileGate(null);
+                      next();
+                    }}
+                    onCancel={() => setProfileGate(null)}
+                  />
+                </div>
+              </div>
+            )}
+
             {showBuyCredits && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
                 <div className="w-full max-w-sm rounded-2xl bg-[var(--nv-bg-module)] border border-[var(--nv-border)] p-6 space-y-4">
@@ -1297,9 +1345,12 @@ export default function FacturacionPage() {
                     <span className="text-[var(--nv-text-muted)]">
                       Completa los <span className="text-[var(--nv-text)] font-semibold">datos de facturación</span> de tu organización antes de poder pagar un plan.
                     </span>
-                    <Link href="/dashboard/perfil" className="text-[var(--nv-accent)] hover:underline shrink-0 font-semibold">
-                      Completar en Perfil →
-                    </Link>
+                    <button
+                      onClick={() => setProfileGate({ then: () => {} })}
+                      className="text-[var(--nv-accent)] hover:underline shrink-0 font-semibold"
+                    >
+                      Completar ahora →
+                    </button>
                   </div>
                 ) : (
                   <div className="rounded-xl border border-[var(--nv-border)] bg-[var(--nv-bg-control)] p-3 flex items-center justify-between gap-3 text-xs">
@@ -1477,12 +1528,18 @@ export default function FacturacionPage() {
                                 )}
                               </>
                             ) : (
-                              <Link
-                                href="/dashboard/perfil"
-                                className="block text-[10px] text-[var(--nv-accent)] hover:underline text-center"
+                              <button
+                                onClick={() => setProfileGate({
+                                  then: () => void openBoldPlanCheckout(
+                                    "/api/billing/bold/checkout",
+                                    { plan_id: p.id },
+                                    () => { void load(); setShowPlanPicker(false); }
+                                  ),
+                                })}
+                                className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-[var(--nv-accent)] hover:opacity-90 text-white text-[11px] font-semibold py-2 transition-opacity"
                               >
-                                Completa tus datos de facturación para poder pagar
-                              </Link>
+                                Pagar {p.name} con Bold (COP)
+                              </button>
                             )}
                           </div>
                         )}
