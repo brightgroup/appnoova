@@ -37,6 +37,11 @@ export function formatInboxDisplayTitle(
     return e164 || label || "WhatsApp";
   }
 
+  // Nombre (y @usuario en Instagram) ya viene del perfil de Meta, sin teléfono.
+  if (channel === "instagram" || channel === "messenger") {
+    return contactLabel.trim() || (channel === "instagram" ? "Cliente de Instagram" : "Cliente de Messenger");
+  }
+
   if (channel === "web_widget") {
     if (contactLabel.startsWith("anonymous-")) {
       const suffix = contactLabel.replace("anonymous-", "").replace(".", "").slice(-6);

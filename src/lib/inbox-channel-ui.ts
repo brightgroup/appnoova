@@ -1,4 +1,4 @@
-import { Code2, Link2, MessageCircle, MessageSquare, Phone, type LucideIcon } from "lucide-react";
+import { Code2, Facebook, Instagram, Link2, MessageCircle, MessageSquare, Phone, type LucideIcon } from "lucide-react";
 import type { BadgeVariant } from "@/components/ui/Badge";
 
 export interface InboxChannelStyle {
@@ -12,6 +12,16 @@ const STYLES: Record<string, InboxChannelStyle> = {
     icon: MessageCircle,
     label: "WhatsApp",
     variant: "emerald",
+  },
+  instagram: {
+    icon: Instagram,
+    label: "Instagram",
+    variant: "violet",
+  },
+  messenger: {
+    icon: Facebook,
+    label: "Messenger",
+    variant: "blue",
   },
   web_widget: {
     icon: Link2,
