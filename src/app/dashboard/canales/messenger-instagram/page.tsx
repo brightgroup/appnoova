@@ -106,6 +106,14 @@ export default function MessengerInstagramPage() {
   });
 
   return (
+    <>
+    {/* Fuera de ChannelListPage: mientras recarga, esa vista reemplaza sus hijos por un
+        spinner y el modal se desmontaba justo antes de mostrar el resultado. */}
+    <MetaMessagingConnectModal
+      open={connectOpen}
+      onClose={() => setConnectOpen(false)}
+      onSuccess={load}
+    />
     <ChannelListPage
       title="Messenger e Instagram"
       description="Atiende los mensajes de tu página de Facebook y de Instagram Direct desde el inbox de Noova, con tu agente de IA."
@@ -121,12 +129,6 @@ export default function MessengerInstagramPage() {
         </button>
       }
     >
-      <MetaMessagingConnectModal
-        open={connectOpen}
-        onClose={() => setConnectOpen(false)}
-        onSuccess={load}
-      />
-
       {!dbReady && (
         <div className="mx-6 mt-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
           Falta la migración 156_meta_messaging_channels.sql en Supabase.
@@ -232,5 +234,6 @@ export default function MessengerInstagramPage() {
         </div>
       )}
     </ChannelListPage>
+    </>
   );
 }
