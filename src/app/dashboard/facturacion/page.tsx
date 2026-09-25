@@ -703,21 +703,41 @@ export default function FacturacionPage() {
                     )}
                   </div>
 
-                  {/* Próxima renovación */}
-                  <div className="bg-white/[.02] border border-white/[.08] rounded-xl p-5 hover:bg-white/[.04] transition-colors">
-                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                      <Calendar className="w-3 h-3" /> Renovación
-                    </p>
-                    <p className="text-lg font-bold">{fmtDate(wallet?.period_end ?? null)}</p>
-                    {daysLeft != null && (
-                      <p className={`text-sm mt-1 ${daysLeft <= 5 ? "text-amber-400" : "text-gray-400"}`}>
-                        en {daysLeft} día{daysLeft === 1 ? "" : "s"}
+                  {/* Próxima renovación — con facturas impagas el periodo ya avanzado
+                      (el cron lo abre al emitir la factura) NO está pago: se muestra
+                      el pago pendiente, no una renovación que aún no ocurrió. */}
+                  {nextDueInvoice ? (
+                    <div className={`border rounded-xl p-5 ${nextDueInvoice.status === "overdue" ? "bg-red-500/5 border-red-500/30" : "bg-amber-500/5 border-amber-500/30"}`}>
+                      <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                        <Calendar className="w-3 h-3" /> Pago pendiente
                       </p>
-                    )}
-                    <p className="text-xs text-gray-500 mt-2">
-                      Inicio: {fmtDate(wallet?.period_start ?? null)}
-                    </p>
-                  </div>
+                      <p className="text-lg font-bold">Vence {fmtDate(nextDueInvoice.due_date)}</p>
+                      {dueDaysLeft != null && (
+                        <p className={`text-sm mt-1 ${nextDueInvoice.status === "overdue" || dueDaysLeft <= 5 ? "text-amber-400" : "text-gray-400"}`}>
+                          {dueDaysLeft > 0 ? `en ${dueDaysLeft} día${dueDaysLeft === 1 ? "" : "s"}` : dueDaysLeft === 0 ? "hoy" : `hace ${Math.abs(dueDaysLeft)} día${Math.abs(dueDaysLeft) === 1 ? "" : "s"}`}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-500 mt-2">
+                        {unpaidAllCop ? `$${fmtN(unpaidTotalCop)} COP por pagar` : fmtInvoiceAmount(nextDueInvoice)}
+                        {" · "}se renueva al pagar
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-white/[.02] border border-white/[.08] rounded-xl p-5 hover:bg-white/[.04] transition-colors">
+                      <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                        <Calendar className="w-3 h-3" /> Renovación
+                      </p>
+                      <p className="text-lg font-bold">{fmtDate(wallet?.period_end ?? null)}</p>
+                      {daysLeft != null && (
+                        <p className={`text-sm mt-1 ${daysLeft <= 5 ? "text-amber-400" : "text-gray-400"}`}>
+                          en {daysLeft} día{daysLeft === 1 ? "" : "s"}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-500 mt-2">
+                        Inicio: {fmtDate(wallet?.period_start ?? null)}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Gráfico de consumo diario */}
@@ -1118,15 +1138,21 @@ export default function FacturacionPage() {
 
                   <div className="mt-5 pt-5 border-t border-[var(--nv-border)] flex items-center justify-between flex-wrap gap-3">
                     <div>
-                      <p className="text-xs text-[var(--nv-text-muted)]">Próxima renovación</p>
-                      <p className="text-sm font-semibold text-[var(--nv-text)]">
-                        {fmtDate(wallet?.period_end ?? null)}
-                        {daysLeft != null && (
-                          <span className={`ml-2 font-normal ${daysLeft <= 5 ? "text-amber-400" : "text-[var(--nv-text-muted)]"}`}>
-                            en {daysLeft} día{daysLeft === 1 ? "" : "s"}
-                          </span>
-                        )}
-                      </p>
+                      {nextDueInvoice ? (
+                        <p className="text-xs text-[var(--nv-text-muted)]">Renovación pendiente de pago</p>
+                      ) : (
+                        <>
+                          <p className="text-xs text-[var(--nv-text-muted)]">Próxima renovación</p>
+                          <p className="text-sm font-semibold text-[var(--nv-text)]">
+                            {fmtDate(wallet?.period_end ?? null)}
+                            {daysLeft != null && (
+                              <span className={`ml-2 font-normal ${daysLeft <= 5 ? "text-amber-400" : "text-[var(--nv-text-muted)]"}`}>
+                                en {daysLeft} día{daysLeft === 1 ? "" : "s"}
+                              </span>
+                            )}
+                          </p>
+                        </>
+                      )}
                       {nextDueInvoice && (
                         <p className={`text-xs mt-1 ${nextDueInvoice.status === "overdue" ? "text-red-400" : "text-amber-400"}`}>
                           Factura {nextDueInvoice.status === "overdue" ? "vencida" : "pendiente"}: vence {fmtDate(nextDueInvoice.due_date)}

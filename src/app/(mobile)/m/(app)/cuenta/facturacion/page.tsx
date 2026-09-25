@@ -85,6 +85,12 @@ export default function MobileFacturacionPage() {
   const subscription = data?.subscription ?? null;
   const wallet = data?.wallet ?? null;
   const invoices = data?.invoices ?? [];
+  // Con facturas impagas el periodo ya avanzado no está pago: se muestra el
+  // vencimiento del pago pendiente en vez de una renovación que no ocurrió.
+  const nextDue =
+    invoices
+      .filter((inv) => inv.status === "pending" || inv.status === "overdue")
+      .sort((a, b) => a.due_date.localeCompare(b.due_date))[0] ?? null;
   const planName = subscription?.plans?.name ?? "";
   const monthlyCredits = subscription?.monthly_credits ?? subscription?.plans?.monthly_credits ?? 0;
   const priceUsd = subscription?.price_usd ?? subscription?.plans?.price_usd ?? 0;
@@ -140,7 +146,10 @@ export default function MobileFacturacionPage() {
                         <i style={{ width: `${Math.min(100, Math.round(wallet.used_pct))}%` }} />
                       </div>
                       <div className="usage-foot">
-                        {Math.round(wallet.used_pct)}% del ciclo · renueva el {formatShortDate(wallet.period_end)}
+                        {Math.round(wallet.used_pct)}% del ciclo ·{" "}
+                        {nextDue
+                          ? `pago pendiente, vence el ${formatShortDate(nextDue.due_date)}`
+                          : `renueva el ${formatShortDate(wallet.period_end)}`}
                       </div>
                     </div>
                     <div className="usage-blk card-split">
