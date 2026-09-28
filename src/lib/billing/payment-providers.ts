@@ -7,4 +7,4 @@
  * cancelación no dependen de este flag, para no dejar a esos clientes sin
  * forma de gestionar lo que ya se les cobra.
  */
-export const PADDLE_CHECKOUT_ENABLED = false;
+export const PADDLE_CHECKOUT_ENABLED = true;
