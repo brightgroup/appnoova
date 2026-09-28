@@ -18,6 +18,7 @@ import {
 import { isSuperAdminUser } from "@/lib/admin-server";
 import { planVisibleInBillingCatalog } from "@/lib/billing/plan-visibility";
 import { fetchBillingProfile } from "@/lib/billing/billing-profile";
+import { PADDLE_CHECKOUT_ENABLED } from "@/lib/billing/payment-providers";
 
 interface UsageEventRow {
   created_at: string;
@@ -269,6 +270,7 @@ export async function GET(req: NextRequest) {
     daily_chart: dailyChart,
     usage_details: usageDetails,
     credit_packages: creditPackagesRes.data ?? [],
+    paddle_credits_checkout_enabled: PADDLE_CHECKOUT_ENABLED || superAdmin,
     stats: {
       avg_daily: avgDaily30,
       peak_daily: peakDay,

@@ -87,6 +87,7 @@ interface BillingData {
   invoices: Invoice[]; plans: Plan[];
   daily_chart: DailyPoint[]; usage_details: UsageDetail[]; stats: Stats;
   credit_packages?: { id: string; credits: number; price_usd: number }[];
+  paddle_credits_checkout_enabled?: boolean;
 }
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -1328,7 +1329,7 @@ export default function FacturacionPage() {
                   {buyCreditsError && <p className="text-xs text-red-400">{buyCreditsError}</p>}
                   {buyBoldCreditsError && <p className="text-xs text-red-400">{buyBoldCreditsError}</p>}
                   <p className="text-[11px] text-[var(--nv-text-faint)]">
-                    Paga con tarjeta, PSE, Nequi o Botón Bancolombia (COP).{PADDLE_CHECKOUT_ENABLED && " Tarjeta: pago internacional en USD."}
+                    Paga con tarjeta, PSE, Nequi o Botón Bancolombia (COP).{(PADDLE_CHECKOUT_ENABLED || data?.paddle_credits_checkout_enabled) && " Tarjeta: pago internacional en USD."}
                   </p>
                   <div className="flex justify-end gap-2 pt-2">
                     <button
@@ -1337,7 +1338,7 @@ export default function FacturacionPage() {
                     >
                       Volver
                     </button>
-                    {PADDLE_CHECKOUT_ENABLED && (
+                    {(PADDLE_CHECKOUT_ENABLED || data?.paddle_credits_checkout_enabled) && (
                       <button
                         onClick={() => {
                           if (!buyPackageId) return;
