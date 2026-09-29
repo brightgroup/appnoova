@@ -105,6 +105,7 @@ export interface BoldPaymentLinkStatus {
   id: string;
   status: "ACTIVE" | "PROCESSING" | "PAID" | "REJECTED" | "CANCELLED" | "EXPIRED";
   total: number;
+  currency?: string;
   transaction_id: string | null;
   reference: string;
 }

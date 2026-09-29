@@ -116,7 +116,7 @@ async function ensureNoovaProduct(): Promise<string> {
     tax_included: true,
     taxes: [{ id: IVA_19_TAX_ID }],
     unit_label: "unidad",
-    prices: [{ currency_code: "COP", price_list: [{ position: 1, value: 0 }] }],
+    prices: [{ currency_code: "COP", price_list: [{ position: 1, value: 1 }] }],
   });
   return NOOVA_PRODUCT_CODE;
 }
