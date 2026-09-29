@@ -1228,6 +1228,20 @@ export default function FacturacionPage() {
                       )}
                     </div>
                   )}
+
+                  {/* Bold no tiene portal/cancelación propios aquí todavía, pero comprar
+                      créditos puntuales es agnóstico al proveedor — el modal ya soporta
+                      Bold vía openBoldCreditsCheckout, solo faltaba mostrar la entrada. */}
+                  {sub && sub.billing_provider !== "paddle" && (
+                    <div className="mt-4 pt-4 border-t border-[var(--nv-border)]">
+                      <button
+                        onClick={() => { setBuyPackageId(null); setShowBuyCredits(true); }}
+                        className="text-xs font-semibold text-[var(--nv-text-muted)] hover:text-[var(--nv-text)] transition-colors"
+                      >
+                        Comprar créditos
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
