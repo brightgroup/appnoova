@@ -178,11 +178,8 @@ export async function POST(req: NextRequest) {
       await db.from("profiles").update({ full_name: fullName }).eq("id", existingProfile.id);
     }
 
-    await db.from("user_active_organization").upsert({
-      user_id: existingProfile.id,
-      organization_id: ctx.organizationId,
-    });
-    await db.from("users").update({ organization_id: ctx.organizationId }).eq("id", existingProfile.id);
+    // No cambiamos la organización activa de una cuenta existente: la cuenta
+    // puede pertenecer a otra organización y es el usuario quien elige cambiarse.
 
     return NextResponse.json(
       {
@@ -311,6 +308,19 @@ export async function PATCH(req: NextRequest) {
   let profileUpdated = false;
 
   if (fullName !== undefined || password) {
+    // Nombre y contraseña son de la cuenta global: solo se editan desde una
+    // organización si la cuenta no pertenece a ninguna otra.
+    const { count: otherOrgs } = await db
+      .from("organization_members")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", target.user_id)
+      .neq("organization_id", ctx.organizationId);
+    if ((otherOrgs ?? 0) > 0) {
+      return NextResponse.json(
+        { error: "Este usuario también pertenece a otra organización; solo él puede cambiar su nombre o contraseña." },
+        { status: 403 }
+      );
+    }
     try {
       await updateOrgMemberProfile(db, target.user_id, {
         fullName: fullName || undefined,
