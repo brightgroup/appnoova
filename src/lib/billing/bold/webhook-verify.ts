@@ -18,16 +18,14 @@ function safeEqualHex(expectedHex: string, actualHex: string): boolean {
  * crudo codificado en Base64, usando la llave secreta del comercio.
  * https://developers.bold.co/webhook
  *
- * Nota: la documentación de Bold indica que, para transacciones hechas con
- * llaves de pruebas, la firma se calcula con una llave vacía en vez de la
- * llave secreta configurada. Como no hay forma de saber de antemano cuál
- * aplicó, probamos ambas y aceptamos si alguna coincide.
+ * Solo se acepta la firma calculada con la llave secreta configurada. Bold
+ * firma las transacciones de prueba con una llave vacía, pero esa firma la
+ * puede calcular cualquiera, así que no la aceptamos: esos eventos caen al
+ * camino de confirmación contra la API de Bold en la ruta del webhook.
  */
 export function verifyBoldWebhookSignature(rawBody: string, signatureHeader: string | null): boolean {
   if (!signatureHeader) return false;
   const secret = boldWebhookSecret();
-
-  if (safeEqualHex(hmacHex(rawBody, secret), signatureHeader)) return true;
-  if (secret && safeEqualHex(hmacHex(rawBody, ""), signatureHeader)) return true;
-  return false;
+  if (!secret) return false;
+  return safeEqualHex(hmacHex(rawBody, secret), signatureHeader);
 }

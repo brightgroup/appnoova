@@ -403,16 +403,16 @@ export function VoiceSessionPanel({
     disconnectReasonRef.current = "Agent Hangup";
     sessionStartRef.current = null;
 
-    let apiKey = "";
+    let liveToken = "";
     try {
-      const res = await fetch("/api/voice/gemini-config");
+      const res = await fetch("/api/voice/gemini-config", { headers: await getAuthHeaders() });
       const data = await res.json();
-      if (!res.ok || !data.apiKey) {
-        setError(data.error || "No se pudo cargar la API key de Google.");
+      if (!res.ok || !data.token) {
+        setError(data.error || "No se pudo iniciar la sesión de voz.");
         setState("error");
         return;
       }
-      apiKey = data.apiKey;
+      liveToken = data.token;
     } catch {
       setError("Error de red al obtener la configuración de Gemini.");
       setState("error");
@@ -473,7 +473,7 @@ export function VoiceSessionPanel({
 
       setStatusHint("Conectando con Gemini Live...");
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = new GoogleGenAI({ apiKey: liveToken, httpOptions: { apiVersion: "v1alpha" } });
       const session = await ai.live.connect({
         model: cfg.model || DEFAULT_LIVE_MODEL,
         config: buildGeminiLiveSessionConfig({
@@ -495,7 +495,7 @@ export function VoiceSessionPanel({
           },
           onclose: (e: CloseEvent) => {
             if (e.code !== 1000 && e.code !== 1005) {
-              setError(`Conexión cerrada (${e.code}): ${e.reason || "revisa tu API key"}`);
+              setError(`Conexión cerrada (${e.code}): ${e.reason || "intenta de nuevo"}`);
               setState("error");
             }
           }
