@@ -28,8 +28,9 @@ import {
   persistUserMessageOnly
 } from "@/lib/text-conversation-persist";
 import { toTextConversationRecord } from "@/lib/text-conversation-record";
+import { normalizeChatMessages } from "@/lib/text-chat-utils";
 import { withConversationLock } from "@/lib/whatsapp/conversation-lock";
-import { uploadWhatsAppMedia } from "@/lib/whatsapp/media-storage";
+import { uploadWhatsAppMedia, WHATSAPP_MEDIA_BUCKET } from "@/lib/whatsapp/media-storage";
 import type { TextAgentConversationRecord, TextChatMessage } from "@/types/text-agent-conversation";
 
 /**
@@ -60,25 +61,79 @@ async function findMetaConversation(
   return toTextConversationRecord(data);
 }
 
-async function mergeConversationMetadata(
+/**
+ * Los mensajes del hilo no guardan el `mid` de Meta, así que se lleva aparte un
+ * índice mid → created_at del mensaje del cliente. Sirve para ubicar el mensaje
+ * cuando el cliente lo elimina ("unsend"), requisito de la revisión de Meta.
+ */
+const MESSAGE_INDEX_LIMIT = 300;
+
+async function mergeMetadataAndIndexMessage(
   db: SupabaseClient,
   conversationId: string,
   userId: string,
-  patch: Record<string, unknown>
+  patch: Record<string, unknown>,
+  messageId: string
 ): Promise<void> {
   const { data } = await db
     .from("text_agent_conversations")
-    .select("metadata")
+    .select("metadata, messages")
     .eq("id", conversationId)
     .eq("user_id", userId)
     .maybeSingle();
 
   const prior = (data?.metadata && typeof data.metadata === "object" ? data.metadata : {}) as Record<string, unknown>;
+  const lastUser = [...normalizeChatMessages(data?.messages)].reverse().find(m => m.role === "user");
+  const priorIndex = (prior.meta_message_index && typeof prior.meta_message_index === "object"
+    ? prior.meta_message_index
+    : {}) as Record<string, string>;
+  const index = lastUser ? { ...priorIndex, [messageId]: lastUser.created_at } : priorIndex;
+  const trimmed = Object.fromEntries(Object.entries(index).slice(-MESSAGE_INDEX_LIMIT));
+
   await db
     .from("text_agent_conversations")
-    .update({ metadata: { ...prior, ...patch }, updated_at: new Date().toISOString() })
+    .update({
+      metadata: { ...prior, ...patch, meta_message_index: trimmed },
+      updated_at: new Date().toISOString()
+    })
     .eq("id", conversationId)
     .eq("user_id", userId);
+}
+
+const UNSENT_PLACEHOLDER = "🗑️ El cliente eliminó este mensaje";
+
+/** El cliente eliminó un mensaje: se reemplaza en el inbox y se borra su adjunto guardado. */
+async function handleUnsend(
+  db: SupabaseClient,
+  channel: MetaMessagingChannelRecord,
+  event: MetaInboundEvent
+): Promise<{ ok: boolean; error?: string }> {
+  const existing = await findMetaConversation(db, channel, event.contactId);
+  const targetMid = event.deletedMessageId;
+  if (!existing || !targetMid) return { ok: true };
+
+  const index = (existing.metadata?.meta_message_index ?? {}) as Record<string, string>;
+  const createdAt = index[targetMid];
+  if (!createdAt) return { ok: true };
+
+  let removedPath: string | null = null;
+  const messages = normalizeChatMessages(existing.messages).map(m => {
+    if (m.role !== "user" || m.created_at !== createdAt) return m;
+    removedPath = m.media_storage_path ?? null;
+    return { role: m.role, content: UNSENT_PLACEHOLDER, created_at: m.created_at };
+  });
+
+  const { error } = await db
+    .from("text_agent_conversations")
+    .update({ messages, updated_at: new Date().toISOString() })
+    .eq("id", existing.id)
+    .eq("user_id", channel.user_id);
+  if (error) return { ok: false, error: error.message };
+
+  if (removedPath) {
+    await db.storage.from(WHATSAPP_MEDIA_BUCKET).remove([removedPath]).catch(() => undefined);
+  }
+  return { ok: true };
 }
 
 function mediaTypeFor(att: MetaInboundAttachment): TextChatMessage["media_type"] {
@@ -277,7 +332,7 @@ async function handleCustomerMessage(
       userMediaMime: content.mediaMime
     });
     if (!persisted.error) {
-      await mergeConversationMetadata(db, persisted.conversationId, channel.user_id, metaPatch);
+      await mergeMetadataAndIndexMessage(db, persisted.conversationId, channel.user_id, metaPatch, event.messageId);
     }
     return persisted;
   }
@@ -426,6 +481,10 @@ export async function processMetaMessagingInbound(
   event: MetaInboundEvent
 ): Promise<{ ok: boolean; error?: string }> {
   return withConversationLock(`${channel.id}:${event.contactId}`, () =>
-    event.kind === "echo" ? handleEcho(db, channel, event) : handleCustomerMessage(db, channel, event)
+    event.kind === "echo"
+      ? handleEcho(db, channel, event)
+      : event.kind === "unsend"
+        ? handleUnsend(db, channel, event)
+        : handleCustomerMessage(db, channel, event)
   );
 }

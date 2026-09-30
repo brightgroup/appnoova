@@ -45,9 +45,12 @@ export interface MetaInboundEvent {
   accountId: string;
   /** PSID / IGSID del cliente final (en un echo, el destinatario). */
   contactId: string;
-  kind: "message" | "echo" | "postback";
+  /** "unsend": el cliente eliminó un mensaje que ya había enviado. */
+  kind: "message" | "echo" | "postback" | "unsend";
   /** `mid` del mensaje; en postbacks sin mid se arma uno estable. */
   messageId: string;
+  /** Solo "unsend": `mid` del mensaje original que el cliente eliminó. */
+  deletedMessageId?: string;
   timestamp: number;
   text: string;
   attachments: MetaInboundAttachment[];

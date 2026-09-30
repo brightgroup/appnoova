@@ -85,7 +85,26 @@ function parseEvent(
 
   if (ev.message) {
     const msg = ev.message;
-    if (!msg.mid || msg.is_deleted) return null;
+    if (!msg.mid) return null;
+    if (msg.is_deleted) {
+      // Mismo mid que el mensaje original: se le da otro id para que el dedup no lo descarte.
+      return {
+        platform,
+        accountId,
+        contactId: senderId,
+        kind: "unsend",
+        messageId: `unsend_${msg.mid}`,
+        deletedMessageId: msg.mid,
+        timestamp,
+        text: "",
+        attachments: [],
+        quickReplyPayload: null,
+        postbackPayload: null,
+        storyReplyUrl: null,
+        referral: null,
+        echoAppId: null
+      };
+    }
     const isEcho = msg.is_echo === true;
     const attachments: MetaInboundAttachment[] = (msg.attachments ?? []).map(a => ({
       type: toAttachmentType(a.type),
