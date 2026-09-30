@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withSignedRecordingUrls } from "@/lib/voice-call-storage";
 import { adminClient } from "@/lib/voice-agents-server";
 import { requireOrgModule } from "@/lib/module-auth";
 import { toVoiceCampaignRecord } from "@/lib/campaigns/record";
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
       .order("created_at", { ascending: false });
 
     if (callsErr) return NextResponse.json({ error: callsErr.message }, { status: 500 });
-    return NextResponse.json({ calls: calls ?? [] });
+    return NextResponse.json({ calls: await withSignedRecordingUrls(db, calls ?? []) });
   }
 
   if (!campaign.audience_table_id) {

@@ -3,7 +3,7 @@ import { analyzeCallTranscript } from "@/lib/call-analysis";
 import { deriveQualityLabel } from "@/lib/voice-agent-display";
 import { buildFallbackSummary } from "@/lib/voice-call-utils";
 import { creditsForVoiceDuration } from "@/lib/billing/pricing";
-import { uploadCallRecording } from "@/lib/voice-call-storage";
+import { uploadCallRecording, withSignedRecordingUrls } from "@/lib/voice-call-storage";
 import { adminClient, getUserIdFromRequest } from "@/lib/voice-agents-server";
 import {
   billingBlockedMessage,
@@ -207,7 +207,8 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ call: toRecord(callRow), dbReady: true });
+    const [signedCall] = await withSignedRecordingUrls(db, [toRecord(callRow)]);
+    return NextResponse.json({ call: signedCall, dbReady: true });
   }
 
   // Registro unificado:
@@ -252,7 +253,7 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    calls: (data ?? []).map(row => toRecord(row as Record<string, unknown>)),
+    calls: await withSignedRecordingUrls(db, (data ?? []).map(row => toRecord(row as Record<string, unknown>))),
     dbReady: true,
   });
 }
@@ -442,5 +443,6 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  return NextResponse.json({ call: toRecord({ ...call, audio_url: audioUrl }) });
+  const [signedCall] = await withSignedRecordingUrls(db, [toRecord({ ...call, audio_url: audioUrl })]);
+  return NextResponse.json({ call: signedCall });
 }
