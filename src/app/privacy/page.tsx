@@ -6,7 +6,7 @@ import { getMarketingSiteUrl } from "@/lib/marketing-site-url";
 export const metadata: Metadata = {
   title: "Política de Privacidad – Noova 360",
   description:
-    "Política de privacidad de Noova 360 (BG Soluciones). Tratamiento de datos personales, WhatsApp Business Platform y derechos de los titulares.",
+    "Política de privacidad de Noova 360 (BG Soluciones). Tratamiento de datos personales, WhatsApp Business Platform, Messenger, Instagram y derechos de los titulares.",
   alternates: {
     canonical: "https://app.noova360.com/privacy"
   },
@@ -30,6 +30,9 @@ const SECTIONS = [
           con domicilio en Bogotá, Colombia. Actuamos como proveedor de tecnología autorizado por Meta
           para el uso de la API de WhatsApp Business (WhatsApp Business Platform), lo que nos permite
           conectar a nuestros clientes con sus usuarios finales a través de WhatsApp de forma automatizada.
+          También permitimos que nuestros clientes conecten su Página de Facebook y su cuenta profesional de
+          Instagram para atender mensajes de Messenger e Instagram Direct desde Noova 360, mediante las APIs
+          oficiales de Meta.
         </p>
         <p>
           Contacto:{" "}
@@ -53,12 +56,17 @@ const SECTIONS = [
           <li>Nombre, NIT/RUT y datos generales de la empresa</li>
           <li>Datos de facturación y pago (procesados por proveedores de pago certificados)</li>
         </ul>
-        <p><strong>De los usuarios finales (clientes de nuestros clientes que interactúan por WhatsApp u otros canales):</strong></p>
+        <p><strong>De los usuarios finales (clientes de nuestros clientes que interactúan por WhatsApp, Messenger, Instagram u otros canales):</strong></p>
         <ul className="list-disc pl-5 space-y-1.5 mb-4">
           <li>Número de teléfono de WhatsApp</li>
           <li>Contenido de los mensajes enviados y recibidos dentro de las conversaciones</li>
           <li>Metadatos de mensajes (marca de tiempo, estado de entrega, tipo de mensaje)</li>
           <li>Nombre de perfil de WhatsApp, cuando está disponible</li>
+          <li>
+            En Messenger e Instagram: el identificador que Meta asigna a la persona para esa Página o cuenta
+            (PSID/IGSID), su nombre, foto de perfil y, en Instagram, su nombre de usuario (@usuario)
+          </li>
+          <li>Datos de origen del contacto que entrega Meta, como el anuncio o enlace desde el que la persona escribió</li>
         </ul>
         <p><strong>Datos técnicos y de uso:</strong></p>
         <ul className="list-disc pl-5 space-y-1.5">
@@ -117,13 +125,59 @@ const SECTIONS = [
   },
   {
     num: 4,
+    title: "Integración con Messenger e Instagram",
+    content: (
+      <>
+        <p>
+          Cuando un negocio cliente conecta su Página de Facebook y, si la tiene vinculada, su cuenta profesional
+          de Instagram en Noova 360 (mediante Inicio de sesión con Facebook para empresas, con su consentimiento
+          explícito), usamos esa conexión exclusivamente para:
+        </p>
+        <ul className="list-disc pl-5 space-y-1.5 mb-4">
+          <li>Listar las Páginas y cuentas de Instagram que el negocio eligió y registrarlas como canales</li>
+          <li>Suscribir esas Páginas a nuestras notificaciones (webhooks) para recibir los mensajes que llegan</li>
+          <li>
+            Mostrar las conversaciones de Messenger e Instagram Direct en el inbox del negocio, con el nombre y la
+            foto de la persona para que el equipo sepa con quién habla
+          </li>
+          <li>
+            Responder a esas conversaciones con el asistente de IA configurado por el negocio o por una persona de
+            su equipo, solo en conversaciones iniciadas por el usuario final y dentro de los plazos que fija Meta
+          </li>
+        </ul>
+        <p>
+          <strong>Permisos que usamos:</strong> <code>pages_show_list</code>, <code>pages_manage_metadata</code>,{" "}
+          <code>pages_messaging</code>, <code>instagram_basic</code>, <code>instagram_manage_messages</code> y{" "}
+          <code>business_management</code>. No publicamos contenido en la Página ni en Instagram, no leemos sus
+          publicaciones, anuncios ni seguidores, y no enviamos mensajes promocionales a nombre del negocio.
+        </p>
+        <p>
+          El token de acceso de la Página se guarda cifrado. Si el usuario final elimina un mensaje en Messenger o
+          Instagram, lo eliminamos también del inbox y borramos su archivo adjunto. Los datos recibidos de Meta no
+          se usan con fines publicitarios, no se venden y no se usan para entrenar modelos de inteligencia
+          artificial.
+        </p>
+        <p>
+          El negocio cliente puede revocar este acceso en cualquier momento desde Noova 360 (Canales → Messenger e
+          Instagram → Desconectar) o desde Facebook en Configuración → Integraciones empresariales. Al desconectar,
+          dejamos de recibir mensajes de inmediato. Para solicitar la eliminación de estos datos, escribe a{" "}
+          <a href="mailto:info@bgsoluciones.com.co" className="text-[#99c9ff] hover:underline">
+            info@bgsoluciones.com.co
+          </a>
+          .
+        </p>
+      </>
+    )
+  },
+  {
+    num: 5,
     title: "Cómo usamos los datos",
     content: (
       <>
         <p>Usamos los datos recopilados exclusivamente para:</p>
         <ul className="list-disc pl-5 space-y-1.5 mb-4">
           <li>Prestar el servicio de automatización e inteligencia artificial contratado por nuestros clientes</li>
-          <li>Procesar, enrutar y almacenar conversaciones de WhatsApp en el inbox centralizado de cada cliente</li>
+          <li>Procesar, enrutar y almacenar conversaciones de WhatsApp, Messenger e Instagram en el inbox centralizado de cada cliente</li>
           <li>Generar respuestas automáticas mediante modelos de inteligencia artificial, en nombre del negocio cliente</li>
           <li>Registrar el historial de conversaciones para consulta por parte del negocio cliente</li>
           <li>Enviar notificaciones operativas y de servicio a los clientes registrados</li>
@@ -134,18 +188,18 @@ const SECTIONS = [
             Importante — Uso de datos para entrenar IA
           </p>
           <p>
-            Noova 360 <strong>no utiliza actualmente</strong> los mensajes de WhatsApp ni las conversaciones
+            Noova 360 <strong>no utiliza actualmente</strong> los mensajes de WhatsApp, Messenger o Instagram ni las conversaciones
             de los usuarios finales para entrenar, ajustar ni mejorar modelos de inteligencia artificial. En caso
             de que esta práctica cambie en el futuro, notificaremos a nuestros clientes con al menos 30 días de
             anticipación y solicitaremos su consentimiento explícito antes de implementar cualquier cambio. Los
-            datos de WhatsApp nunca serán compartidos con terceros para fines publicitarios.
+            datos de WhatsApp, Messenger e Instagram nunca serán compartidos con terceros para fines publicitarios.
           </p>
         </div>
       </>
     )
   },
   {
-    num: 5,
+    num: 6,
     title: "Almacenamiento y retención de datos",
     content: (
       <>
@@ -166,7 +220,7 @@ const SECTIONS = [
     )
   },
   {
-    num: 6,
+    num: 7,
     title: "Compartición de datos con terceros",
     content: (
       <>
@@ -176,8 +230,9 @@ const SECTIONS = [
         </p>
         <ul className="list-disc pl-5 space-y-1.5 mb-4">
           <li>
-            <strong>Meta Platforms / WhatsApp:</strong> como proveedor de tecnología registrado, los mensajes se
-            transmiten a través de la WhatsApp Business Platform de Meta conforme a sus términos y condiciones.
+            <strong>Meta Platforms (WhatsApp, Messenger e Instagram):</strong> como proveedor de tecnología
+            registrado, los mensajes se transmiten a través de la WhatsApp Business Platform y de las APIs de
+            Messenger e Instagram de Meta, conforme a sus términos y condiciones (ver sección 4).
           </li>
           <li>
             <strong>Google Calendar API:</strong> cuando el negocio cliente conecta su calendario, consultamos y
@@ -206,7 +261,7 @@ const SECTIONS = [
     )
   },
   {
-    num: 7,
+    num: 8,
     title: "Seguridad de los datos",
     content: (
       <>
@@ -227,7 +282,7 @@ const SECTIONS = [
     )
   },
   {
-    num: 8,
+    num: 9,
     title: "Derechos de los titulares de datos",
     content: (
       <>
@@ -253,7 +308,7 @@ const SECTIONS = [
     )
   },
   {
-    num: 9,
+    num: 10,
     title: "Uso de cookies y tecnologías similares",
     content: (
       <p>
@@ -264,7 +319,7 @@ const SECTIONS = [
     )
   },
   {
-    num: 10,
+    num: 11,
     title: "Cambios a esta política",
     content: (
       <p>
@@ -276,7 +331,7 @@ const SECTIONS = [
     )
   },
   {
-    num: 11,
+    num: 12,
     title: "Contacto",
     content: (
       <>
@@ -329,14 +384,14 @@ export default function PrivacyPolicyPage() {
           Política de Privacidad
         </h1>
         <p className="text-sm text-gray-500 mb-8 pb-8 border-b border-white/[.08]">
-          Última actualización: 23 de julio de 2026 · Vigente desde: 15 de junio de 2026
+          Última actualización: 30 de septiembre de 2026 · Vigente desde: 15 de junio de 2026
         </p>
 
         <div className="rounded-xl border border-[#0f7eff]/25 bg-[#0f7eff]/[.08] px-5 py-4 mb-10 text-sm text-gray-300 leading-relaxed">
           Noova 360 es una plataforma de automatización e inteligencia artificial para empresas. Esta política
           explica qué datos recopilamos, cómo los usamos y cómo los protegemos, tanto de nuestros clientes (los
           negocios que contratan el servicio) como de los usuarios finales con quienes esos negocios se comunican
-          a través de WhatsApp, Google Calendar y otros canales o integraciones.
+          a través de WhatsApp, Messenger, Instagram, Google Calendar y otros canales o integraciones.
         </div>
 
         <div className="space-y-10">
@@ -367,7 +422,8 @@ export default function PrivacyPolicyPage() {
         <p>© 2026 Noova 360 · BG Soluciones · Bogotá, Colombia</p>
         <p className="mt-2 text-xs text-gray-600 max-w-xl mx-auto">
           Esta política cumple con la Ley 1581 de 2012, los requisitos de Meta para proveedores de tecnología
-          de WhatsApp Business Platform, y la Política de Datos de Usuario de los Servicios de API de Google
+          de WhatsApp Business Platform, las Condiciones de la Plataforma de Meta para Messenger e Instagram,
+          y la Política de Datos de Usuario de los Servicios de API de Google
           (incluidos los requisitos de Uso Limitado).
         </p>
       </footer>
