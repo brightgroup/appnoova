@@ -125,12 +125,29 @@ jobs:
       - name: Respaldar buckets de Storage a Drive
         run: |
           set -euo pipefail
-          # Nota: usa "copy" (no "sync") a propósito — nunca borra en Drive algo
-          # que haya desaparecido del bucket origen, para no perder respaldo si
-          # un archivo se borra por error en producción. Esto hace que la carpeta
-          # de Drive crezca con el tiempo; revisa tu cuota de Drive de vez en cuando.
-          rclone copy supabase-s3:whatsapp-media gdrive:appnoova-backups/storage/whatsapp-media --fast-list --progress
-          rclone copy supabase-s3:voice-call-recordings gdrive:appnoova-backups/storage/voice-call-recordings --fast-list --progress
+          # "sync" con --backup-dir: lo que desaparece del bucket (borrado por
+          # el usuario o por la política de retención) no se pierde de golpe,
+          # se mueve a storage-deleted/<fecha>/ y se purga a los 90 días, igual
+          # que los dumps de BD. Así los respaldos cumplen la retención de 90 días.
+          DAY=$(date -u +%Y-%m-%d)
+          for bucket in whatsapp-media voice-call-recordings microsite-assets; do
+            rclone sync "supabase-s3:${bucket}" "gdrive:appnoova-backups/storage/${bucket}" \
+              --backup-dir "gdrive:appnoova-backups/storage-deleted/${DAY}/${bucket}" \
+              --fast-list --progress
+          done
+
+      - name: Purgar archivos borrados con más de 90 días en Drive
+        # Por nombre de carpeta (fecha de borrado), no por --min-age: rclone mide la
+        # antigüedad por la fecha del archivo, no por cuándo salió del bucket.
+        run: |
+          set -euo pipefail
+          CUTOFF=$(date -u -d '90 days ago' +%Y-%m-%d)
+          for dir in $(rclone lsf --dirs-only gdrive:appnoova-backups/storage-deleted 2>/dev/null || true); do
+            day="${dir%/}"
+            if [[ "$day" < "$CUTOFF" ]]; then
+              rclone purge "gdrive:appnoova-backups/storage-deleted/${day}"
+            fi
+          done
 
       - name: Limpiar dump local del runner
         if: always()

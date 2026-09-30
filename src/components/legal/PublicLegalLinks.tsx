@@ -17,6 +17,12 @@ export function PublicLegalLinks({ className = "" }: { className?: string }) {
       <a href="/privacy" className="hover:underline">
         Privacy Policy
       </a>
+      <span aria-hidden className="mx-2 opacity-50">
+        ·
+      </span>
+      <a href="/tratamiento-datos" className="hover:underline">
+        Tratamiento de Datos
+      </a>
     </nav>
   );
 }

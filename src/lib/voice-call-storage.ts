@@ -41,7 +41,7 @@ export async function uploadCallRecording(
 const RECORDING_SIGNED_URL_TTL_SEC = 3600;
 
 /** Ruta dentro del bucket a partir de la URL guardada en `audio_url` (pública antigua o firmada). */
-function recordingPathFromUrl(url: string): string | null {
+export function recordingPathFromUrl(url: string): string | null {
   const marker = `/${VOICE_RECORDINGS_BUCKET}/`;
   const i = url.indexOf(marker);
   if (i < 0) return null;
