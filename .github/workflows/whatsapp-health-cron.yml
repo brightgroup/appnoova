@@ -1,0 +1,45 @@
+# Chequeo de salud de líneas WhatsApp cada 15 minutos: reactiva líneas que
+# quedaron apagadas después de un pago y re-vincula el webhook de Twilio si no
+# apunta a Noova (ver src/lib/whatsapp/channel-health.ts). Sin esto, una línea
+# con el webhook desconectado pierde los mensajes de los clientes en silencio.
+#
+# Usa los mismos secrets que billing-cron.yml: APP_URL y CRON_SECRET.
+
+name: WhatsApp Health Cron
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: whatsapp-health-cron
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ejecutar /api/cron/whatsapp-health
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "Faltan secrets APP_URL / CRON_SECRET." >&2
+            exit 1
+          fi
+          response=$(curl -sS -o response.json -w "%{http_code}" \
+            -H "x-cron-secret: ${CRON_SECRET}" \
+            "${APP_URL%/}/api/cron/whatsapp-health")
+          echo "HTTP $response"
+          cat response.json
+          echo
+          if [ "$response" -ge 300 ]; then
+            echo "El chequeo de WhatsApp respondió con error." >&2
+            exit 1
+          fi

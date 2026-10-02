@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { toWhatsAppChannelRecord } from "@/lib/whatsapp-channel";
 import type { WhatsAppChannelRecord } from "@/types/whatsapp-channel";
 import { detachTwilioWhatsAppSenderWebhook } from "@/lib/whatsapp/twilio-senders";
+import { syncTwilioWhatsAppChannel } from "@/lib/whatsapp/twilio-channel-sync";
 
 export interface WhatsAppBillingSuspendResult {
   organizationId: string;
@@ -97,7 +98,16 @@ export async function suspendOrgWhatsAppChannelsForBilling(
   return result;
 }
 
-/** Tras pago: deja canales en pending para reactivación manual (webhook + activar). */
+/**
+ * Tras pago: reactiva las líneas que se suspendieron por facturación.
+ *
+ * Antes solo las dejaba en "pending" esperando una reactivación manual que
+ * nadie hacía: el webhook de Twilio seguía desconectado y los mensajes de los
+ * clientes se perdían en silencio durante días (Mil hojaldres, 2026-09-29 →
+ * 2026-10-02). Ahora, en líneas Twilio, re-vincula el webhook y las deja
+ * "active" en el mismo paso; si Twilio falla quedan "pending" y el cron
+ * /api/cron/whatsapp-health lo reintenta cada 15 minutos.
+ */
 export async function markOrgWhatsAppChannelsPendingReactivation(
   db: SupabaseClient,
   organizationId: string
@@ -132,7 +142,14 @@ export async function markOrgWhatsAppChannelsPendingReactivation(
       })
       .eq("id", row.id);
 
-    if (!error) count += 1;
+    if (error) continue;
+    count += 1;
+
+    try {
+      await syncTwilioWhatsAppChannel(db, String(row.id));
+    } catch (err) {
+      console.error("[whatsapp/billing] no se pudo reactivar la línea tras el pago", row.id, err);
+    }
   }
 
   return count;
